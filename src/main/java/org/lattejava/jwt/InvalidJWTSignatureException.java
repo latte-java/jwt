@@ -22,4 +22,10 @@ package org.lattejava.jwt;
  * @author Daniel DeGroff
  */
 public class InvalidJWTSignatureException extends JWTException {
+  public InvalidJWTSignatureException() {
+  }
+
+  public InvalidJWTSignatureException(Throwable cause) {
+    super(cause.getMessage(), cause);
+  }
 }

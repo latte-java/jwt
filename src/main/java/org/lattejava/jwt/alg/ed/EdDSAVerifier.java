@@ -138,8 +138,14 @@ public class EdDSAVerifier implements Verifier {
       verifier.initVerify(publicKey);
       verifier.update(message);
 
-      if (!verifier.verify(signature)) {
-        throw new InvalidJWTSignatureException();
+      // Depending upon the JCE provider, an invalid signature may cause verify() to return false
+      // or throw a SignatureException. For example, the signature length may not match the key size.
+      try {
+        if (!verifier.verify(signature)) {
+          throw new InvalidJWTSignatureException();
+        }
+      } catch (SignatureException e) {
+        throw new InvalidJWTSignatureException(e);
       }
     } catch (InvalidKeyException | NoSuchAlgorithmException | SignatureException e) {
       throw new JWTVerifierException("An unexpected exception occurred when attempting to verify the JWT", e);

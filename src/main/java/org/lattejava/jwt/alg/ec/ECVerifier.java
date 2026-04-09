@@ -131,30 +131,6 @@ public class ECVerifier implements Verifier {
     return this.algorithm == algorithm;
   }
 
-  private void checkFor_CVE_2022_21449(byte[] signature) {
-    int half = signature.length / 2;
-
-    boolean rOk = false;
-    boolean sOk = false;
-    for (int i = 0; i < signature.length; i++) {
-      if (i < half) {
-        rOk = signature[i] != 0;
-        if (rOk) {
-          i = half - 1;
-        }
-      } else {
-        sOk = signature[i] != 0;
-        if (sOk) {
-          break;
-        }
-      }
-    }
-
-    if (!rOk || !sOk) {
-      throw new InvalidJWTSignatureException();
-    }
-  }
-
   @Override
   public void verify(Algorithm algorithm, byte[] message, byte[] signature) {
     Objects.requireNonNull(algorithm);
@@ -169,15 +145,19 @@ public class ECVerifier implements Verifier {
     if (signature.length != expectedLength) {
       throw new InvalidJWTSignatureException();
     }
-    checkFor_CVE_2022_21449(signature);
-
     try {
       Signature verifier = Signature.getInstance(algorithm.getName() + "inP1363Format");
       verifier.initVerify(publicKey);
       verifier.update(message);
 
-      if (!verifier.verify(signature)) {
-        throw new InvalidJWTSignatureException();
+      // Depending upon the JCE provider, an invalid signature may cause verify() to return false
+      // or throw a SignatureException. For example, the signature length may not match the key size.
+      try {
+        if (!verifier.verify(signature)) {
+          throw new InvalidJWTSignatureException();
+        }
+      } catch (SignatureException e) {
+        throw new InvalidJWTSignatureException(e);
       }
     } catch (InvalidKeyException | NoSuchAlgorithmException | SignatureException | SecurityException e) {
       throw new JWTVerifierException("An unexpected exception occurred when attempting to verify the JWT", e);

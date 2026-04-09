@@ -89,7 +89,7 @@ public abstract class BaseJWTTest extends BaseTest {
       runnable.run();
       fail("Expected [" + expected.getCanonicalName() + "] to be thrown. No Exception was thrown.");
     } catch (Exception e) {
-      if (!e.getClass().isAssignableFrom(expected)) {
+      if (!expected.isAssignableFrom(e.getClass())) {
         fail("Expected [" + expected.getCanonicalName() + "] to be thrown. Caught this instead [" + e.getClass().getCanonicalName() + "]");
       }
     }

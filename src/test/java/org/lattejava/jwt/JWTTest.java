@@ -1073,7 +1073,7 @@ public class JWTTest extends BaseJWTTest {
     Signer signer = RSASigner.newSHA256Signer(readFile("rsa_private_key_2048.pem"));
     String encodedJWT = JWT.getEncoder().encode(jwt, signer);
     // Verify with a different RSA public key (4096-bit)
-    expectException(JWTVerifierException.class, () ->
+    expectException(InvalidJWTSignatureException.class, () ->
         JWT.getDecoder().decode(encodedJWT, RSAVerifier.newVerifier(rsaPublicKey4096Path)));
   }
 
