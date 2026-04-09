@@ -17,7 +17,7 @@
 jacksonVersion = "2.21.2"
 slf4jVersion = "1.7.36"
 
-project(group: "org.lattejava", name: "latte-jwt", version: "1.0.0", licenses: ["ApacheV2_0"]) {
+project(group: "org.lattejava", name: "latte-jwt", version: "1.0.0", licenses: ["ApacheV2_0", "MIT"]) {
 
   workflow {
     fetch {
