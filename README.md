@@ -1,4 +1,4 @@
-## Java JWT ![semver 2.0.0 compliant](https://img.shields.io/badge/semver-2.0.0-brightgreen.svg?style=flat-square) [![Tests](https://github.com/latte-java/java-jwt/actions/workflows/test.yml/badge.svg)](https://github.com/latte-java/java-jwt/actions/workflows/test.yml)
+## Java JWT ![semver 2.0.0 compliant](https://img.shields.io/badge/semver-2.0.0-brightgreen.svg?style=flat-square) [![Tests](https://github.com/latte-java/jwt/actions/workflows/test.yml/badge.svg)](https://github.com/latte-java/jwt/actions/workflows/test.yml)
 Java JWT is intended to be fast and easy to use. Java JWT has a single external dependency on Jackson, no Bouncy Castle, Apache Commons or Guava.
 
 ## Features
