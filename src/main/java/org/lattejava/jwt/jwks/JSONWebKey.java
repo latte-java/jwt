@@ -21,8 +21,8 @@ import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.lattejava.jwt.Buildable;
-import org.lattejava.jwt.domain.Algorithm;
-import org.lattejava.jwt.domain.KeyType;
+import org.lattejava.jwt.Algorithm;
+import org.lattejava.jwt.KeyType;
 import org.lattejava.jwt.json.Mapper;
 
 import java.security.PrivateKey;

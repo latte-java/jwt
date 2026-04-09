@@ -16,7 +16,6 @@
 
 package org.lattejava.jwt;
 
-import org.lattejava.BaseTest;
 import org.lattejava.jwt.json.Mapper;
 import org.testng.Assert;
 

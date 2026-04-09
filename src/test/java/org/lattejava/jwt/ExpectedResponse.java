@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2019, FusionAuth, All Rights Reserved
+ * Copyright (c) 2020, FusionAuth, All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,34 +16,19 @@
 
 package org.lattejava.jwt;
 
+import org.lattejava.jwt.Buildable;
+
+import java.nio.file.Path;
+
 /**
- * JWT Signer.
- *
  * @author Daniel DeGroff
  */
-public interface Signer {
+public class ExpectedResponse implements Buildable<ExpectedResponse> {
+  public String contentType = "application/json";
 
-  /**
-   * Return the algorithm supported by this signer.
-   *
-   * @return the algorithm.
-   */
-  Algorithm getAlgorithm();
+  public String response;
 
-  /**
-   * Return the kid used for this signer.
-   *
-   * @return the kid
-   */
-  default String getKid() {
-    throw new UnsupportedOperationException();
-  }
+  public Path responseFile;
 
-  /**
-   * Sign the provided message and return the signature.
-   *
-   * @param payload The JWT payload to sign.
-   * @return The message signature in a byte array.
-   */
-  byte[] sign(String payload);
+  public int status = 200;
 }

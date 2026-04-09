@@ -20,8 +20,8 @@ import org.lattejava.jwt.der.DerDecodingException;
 import org.lattejava.jwt.der.DerInputStream;
 import org.lattejava.jwt.der.ObjectIdentifier;
 import org.lattejava.jwt.JWTUtils;
-import org.lattejava.jwt.domain.Algorithm;
-import org.lattejava.jwt.domain.KeyType;
+import org.lattejava.jwt.Algorithm;
+import org.lattejava.jwt.KeyType;
 import org.lattejava.jwt.pem.PEM;
 import org.lattejava.jwt.internal.KeyUtils;
 

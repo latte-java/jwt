@@ -16,7 +16,7 @@
 
 package org.lattejava.jwt.jwks;
 
-import org.lattejava.jwt.domain.KeyType;
+import org.lattejava.jwt.KeyType;
 import org.lattejava.jwt.pem.PEMEncoder;
 import org.lattejava.jwt.pem.PEM;
 

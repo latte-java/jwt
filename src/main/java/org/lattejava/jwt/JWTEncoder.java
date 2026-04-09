@@ -16,8 +16,6 @@
 
 package org.lattejava.jwt;
 
-import org.lattejava.jwt.domain.Header;
-import org.lattejava.jwt.domain.JWT;
 import org.lattejava.jwt.json.Mapper;
 
 import java.util.ArrayList;

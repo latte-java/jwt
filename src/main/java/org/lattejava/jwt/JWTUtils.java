@@ -18,9 +18,6 @@ package org.lattejava.jwt;
 
 import org.lattejava.jwt.internal.HexUtils;
 import org.lattejava.jwt.jwks.JSONWebKey;
-import org.lattejava.jwt.domain.Header;
-import org.lattejava.jwt.domain.JWT;
-import org.lattejava.jwt.domain.KeyPair;
 import org.lattejava.jwt.json.Mapper;
 import org.lattejava.jwt.pem.PEM;
 

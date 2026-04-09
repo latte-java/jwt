@@ -16,19 +16,16 @@
 
 package org.lattejava.jwt;
 
-import org.lattejava.jwt.domain.Algorithm;
-import org.lattejava.jwt.domain.Header;
-import org.lattejava.jwt.domain.JWT;
-import org.lattejava.jwt.alg.ec.ECSigner;
-import org.lattejava.jwt.alg.ec.ECVerifier;
-import org.lattejava.jwt.alg.ed.EdDSASigner;
-import org.lattejava.jwt.alg.ed.EdDSAVerifier;
-import org.lattejava.jwt.alg.hmac.HMACSigner;
-import org.lattejava.jwt.alg.hmac.HMACVerifier;
-import org.lattejava.jwt.alg.rsa.RSAPSSSigner;
-import org.lattejava.jwt.alg.rsa.RSAPSSVerifier;
-import org.lattejava.jwt.alg.rsa.RSASigner;
-import org.lattejava.jwt.alg.rsa.RSAVerifier;
+import org.lattejava.jwt.algorithm.ec.ECSigner;
+import org.lattejava.jwt.algorithm.ec.ECVerifier;
+import org.lattejava.jwt.algorithm.ed.EdDSASigner;
+import org.lattejava.jwt.algorithm.ed.EdDSAVerifier;
+import org.lattejava.jwt.algorithm.hmac.HMACSigner;
+import org.lattejava.jwt.algorithm.hmac.HMACVerifier;
+import org.lattejava.jwt.algorithm.rsa.RSAPSSSigner;
+import org.lattejava.jwt.algorithm.rsa.RSAPSSVerifier;
+import org.lattejava.jwt.algorithm.rsa.RSASigner;
+import org.lattejava.jwt.algorithm.rsa.RSAVerifier;
 import org.lattejava.jwt.pem.PEM;
 import org.testng.annotations.Test;
 
@@ -1083,7 +1080,7 @@ public class JWTTest extends BaseJWTTest {
     Signer signer = ECSigner.newSHA256Signer(readFile("ec_private_key_p_256.pem"));
     String encodedJWT = JWT.getEncoder().encode(jwt, signer);
     // Generate a different EC key pair and verify with it
-    org.lattejava.jwt.domain.KeyPair differentKey = JWTUtils.generate256_ECKeyPair();
+    KeyPair differentKey = JWTUtils.generate256_ECKeyPair();
     expectException(InvalidJWTSignatureException.class, () ->
         JWT.getDecoder().decode(encodedJWT, ECVerifier.newVerifier(differentKey.publicKey)));
   }
@@ -1094,7 +1091,7 @@ public class JWTTest extends BaseJWTTest {
     Signer signer = EdDSASigner.newSigner(readFile("ed_dsa_ed25519_private_key.pem"));
     String encodedJWT = JWT.getEncoder().encode(jwt, signer);
     // Generate a different Ed25519 key pair and verify with it
-    org.lattejava.jwt.domain.KeyPair differentKey = JWTUtils.generate_ed25519_EdDSAKeyPair();
+    KeyPair differentKey = JWTUtils.generate_ed25519_EdDSAKeyPair();
     expectException(InvalidJWTSignatureException.class, () ->
         JWT.getDecoder().decode(encodedJWT, EdDSAVerifier.newVerifier(differentKey.publicKey.getBytes(StandardCharsets.UTF_8))));
   }

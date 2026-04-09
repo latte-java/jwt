@@ -16,13 +16,8 @@
 
 package org.lattejava.jwt;
 
-import org.lattejava.BaseTest;
 import org.lattejava.jwt.jwks.JSONWebKey;
-import org.lattejava.jwt.domain.Algorithm;
-import org.lattejava.jwt.domain.JWT;
-import org.lattejava.jwt.domain.KeyPair;
-import org.lattejava.jwt.domain.KeyType;
-import org.lattejava.jwt.alg.hmac.HMACSigner;
+import org.lattejava.jwt.algorithm.hmac.HMACSigner;
 import org.lattejava.jwt.pem.PEM;
 import org.testng.annotations.Test;
 

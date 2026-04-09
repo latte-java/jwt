@@ -16,8 +16,6 @@
 
 package org.lattejava.jwt;
 
-import org.lattejava.jwt.domain.Algorithm;
-
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;

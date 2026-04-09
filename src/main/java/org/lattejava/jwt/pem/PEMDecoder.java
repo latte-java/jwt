@@ -21,7 +21,7 @@ import org.lattejava.jwt.der.DerOutputStream;
 import org.lattejava.jwt.der.DerValue;
 import org.lattejava.jwt.der.ObjectIdentifier;
 import org.lattejava.jwt.der.Tag;
-import org.lattejava.jwt.domain.KeyType;
+import org.lattejava.jwt.KeyType;
 import org.lattejava.jwt.internal.KeyUtils;
 
 import java.io.ByteArrayInputStream;

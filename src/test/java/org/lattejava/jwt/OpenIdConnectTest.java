@@ -16,8 +16,6 @@
 
 package org.lattejava.jwt;
 
-import org.lattejava.BaseTest;
-import org.lattejava.jwt.domain.Algorithm;
 import org.testng.annotations.Test;
 
 import static org.lattejava.jwt.OpenIDConnect.at_hash;

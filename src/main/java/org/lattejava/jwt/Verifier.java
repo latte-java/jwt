@@ -16,8 +16,6 @@
 
 package org.lattejava.jwt;
 
-import org.lattejava.jwt.domain.Algorithm;
-
 /**
  * @author Daniel DeGroff
  */
