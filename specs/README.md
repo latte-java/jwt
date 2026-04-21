@@ -12,7 +12,7 @@ Short-term work (single-feature proposals, bug-fix design notes, one-off RFC rea
 
 | Spec | Version | Status | Last updated | Owner | Summary |
 |------|---------|--------|--------------|-------|---------|
-| [7.0-architecture.md](7.0-architecture.md) | 7.0.0 | Under Review | 2026-04-21 | Daniel DeGroff | Full architecture redesign: Algorithm as interface, zero-dep JSON with pluggable strategy, immutable builders, `Instant`-typed time claims, RFC 8725 alignment, RFC 7638 canonical thumbprint, internal SHAKE256 for OIDC Ed448, DER-based X.509. |
+| [7.0-architecture.md](7.0-architecture.md) | 7.0.0 | Under Review | 2026-04-21 (review pass 4) | Daniel DeGroff | Full architecture redesign: Algorithm as interface, zero-dep JSON with pluggable strategy, immutable builders, `Instant`-typed time claims, RFC 8725 alignment, RFC 7638 canonical thumbprint, internal SHAKE256 for OIDC Ed448, DER-based X.509. Pass-4 adds explicit crypto contracts (ECDSA DER↔JOSE, RSASSA-PSS parameters, EC on-curve validation), Signer/Verifier thread-safety contract, `maxNumberLength` parse-DoS defense, JWKS `maxResponseBytes`/`maxRedirects` defaults, and `jku`/`x5u`/`jwk` no-dereference guarantee. |
 
 ## Spec lifecycle
 
