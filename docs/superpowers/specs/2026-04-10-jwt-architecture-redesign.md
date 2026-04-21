@@ -1,9 +1,9 @@
 # JWT Library Architecture Redesign
 
 **Date:** 2026-04-10
-**Updated:** 2026-04-20
+**Updated:** 2026-04-21
 **Version:** 7.0.0 (major breaking change)
-**Scope:** Full library -- JWT core, JWK, OAuth2 metadata, PEM/DER enhancements
+**Scope:** Full library -- JWT core, JWK, OAuth2 metadata, PEM/DER enhancements. JWE (JSON Web Encryption, RFC 7516) is out of scope for 7.0.
 **License:** All new files use the MIT license.
 
 ## Design Goals
@@ -21,7 +21,7 @@
 ```
 ┌──────────────────────────────────────────────────┐
 │                   User Code                      │
-│  JWT.builder().sub("user").exp(instant).build()  │
+│  JWT.builder().subject("u").expiresAt(i).build() │
 │  encoder.encode(jwt, signer)                     │
 │  decoder.decode(token, verifier)                 │
 └──────────┬──────────────────────┬────────────────┘
@@ -54,7 +54,7 @@ This is a major version bump. The following changes are intentionally breaking:
 | `Signer.sign()` | `byte[] sign(String payload)` | `byte[] sign(byte[] message)` | All custom `Signer` implementations must update. The encoder now calls `getBytes(UTF_8)` before passing to `sign()`. |
 | `Signer.getAlgorithm()` | Returns `Algorithm` enum | `algorithm()` returns `Algorithm` interface | Method rename + return type change |
 | `Signer.getKid()` | Throws `UnsupportedOperationException` by default | `kid()` returns `null` by default | Behavior change: callers no longer need to catch exceptions |
-| `JWT` | Mutable POJO with setters, `ZonedDateTime` fields | Immutable, builder pattern, `Instant` fields, spec field names (`sub` not `subject`) | Full rewrite of construction and access patterns |
+| `JWT` | Mutable POJO with setters, `ZonedDateTime` fields | Immutable, builder pattern, `Instant` fields, long English names (`subject` not `getSubject`, fluent no-prefix style) | Full rewrite of construction and access patterns |
 | `Header` | Mutable POJO with `set()` | Immutable, builder pattern, explicit `kid` field | Full rewrite |
 | `JWT.getEncoder()` / `JWT.getDecoder()` | Static factories | Removed | Use `new JWTEncoder()` / `new JWTDecoder()` directly |
 | Jackson dependency | Required (compile) | Removed | Users who need Jackson implement `JSONProcessor` |
@@ -145,39 +145,57 @@ No `Algorithm.EdDSA` constant is defined. If a token arrives with `"alg": "EdDSA
 
 The signers always emit the fully-specified identifier (`"Ed25519"` or `"Ed448"`) in the JWT header.
 
+**Handling legacy `"EdDSA"` tokens:** The library architecture supports this without any built-in changes. A user who receives tokens with `"alg": "EdDSA"` can wrap their Ed25519 verifier to accept the legacy identifier:
+
+```java
+Verifier legacyEdDSA = new Verifier() {
+    private final EdDSAVerifier delegate = new EdDSAVerifier(publicKey);
+
+    public boolean canVerify(Algorithm algorithm) {
+        return "EdDSA".equals(algorithm.name()) || delegate.canVerify(algorithm);
+    }
+
+    public void verify(Algorithm algorithm, byte[] message, byte[] signature) {
+        delegate.verify(delegate.algorithm(), message, signature);
+    }
+};
+```
+
+This is an application-level decision because the old `"EdDSA"` identifier is polymorphic -- it could mean Ed25519 or Ed448. The application knows which curve to expect; the library does not.
+
 ## 2. JWT (Immutable + Builder)
 
 ```java
 public class JWT {
-    // Registered claims -- spec names, spec-aligned types
-    private final String iss;        // Issuer
-    private final String sub;        // Subject
-    private final Object aud;        // Audience: String or List<String>, preserved as-is
-    private final Instant exp;       // Expiration Time
-    private final Instant nbf;       // Not Before
-    private final Instant iat;       // Issued At
-    private final String jti;        // JWT ID
+    // Registered claims -- long English names, spec-aligned types
+    private final String issuer;          // "iss"
+    private final String subject;         // "sub"
+    private final Object audience;        // "aud": String or List<String>, preserved as-is
+    private final Instant expiresAt;      // "exp"
+    private final Instant notBefore;      // "nbf"
+    private final Instant issuedAt;       // "iat"
+    private final String id;              // "jti"
     private final Map<String, Object> customClaims;
 
     // Header -- populated on decode, not serialized with claims
     private final Header header;
 
-    // --- Fluent getters (no "get" prefix) ---
-    public String iss() { ... }
-    public String sub() { ... }
-    public Instant exp() { ... }
-    public Instant nbf() { ... }
-    public Instant iat() { ... }
-    public String jti() { ... }
+    // --- Fluent getters (no "get" prefix, long English names) ---
+    public String issuer() { ... }
+    public String subject() { ... }
+    public Instant expiresAt() { ... }
+    public Instant notBefore() { ... }
+    public Instant issuedAt() { ... }
+    public String id() { ... }
     public Header header() { ... }
 
     // --- Audience accessors ---
     /** Returns the raw audience value: String, List<String>, or null. */
-    public Object aud() { ... }
+    public Object audience() { ... }
     /** Returns audience as a single string. If aud is a list, returns the first element. */
-    public String audSingle() { ... }
+    public String audienceSingle() { ... }
     /** Returns audience as a list. If aud is a single string, wraps it in a list. */
-    public List<String> audList() { ... }
+    public List<String> audienceList() { ... }
 
     // --- Custom claim accessors ---
     // These look up by name, checking registered claims first, then customClaims.
@@ -232,25 +250,25 @@ public class JWT {
     public static Builder builder() { return new Builder(); }
 
     public static class Builder {
-        public Builder iss(String issuer) { ... }
-        public Builder sub(String subject) { ... }
-        public Builder aud(String audience) { ... }
-        public Builder aud(List<String> audiences) { ... }
-        public Builder exp(Instant expiration) { ... }
-        public Builder exp(long epochSeconds) { ... }
-        public Builder nbf(Instant notBefore) { ... }
-        public Builder nbf(long epochSeconds) { ... }
-        public Builder iat(Instant issuedAt) { ... }
-        public Builder iat(long epochSeconds) { ... }
-        public Builder jti(String jwtId) { ... }
+        public Builder issuer(String issuer) { ... }
+        public Builder subject(String subject) { ... }
+        public Builder audience(String audience) { ... }
+        public Builder audience(List<String> audiences) { ... }
+        public Builder expiresAt(Instant expiration) { ... }
+        public Builder expiresAt(long epochSeconds) { ... }
+        public Builder notBefore(Instant notBefore) { ... }
+        public Builder notBefore(long epochSeconds) { ... }
+        public Builder issuedAt(Instant issuedAt) { ... }
+        public Builder issuedAt(long epochSeconds) { ... }
+        public Builder id(String jwtId) { ... }
 
         /**
          * Add a claim. If the name matches a registered claim (iss, sub, aud, exp,
          * nbf, iat, jti), the value is routed to the corresponding typed field with
-         * type coercion (e.g., a Number value for "exp" is converted to Instant via
-         * epochSeconds). Throws IllegalArgumentException if the value cannot be
-         * coerced to the registered claim's type. Unrecognized names are stored in
-         * customClaims. A registered claim name can never collide with customClaims.
+         * type coercion (see table below). Throws IllegalArgumentException if the
+         * value cannot be coerced to the registered claim's type. Unrecognized names
+         * are stored in customClaims. A registered claim name can never collide with
+         * customClaims.
          */
         public Builder claim(String name, Object value) { ... }
 
@@ -259,17 +277,42 @@ public class JWT {
 }
 ```
 
+### Builder.claim() Coercion Rules
+
+When `claim(name, value)` is called with a registered claim name, the value is coerced to the target type:
+
+| Claim name | Target type | Accepted value types | Coercion |
+|------------|------------|---------------------|----------|
+| `iss`, `sub`, `jti` | `String` | `String` | Direct assignment |
+| `iss`, `sub`, `jti` | `String` | Any other type | `IllegalArgumentException` |
+| `exp`, `nbf`, `iat` | `Instant` | `Instant` | Direct assignment |
+| `exp`, `nbf`, `iat` | `Instant` | `Number` (Long, Integer, BigInteger, BigDecimal, Double) | `Instant.ofEpochSecond(value.longValue())` |
+| `exp`, `nbf`, `iat` | `Instant` | `ZonedDateTime` | `value.toInstant()` (eases migration from 6.x) |
+| `exp`, `nbf`, `iat` | `Instant` | Any other type | `IllegalArgumentException` |
+| `aud` | `Object` | `String` | Stored as `String` |
+| `aud` | `Object` | `List<String>` | Stored as `List<String>` |
+| `aud` | `Object` | Any other type | `IllegalArgumentException` |
+
+Unrecognized claim names are stored as-is in `customClaims` with no type coercion.
+
+```java
+// These are equivalent:
+JWT.builder().expiresAt(Instant.ofEpochSecond(1700000000)).build();
+JWT.builder().claim("exp", 1700000000L).build();
+JWT.builder().claim("exp", Instant.ofEpochSecond(1700000000)).build();
+```
+
 ### Audience Handling
 
 The `aud` claim is stored exactly as provided -- preserving the original form through round-trips.
 
-- `builder.aud("single")` -> stored as `String` -> serialized as `"aud": "single"`
-- `builder.aud(List.of("single"))` -> stored as `List<String>` -> serialized as `"aud": ["single"]`
-- `builder.aud(List.of("a", "b"))` -> stored as `List<String>` -> serialized as `"aud": ["a", "b"]`
+- `builder.audience("single")` -> stored as `String` -> serialized as `"aud": "single"`
+- `builder.audience(List.of("single"))` -> stored as `List<String>` -> serialized as `"aud": ["single"]`
+- `builder.audience(List.of("a", "b"))` -> stored as `List<String>` -> serialized as `"aud": ["a", "b"]`
 
 On deserialization, `fromMap()` preserves the JSON form: a JSON string becomes a `String`, a JSON array becomes a `List<String>`. No implicit conversion between the two forms.
 
-The typed accessors (`audSingle()`, `audList()`) provide convenience without mutating the stored representation.
+The typed accessors (`audienceSingle()`, `audienceList()`) provide convenience without mutating the stored representation.
 
 ### fromMap() Resilience
 
@@ -279,21 +322,33 @@ The typed accessors (`audSingle()`, `audList()`) provide convenience without mut
 - String claims (`iss`, `sub`, `jti`): non-string values for these RFC-specified string claims throw `InvalidJWTException`.
 - Unknown/custom claims: passed through as-is from the JSON processor into `customClaims`.
 
+### Immutability of Returned Collections
+
+All map and list accessors return unmodifiable views. Callers cannot mutate the JWT's internal state through returned references:
+
+- `claims()` returns `Collections.unmodifiableMap(...)` (shallow copy)
+- `toSerializableMap()` returns an unmodifiable map (new map, not a view of internals)
+- `audienceList()` returns `Collections.unmodifiableList(...)`
+- `Header.parameters()` and `Header.toSerializableMap()` same pattern
+- `JSONWebKey.parameters()`, `JSONWebKey.x5c()` same pattern
+
+This is a shallow guarantee -- map values that are mutable objects (e.g., nested `Map` or `List` from custom claims) are not defensively copied. For JWT-sized payloads with standard JSON types this is sufficient.
+
 ### toSerializableMap() Behavior
 
-Registered claims are written first, then custom claims. Since `Builder.claim()` routes registered names to their typed fields (never to `customClaims`), no collision between registered and custom claims is possible in `toSerializableMap()`. Null-valued claims are omitted.
+Registered claims are written first (using `LinkedHashMap` to preserve insertion order), then custom claims. Since `Builder.claim()` routes registered names to their typed fields (never to `customClaims`), no collision between registered and custom claims is possible in `toSerializableMap()`. Null-valued claims are omitted.
 
 ### Key changes from current
 
 | Aspect | Current (6.x) | New (7.0) |
 |--------|---------------|-----------|
-| Fields | `subject`, `issuer`, `expiration` | `sub`, `iss`, `exp` |
+| Fields / accessors | `subject`, `issuer`, `expiration` (with `get`/`set` prefix) | `subject()`, `issuer()`, `expiresAt()` (fluent, no prefix) |
 | Time type | `ZonedDateTime` | `Instant` (+ `long` builder overloads) |
 | Mutability | Mutable POJO with setters | Immutable, builder pattern (reusable builders) |
 | Annotations | `@JsonProperty`, `@JsonSerialize`, etc. | None |
 | Serialization | Jackson ObjectMapper directly | `toSerializableMap()` -> `JSONProcessor` |
 | Custom claims map | `otherClaims` | `customClaims` (not directly exposed) |
-| Audience | `Object` with no typed accessors | `Object` with `audSingle()` / `audList()` accessors |
+| Audience | `Object` with no typed accessors | `Object` with `audienceSingle()` / `audienceList()` accessors |
 | Static factories | `JWT.getEncoder()`, `JWT.getDecoder()` | Removed -- construct `new JWTEncoder()` / `new JWTDecoder()` directly |
 | `toString()` | Uses `Mapper.prettyPrint()` (Jackson) | Uses built-in `LatteJSONProcessor` always |
 
@@ -338,6 +393,30 @@ public class Header {
 ```
 
 Header uses RFC 7515 terminology: "parameters" (not "claims"). Custom parameter storage is `customParameters` internally, accessed via `get(name)` and `parameters()` (which merges all parameters into a single map).
+
+### Header.fromMap() Behavior
+
+`Header.fromMap()` converts the `"alg"` string value to an `Algorithm` instance via `Algorithm.of()`. If `"alg"` is missing from the map, `fromMap()` throws `InvalidJWTException` -- the `alg` parameter is REQUIRED per RFC 7515 Section 4.1.1.
+
+### Critical Header Parameter (`crit`) — RFC 7515 Section 4.1.11
+
+Per RFC 7515, if a JWT header contains a `"crit"` array, the recipient MUST understand and process every header parameter name listed, or reject the JWS. Failing to enforce this is an active CVE category (CVE-2026-32597, CVE-2026-35042, GHSA-9ggr-2464-2j32) -- libraries that silently accept tokens with unrecognized `crit` entries enable split-brain verification in heterogeneous systems.
+
+**Behavior:** The decoder checks for `"crit"` in the parsed header. If present and non-empty, every name in the array must appear in the decoder's set of understood critical parameters. If any name is unrecognized, the decoder throws `InvalidJWTException`. Since this library does not natively process any extension header parameters, the default set is empty -- meaning any token with a non-empty `crit` array is rejected unless the caller explicitly opts in.
+
+**Configuration:** `JWTDecoder` accepts an optional `Set<String>` of understood critical header parameter names:
+
+```java
+// Default -- rejects any token with crit (safe default)
+JWTDecoder decoder = new JWTDecoder();
+
+// Opt in to specific critical headers
+JWTDecoder decoder = new JWTDecoder.Builder()
+    .criticalHeaders(Set.of("b64", "http://openbanking.org.uk/iat"))
+    .build();
+```
+
+The decoder validates that the listed names are present; the application is responsible for actually processing the extension semantics. This follows the same pattern as JJWT's `critical().add(...)` API.
 
 ## 4. JSONProcessor (Strategy Interface)
 
@@ -451,21 +530,18 @@ public class JWTEncoder {
     public JWTEncoder(JSONProcessor jsonProcessor) { ... }
 
     public String encode(JWT jwt, Signer signer) { ... }
-    public String encode(JWT jwt, Signer signer, Header header) { ... }
     public String encode(JWT jwt, Signer signer, Consumer<Header.Builder> consumer) { ... }
 }
 
 public class JWTDecoder {
     private final JSONProcessor jsonProcessor;
-    private final int clockSkew;
+    private final Duration clockSkew;
+    private final Set<String> criticalHeaders;
 
-    public JWTDecoder() { this(null, 0); }
-    public JWTDecoder(JSONProcessor jsonProcessor) { this(jsonProcessor, 0); }
-    public JWTDecoder(int clockSkewSeconds) { this(null, clockSkewSeconds); }
-    public JWTDecoder(JSONProcessor jsonProcessor, int clockSkewSeconds) {
-        this.jsonProcessor = JWTConfig.resolve(jsonProcessor);
-        this.clockSkew = clockSkewSeconds;
-    }
+    public JWTDecoder() { ... }
+    public JWTDecoder(JSONProcessor jsonProcessor) { ... }
+    public JWTDecoder(Duration clockSkew) { ... }
+    public JWTDecoder(JSONProcessor jsonProcessor, Duration clockSkew) { ... }
 
     /** Single verifier. */
     public JWT decode(String encodedJWT, Verifier verifier) { ... }
@@ -493,7 +569,19 @@ public class JWTDecoder {
 }
 ```
 
-`JWTDecoder` and `JWTEncoder` are lightweight objects intended to be instantiated per-use. Both fields (`jsonProcessor` and `clockSkew`) are `final`. The decoder is not designed for shared/long-lived use, but its immutability means there is no thread-safety hazard if it is shared.
+`JWTDecoder` and `JWTEncoder` are lightweight objects intended to be instantiated per-use. All fields are `final`. The decoder is not designed for shared/long-lived use, but its immutability means there is no thread-safety hazard if it is shared.
+
+For advanced configuration (critical headers, etc.), use the builder:
+
+```java
+JWTDecoder decoder = new JWTDecoder.Builder()
+    .jsonProcessor(myProcessor)
+    .clockSkew(Duration.ofSeconds(30))
+    .criticalHeaders(Set.of("b64"))
+    .build();
+```
+
+The constructors remain for the common cases; the builder adds access to the full configuration surface.
 
 ### TimeMachineJWTDecoder
 
@@ -503,7 +591,7 @@ For testing time-dependent JWT validation logic. Overrides the `now()` used for 
 public class TimeMachineJWTDecoder extends JWTDecoder {
     public TimeMachineJWTDecoder(Instant now) { ... }
     public TimeMachineJWTDecoder(Instant now, JSONProcessor jsonProcessor) { ... }
-    public TimeMachineJWTDecoder(Instant now, JSONProcessor jsonProcessor, int clockSkewSeconds) { ... }
+    public TimeMachineJWTDecoder(Instant now, JSONProcessor jsonProcessor, Duration clockSkew) { ... }
 }
 ```
 
@@ -521,28 +609,28 @@ The returned JWT has its `header()` populated, so a separate header-only decode 
 
 1. Build `Header` -- the encoder pre-populates `alg` from `signer.algorithm()` and `kid` from `signer.kid()` (null if the signer has no kid):
    - `encode(jwt, signer)`: uses signer defaults directly
-   - `encode(jwt, signer, header)`: uses the provided header as-is (caller has full control)
-   - `encode(jwt, signer, consumer)`: passes a pre-populated `Header.Builder` to the consumer, who can add extra parameters (e.g., `x5t`, `cty`) or override/remove `kid` by setting it to `null`
-2. `header.toSerializableMap()` -> `jsonProcessor.serialize()` -> Base64URL encode
-3. `jwt.toSerializableMap()` -> `jsonProcessor.serialize()` -> Base64URL encode
+   - `encode(jwt, signer, consumer)`: passes a pre-populated `Header.Builder` to the consumer, who can add extra parameters (e.g., `x5t`, `cty`) or override/remove `kid` by setting it to `null`. The `alg` is always set from the signer and cannot be overridden -- this prevents accidental mismatches between the header algorithm and the actual signing algorithm.
+2. `header.toSerializableMap()` -> `jsonProcessor.serialize()` -> Base64URL encode (no padding, per RFC 7515 Section 2)
+3. `jwt.toSerializableMap()` -> `jsonProcessor.serialize()` -> Base64URL encode (no padding)
 4. Concatenate `encodedHeader.encodedPayload`
 5. Convert the concatenated string to `byte[]` via `getBytes(UTF_8)`, then `signer.sign(bytes)` -> Base64URL encode
 6. Return `encodedHeader.encodedPayload.encodedSignature`
 
 ### Decode Flow
 
-1. Split on `.` -> `[headerB64, payloadB64, signatureB64]`
-2. Base64URL decode header -> `jsonProcessor.deserialize()` -> `Header.fromMap()`
-3. Select verifier:
-   - Single verifier: use directly (after `canVerify` check)
-   - Map: look up by `header.kid()`
-   - Function: call `verifierResolver.apply(header)` -- caller has full access to the header for any selection strategy
-4. Verify signature against `headerB64.payloadB64`
-5. Base64URL decode payload -> `jsonProcessor.deserialize()` -> `JWT.fromMap()`
+1. Split on `.` -- requires exactly 3 segments. Fewer than 3 (missing signature) throws `MissingSignatureException`. More than 3 (e.g., a JWE compact serialization with 5 parts) throws `InvalidJWTException`. This is existing 6.x behavior preserved in 7.0.
+2. Base64URL decode header -> `jsonProcessor.deserialize()` -> `Header.fromMap()`. Missing `alg` throws `InvalidJWTException`.
+3. If `crit` is present in the header, validate all listed parameter names against the decoder's `criticalHeaders` set. Unrecognized names throw `InvalidJWTException`.
+4. Select verifier:
+   - Single verifier: use directly (after `canVerify` check). If `canVerify` returns false, throw `MissingVerifierException`.
+   - Map: look up by `header.kid()`. If the header has no `kid`, or the `kid` does not match any key in the map, throw `MissingVerifierException`.
+   - Function: call `verifierResolver.apply(header)` -- caller has full access to the header for any selection strategy. If the function returns null, throw `MissingVerifierException`.
+5. Verify signature against `headerB64.payloadB64`
+6. Base64URL decode payload -> `jsonProcessor.deserialize()` -> `JWT.fromMap()`
    - `fromMap()` converts `Number` values in `exp`/`nbf`/`iat` to `Instant`
-6. Validate `exp`/`nbf` with clock skew
-7. If a `validator` was provided, call `validator.accept(jwt)` -- the validator throws any `JWTException` subclass to reject the token
-8. Return `JWT`
+7. Validate `exp`/`nbf` with clock skew
+8. If a `validator` was provided, call `validator.accept(jwt)` -- the validator throws any `JWTException` subclass to reject the token
+9. Return `JWT`
 
 ### Post-decode Validation
 
@@ -550,9 +638,9 @@ The optional `Consumer<JWT> validator` parameter runs after signature verificati
 
 ```java
 decoder.decode(token, verifier, jwt -> {
-    if (!"expected-issuer".equals(jwt.iss()))
-        throw new InvalidJWTException("Unexpected issuer: " + jwt.iss());
-    if (!jwt.audList().contains("my-service"))
+    if (!"expected-issuer".equals(jwt.issuer()))
+        throw new InvalidJWTException("Unexpected issuer: " + jwt.issuer());
+    if (!jwt.audienceList().contains("my-service"))
         throw new InvalidJWTException("Token not intended for this service");
 });
 ```
@@ -638,6 +726,17 @@ public final class Verifiers {
      * Returns a composite Verifier that tries each delegate in order, using the first
      * where canVerify() returns true. This replaces the varargs Verifier... parameter
      * from the 6.x JWTDecoder.decode() method.
+     *
+     * <p><strong>Fail-fast semantics:</strong> {@code canVerify()} answers "does this
+     * verifier understand this algorithm?" -- not "is the signature valid." The first
+     * verifier where {@code canVerify()} returns true gets one shot at
+     * {@code verify()}. If {@code verify()} throws (e.g., invalid signature), the
+     * exception propagates immediately -- subsequent verifiers are not tried. The
+     * intended usage is that no two verifiers in the list should return
+     * {@code canVerify() == true} for the same algorithm.</p>
+     *
+     * <p>If no verifier's {@code canVerify()} returns true, throws
+     * {@code MissingVerifierException}.</p>
      */
     public static Verifier anyOf(Verifier... verifiers) { ... }
 }
@@ -667,7 +766,6 @@ public interface KeyType {
     KeyType RSA = new StandardKeyType("RSA");
     KeyType EC  = new StandardKeyType("EC");
     KeyType OKP = new StandardKeyType("OKP");
-    KeyType RSA_PSS = new StandardKeyType("RSASSA-PSS");
     KeyType OCT = new StandardKeyType("oct");
 
     /** Look up by name. Returns a standard constant if matched, otherwise a new instance. */
@@ -678,6 +776,8 @@ public interface KeyType {
 `StandardKeyType` is a package-private class with `equals`/`hashCode` based on `name()`, same pattern as `StandardAlgorithm`. `KeyType.of()` interns standard constants the same way `Algorithm.of()` does.
 
 `KeyType.OCT` represents symmetric keys per RFC 7517 Section 6.4. This ensures the JWK parser does not choke on `"kty": "oct"` entries in a JWKS response. Full symmetric JWK support (building/parsing `oct` keys) may be added in a future release, but the `KeyType` constant is defined now for forward compatibility.
+
+**RSA-PSS keys:** No separate `KeyType.RSA_PSS` is defined. The IANA "JSON Web Key Types" registry does not include `"RSASSA-PSS"` as a `kty` value -- RSA-PSS keys use `"kty": "RSA"` on the wire, the same as PKCS#1 v1.5 keys. The algorithm distinction is in the `"alg"` parameter (e.g., `"PS256"`), not in `kty`. Internally, Java's `KeyFactory` uses `"RSASSA-PSS"` as an algorithm identifier for PSS-specific keys -- the `JSONWebKeyBuilder` and `JSONWebKeyParser` handle this distinction without exposing it through `KeyType`.
 
 ## 8. JWK / OAuth2
 
@@ -973,11 +1073,11 @@ All existing exceptions remain unchanged:
 |------|--------|
 | `Algorithm.java` | Enum -> Interface + `StandardAlgorithm` |
 | `KeyType.java` | Enum -> Interface + `StandardKeyType` |
-| `JWT.java` | Remove annotations, immutable builder, `Instant` times, spec field names, remove `getEncoder()`/`getDecoder()`, remove `decodeUnsecured()` |
+| `JWT.java` | Remove annotations, immutable builder, `Instant` times, long English names (fluent, no `get`/`set` prefix), remove `getEncoder()`/`getDecoder()`, remove `decodeUnsecured()` |
 | `Header.java` | Remove annotations, immutable builder, `parameters()` naming |
 | `JWTUtils.java` | Move decode methods to `JWTDecoder`, update `generateJWS_kid` to use `JSONProcessor` |
 | `JWTEncoder.java` | Use `JSONProcessor` via `JWTConfig.resolve()` instead of `Mapper` |
-| `JWTDecoder.java` | Use `JSONProcessor`, `Instant` for time validation, constructor-based config (final fields), add `decodeUnsecured()`, simplified overloads, optional validator |
+| `JWTDecoder.java` | Use `JSONProcessor`, `Instant` for time validation, `Duration` for clock skew, constructor-based config (final fields), add `decodeUnsecured()`, simplified overloads, optional validator, `crit` header validation, builder for advanced config |
 | `TimeMachineJWTDecoder.java` | Update to use `Instant` instead of `ZonedDateTime` |
 | `JSONWebKey.java` | Remove annotations, immutable builder, `customParameters` naming, explicit `x5t#S256` map handling, remove `Buildable<T>` |
 | `JSONWebKeyBuilder.java` | Use `JSONProcessor` instead of `Mapper` |
@@ -1088,6 +1188,7 @@ All tests should include a use-case comment at the top describing the scenario: 
 - // Use case: First matching verifier is used (ordered delegation)
 - // Use case: No matching verifier throws MissingVerifierException
 - // Use case: Single verifier behaves identically to direct use
+- // Use case: Fail-fast -- first canVerify() match that fails verify() propagates exception, does not try next verifier
 
 ### Integration Tests
 
@@ -1134,6 +1235,11 @@ All tests should include a use-case comment at the top describing the scenario: 
 - // Use case: Expired token rejected with JWTExpiredException
 - // Use case: Not-yet-valid token rejected with JWTUnavailableForProcessingException
 - // Use case: Clock skew allows slightly expired token when configured
+- // Use case: Token with crit header listing unknown parameter -- rejected with InvalidJWTException
+- // Use case: Token with crit header listing parameter registered via criticalHeaders -- accepted
+- // Use case: Token with empty crit array -- accepted (no critical parameters to check)
+- // Use case: Map<String, Verifier> with missing kid in header -- rejected with MissingVerifierException
+- // Use case: Map<String, Verifier> with unrecognized kid -- rejected with MissingVerifierException
 
 ### Wire-format Compatibility Tests
 
