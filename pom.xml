@@ -3,7 +3,7 @@
 
     <groupId>org.lattejava</groupId>
     <artifactId>latte-jwt</artifactId>
-    <version>6.1.0</version>
+    <version>7.0.0-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>Java JWT</name>
