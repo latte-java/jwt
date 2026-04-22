@@ -1,28 +1,34 @@
 /*
- * Copyright (c) 2016-2025, FusionAuth, All Rights Reserved
+ * Copyright (c) 2026, The Latte Project, All Rights Reserved
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to permit
+ * persons to whom the Software is furnished to do so, subject to the
+ * following conditions:
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ * The above copyright notice and this permission notice shall be included
+ * in all copies or substantial portions of the Software.
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
- * either express or implied. See the License for the specific
- * language governing permissions and limitations under the License.
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+ * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+ * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+ * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
 package org.lattejava.jwt.algorithm.rsa;
 
+import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.InvalidJWTSignatureException;
-import org.lattejava.jwt.InvalidKeyLengthException;
 import org.lattejava.jwt.InvalidKeyTypeException;
 import org.lattejava.jwt.JWTVerifierException;
 import org.lattejava.jwt.MissingPublicKeyException;
 import org.lattejava.jwt.Verifier;
-import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.pem.PEM;
 
 import java.io.IOException;
@@ -37,67 +43,54 @@ import java.security.interfaces.RSAPublicKey;
 import java.util.Objects;
 
 /**
- * This class is used to verify a JWT with an RSA signature using an RSA Public Key.
+ * RSASSA-PKCS1-v1_5 {@link Verifier} for the {@code RS256} / {@code RS384}
+ * / {@code RS512} JWA algorithms (RFC 7518 §3.3).
  *
- * @author Daniel DeGroff
+ * <p>Each call to {@link #verify(Algorithm, byte[], byte[])} obtains a
+ * fresh {@link Signature} instance per the spec §6 thread-safety contract.</p>
+ *
+ * @author The Latte Project
  */
 public class RSAVerifier implements Verifier {
   private final RSAPublicKey publicKey;
 
   private RSAVerifier(PublicKey publicKey) {
     Objects.requireNonNull(publicKey);
-
-    if (!(publicKey instanceof RSAPublicKey)) {
+    if (!(publicKey instanceof RSAPublicKey rsa)) {
       throw new InvalidKeyTypeException("Expecting a public key of type [RSAPublicKey], but found [" + publicKey.getClass().getSimpleName() + "].");
     }
-    this.publicKey = (RSAPublicKey) publicKey;
-    assertValidKeyLength();
+    this.publicKey = rsa;
+    RSAFamily.assertMinimumModulus(this.publicKey.getModulus().bitLength());
   }
 
-  private RSAVerifier(String publicKey) {
-    Objects.requireNonNull(publicKey);
-
-    PEM pem = PEM.decode(publicKey);
+  private RSAVerifier(String pemPublicKey) {
+    Objects.requireNonNull(pemPublicKey);
+    PEM pem = PEM.decode(pemPublicKey);
     if (pem.publicKey == null) {
       throw new MissingPublicKeyException("The provided PEM encoded string did not contain a public key.");
     }
-    if (!(pem.publicKey instanceof RSAPublicKey)) {
+    if (!(pem.publicKey instanceof RSAPublicKey rsa)) {
       throw new InvalidKeyTypeException("Expecting a public key of type [RSAPublicKey], but found [" + pem.publicKey.getClass().getSimpleName() + "].");
     }
-
-    this.publicKey = pem.getPublicKey();
-    assertValidKeyLength();
+    this.publicKey = rsa;
+    RSAFamily.assertMinimumModulus(this.publicKey.getModulus().bitLength());
   }
 
-  /**
-   * Return a new instance of the RSA Verifier with the provided public key.
-   *
-   * @param publicKey The RSA public key object.
-   * @return a new instance of the RSA verifier.
-   */
   public static RSAVerifier newVerifier(PublicKey publicKey) {
     return new RSAVerifier(publicKey);
   }
 
-  /**
-   * Return a new instance of the RSA Verifier with the provided public key.
-   *
-   * @param publicKey The RSA public key PEM.
-   * @return a new instance of the RSA verifier.
-   */
-  public static RSAVerifier newVerifier(String publicKey) {
-    return new RSAVerifier(publicKey);
+  public static RSAVerifier newVerifier(String pemPublicKey) {
+    return new RSAVerifier(pemPublicKey);
   }
 
-  /**
-   * Return a new instance of the RSA Verifier with the provided public key.
-   *
-   * @param path The path to the RSA public key PEM.
-   * @return a new instance of the RSA verifier.
-   */
+  public static RSAVerifier newVerifier(byte[] bytes) {
+    Objects.requireNonNull(bytes);
+    return new RSAVerifier(new String(bytes));
+  }
+
   public static RSAVerifier newVerifier(Path path) {
     Objects.requireNonNull(path);
-
     try {
       return new RSAVerifier(new String(Files.readAllBytes(path)));
     } catch (IOException e) {
@@ -105,19 +98,7 @@ public class RSAVerifier implements Verifier {
     }
   }
 
-  /**
-   * Return a new instance of the RSA Verifier with the provided public key.
-   *
-   * @param bytes The bytes of the RSA public key PEM.
-   * @return a new instance of the RSA verifier.
-   */
-  public static RSAVerifier newVerifier(byte[] bytes) {
-    Objects.requireNonNull(bytes);
-    return new RSAVerifier((new String(bytes)));
-  }
-
   @Override
-  @SuppressWarnings("Duplicates")
   public boolean canVerify(Algorithm algorithm) {
     return switch (algorithm.name()) {
       case "RS256", "RS384", "RS512" -> true;
@@ -125,17 +106,15 @@ public class RSAVerifier implements Verifier {
     };
   }
 
+  @Override
   public void verify(Algorithm algorithm, byte[] message, byte[] signature) {
     Objects.requireNonNull(algorithm);
     Objects.requireNonNull(message);
     Objects.requireNonNull(signature);
-
     try {
-      Signature verifier = Signature.getInstance(org.lattejava.jwt.internal.JCAAlgorithmMapping.toJCA(algorithm));
+      Signature verifier = Signature.getInstance(RSAFamily.toJCA(algorithm));
       verifier.initVerify(publicKey);
       verifier.update(message);
-      // Depending upon the JCE provider, an invalid signature may cause verify() to return false
-      // or throw a SignatureException. For example, the signature length may not match the key size.
       try {
         if (!verifier.verify(signature)) {
           throw new InvalidJWTSignatureException();
@@ -145,14 +124,6 @@ public class RSAVerifier implements Verifier {
       }
     } catch (InvalidKeyException | NoSuchAlgorithmException | SignatureException | SecurityException e) {
       throw new JWTVerifierException("An unexpected exception occurred when attempting to verify the JWT", e);
-    }
-  }
-
-  private void assertValidKeyLength() {
-    int keyLength = this.publicKey.getModulus().bitLength();
-    // We would normally expect 2048, but it turns out it is possible for an RSA key to be generated of length 2047.
-    if (keyLength < 2047) {
-      throw new InvalidKeyLengthException("Key length of [" + keyLength + "] is less than the required key length of 2048 bits.");
     }
   }
 }

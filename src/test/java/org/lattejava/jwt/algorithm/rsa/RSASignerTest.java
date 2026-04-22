@@ -67,20 +67,20 @@ public class RSASignerTest extends BaseJWTTest {
     assertNotNull(RSASigner.newSHA512Signer(PEM.decode(readFile("rsa_private_key_4096.pem")).privateKey));
 
     // With kid
-    assertEquals(RSASigner.newSHA256Signer(PEM.decode(readFile("rsa_private_key_2048.pem")).privateKey, "abc").getKid(), "abc");
-    assertEquals(RSASigner.newSHA256Signer(PEM.decode(readFile("rsa_private_key_2048_with_meta.pem")).privateKey, "abc").getKid(), "abc");
-    assertEquals(RSASigner.newSHA256Signer(PEM.decode(readFile("rsa_private_key_3072.pem")).privateKey, "abc").getKid(), "abc");
-    assertEquals(RSASigner.newSHA256Signer(PEM.decode(readFile("rsa_private_key_4096.pem")).privateKey, "abc").getKid(), "abc");
+    assertEquals(RSASigner.newSHA256Signer(PEM.decode(readFile("rsa_private_key_2048.pem")).privateKey, "abc").kid(), "abc");
+    assertEquals(RSASigner.newSHA256Signer(PEM.decode(readFile("rsa_private_key_2048_with_meta.pem")).privateKey, "abc").kid(), "abc");
+    assertEquals(RSASigner.newSHA256Signer(PEM.decode(readFile("rsa_private_key_3072.pem")).privateKey, "abc").kid(), "abc");
+    assertEquals(RSASigner.newSHA256Signer(PEM.decode(readFile("rsa_private_key_4096.pem")).privateKey, "abc").kid(), "abc");
 
-    assertEquals(RSASigner.newSHA384Signer(PEM.decode(readFile("rsa_private_key_2048.pem")).privateKey, "abc").getKid(), "abc");
-    assertEquals(RSASigner.newSHA384Signer(PEM.decode(readFile("rsa_private_key_2048_with_meta.pem")).privateKey, "abc").getKid(), "abc");
-    assertEquals(RSASigner.newSHA384Signer(PEM.decode(readFile("rsa_private_key_3072.pem")).privateKey, "abc").getKid(), "abc");
-    assertEquals(RSASigner.newSHA384Signer(PEM.decode(readFile("rsa_private_key_4096.pem")).privateKey, "abc").getKid(), "abc");
+    assertEquals(RSASigner.newSHA384Signer(PEM.decode(readFile("rsa_private_key_2048.pem")).privateKey, "abc").kid(), "abc");
+    assertEquals(RSASigner.newSHA384Signer(PEM.decode(readFile("rsa_private_key_2048_with_meta.pem")).privateKey, "abc").kid(), "abc");
+    assertEquals(RSASigner.newSHA384Signer(PEM.decode(readFile("rsa_private_key_3072.pem")).privateKey, "abc").kid(), "abc");
+    assertEquals(RSASigner.newSHA384Signer(PEM.decode(readFile("rsa_private_key_4096.pem")).privateKey, "abc").kid(), "abc");
 
-    assertEquals(RSASigner.newSHA512Signer(PEM.decode(readFile("rsa_private_key_2048.pem")).privateKey, "abc").getKid(), "abc");
-    assertEquals(RSASigner.newSHA512Signer(PEM.decode(readFile("rsa_private_key_2048_with_meta.pem")).privateKey, "abc").getKid(), "abc");
-    assertEquals(RSASigner.newSHA512Signer(PEM.decode(readFile("rsa_private_key_3072.pem")).privateKey, "abc").getKid(), "abc");
-    assertEquals(RSASigner.newSHA512Signer(PEM.decode(readFile("rsa_private_key_4096.pem")).privateKey, "abc").getKid(), "abc");
+    assertEquals(RSASigner.newSHA512Signer(PEM.decode(readFile("rsa_private_key_2048.pem")).privateKey, "abc").kid(), "abc");
+    assertEquals(RSASigner.newSHA512Signer(PEM.decode(readFile("rsa_private_key_2048_with_meta.pem")).privateKey, "abc").kid(), "abc");
+    assertEquals(RSASigner.newSHA512Signer(PEM.decode(readFile("rsa_private_key_3072.pem")).privateKey, "abc").kid(), "abc");
+    assertEquals(RSASigner.newSHA512Signer(PEM.decode(readFile("rsa_private_key_4096.pem")).privateKey, "abc").kid(), "abc");
   }
 
   @Test
@@ -102,19 +102,19 @@ public class RSASignerTest extends BaseJWTTest {
     assertNotNull(RSASigner.newSHA512Signer(readFile("rsa_private_key_4096.pem")));
 
     // With kid
-    assertEquals(RSASigner.newSHA256Signer(readFile("rsa_private_key_2048.pem"), "abc").getKid(), "abc");
-    assertEquals(RSASigner.newSHA256Signer(readFile("rsa_private_key_2048_with_meta.pem"), "abc").getKid(), "abc");
-    assertEquals(RSASigner.newSHA256Signer(readFile("rsa_private_key_3072.pem"), "abc").getKid(), "abc");
-    assertEquals(RSASigner.newSHA256Signer(readFile("rsa_private_key_4096.pem"), "abc").getKid(), "abc");
+    assertEquals(RSASigner.newSHA256Signer(readFile("rsa_private_key_2048.pem"), "abc").kid(), "abc");
+    assertEquals(RSASigner.newSHA256Signer(readFile("rsa_private_key_2048_with_meta.pem"), "abc").kid(), "abc");
+    assertEquals(RSASigner.newSHA256Signer(readFile("rsa_private_key_3072.pem"), "abc").kid(), "abc");
+    assertEquals(RSASigner.newSHA256Signer(readFile("rsa_private_key_4096.pem"), "abc").kid(), "abc");
 
-    assertEquals(RSASigner.newSHA384Signer(readFile("rsa_private_key_2048.pem"), "abc").getKid(), "abc");
-    assertEquals(RSASigner.newSHA384Signer(readFile("rsa_private_key_2048_with_meta.pem"), "abc").getKid(), "abc");
-    assertEquals(RSASigner.newSHA384Signer(readFile("rsa_private_key_3072.pem"), "abc").getKid(), "abc");
-    assertEquals(RSASigner.newSHA384Signer(readFile("rsa_private_key_4096.pem"), "abc").getKid(), "abc");
+    assertEquals(RSASigner.newSHA384Signer(readFile("rsa_private_key_2048.pem"), "abc").kid(), "abc");
+    assertEquals(RSASigner.newSHA384Signer(readFile("rsa_private_key_2048_with_meta.pem"), "abc").kid(), "abc");
+    assertEquals(RSASigner.newSHA384Signer(readFile("rsa_private_key_3072.pem"), "abc").kid(), "abc");
+    assertEquals(RSASigner.newSHA384Signer(readFile("rsa_private_key_4096.pem"), "abc").kid(), "abc");
 
-    assertEquals(RSASigner.newSHA512Signer(readFile("rsa_private_key_2048.pem"), "abc").getKid(), "abc");
-    assertEquals(RSASigner.newSHA512Signer(readFile("rsa_private_key_2048_with_meta.pem"), "abc").getKid(), "abc");
-    assertEquals(RSASigner.newSHA512Signer(readFile("rsa_private_key_3072.pem"), "abc").getKid(), "abc");
-    assertEquals(RSASigner.newSHA512Signer(readFile("rsa_private_key_4096.pem"), "abc").getKid(), "abc");
+    assertEquals(RSASigner.newSHA512Signer(readFile("rsa_private_key_2048.pem"), "abc").kid(), "abc");
+    assertEquals(RSASigner.newSHA512Signer(readFile("rsa_private_key_2048_with_meta.pem"), "abc").kid(), "abc");
+    assertEquals(RSASigner.newSHA512Signer(readFile("rsa_private_key_3072.pem"), "abc").kid(), "abc");
+    assertEquals(RSASigner.newSHA512Signer(readFile("rsa_private_key_4096.pem"), "abc").kid(), "abc");
   }
 }
