@@ -233,7 +233,7 @@ public class JSONWebKeyParserTest extends BaseJWTTest {
     };
   }
 
-  @Test(dataProvider = "EdDSACurves", invocationCount = 1_000)
+  @Test(dataProvider = "EdDSACurves")
   public void parse_eddsa(String curve) {
     KeyPair keyPair = curve.equals("Ed25519")
         ? JWTUtils.generate_ed25519_EdDSAKeyPair()

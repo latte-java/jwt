@@ -69,12 +69,11 @@ public class KeyUtilsTests {
     assertEquals(KeyUtils.getKeyLength(key), 384);
   }
 
-  // Running 500 times to ensure we get consistency. EC keys can vary in length, but the "reported" size returned
-  // from the .getKeyLength() should be consistent. Out of 500 tests (if we had an error in the logic) we may get 1-5
-  // failures where the key is not an exact size, and we have to figure out which key size it should be reported as.
-  // - For testing locally, you can ramp up this invocation count to 100k or something like that to prove that we have
-  //   consistency over time.
-  @Test(dataProvider = "ecKeyLengths", invocationCount = 500)
+  // Running 1_000 times to ensure consistency. EC public-key X/Y coordinates have a ~1/256 chance per byte of starting
+  // with 0x00 (which exposes BigInteger encoding-length edge cases). With two coordinates per iteration that is ~0.78%
+  // per iteration, so 1_000 iterations yields ~99.6% probability of triggering a leading-zero bug if one exists. Bump
+  // this locally to 10_000+ when investigating a specific encoding regression.
+  @Test(dataProvider = "ecKeyLengths", invocationCount = 1_000)
   public void ec_getKeyLength(String algorithm, int keySize, int privateKeySize, int publicKeySize) throws Exception {
     KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance(algorithm);
     keyPairGenerator.initialize(keySize);
