@@ -1,29 +1,35 @@
 /*
- * Copyright (c) 2025, FusionAuth, All Rights Reserved
+ * Copyright (c) 2026, The Latte Project, All Rights Reserved
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to permit
+ * persons to whom the Software is furnished to do so, subject to the
+ * following conditions:
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ * The above copyright notice and this permission notice shall be included
+ * in all copies or substantial portions of the Software.
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
- * either express or implied. See the License for the specific
- * language governing permissions and limitations under the License.
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+ * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+ * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+ * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
 package org.lattejava.jwt.algorithm.ed;
 
+import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.InvalidKeyTypeException;
 import org.lattejava.jwt.JWTSigningException;
 import org.lattejava.jwt.MissingPrivateKeyException;
 import org.lattejava.jwt.Signer;
-import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.pem.PEM;
 
-import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
@@ -33,7 +39,14 @@ import java.security.interfaces.EdECPrivateKey;
 import java.util.Objects;
 
 /**
- * @author Daniel DeGroff
+ * EdDSA {@link Signer} for the {@code Ed25519} / {@code Ed448} JWA
+ * algorithms (RFC 8037 §3.1, JOSE registry).
+ *
+ * <p>The JWA algorithm is derived from the key's curve at construction.
+ * Each call to {@link #sign(byte[])} obtains a fresh {@link Signature}
+ * instance per the spec §6 thread-safety contract.</p>
+ *
+ * @author The Latte Project
  */
 public class EdDSASigner implements Signer {
   private final Algorithm algorithm;
@@ -44,100 +57,61 @@ public class EdDSASigner implements Signer {
 
   private EdDSASigner(PrivateKey privateKey, String kid) {
     Objects.requireNonNull(privateKey);
-
-    if (!(privateKey instanceof EdECPrivateKey)) {
+    if (!(privateKey instanceof EdECPrivateKey ed)) {
       throw new InvalidKeyTypeException("Expecting a private key of type [EdECPrivateKey], but found [" + privateKey.getClass().getSimpleName() + "].");
     }
-
+    this.privateKey = ed;
     this.kid = kid;
-    this.privateKey = (EdECPrivateKey) privateKey;
-    this.algorithm = Algorithm.fromName(this.privateKey.getParams().getName());
-    if (this.algorithm == null) {
-      throw new InvalidKeyTypeException("Unsupported algorithm reported by the private key. [" + this.privateKey.getParams().getName() + "].");
-    }
+    this.algorithm = EdDSAFamily.algorithmForCurveName(this.privateKey.getParams().getName());
   }
 
-  private EdDSASigner(String privateKey, String kid) {
-    Objects.requireNonNull(privateKey);
-
-    PEM pem = PEM.decode(privateKey);
+  private EdDSASigner(String pemPrivateKey, String kid) {
+    Objects.requireNonNull(pemPrivateKey);
+    PEM pem = PEM.decode(pemPrivateKey);
     if (pem.privateKey == null) {
       throw new MissingPrivateKeyException("The provided PEM encoded string did not contain a private key.");
     }
-
-    if (!(pem.privateKey instanceof EdECPrivateKey)) {
+    if (!(pem.privateKey instanceof EdECPrivateKey ed)) {
       throw new InvalidKeyTypeException("Expecting a private key of type [EdECPrivateKey], but found [" + pem.privateKey.getClass().getSimpleName() + "].");
     }
-
+    this.privateKey = ed;
     this.kid = kid;
-    this.privateKey = pem.getPrivateKey();
-    this.algorithm = Algorithm.fromName(this.privateKey.getParams().getName());
-    if (this.algorithm == null) {
-      throw new InvalidKeyTypeException("Unsupported algorithm reported by the private key. [" + this.privateKey.getParams().getName() + "].");
-    }
+    this.algorithm = EdDSAFamily.algorithmForCurveName(this.privateKey.getParams().getName());
   }
 
-  /**
-   * Build a new EdDSA signer.
-   *
-   * @param privateKey The private key.
-   * @param kid        The key identifier. This will be used by the JWTEncoder to write the 'kid' header.
-   * @return a new EdDSA signer.
-   */
   public static EdDSASigner newSigner(PrivateKey privateKey, String kid) {
     return new EdDSASigner(privateKey, kid);
   }
 
-  /**
-   * Build a new EdDSA signer.
-   *
-   * @param privateKey The private key.
-   * @return a new EdDSA signer.
-   */
   public static EdDSASigner newSigner(PrivateKey privateKey) {
     return new EdDSASigner(privateKey, null);
   }
 
-  /**
-   * Build a new EdDSA signer.
-   *
-   * @param privateKey The private key.
-   * @param kid        The key identifier. This will be used by the JWTEncoder to write the 'kid' header.
-   * @return a new EdDSA signer.
-   */
-  public static EdDSASigner newSigner(String privateKey, String kid) {
-    return new EdDSASigner(privateKey, kid);
+  public static EdDSASigner newSigner(String pemPrivateKey, String kid) {
+    return new EdDSASigner(pemPrivateKey, kid);
   }
 
-  /**
-   * Build a new EdDSA signer.
-   *
-   * @param privateKey The private key.
-   * @return a new EdDSA signer.
-   */
-  public static EdDSASigner newSigner(String privateKey) {
-    return new EdDSASigner(privateKey, null);
+  public static EdDSASigner newSigner(String pemPrivateKey) {
+    return new EdDSASigner(pemPrivateKey, null);
   }
 
   @Override
-  public Algorithm getAlgorithm() {
-    return this.algorithm;
+  public Algorithm algorithm() {
+    return algorithm;
   }
 
   @Override
-  public String getKid() {
+  public String kid() {
     return kid;
   }
 
   @Override
   public byte[] sign(byte[] message) {
     Objects.requireNonNull(message);
-
     try {
-      Signature signature = Signature.getInstance(org.lattejava.jwt.internal.JCAAlgorithmMapping.toJCA(algorithm));
+      Signature signature = Signature.getInstance(EdDSAFamily.toJCA(algorithm));
       signature.initSign(privateKey);
       signature.update(message);
-
       return signature.sign();
     } catch (InvalidKeyException | NoSuchAlgorithmException | SignatureException e) {
       throw new JWTSigningException("An unexpected exception occurred when attempting to sign the JWT", e);

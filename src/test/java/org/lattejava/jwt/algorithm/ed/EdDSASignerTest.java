@@ -77,11 +77,11 @@ public class EdDSASignerTest extends BaseJWTTest {
     // Add kid
 
     // Key as string
-    assertNotNull(EdDSASigner.newSigner(readFile("ed_dsa_ed25519_private_key.pem"), "abc").getKid(), "abc");
-    assertNotNull(EdDSASigner.newSigner(readFile("ed_dsa_ed448_private_key.pem"), "abc").getKid(), "abc");
+    assertNotNull(EdDSASigner.newSigner(readFile("ed_dsa_ed25519_private_key.pem"), "abc").kid(), "abc");
+    assertNotNull(EdDSASigner.newSigner(readFile("ed_dsa_ed448_private_key.pem"), "abc").kid(), "abc");
 
     // Key as object
-    assertNotNull(EdDSASigner.newSigner(PEM.decode(getPath("ed_dsa_ed25519_private_key.pem")).privateKey, "abc").getKid(), "abc");
-    assertNotNull(EdDSASigner.newSigner(PEM.decode(getPath("ed_dsa_ed448_private_key.pem")).privateKey, "abc").getKid(), "abc");
+    assertNotNull(EdDSASigner.newSigner(PEM.decode(getPath("ed_dsa_ed25519_private_key.pem")).privateKey, "abc").kid(), "abc");
+    assertNotNull(EdDSASigner.newSigner(PEM.decode(getPath("ed_dsa_ed448_private_key.pem")).privateKey, "abc").kid(), "abc");
   }
 }
