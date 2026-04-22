@@ -55,21 +55,21 @@ public class JSONWebKeyParser {
 
     try {
       // RSA Public key
-      if (key.kty == KeyType.RSA) {
-        BigInteger modulus = base64DecodeUint(key.n);
-        BigInteger publicExponent = base64DecodeUint(key.e);
+      if (key.kty() == KeyType.RSA) {
+        BigInteger modulus = base64DecodeUint(key.n());
+        BigInteger publicExponent = base64DecodeUint(key.e());
         PublicKey publicKey = KeyFactory.getInstance("RSA").generatePublic(new RSAPublicKeySpec(modulus, publicExponent));
 
         // If the x5c is non-null, verify the public key
-        if (key.x5c != null && key.x5c.size() > 0) {
+        if (key.x5c() != null && key.x5c().size() > 0) {
           verifyX5cRSA(key, modulus, publicExponent);
         }
 
         return publicKey;
-      } else if (key.kty == KeyType.EC) {
+      } else if (key.kty() == KeyType.EC) {
         // EC Public key
         AlgorithmParameters parameters = AlgorithmParameters.getInstance("EC");
-        switch (key.crv) {
+        switch (key.crv()) {
           case "P-256":
             parameters.init(new ECGenParameterSpec("secp256r1"));
             break;
@@ -84,23 +84,23 @@ public class JSONWebKeyParser {
         }
 
         ECParameterSpec ecParameterSpec = parameters.getParameterSpec(ECParameterSpec.class);
-        BigInteger xCoordinate = base64DecodeUint(key.x);
-        BigInteger yCoordinate = base64DecodeUint(key.y);
+        BigInteger xCoordinate = base64DecodeUint(key.x());
+        BigInteger yCoordinate = base64DecodeUint(key.y());
         ECPoint ecPoint = new ECPoint(xCoordinate, yCoordinate);
         PublicKey publicKey = KeyFactory.getInstance("EC").generatePublic(new ECPublicKeySpec(ecPoint, ecParameterSpec));
 
         // If the x5x is non-null, verify the public key
-        if (key.x5c != null && key.x5c.size() > 0) {
+        if (key.x5c() != null && key.x5c().size() > 0) {
           verifyX5cEC(key, xCoordinate, yCoordinate);
         }
 
         return publicKey;
-      } else if (key.kty == KeyType.OKP) {
-        if (!"Ed25519".equals(key.crv) && !"Ed448".equals(key.crv)) {
+      } else if (key.kty() == KeyType.OKP) {
+        if (!"Ed25519".equals(key.crv()) && !"Ed448".equals(key.crv())) {
           throw new UnsupportedOperationException("Only a Ed25519 or Ed448 OKP JSON Web key may be parsed.");
         }
 
-        byte[] bytes = Base64.getUrlDecoder().decode(key.x);
+        byte[] bytes = Base64.getUrlDecoder().decode(key.x());
         reverseArray(bytes);
 
         int lastBit = bytes[0] & 0xFF;
@@ -108,8 +108,8 @@ public class JSONWebKeyParser {
         bytes[0] = (byte) (lastBit & Byte.MAX_VALUE);
         BigInteger y = new BigInteger(1, bytes);
 
-        KeySpec keySpec = new EdECPublicKeySpec(new NamedParameterSpec(key.crv), new EdECPoint(xOdd, y));
-        return KeyFactory.getInstance(key.crv).generatePublic(keySpec);
+        KeySpec keySpec = new EdECPublicKeySpec(new NamedParameterSpec(key.crv()), new EdECPoint(xOdd, y));
+        return KeyFactory.getInstance(key.crv()).generatePublic(keySpec);
       }
     } catch (JSONWebKeyParserException e) {
       throw e;
@@ -137,23 +137,23 @@ public class JSONWebKeyParser {
   public boolean containsPrivateKeyParams(JSONWebKey key) throws JSONWebKeyParserException{
     Objects.requireNonNull(key);
 
-    if (key.kty == KeyType.RSA) {
+    if (key.kty() == KeyType.RSA) {
       // RSA public key only has n, e
-      if (key.p != null || key.q != null || key.d != null || key.dp != null || key.dq != null || key.qi != null) {
+      if (key.p() != null || key.q() != null || key.d() != null || key.dp() != null || key.dq() != null || key.qi() != null) {
         return true;
       } else {
         return false;
       }
-    } else if (key.kty == KeyType.EC) {
+    } else if (key.kty() == KeyType.EC) {
       // EC Public key only has crv, x, y
-      if (key.d != null) {
+      if (key.d() != null) {
         return true;
       } else {
         return false;
       }
-    } else if (key.kty == KeyType.OKP) {
+    } else if (key.kty() == KeyType.OKP) {
       // EdDSA Public keys have crv and x
-      if (key.d != null) {
+      if (key.d() != null) {
         return true;
       } else {
         return false;
@@ -166,7 +166,7 @@ public class JSONWebKeyParser {
   private void verifyX5cEC(JSONWebKey key, BigInteger expectedXCoordinate, BigInteger expectedYCoordinate) {
     // The first key in this array MUST contain the public key.
     // >  https://tools.ietf.org/html/rfc7517#section-4.7
-    String encodedCertificate = key.x5c.get(0);
+    String encodedCertificate = key.x5c().get(0);
     String pem = new PEMEncoder().parseEncodedCertificate(encodedCertificate);
     PublicKey actual = PEM.decode(pem).publicKey;
     if (!(actual instanceof ECPublicKey ecPublicKey)) {
@@ -201,7 +201,7 @@ public class JSONWebKeyParser {
   private void verifyX5cRSA(JSONWebKey key, BigInteger expectedModulus, BigInteger expectedPublicExponent) {
     // The first key in this array MUST contain the public key.
     // >  https://tools.ietf.org/html/rfc7517#section-4.7
-    String encodedCertificate = key.x5c.get(0);
+    String encodedCertificate = key.x5c().get(0);
     String pem = new PEMEncoder().parseEncodedCertificate(encodedCertificate);
     PublicKey actual = PEM.decode(pem).publicKey;
 

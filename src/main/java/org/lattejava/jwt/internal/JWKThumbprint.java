@@ -66,7 +66,7 @@ public final class JWKThumbprint {
     if (key == null) {
       throw new IllegalArgumentException("key is null");
     }
-    if (key.kty == null) {
+    if (key.kty() == null) {
       throw new IllegalArgumentException("key.kty is null");
     }
 
@@ -91,28 +91,28 @@ public final class JWKThumbprint {
    */
   private static Map<String, Object> canonicalMembers(JSONWebKey key) {
     Map<String, Object> m = new LinkedHashMap<>(4);
-    KeyType kty = key.kty;
+    KeyType kty = key.kty();
     String ktyName = kty.name();
     switch (ktyName) {
       case "EC":
-        m.put("crv", key.crv);
+        m.put("crv", key.crv());
         m.put("kty", ktyName);
-        m.put("x", key.x);
-        m.put("y", key.y);
+        m.put("x", key.x());
+        m.put("y", key.y());
         return m;
       case "RSA":
       case "RSASSA_PSS":
-        m.put("e", key.e);
+        m.put("e", key.e());
         m.put("kty", ktyName);
-        m.put("n", key.n);
+        m.put("n", key.n());
         return m;
       case "OKP":
-        m.put("crv", key.crv);
+        m.put("crv", key.crv());
         m.put("kty", ktyName);
-        m.put("x", key.x);
+        m.put("x", key.x());
         return m;
       case "oct":
-        Object kVal = key.other == null ? null : key.other.get("k");
+        Object kVal = key.other() == null ? null : key.other().get("k");
         m.put("k", kVal);
         m.put("kty", ktyName);
         return m;

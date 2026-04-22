@@ -23,10 +23,6 @@
 
 package org.lattejava.jwt.jwks;
 
-import com.fasterxml.jackson.annotation.JsonAnyGetter;
-import com.fasterxml.jackson.annotation.JsonAnySetter;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.KeyType;
 import org.lattejava.jwt.LatteJSONProcessor;
@@ -47,11 +43,9 @@ import java.util.Set;
  * A JSON Web Key as defined by <a href="https://tools.ietf.org/html/rfc7517#section-4">RFC 7517 §4</a>
  * and <a href="https://tools.ietf.org/html/rfc7518">RFC 7518</a>.
  *
- * <p>Construct via {@link #builder()} for fluent immutable-style construction or
- * via {@link #fromMap(Map)} for JSON-driven construction. Public fields and
- * a no-arg constructor are retained for back-compat with the legacy 6.x test
- * surface and for Jackson-style serialization; new code should prefer the
- * builder.</p>
+ * <p>Immutable value type. Construct via {@link #builder()} for fluent
+ * construction or via {@link #fromMap(Map)} for JSON-driven construction.
+ * Read state through the typed accessors ({@link #alg()}, {@link #kty()}, ...).
  *
  * <p>{@link #toString()} <strong>always</strong> redacts the private-key
  * material fields (d, dp, dq, p, q, qi) to {@code "***"}. Use
@@ -61,7 +55,7 @@ import java.util.Set;
  *
  * @author The Latte Project
  */
-public class JSONWebKey {
+public final class JSONWebKey {
   /** RFC 7517 / 7518 typed parameter names this class binds to its own fields. */
   static final Set<String> REGISTERED_PARAMETER_NAMES = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
       "alg", "crv", "kid", "kty", "use", "key_ops", "x5u",
@@ -69,66 +63,159 @@ public class JSONWebKey {
       "x", "y", "x5c", "x5t", "x5t#S256", "x5t_256"
   )));
 
-  public Algorithm alg;
+  private final Algorithm alg;
 
-  public String crv;
+  private final String crv;
 
-  public String d;
+  private final String d;
 
-  public String dp;
+  private final String dp;
 
-  public String dq;
+  private final String dq;
 
-  public String e;
+  private final String e;
 
-  public String kid;
+  private final String kid;
 
-  public KeyType kty;
+  private final KeyType kty;
 
-  public List<String> key_ops;
+  private final List<String> key_ops;
 
-  public String n;
+  private final String n;
 
-  @JsonAnySetter
-  public Map<String, Object> other = new LinkedHashMap<>();
+  private final Map<String, Object> other;
 
-  public String p;
+  private final String p;
 
-  public String q;
+  private final String q;
 
-  public String qi;
+  private final String qi;
 
-  public String use;
+  private final String use;
 
-  public String x;
+  private final String x;
 
-  public List<String> x5c;
+  private final List<String> x5c;
 
-  public String x5t;
+  private final String x5t;
 
-  @JsonProperty("x5t#S256")
-  public String x5t_256;
+  private final String x5t_256;
 
-  public String x5u;
+  private final String x5u;
 
-  public String y;
+  private final String y;
+
+  private JSONWebKey(Builder b) {
+    this.alg = b.alg;
+    this.crv = b.crv;
+    this.d = b.d;
+    this.dp = b.dp;
+    this.dq = b.dq;
+    this.e = b.e;
+    this.kid = b.kid;
+    this.kty = b.kty;
+    this.key_ops = b.key_ops == null ? null : Collections.unmodifiableList(new java.util.ArrayList<>(b.key_ops));
+    this.n = b.n;
+    this.other = Collections.unmodifiableMap(new LinkedHashMap<>(b.other));
+    this.p = b.p;
+    this.q = b.q;
+    this.qi = b.qi;
+    this.use = b.use;
+    this.x = b.x;
+    this.x5c = b.x5c == null ? null : Collections.unmodifiableList(new java.util.ArrayList<>(b.x5c));
+    this.x5t = b.x5t;
+    this.x5t_256 = b.x5t_256;
+    this.x5u = b.x5u;
+    this.y = b.y;
+  }
+
+  // ---------- Typed accessors ----------
+
+  public Algorithm alg() {
+    return alg;
+  }
+
+  public String crv() {
+    return crv;
+  }
+
+  public String d() {
+    return d;
+  }
+
+  public String dp() {
+    return dp;
+  }
+
+  public String dq() {
+    return dq;
+  }
+
+  public String e() {
+    return e;
+  }
+
+  public String kid() {
+    return kid;
+  }
+
+  public KeyType kty() {
+    return kty;
+  }
+
+  public List<String> key_ops() {
+    return key_ops;
+  }
+
+  public String n() {
+    return n;
+  }
+
+  public String p() {
+    return p;
+  }
+
+  public String q() {
+    return q;
+  }
+
+  public String qi() {
+    return qi;
+  }
+
+  public String use() {
+    return use;
+  }
+
+  public String x() {
+    return x;
+  }
+
+  public List<String> x5c() {
+    return x5c;
+  }
+
+  public String x5t() {
+    return x5t;
+  }
+
+  public String x5t_256() {
+    return x5t_256;
+  }
+
+  public String x5u() {
+    return x5u;
+  }
+
+  public String y() {
+    return y;
+  }
 
   /**
-   * Add a custom (non-registered) JWK parameter. Registered parameter names
-   * (e.g. {@code "alg"}, {@code "x5t#S256"}) MUST be set via the typed fields;
-   * calling this for a registered name throws {@link JSONWebKeyBuilderException}.
-   *
-   * @param name  the parameter name
-   * @param value the value
-   * @return this instance for chaining
+   * Returns the unmodifiable map of custom (non-registered) JWK parameters.
    */
-  public JSONWebKey add(String name, Object value) {
-    Objects.requireNonNull(name, "name");
-    if (REGISTERED_PARAMETER_NAMES.contains(name)) {
-      throw new JSONWebKeyBuilderException("Cannot add a registered JWK parameter [" + name + "]; set it via the typed field.");
-    }
-    other.put(name, value);
-    return this;
+  public Map<String, Object> other() {
+    return other;
   }
 
   // ---------- Custom-parameter access ----------
@@ -166,19 +253,12 @@ public class JSONWebKey {
     }
   }
 
-  /** Jackson {@code @JsonAnyGetter}: emit non-registered members as JSON top-level keys. */
-  @JsonAnyGetter
-  public Map<String, Object> getOther() {
-    return other;
-  }
-
   // ---------- Serialization ----------
 
   /**
    * Map suitable for JSON serialization. The Java field {@code x5t_256} is
    * emitted under the wire-form key {@code "x5t#S256"} per RFC 7517 §4.9.
    */
-  @JsonIgnore
   public Map<String, Object> toSerializableMap() {
     Map<String, Object> out = new LinkedHashMap<>();
     if (alg != null) out.put("alg", alg.name());
@@ -201,11 +281,9 @@ public class JSONWebKey {
     if (x5c != null) out.put("x5c", x5c);
     if (x5t != null) out.put("x5t", x5t);
     if (x5t_256 != null) out.put("x5t#S256", x5t_256);
-    if (other != null) {
-      for (Map.Entry<String, Object> entry : other.entrySet()) {
-        if (entry.getValue() != null) {
-          out.put(entry.getKey(), entry.getValue());
-        }
+    for (Map.Entry<String, Object> entry : other.entrySet()) {
+      if (entry.getValue() != null) {
+        out.put(entry.getKey(), entry.getValue());
       }
     }
     return Collections.unmodifiableMap(out);
@@ -219,21 +297,21 @@ public class JSONWebKey {
   @SuppressWarnings("unchecked")
   public static JSONWebKey fromMap(Map<String, Object> map) {
     Objects.requireNonNull(map, "map");
-    JSONWebKey k = new JSONWebKey();
+    Builder b = new Builder();
     for (Map.Entry<String, Object> entry : map.entrySet()) {
       String name = entry.getKey();
       Object value = entry.getValue();
       if (value == null) continue;
       switch (name) {
         case "alg":
-          k.alg = value instanceof Algorithm ? (Algorithm) value : Algorithm.of(value.toString());
+          b.alg = value instanceof Algorithm ? (Algorithm) value : Algorithm.of(value.toString());
           break;
-        case "crv":  k.crv = value.toString(); break;
-        case "kid":  k.kid = value.toString(); break;
+        case "crv":  b.crv = value.toString(); break;
+        case "kid":  b.kid = value.toString(); break;
         case "kty":
-          k.kty = value instanceof KeyType ? (KeyType) value : KeyType.of(value.toString());
+          b.kty = value instanceof KeyType ? (KeyType) value : KeyType.of(value.toString());
           break;
-        case "use":  k.use = value.toString(); break;
+        case "use":  b.use = value.toString(); break;
         case "key_ops":
           if (!(value instanceof List)) {
             throw new IllegalArgumentException("JWK parameter [key_ops] must be an array of strings");
@@ -245,19 +323,19 @@ public class JSONWebKey {
             }
             ops.add((String) element);
           }
-          k.key_ops = ops;
+          b.key_ops = ops;
           break;
-        case "x5u":  k.x5u = value.toString(); break;
-        case "d":    k.d = value.toString(); break;
-        case "dp":   k.dp = value.toString(); break;
-        case "dq":   k.dq = value.toString(); break;
-        case "e":    k.e = value.toString(); break;
-        case "n":    k.n = value.toString(); break;
-        case "p":    k.p = value.toString(); break;
-        case "q":    k.q = value.toString(); break;
-        case "qi":   k.qi = value.toString(); break;
-        case "x":    k.x = value.toString(); break;
-        case "y":    k.y = value.toString(); break;
+        case "x5u":  b.x5u = value.toString(); break;
+        case "d":    b.d = value.toString(); break;
+        case "dp":   b.dp = value.toString(); break;
+        case "dq":   b.dq = value.toString(); break;
+        case "e":    b.e = value.toString(); break;
+        case "n":    b.n = value.toString(); break;
+        case "p":    b.p = value.toString(); break;
+        case "q":    b.q = value.toString(); break;
+        case "qi":   b.qi = value.toString(); break;
+        case "x":    b.x = value.toString(); break;
+        case "y":    b.y = value.toString(); break;
         case "x5c":
           if (!(value instanceof List)) {
             throw new IllegalArgumentException("JWK parameter [x5c] must be an array of strings");
@@ -269,16 +347,16 @@ public class JSONWebKey {
             }
             chain.add((String) element);
           }
-          k.x5c = chain;
+          b.x5c = chain;
           break;
-        case "x5t":  k.x5t = value.toString(); break;
-        case "x5t#S256": k.x5t_256 = value.toString(); break;
+        case "x5t":  b.x5t = value.toString(); break;
+        case "x5t#S256": b.x5t_256 = value.toString(); break;
         default:
-          k.other.put(name, value);
+          b.other.put(name, value);
           break;
       }
     }
-    return k;
+    return b.build();
   }
 
   public String toJSON() {
@@ -290,25 +368,25 @@ public class JSONWebKey {
    * (d, dp, dq, p, q, qi). Safe to serve from a public JWKS endpoint.
    */
   public JSONWebKey toPublicJSONWebKey() {
-    JSONWebKey copy = new JSONWebKey();
-    copy.alg = alg;
-    copy.crv = crv;
-    copy.kid = kid;
-    copy.kty = kty;
-    copy.use = use;
-    copy.key_ops = key_ops;
-    copy.x5u = x5u;
-    copy.e = e;
-    copy.n = n;
-    copy.x = x;
-    copy.y = y;
-    copy.x5c = x5c;
-    copy.x5t = x5t;
-    copy.x5t_256 = x5t_256;
-    if (other != null) {
-      copy.other.putAll(other);
+    Builder b = new Builder()
+        .alg(alg)
+        .crv(crv)
+        .kid(kid)
+        .kty(kty)
+        .use(use)
+        .keyOps(key_ops)
+        .x5u(x5u)
+        .e(e)
+        .n(n)
+        .x(x)
+        .y(y)
+        .x5c(x5c)
+        .x5t(x5t)
+        .x5t_256(x5t_256);
+    for (Map.Entry<String, Object> entry : other.entrySet()) {
+      b.parameter(entry.getKey(), entry.getValue());
     }
-    return copy;
+    return b.build();
   }
 
   // ---------- Static convenience methods ----------
@@ -396,32 +474,52 @@ public class JSONWebKey {
   }
 
   /**
-   * Fluent builder for {@link JSONWebKey}. Calling {@link #build()} returns a
-   * new instance; the builder may be reused.
+   * Mutable, reusable builder for {@link JSONWebKey}. Calling {@link #build()}
+   * produces a new immutable instance; the builder may be reused.
    */
   public static final class Builder {
-    private final JSONWebKey k = new JSONWebKey();
+    private Algorithm alg;
+    private String crv;
+    private String d;
+    private String dp;
+    private String dq;
+    private String e;
+    private String kid;
+    private KeyType kty;
+    private List<String> key_ops;
+    private String n;
+    private final Map<String, Object> other = new LinkedHashMap<>();
+    private String p;
+    private String q;
+    private String qi;
+    private String use;
+    private String x;
+    private List<String> x5c;
+    private String x5t;
+    private String x5t_256;
+    private String x5u;
+    private String y;
 
-    public Builder alg(Algorithm v)          { k.alg = v; return this; }
-    public Builder crv(String v)             { k.crv = v; return this; }
-    public Builder kid(String v)             { k.kid = v; return this; }
-    public Builder kty(KeyType v)            { k.kty = v; return this; }
-    public Builder use(String v)             { k.use = v; return this; }
-    public Builder keyOps(List<String> v)    { k.key_ops = v; return this; }
-    public Builder x5u(String v)             { k.x5u = v; return this; }
-    public Builder d(String v)               { k.d = v; return this; }
-    public Builder dp(String v)              { k.dp = v; return this; }
-    public Builder dq(String v)              { k.dq = v; return this; }
-    public Builder e(String v)               { k.e = v; return this; }
-    public Builder n(String v)               { k.n = v; return this; }
-    public Builder p(String v)               { k.p = v; return this; }
-    public Builder q(String v)               { k.q = v; return this; }
-    public Builder qi(String v)              { k.qi = v; return this; }
-    public Builder x(String v)               { k.x = v; return this; }
-    public Builder y(String v)               { k.y = v; return this; }
-    public Builder x5c(List<String> v)       { k.x5c = v; return this; }
-    public Builder x5t(String v)             { k.x5t = v; return this; }
-    public Builder x5t_256(String v)         { k.x5t_256 = v; return this; }
+    public Builder alg(Algorithm v)          { this.alg = v; return this; }
+    public Builder crv(String v)             { this.crv = v; return this; }
+    public Builder kid(String v)             { this.kid = v; return this; }
+    public Builder kty(KeyType v)            { this.kty = v; return this; }
+    public Builder use(String v)             { this.use = v; return this; }
+    public Builder keyOps(List<String> v)    { this.key_ops = v; return this; }
+    public Builder x5u(String v)             { this.x5u = v; return this; }
+    public Builder d(String v)               { this.d = v; return this; }
+    public Builder dp(String v)              { this.dp = v; return this; }
+    public Builder dq(String v)              { this.dq = v; return this; }
+    public Builder e(String v)               { this.e = v; return this; }
+    public Builder n(String v)               { this.n = v; return this; }
+    public Builder p(String v)               { this.p = v; return this; }
+    public Builder q(String v)               { this.q = v; return this; }
+    public Builder qi(String v)              { this.qi = v; return this; }
+    public Builder x(String v)               { this.x = v; return this; }
+    public Builder y(String v)               { this.y = v; return this; }
+    public Builder x5c(List<String> v)       { this.x5c = v; return this; }
+    public Builder x5t(String v)             { this.x5t = v; return this; }
+    public Builder x5t_256(String v)         { this.x5t_256 = v; return this; }
 
     /**
      * Add a custom (non-registered) JWK parameter. Registered parameters MUST
@@ -429,34 +527,16 @@ public class JSONWebKey {
      * {@link JSONWebKeyBuilderException}.
      */
     public Builder parameter(String name, Object value) {
-      k.add(name, value);
+      Objects.requireNonNull(name, "name");
+      if (REGISTERED_PARAMETER_NAMES.contains(name)) {
+        throw new JSONWebKeyBuilderException("Cannot add a registered JWK parameter [" + name + "]; set it via the typed builder method.");
+      }
+      other.put(name, value);
       return this;
     }
 
     public JSONWebKey build() {
-      JSONWebKey out = new JSONWebKey();
-      out.alg = k.alg;
-      out.crv = k.crv;
-      out.kid = k.kid;
-      out.kty = k.kty;
-      out.use = k.use;
-      out.key_ops = k.key_ops;
-      out.x5u = k.x5u;
-      out.d = k.d;
-      out.dp = k.dp;
-      out.dq = k.dq;
-      out.e = k.e;
-      out.n = k.n;
-      out.p = k.p;
-      out.q = k.q;
-      out.qi = k.qi;
-      out.x = k.x;
-      out.y = k.y;
-      out.x5c = k.x5c;
-      out.x5t = k.x5t;
-      out.x5t_256 = k.x5t_256;
-      out.other.putAll(k.other);
-      return out;
+      return new JSONWebKey(this);
     }
   }
 }

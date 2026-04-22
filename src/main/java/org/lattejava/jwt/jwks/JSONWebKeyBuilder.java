@@ -203,22 +203,22 @@ public class JSONWebKeyBuilder {
       return base;
     }
 
-    Algorithm alg = base.alg != null ? base.alg : determineKeyAlgorithm(x509Certificate);
+    Algorithm alg = base.alg() != null ? base.alg() : determineKeyAlgorithm(x509Certificate);
 
     try {
       String encodedCertificate = new String(Base64.getEncoder().encode(certificate.getEncoded()));
       // Rebuild using the existing fields plus alg + x5c chain.
       return JSONWebKey.builder()
           .alg(alg)
-          .crv(base.crv)
-          .kid(base.kid)
-          .kty(base.kty)
-          .use(base.use)
-          .keyOps(base.key_ops)
-          .x5u(base.x5u)
-          .d(base.d).dp(base.dp).dq(base.dq).e(base.e).n(base.n)
-          .p(base.p).q(base.q).qi(base.qi)
-          .x(base.x).y(base.y)
+          .crv(base.crv())
+          .kid(base.kid())
+          .kty(base.kty())
+          .use(base.use())
+          .keyOps(base.key_ops())
+          .x5u(base.x5u())
+          .d(base.d()).dp(base.dp()).dq(base.dq()).e(base.e()).n(base.n())
+          .p(base.p()).q(base.q()).qi(base.qi())
+          .x(base.x()).y(base.y())
           .x5c(Collections.singletonList(encodedCertificate))
           .x5t(JWTUtils.generateJWS_x5t(encodedCertificate))
           .x5t_256(JWTUtils.generateJWS_x5t("SHA-256", encodedCertificate))

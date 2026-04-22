@@ -361,10 +361,11 @@ public class JWTUtilsTest extends BaseTest {
   public void jws_kid_rsaControl() {
     // Control example from RFC 7638
     // https://tools.ietf.org/html/rfc7638#section-3.1
-    JSONWebKey rsaKey = new JSONWebKey();
-    rsaKey.kty = KeyType.RSA;
-    rsaKey.n = "0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw";
-    rsaKey.e = "AQAB";
+    JSONWebKey rsaKey = JSONWebKey.builder()
+        .kty(KeyType.RSA)
+        .n("0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw")
+        .e("AQAB")
+        .build();
 
     // SHA-1
     assertEquals(JWTUtils.generateJWS_kid(rsaKey), "nMGlFRw9Y5POaSOaIaRBc9P2nfA");
@@ -379,10 +380,11 @@ public class JWTUtilsTest extends BaseTest {
   public void jws_kid_pssControl() {
     // Same elements as rsa control, but we have a different key type,
     // so we'll get different sha values.
-    JSONWebKey pssKey = new JSONWebKey();
-    pssKey.kty = KeyType.RSASSA_PSS;
-    pssKey.n = "0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw";
-    pssKey.e = "AQAB";
+    JSONWebKey pssKey = JSONWebKey.builder()
+        .kty(KeyType.RSASSA_PSS)
+        .n("0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw")
+        .e("AQAB")
+        .build();
 
     // SHA-1
     assertEquals(JWTUtils.generateJWS_kid(pssKey), "cQP8OQaKDsN3IcB7kS48XMywclQ");
@@ -395,11 +397,12 @@ public class JWTUtilsTest extends BaseTest {
 
   @Test
   public void jws_kid_ec() {
-    JSONWebKey ecKey = new JSONWebKey();
-    ecKey.kty = KeyType.EC;
-    ecKey.crv = "P-256";
-    ecKey.x = "MKBCTNIcKUSDii11ySs3526iDZ8AiTo7Tu6KPAqv7D4";
-    ecKey.y = "4Etl6SRW2YiLUrN5vfvVHuhp7x8PxltmWWlbbM4IFyM";
+    JSONWebKey ecKey = JSONWebKey.builder()
+        .kty(KeyType.EC)
+        .crv("P-256")
+        .x("MKBCTNIcKUSDii11ySs3526iDZ8AiTo7Tu6KPAqv7D4")
+        .y("4Etl6SRW2YiLUrN5vfvVHuhp7x8PxltmWWlbbM4IFyM")
+        .build();
 
     // SHA-1
     assertEquals(JWTUtils.generateJWS_kid(ecKey), "VHriznG7vJAFpXMXRmGgAkA5sEE");
@@ -414,10 +417,11 @@ public class JWTUtilsTest extends BaseTest {
   public void jws_kid_eddsa() {
     // Control example from RFC 8037 (the SHA-256 thumbprint)
     // https://www.rfc-editor.org/rfc/rfc8037.html#appendix-A.3
-    JSONWebKey eddsaKey = new JSONWebKey();
-    eddsaKey.kty = KeyType.OKP;
-    eddsaKey.crv = "Ed25519";
-    eddsaKey.x = "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo";
+    JSONWebKey eddsaKey = JSONWebKey.builder()
+        .kty(KeyType.OKP)
+        .crv("Ed25519")
+        .x("11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo")
+        .build();
 
     // SHA-1
     assertEquals(JWTUtils.generateJWS_kid(eddsaKey), "VmxEWEmFxGLRPOX30HXyts0yJOE");

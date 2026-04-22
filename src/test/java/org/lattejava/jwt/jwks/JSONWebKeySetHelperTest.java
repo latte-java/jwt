@@ -74,8 +74,8 @@ public class JSONWebKeySetHelperTest extends BaseTest {
 
     List<JSONWebKey> keys = JSONWebKeySetHelper.retrieveKeysFromJWKS("http://localhost:" + PORT + "/jwks.json");
     assertEquals(keys.size(), 2);
-    assertEquals(keys.get(0).kid, "a");
-    assertEquals(keys.get(1).kid, "b");
+    assertEquals(keys.get(0).kid(), "a");
+    assertEquals(keys.get(1).kid(), "b");
   }
 
   // Use case: Response of exactly maxResponseBytes accepted

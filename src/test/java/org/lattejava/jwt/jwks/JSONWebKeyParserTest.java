@@ -21,7 +21,7 @@ import org.lattejava.jwt.JWTUtils;
 import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.KeyPair;
 import org.lattejava.jwt.KeyType;
-import org.lattejava.jwt.json.Mapper;
+import org.lattejava.jwt.LatteJSONProcessor;
 import org.lattejava.jwt.pem.PEM;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -84,21 +84,17 @@ public class JSONWebKeyParserTest extends BaseJWTTest {
     // Just parsing, expecting no explosions.
 
     // EC 256 Certificate
-    byte[] certificate256 = Files.readAllBytes(Paths.get("src/test/resources/jwk/ec_certificate_p_256.json"));
-    JSONWebKey.parse(Mapper.deserialize(certificate256, JSONWebKey.class));
+    JSONWebKey.parse(loadJWK("src/test/resources/jwk/ec_certificate_p_256.json"));
 
     // EC 384 Certificate
-    byte[] certificate384 = Files.readAllBytes(Paths.get("src/test/resources/jwk/ec_certificate_p_384.json"));
-    JSONWebKey.parse(Mapper.deserialize(certificate384, JSONWebKey.class));
+    JSONWebKey.parse(loadJWK("src/test/resources/jwk/ec_certificate_p_384.json"));
 
     // EC 521 Certificate
-    byte[] certificate521 = Files.readAllBytes(Paths.get("src/test/resources/jwk/ec_certificate_p_521.json"));
-    JSONWebKey.parse(Mapper.deserialize(certificate521, JSONWebKey.class));
+    JSONWebKey.parse(loadJWK("src/test/resources/jwk/ec_certificate_p_521.json"));
 
     // Hacked public key
-    byte[] hacked256 = Files.readAllBytes(Paths.get("src/test/resources/jwk/ec_certificate_hacked_x5c_p_256.json"));
     try {
-      JSONWebKey.parse(Mapper.deserialize(hacked256, JSONWebKey.class));
+      JSONWebKey.parse(loadJWK("src/test/resources/jwk/ec_certificate_hacked_x5c_p_256.json"));
       fail("Expected an exception");
     } catch (JSONWebKeyParserException expected) {
       assertEquals(expected.getMessage(),
@@ -111,13 +107,11 @@ public class JSONWebKeyParserTest extends BaseJWTTest {
     // Just parsing, expecting no explosions.
 
     // RSA 2048 bit Certificate
-    byte[] certificate256 = Files.readAllBytes(Paths.get("src/test/resources/jwk/rsa_certificate_2048.json"));
-    JSONWebKey.parse(Mapper.deserialize(certificate256, JSONWebKey.class));
+    JSONWebKey.parse(loadJWK("src/test/resources/jwk/rsa_certificate_2048.json"));
 
     // Hacked public key
-    byte[] hacked256 = Files.readAllBytes(Paths.get("src/test/resources/jwk/rsa_certificate_hacked_x5c_2048.json"));
     try {
-      JSONWebKey.parse(Mapper.deserialize(hacked256, JSONWebKey.class));
+      JSONWebKey.parse(loadJWK("src/test/resources/jwk/rsa_certificate_hacked_x5c_2048.json"));
       fail("Expected an exception");
     } catch (JSONWebKeyParserException expected) {
       assertEquals(expected.getMessage(),
@@ -127,45 +121,47 @@ public class JSONWebKeyParserTest extends BaseJWTTest {
 
   @Test(dataProvider = "ecPublicKeys")
   public void parse_ec_keys(String curve, String x, String y) {
-    JSONWebKey expected = new JSONWebKey();
-    expected.crv = curve;
-    expected.kty = KeyType.EC;
-    expected.x = x;
-    expected.y = y;
+    JSONWebKey expected = JSONWebKey.builder()
+        .crv(curve)
+        .kty(KeyType.EC)
+        .x(x)
+        .y(y)
+        .build();
 
     PublicKey publicKey = JSONWebKey.parse(expected);
     assertNotNull(publicKey);
 
     // Compare to the original expected key
     String encodedPEM = PEM.encode(publicKey);
-    assertEquals(JSONWebKey.build(encodedPEM).x, expected.x);
-    assertEquals(JSONWebKey.build(encodedPEM).y, expected.y);
+    assertEquals(JSONWebKey.build(encodedPEM).x(), expected.x());
+    assertEquals(JSONWebKey.build(encodedPEM).y(), expected.y());
 
     // Get the public key from the PEM, and assert against the expected values
     PEM pem = PEM.decode(encodedPEM);
-    assertEquals(JSONWebKey.build(pem.publicKey).x, expected.x);
-    assertEquals(JSONWebKey.build(pem.publicKey).y, expected.y);
+    assertEquals(JSONWebKey.build(pem.publicKey).x(), expected.x());
+    assertEquals(JSONWebKey.build(pem.publicKey).y(), expected.y());
   }
 
   @Test(dataProvider = "rsaPublicKeys")
   public void parse_well_known(String exponent, String modulus) {
-    JSONWebKey expected = new JSONWebKey();
-    expected.kty = KeyType.RSA;
-    expected.e = exponent;
-    expected.n = modulus;
+    JSONWebKey expected = JSONWebKey.builder()
+        .kty(KeyType.RSA)
+        .e(exponent)
+        .n(modulus)
+        .build();
 
     PublicKey publicKey = JSONWebKey.parse(expected);
     assertNotNull(publicKey);
 
     // Compare to the original expected key
     String encodedPEM = PEM.encode(publicKey);
-    assertEquals(JSONWebKey.build(encodedPEM).n, expected.n);
-    assertEquals(JSONWebKey.build(encodedPEM).e, expected.e);
+    assertEquals(JSONWebKey.build(encodedPEM).n(), expected.n());
+    assertEquals(JSONWebKey.build(encodedPEM).e(), expected.e());
 
     // Get the public key from the PEM, and assert against the expected values
     PEM pem = PEM.decode(encodedPEM);
-    assertEquals(JSONWebKey.build(pem.publicKey).n, expected.n);
-    assertEquals(JSONWebKey.build(pem.publicKey).e, expected.e);
+    assertEquals(JSONWebKey.build(pem.publicKey).n(), expected.n());
+    assertEquals(JSONWebKey.build(pem.publicKey).e(), expected.e());
   }
 
   @Test
@@ -180,18 +176,18 @@ public class JSONWebKeyParserTest extends BaseJWTTest {
     BigInteger controlE = ((RSAPublicKey) pem.publicKey).getPublicExponent();
 
     // Now decode, and then re-encode the modulus to ensure we can go round trip and not mess it up.
-    BigInteger bigIntegerN = base64DecodeUint(key.n);
+    BigInteger bigIntegerN = base64DecodeUint(key.n());
     String encodedN = base64EncodeUint(bigIntegerN);
 
     assertEquals(controlN, bigIntegerN);
-    assertEquals(key.n, encodedN);
+    assertEquals(key.n(), encodedN);
 
     // Now decode, and then re-encode the exponent to ensure we can go round trip and not mess it up.
-    BigInteger bigIntegerE = base64DecodeUint(key.e);
+    BigInteger bigIntegerE = base64DecodeUint(key.e());
     String encodedE = base64EncodeUint(bigIntegerE);
 
     assertEquals(controlE, bigIntegerE);
-    assertEquals(key.e, encodedE);
+    assertEquals(key.e(), encodedE);
   }
 
   @Test(invocationCount = 1_000)
@@ -199,21 +195,34 @@ public class JSONWebKeyParserTest extends BaseJWTTest {
     KeyPair keyPair = JWTUtils.generate256_ECKeyPair();
 
     // Build a JSON Web Key from our own EC key pair
-    JSONWebKey expected = JSONWebKey.build(keyPair.publicKey);
-    expected.alg = Algorithm.ES256;
+    JSONWebKey base = JSONWebKey.build(keyPair.publicKey);
+    JSONWebKey expected = JSONWebKey.builder()
+        .alg(Algorithm.ES256)
+        .crv(base.crv())
+        .kid(base.kid())
+        .kty(base.kty())
+        .use(base.use())
+        .keyOps(base.key_ops())
+        .x5u(base.x5u())
+        .e(base.e()).n(base.n())
+        .x(base.x()).y(base.y())
+        .x5c(base.x5c())
+        .x5t(base.x5t())
+        .x5t_256(base.x5t_256())
+        .build();
 
     PublicKey publicKey = JSONWebKey.parse(expected);
     assertNotNull(publicKey);
 
     // Compare to the original expected key
     String encodedPEM = PEM.encode(publicKey);
-    assertEquals(JSONWebKey.build(encodedPEM).x, expected.x);
-    assertEquals(JSONWebKey.build(encodedPEM).y, expected.y);
+    assertEquals(JSONWebKey.build(encodedPEM).x(), expected.x());
+    assertEquals(JSONWebKey.build(encodedPEM).y(), expected.y());
 
     // Get the public key from the PEM, and assert against the expected values
     PEM pem = PEM.decode(encodedPEM);
-    assertEquals(JSONWebKey.build(pem.publicKey).x, expected.x);
-    assertEquals(JSONWebKey.build(pem.publicKey).y, expected.y);
+    assertEquals(JSONWebKey.build(pem.publicKey).x(), expected.x());
+    assertEquals(JSONWebKey.build(pem.publicKey).y(), expected.y());
   }
 
   @DataProvider(name = "EdDSACurves")
@@ -231,36 +240,45 @@ public class JSONWebKeyParserTest extends BaseJWTTest {
         : JWTUtils.generate_ed448_EdDSAKeyPair();
 
     // Build a JSON Web Key from our own EdDSA key pair
-    JSONWebKey expectedPublicJWK = JSONWebKey.build(keyPair.publicKey);
-    expectedPublicJWK.alg = Algorithm.Ed25519;
-    expectedPublicJWK.kty = KeyType.OKP;
-    assertNotNull(expectedPublicJWK.x);
-    assertNull(expectedPublicJWK.y);
+    JSONWebKey publicBase = JSONWebKey.build(keyPair.publicKey);
+    JSONWebKey expectedPublicJWK = JSONWebKey.builder()
+        .alg(Algorithm.Ed25519)
+        .crv(publicBase.crv())
+        .kty(KeyType.OKP)
+        .x(publicBase.x())
+        .build();
+    assertNotNull(expectedPublicJWK.x());
+    assertNull(expectedPublicJWK.y());
 
     PublicKey publicKey = JSONWebKey.parse(expectedPublicJWK);
     assertNotNull(publicKey);
 
     // Compare to the original expected key
     String encodedPublicPEM = PEM.encode(publicKey);
-    assertEquals(JSONWebKey.build(encodedPublicPEM).x, expectedPublicJWK.x);
+    assertEquals(JSONWebKey.build(encodedPublicPEM).x(), expectedPublicJWK.x());
 
     // Get the public key from the PEM, and assert against the expected values
     PEM pem = PEM.decode(encodedPublicPEM);
-    assertEquals(JSONWebKey.build(pem.publicKey).x, expectedPublicJWK.x);
+    assertEquals(JSONWebKey.build(pem.publicKey).x(), expectedPublicJWK.x());
 
     // Build a JWK of the private key
-    JSONWebKey expectedPrivateJWK = JSONWebKey.build(keyPair.privateKey);
-    expectedPrivateJWK.alg = Algorithm.Ed25519;
-    expectedPrivateJWK.kty = KeyType.OKP;
-    assertNotNull(expectedPrivateJWK.d);
-    assertNotNull(expectedPrivateJWK.x);
-    assertNull(expectedPrivateJWK.e);
-    assertNull(expectedPrivateJWK.p);
-    assertNull(expectedPrivateJWK.q);
-    assertNull(expectedPrivateJWK.y);
+    JSONWebKey privateBase = JSONWebKey.build(keyPair.privateKey);
+    JSONWebKey expectedPrivateJWK = JSONWebKey.builder()
+        .alg(Algorithm.Ed25519)
+        .crv(privateBase.crv())
+        .kty(KeyType.OKP)
+        .d(privateBase.d())
+        .x(privateBase.x())
+        .build();
+    assertNotNull(expectedPrivateJWK.d());
+    assertNotNull(expectedPrivateJWK.x());
+    assertNull(expectedPrivateJWK.e());
+    assertNull(expectedPrivateJWK.p());
+    assertNull(expectedPrivateJWK.q());
+    assertNull(expectedPrivateJWK.y());
 
     // x should match between public and private
-    assertEquals(expectedPrivateJWK.x, expectedPublicJWK.x);
+    assertEquals(expectedPrivateJWK.x(), expectedPublicJWK.x());
   }
 
   @Test(invocationCount = 100)
@@ -268,21 +286,34 @@ public class JSONWebKeyParserTest extends BaseJWTTest {
     KeyPair keyPair = JWTUtils.generate2048_RSAKeyPair();
 
     // Build a JSON Web Key from our own RSA key pair
-    JSONWebKey expected = JSONWebKey.build(keyPair.publicKey);
-    expected.alg = Algorithm.RS256;
+    JSONWebKey base = JSONWebKey.build(keyPair.publicKey);
+    JSONWebKey expected = JSONWebKey.builder()
+        .alg(Algorithm.RS256)
+        .crv(base.crv())
+        .kid(base.kid())
+        .kty(base.kty())
+        .use(base.use())
+        .keyOps(base.key_ops())
+        .x5u(base.x5u())
+        .e(base.e()).n(base.n())
+        .x(base.x()).y(base.y())
+        .x5c(base.x5c())
+        .x5t(base.x5t())
+        .x5t_256(base.x5t_256())
+        .build();
 
     PublicKey publicKey = JSONWebKey.parse(expected);
     assertNotNull(publicKey);
 
     // Compare to the original expected key
     String encodedPEM = PEM.encode(publicKey);
-    assertEquals(JSONWebKey.build(encodedPEM).n, expected.n);
-    assertEquals(JSONWebKey.build(encodedPEM).e, expected.e);
+    assertEquals(JSONWebKey.build(encodedPEM).n(), expected.n());
+    assertEquals(JSONWebKey.build(encodedPEM).e(), expected.e());
 
     // Get the public key from the PEM, and assert against the expected values
     PEM pem = PEM.decode(encodedPEM);
-    assertEquals(JSONWebKey.build(pem.publicKey).n, expected.n);
-    assertEquals(JSONWebKey.build(pem.publicKey).e, expected.e);
+    assertEquals(JSONWebKey.build(pem.publicKey).n(), expected.n());
+    assertEquals(JSONWebKey.build(pem.publicKey).e(), expected.e());
   }
 
   @Test
@@ -345,5 +376,10 @@ public class JSONWebKeyParserTest extends BaseJWTTest {
     JSONWebKeyParser parser = new JSONWebKeyParser();
     assertTrue(parser.containsPrivateKeyParams(privateJwk));
     assertFalse(parser.containsPrivateKeyParams(publicJwk));
+  }
+
+  private static JSONWebKey loadJWK(String path) throws Exception {
+    byte[] bytes = Files.readAllBytes(Paths.get(path));
+    return JSONWebKey.fromMap(new LatteJSONProcessor().deserialize(bytes));
   }
 }

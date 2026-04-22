@@ -59,7 +59,7 @@ import static org.testng.Assert.assertEquals;
  */
 public class JSONWebKeyBuilderTest extends BaseJWTTest {
   @Test
-  public void add_named_properties() {
+  public void builder_parameter_rejects_registered_names() {
     Arrays.asList(
         "alg",
         "crv",
@@ -79,7 +79,8 @@ public class JSONWebKeyBuilderTest extends BaseJWTTest {
         "x5t",
         "x5t_256",
         "y"
-    ).forEach(key -> expectException(JSONWebKeyBuilderException.class, () -> new JSONWebKey().add(key, "Nunya, Business")));
+    ).forEach(key -> expectException(JSONWebKeyBuilderException.class,
+        () -> JSONWebKey.builder().parameter(key, "Nunya, Business")));
   }
 
   @Test
@@ -124,9 +125,24 @@ public class JSONWebKeyBuilderTest extends BaseJWTTest {
   public void extra_properties() throws Exception {
     // EC 256 Public key
     ECPublicKey ecPublic_p256 = PEM.decode(Paths.get("src/test/resources/ec_public_key_p_256.pem")).getPublicKey();
-    assertJSONEquals(JSONWebKey.build(ecPublic_p256)
-        .add("more", "cowbell")
-        .add("boom", "goes the dynamite"), "src/test/resources/jwk/extra_properties.json");
+    JSONWebKey base = JSONWebKey.build(ecPublic_p256);
+    JSONWebKey withExtras = JSONWebKey.builder()
+        .alg(base.alg())
+        .crv(base.crv())
+        .kid(base.kid())
+        .kty(base.kty())
+        .use(base.use())
+        .keyOps(base.key_ops())
+        .x5u(base.x5u())
+        .e(base.e()).n(base.n())
+        .x(base.x()).y(base.y())
+        .x5c(base.x5c())
+        .x5t(base.x5t())
+        .x5t_256(base.x5t_256())
+        .parameter("more", "cowbell")
+        .parameter("boom", "goes the dynamite")
+        .build();
+    assertJSONEquals(withExtras, "src/test/resources/jwk/extra_properties.json");
   }
 
   @Test
@@ -180,10 +196,8 @@ public class JSONWebKeyBuilderTest extends BaseJWTTest {
     JSONWebKey jwk = JSONWebKey.build(publicKey);
 
     Signer signer = RSASigner.newSHA256Signer(privateKey);
-    // LatteJSONProcessor does not reflect over POJOs (Jackson does); convert the JWK to a plain Map first.
-    @SuppressWarnings("unchecked")
-    Map<String, Object> jwkAsMap = org.lattejava.jwt.json.Mapper.deserialize(
-        org.lattejava.jwt.json.Mapper.serialize(jwk), Map.class);
+    // JSONWebKey exposes a Map view via toSerializableMap() -- no Jackson needed.
+    Map<String, Object> jwkAsMap = jwk.toSerializableMap();
     String encodedJWT = new org.lattejava.jwt.JWTEncoder().encode(jwt, signer, b -> {
       b.parameter("cty", "application/json");
       b.parameter("jwk", jwkAsMap);
@@ -192,10 +206,10 @@ public class JSONWebKeyBuilderTest extends BaseJWTTest {
     // Spec §10: JWTUtils.decodeHeader removed; use JWTDecoder.decodeUnsecured.
     Header header = new org.lattejava.jwt.JWTDecoder().decodeUnsecured(encodedJWT).header();
     assertEquals(header.get("cty"), "application/json");
-    assertEquals(((Map<?, ?>) header.get("jwk")).get("e"), jwk.e);
-    assertEquals(((Map<?, ?>) header.get("jwk")).get("kty"), jwk.kty.name());
-    assertEquals(((Map<?, ?>) header.get("jwk")).get("n"), jwk.n);
-    assertEquals(((Map<?, ?>) header.get("jwk")).get("use"), jwk.use);
+    assertEquals(((Map<?, ?>) header.get("jwk")).get("e"), jwk.e());
+    assertEquals(((Map<?, ?>) header.get("jwk")).get("kty"), jwk.kty().name());
+    assertEquals(((Map<?, ?>) header.get("jwk")).get("n"), jwk.n());
+    assertEquals(((Map<?, ?>) header.get("jwk")).get("use"), jwk.use());
   }
 
   @Test
