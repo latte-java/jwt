@@ -18,11 +18,12 @@ project(group: "org.lattejava", name: "latte-jwt", version: "1.0.0", licenses: [
 
   dependencies {
     group(name: "compile") {
-      dependency(id: "com.fasterxml.jackson.core:jackson-core:${jacksonVersion}")
-      dependency(id: "com.fasterxml.jackson.core:jackson-databind:${jacksonVersion}")
-      dependency(id: "com.fasterxml.jackson.core:jackson-annotations:2.21.0")
+
     }
     group(name: "test-compile", export: false) {
+      dependency(id: "com.fasterxml.jackson.core:jackson-core:${jacksonVersion}")
+      dependency(id: "com.fasterxml.jackson.core:jackson-databind:${jacksonVersion}")
+      //dependency(id: "com.fasterxml.jackson.core:jackson-annotations:2.21.0")
       dependency(id: "org.bouncycastle:bc-fips:2.1.2")
       dependency(id: "org.testng:testng:${testngVersion}")
       // Gets rid of SLF warnings on test run
@@ -39,12 +40,12 @@ project(group: "org.lattejava", name: "latte-jwt", version: "1.0.0", licenses: [
 }
 
 // Plugins
-dependency = loadPlugin(id: "org.lattejava.plugin:dependency:0.1.1")
-java = loadPlugin(id: "org.lattejava.plugin:java:0.1.1")
-javaTestNG = loadPlugin(id: "org.lattejava.plugin:java-testng:0.1.1")
-idea = loadPlugin(id: "org.lattejava.plugin:idea:0.1.1")
-release = loadPlugin(id: "org.lattejava.plugin:release-git:0.1.2")
-pom = loadPlugin(id: "org.lattejava.plugin:pom:0.1.1")
+dependency = loadPlugin(id: "org.lattejava.plugin:dependency:0.1.3")
+java = loadPlugin(id: "org.lattejava.plugin:java:0.1.3")
+javaTestNG = loadPlugin(id: "org.lattejava.plugin:java-testng:0.1.3")
+idea = loadPlugin(id: "org.lattejava.plugin:idea:0.1.3")
+release = loadPlugin(id: "org.lattejava.plugin:release-git:0.1.3")
+pom = loadPlugin(id: "org.lattejava.plugin:pom:0.1.3")
 
 java.settings.javaVersion = "21"
 javaTestNG.settings.javaVersion = "21"

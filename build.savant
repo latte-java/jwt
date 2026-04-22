@@ -39,11 +39,12 @@ project(group: "org.lattejava", name: "latte-jwt", version: "1.0.0", licenses: [
 
   dependencies {
     group(name: "compile") {
-      dependency(id: "com.fasterxml.jackson.core:jackson-core:${jacksonVersion}")
-      dependency(id: "com.fasterxml.jackson.core:jackson-databind:${jacksonVersion}")
-      dependency(id: "com.fasterxml.jackson.core:jackson-annotations:2.21.0")
+
     }
     group(name: "test-compile", export: false) {
+      dependency(id: "com.fasterxml.jackson.core:jackson-core:${jacksonVersion}")
+      dependency(id: "com.fasterxml.jackson.core:jackson-databind:${jacksonVersion}")
+      //dependency(id: "com.fasterxml.jackson.core:jackson-annotations:2.21.0")
       dependency(id: "org.bouncycastle:bc-fips:2.1.2")
       dependency(id: "org.testng:testng:7.9.0")
       // Gets rid of SLF warnings on test run

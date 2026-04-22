@@ -30,14 +30,6 @@ public class Tag {
   public static final int BitString = 3;
 
   /**
-   * GeneralizedTime Tag
-   * <p>
-   * 24 decimal, 0x18 hex. Used by RFC 5280 §4.1.2.5 for dates &gt;= 2050-01-01.
-   * </p>
-   */
-  public static final int GeneralizedTime = 24;
-
-  /**
    * Integer Tag
    */
   public static final int Integer = 2;
@@ -56,6 +48,14 @@ public class Tag {
    * Octet String Tag
    */
   public static final int OctetString = 4;
+
+  /**
+   * UTF-8 String Tag
+   * <p>
+   * 12 decimal, 0x0C hex.
+   * </p>
+   */
+  public static final int UTFString = 12;
 
   /**
    * PrintableString Tag
@@ -94,12 +94,12 @@ public class Tag {
   public static final int UTCTime = 23;
 
   /**
-   * UTF-8 String Tag
+   * GeneralizedTime Tag
    * <p>
-   * 12 decimal, 0x0C hex.
+   * 24 decimal, 0x18 hex. Used by RFC 5280 §4.1.2.5 for dates &gt;= 2050-01-01.
    * </p>
    */
-  public static final int UTFString = 12;
+  public static final int GeneralizedTime = 24;
 
   /**
    * True if this Tag is primitive. False if this Tag is constructed.
