@@ -19,6 +19,7 @@ package org.lattejava.jwt;
 import org.lattejava.jwt.json.Mapper;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.Arrays;
@@ -28,6 +29,14 @@ import java.util.Objects;
 import java.util.function.Function;
 
 /**
+ * TODO Checkpoint 5: full rewrite. This class is a transitional shim that
+ * keeps the build green after the {@link JWT}/{@link Header} model rewrite
+ * in Checkpoint 3. It deserializes the header / claim segments through the
+ * legacy {@link Mapper} into raw {@link Map} structures and then hydrates
+ * via the new {@link Header#fromMap(Map)} / {@link JWT#fromMap(Map, Header)}
+ * factories. Strict size / depth / number-length / crit understood-parameters
+ * checks all land in Checkpoint 5.
+ *
  * @author Daniel DeGroff
  */
 public class JWTDecoder {
@@ -36,9 +45,6 @@ public class JWTDecoder {
   /**
    * Decode the JWT using one of they provided verifiers. One more verifiers may be provided, the first verifier found
    * supporting the algorithm reported by the JWT header will be utilized.
-   * <p>
-   * A JWT that is expired or not yet valid will not be decoded, instead a {@link JWTExpiredException} or {@link
-   * JWTUnavailableForProcessingException} exception will be thrown respectively.
    *
    * @param encodedJWT The encoded JWT in string format.
    * @param verifiers  A map of verifiers.
@@ -50,16 +56,14 @@ public class JWTDecoder {
 
     String[] parts = getParts(encodedJWT);
 
-    Header header = Mapper.deserialize(base64Decode(parts[0]), Header.class);
-    Verifier verifier = Arrays.stream(verifiers).filter(v -> v.canVerify(header.algorithm)).findFirst().orElse(null);
+    Header header = parseHeader(parts[0]);
+    Verifier verifier = Arrays.stream(verifiers).filter(v -> v.canVerify(header.alg())).findFirst().orElse(null);
 
     return validate(encodedJWT, parts, header, verifier);
   }
 
   /**
    * Specify the number of seconds allowed for clock skew used for calculating the expiration and not before instants of a JWT.
-   * <p>
-   * The default value is <code>0</code>.
    *
    * @param clockSkew the number of seconds allowed for clock skew.
    * @return this
@@ -72,39 +76,29 @@ public class JWTDecoder {
   /**
    * Decode the JWT using one of they provided verifiers. A JWT header value named <code>kid</code> is expected to
    * contain the key to look up the correct verifier.
-   * <p>
-   * A JWT that is expired or not yet valid will not be decoded, instead a {@link JWTExpiredException} or {@link
-   * JWTUnavailableForProcessingException} exception will be thrown respectively.
    *
    * @param encodedJWT The encoded JWT in string format.
    * @param verifiers  A map of verifiers.
    * @return a decoded JWT.
    */
   public JWT decode(String encodedJWT, Map<String, Verifier> verifiers) {
-    return decode(encodedJWT, verifiers, h -> h.getString("kid"));
+    return decode(encodedJWT, verifiers, h -> h.kid());
   }
 
   /**
    * Decode the JWT using one of they provided verifiers. A JWT header value named <code>kid</code> is expected to
    * contain the key to look up the correct verifier.
-   * <p>
-   * A JWT that is expired or not yet valid will not be decoded, instead a {@link JWTExpiredException} or {@link
-   * JWTUnavailableForProcessingException} exception will be thrown respectively.
    *
    * @param encodedJWT       The encoded JWT in string format.
    * @param verifierFunction A function that takes a key identifier and returns a verifier.
    * @return a decoded JWT.
    */
   public JWT decode(String encodedJWT, Function<String, Verifier> verifierFunction) {
-    return decode(encodedJWT, verifierFunction, h -> h.getString("kid"));
+    return decode(encodedJWT, verifierFunction, h -> h.kid());
   }
 
   /**
-   * Decode the JWT using one of they provided verifiers. A JWT header value named <code>kid</code> is expected to
-   * contain the key to look up the correct verifier.
-   * <p>
-   * A JWT that is expired or not yet valid will not be decoded, instead a {@link JWTExpiredException} or {@link
-   * JWTUnavailableForProcessingException} exception will be thrown respectively.
+   * Decode the JWT using one of they provided verifiers.
    *
    * @param encodedJWT       The encoded JWT in string format.
    * @param verifierFunction A function that takes a key identifier returns a verifier.
@@ -121,7 +115,7 @@ public class JWTDecoder {
   private JWT decodeJWT(String encodedJWT, Function<String, Verifier> verifierFunction, Function<Header, String> keyFunction) {
     String[] parts = getParts(encodedJWT);
 
-    Header header = Mapper.deserialize(base64Decode(parts[0]), Header.class);
+    Header header = parseHeader(parts[0]);
     String key = keyFunction.apply(header);
     Verifier verifier = verifierFunction.apply(key);
 
@@ -129,12 +123,7 @@ public class JWTDecoder {
   }
 
   /**
-   * Decode the JWT using one of they provided verifiers. The key used to look up the correct verifier is provided by the
-   * <code>keyFunction</code>. The key function is provided the JWT header and is expected to return a string key to
-   * look up the correct verifier.
-   * <p>
-   * A JWT that is expired or not yet valid will not be decoded, instead a {@link JWTExpiredException} or {@link
-   * JWTUnavailableForProcessingException} exception will be thrown respectively.
+   * Decode the JWT using one of they provided verifiers.
    *
    * @param encodedJWT  The encoded JWT in string format.
    * @param verifiers   A map of verifiers.
@@ -148,30 +137,14 @@ public class JWTDecoder {
     return decodeJWT(encodedJWT, verifiers::get, keyFunction);
   }
 
-  /**
-   * Decode the provided base64 encoded string.
-   *
-   * @param string the input string to decode, it is expected to be a valid base64 encoded string.
-   * @return a decoded byte array
-   */
   private byte[] base64Decode(String string) {
     try {
-      // Equal to calling : .decode(string.getBytes(StandardCharsets.ISO_8859_1))
-      // If this is a properly base64 encoded string, decoding using ISO_8859_1 should be fine.
       return Base64.getUrlDecoder().decode(string);
     } catch (IllegalArgumentException e) {
       throw new InvalidJWTException("The encoded JWT is not properly Base64 encoded.", e);
     }
   }
 
-  /**
-   * Split the encoded JWT on a period (.), and return the parts.
-   * <p>
-   * A JWT will be in the format: <code>XXXXX.YYYYY.ZZZZZ</code>.
-   *
-   * @param encodedJWT the encoded form of the JWT
-   * @return an array of parts.
-   */
   private String[] getParts(String encodedJWT) {
     String[] parts = encodedJWT.split("\\.");
     if (parts.length == 3 || (parts.length == 2 && encodedJWT.endsWith("."))) {
@@ -181,46 +154,42 @@ public class JWTDecoder {
     throw new InvalidJWTException("The encoded JWT is not properly formatted. Expected a three part dot separated string.");
   }
 
-  /**
-   * Validate the encoded JWT and return the constructed JWT object if valid.
-   *
-   * @param encodedJWT the encoded JWT
-   * @param parts      the parts of the encoded JWT
-   * @param header     the JWT header
-   * @param verifier   the selected JWT verifier
-   * @return the constructed JWT object containing identity claims
-   */
+  @SuppressWarnings("unchecked")
+  private Header parseHeader(String segment) {
+    Map<String, Object> raw = Mapper.deserialize(base64Decode(segment), Map.class);
+    return Header.fromMap(raw);
+  }
+
+  @SuppressWarnings("unchecked")
+  private JWT parseClaims(String segment, Header header) {
+    Map<String, Object> raw = Mapper.deserialize(base64Decode(segment), Map.class);
+    return JWT.fromMap(raw, header);
+  }
+
   private JWT validate(String encodedJWT, String[] parts, Header header, Verifier verifier) {
-    // When parts.length == 2, we have no signature — always reject.
     if (parts.length == 2) {
       throw new MissingSignatureException("The JWT is missing a signature");
     }
 
     if (verifier == null) {
-      throw new MissingVerifierException("No Verifier has been provided for verify a signature signed using [" + header.algorithm.name() + "]");
+      throw new MissingVerifierException("No Verifier has been provided for verify a signature signed using [" + header.alg().name() + "]");
     }
 
-    // When the verifier has been selected based upon the 'kid' or other identifier in the header, we must verify it can verify the algorithm.
-    // - When multiple verifiers are provided to .decode w/out a kid, we may have already called 'canVerify', this is ok.
-    if (!verifier.canVerify(header.algorithm)) {
-      throw new MissingVerifierException("No Verifier has been provided for verify a signature signed using [" + header.algorithm.name() + "]");
+    if (!verifier.canVerify(header.alg())) {
+      throw new MissingVerifierException("No Verifier has been provided for verify a signature signed using [" + header.alg().name() + "]");
     }
 
     verifySignature(verifier, header, parts[2], encodedJWT);
 
-    // Signature is valid, verify time based JWT claims
-    JWT jwt = Mapper.deserialize(base64Decode(parts[1]), JWT.class);
-    jwt.header = header;
-    ZonedDateTime now = now();
+    JWT jwt = parseClaims(parts[1], header);
+    Instant now = nowInstant();
 
-    // Verify expiration claim
-    ZonedDateTime nowMinusSkew = now.minusSeconds(clockSkew);
+    Instant nowMinusSkew = now.minusSeconds(clockSkew);
     if (jwt.isExpired(nowMinusSkew)) {
       throw new JWTExpiredException();
     }
 
-    // Verify the notBefore claim
-    ZonedDateTime nowPlusSkew = now.plusSeconds(clockSkew);
+    Instant nowPlusSkew = now.plusSeconds(clockSkew);
     if (jwt.isUnavailableForProcessing(nowPlusSkew)) {
       throw new JWTUnavailableForProcessingException();
     }
@@ -229,27 +198,22 @@ public class JWTDecoder {
   }
 
   /**
-   * @return the 'now' to be used to validate 'exp' and 'nbf' claims.
+   * @return the 'now' to be used to validate 'exp' and 'nbf' claims (legacy
+   *     ZonedDateTime; subclasses override this for time-machine variants).
    */
   protected ZonedDateTime now() {
     return ZonedDateTime.now(ZoneOffset.UTC);
   }
 
-  /**
-   * Verify the signature of the encoded JWT. If the signature is invalid a {@link InvalidJWTSignatureException} will be thrown.
-   *
-   * @param verifier   the verifier
-   * @param header     the JWT header
-   * @param signature  the JWT signature
-   * @param encodedJWT the encoded JWT
-   * @throws InvalidJWTSignatureException if the JWT signature is invalid.
-   */
+  private Instant nowInstant() {
+    return now().toInstant();
+  }
+
   private void verifySignature(Verifier verifier, Header header, String signature, String encodedJWT) {
-    // The message comprises the first two segments of the entire JWT, the signature is the last segment.
     int index = encodedJWT.lastIndexOf('.');
     byte[] message = encodedJWT.substring(0, index).getBytes(StandardCharsets.UTF_8);
 
     byte[] signatureBytes = base64Decode(signature);
-    verifier.verify(header.algorithm, message, signatureBytes);
+    verifier.verify(header.alg(), message, signatureBytes);
   }
 }

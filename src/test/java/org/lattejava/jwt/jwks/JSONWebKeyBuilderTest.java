@@ -148,7 +148,7 @@ public class JSONWebKeyBuilderTest extends BaseJWTTest {
     Signer signer = RSAPSSSigner.newSHA256Signer(privateKey);
     String message = "hello world!";
     byte[] messageBytes = message.getBytes(StandardCharsets.UTF_8);
-    byte[] signature = signer.sign(message);
+    byte[] signature = signer.sign(messageBytes);
 
     RSAPublicKey publicKey = PEM.decode(Paths.get("src/test/resources/rsa_pss_public_key_2048.pem")).getPublicKey();
     Verifier verifier = RSAPSSVerifier.newVerifier(publicKey);
@@ -173,17 +173,16 @@ public class JSONWebKeyBuilderTest extends BaseJWTTest {
 
   @Test
   public void embedded_jwk() {
-    JWT jwt = new JWT();
-    jwt.addClaim("foo", "bar");
+    JWT jwt = JWT.builder().claim("foo", "bar").build();
 
     RSAPrivateKey privateKey = PEM.decode(Paths.get("src/test/resources/rsa_private_key_2048.pem")).getPrivateKey();
     RSAPublicKey publicKey = PEM.decode(Paths.get("src/test/resources/rsa_public_key_2048.pem")).getPublicKey();
     JSONWebKey jwk = JSONWebKey.build(publicKey);
 
     Signer signer = RSASigner.newSHA256Signer(privateKey);
-    String encodedJWT = JWT.getEncoder().encode(jwt, signer, h -> {
-      h.set("cty", "application/json");
-      h.set("jwk", jwk);
+    String encodedJWT = new org.lattejava.jwt.JWTEncoder().encode(jwt, signer, b -> {
+      b.parameter("cty", "application/json");
+      b.parameter("jwk", jwk);
     });
 
     Header header = JWTUtils.decodeHeader(encodedJWT);

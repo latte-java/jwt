@@ -21,6 +21,8 @@ import org.lattejava.jwt.MissingVerifierException;
 import org.lattejava.jwt.Signer;
 import org.lattejava.jwt.Verifier;
 import org.lattejava.jwt.JWT;
+import org.lattejava.jwt.JWTDecoder;
+import org.lattejava.jwt.JWTEncoder;
 import org.lattejava.jwt.pem.PEM;
 import org.testng.annotations.Test;
 
@@ -38,23 +40,23 @@ import static org.testng.Assert.fail;
 public class EdDSASignerTest extends BaseJWTTest {
   @Test
   public void signAndVerify() throws Exception {
-    JWT jwt = new JWT().setSubject("1234567890");
+    JWT jwt = JWT.builder().subject("1234567890").build();
 
     // Sign the JWT
     Signer signer = EdDSASigner.newSigner(new String(Files.readAllBytes(Paths.get("src/test/resources/ed_dsa_ed25519_private_key_2.pem"))));
-    String encodedJWT = JWT.getEncoder().encode(jwt, signer);
+    String encodedJWT = new JWTEncoder().encode(jwt, signer);
 
     // Verify the JWT
     Verifier verifier = EdDSAVerifier.newVerifier(Paths.get("src/test/resources/ed_dsa_ed25519_public_key_2.pem"));
-    JWT actual = JWT.getDecoder().decode(encodedJWT, verifier);
+    JWT actual = new JWTDecoder().decode(encodedJWT, verifier);
 
-    assertEquals(actual.subject, jwt.subject);
-    assertEquals(actual.header.algorithm.name(), "Ed25519");
+    assertEquals(actual.subject(), jwt.subject());
+    assertEquals(actual.header().alg().name(), "Ed25519");
 
     Verifier verifier448 = EdDSAVerifier.newVerifier(getPath("ed_dsa_ed448_public_key.pem"));
     try {
       // You can't double stamp a triple stamp, or verify a JWT signed using Ed25519 with an Ed448 verifier.
-      JWT.getDecoder().decode(encodedJWT, verifier448);
+      new JWTDecoder().decode(encodedJWT, verifier448);
       fail("Expected an exception to be thrown.");
     } catch (Exception e) {
       assertTrue(e instanceof MissingVerifierException);

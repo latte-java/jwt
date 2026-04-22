@@ -226,7 +226,7 @@ public class RSAPSSSigner implements Signer {
     return kid;
   }
 
-  public byte[] sign(String message) {
+  public byte[] sign(byte[] message) {
     Objects.requireNonNull(message);
 
     try {
@@ -234,7 +234,7 @@ public class RSAPSSSigner implements Signer {
       String digestName = org.lattejava.jwt.internal.JCAAlgorithmMapping.pssDigestName(algorithm);
       signature.setParameter(new PSSParameterSpec(digestName, "MGF1", new MGF1ParameterSpec(digestName), org.lattejava.jwt.internal.JCAAlgorithmMapping.pssSaltLength(algorithm), 1));
       signature.initSign(privateKey);
-      signature.update(message.getBytes(StandardCharsets.UTF_8));
+      signature.update(message);
       return signature.sign();
     } catch (InvalidKeyException | NoSuchAlgorithmException | SignatureException |
              InvalidAlgorithmParameterException e) {

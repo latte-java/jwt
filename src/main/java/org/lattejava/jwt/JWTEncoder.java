@@ -18,14 +18,24 @@ package org.lattejava.jwt;
 
 import org.lattejava.jwt.json.Mapper;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
+ * TODO Checkpoint 5: full rewrite. This class is a transitional shim that
+ * keeps the build green after the {@link JWT}/{@link Header} model rewrite in
+ * Checkpoint 3 -- it now serializes via the new {@code toSerializableMap()}
+ * API and a {@link Header.Builder} -- but the public API surface, the
+ * {@code Consumer<Header>} / {@code Supplier<Header>} customization shape,
+ * and the JSONProcessor wiring are all replaced in Checkpoint 5.
+ *
  * @author Daniel DeGroff
  */
 public class JWTEncoder {
@@ -37,51 +47,58 @@ public class JWTEncoder {
    * @return the encoded JWT string.
    */
   public String encode(JWT jwt, Signer signer) {
-    return encode(jwt, signer, h -> h.set("kid", signer.getKid()));
+    return encode(jwt, signer, b -> b.kid(signer.getKid()));
   }
 
   /**
-   * Encode the JWT to produce a dot separated encoded string that can be sent in an HTTP request header.
+   * Encode the JWT. The supplier returns a {@link Header.Builder} whose state
+   * is consumed by the encoder; the encoder forces the {@code alg} value to
+   * match the signer.
    *
    * @param jwt      The JWT.
    * @param signer   The signer used to add a signature to the JWT.
-   * @param supplier A header supplier to optionally add header values to the encoded JWT. May be null.
+   * @param supplier A header-builder supplier; may be null.
    * @return the encoded JWT string.
    */
-  public String encode(JWT jwt, Signer signer, Supplier<Header> supplier) {
-    Header header = supplier != null
-        ? supplier.get()
-        : new Header();
-    return encode(jwt, signer, header);
+  public String encode(JWT jwt, Signer signer, Supplier<Header.Builder> supplier) {
+    Header.Builder builder = supplier != null ? supplier.get() : Header.builder();
+    return encode(jwt, signer, builder);
   }
 
   /**
-   * Encode the JWT to produce a dot separated encoded string that can be sent in an HTTP request header.
+   * Encode the JWT. The consumer mutates a fresh {@link Header.Builder}; the
+   * encoder forces the {@code alg} value to match the signer.
    *
    * @param jwt      The JWT.
    * @param signer   The signer used to add a signature to the JWT.
-   * @param consumer A header consumer to optionally add header values to the encoded JWT. May be null.
+   * @param consumer A header-builder consumer; may be null.
    * @return the encoded JWT string.
    */
-  public String encode(JWT jwt, Signer signer, Consumer<Header> consumer) {
-    Header header = new Header();
+  public String encode(JWT jwt, Signer signer, Consumer<Header.Builder> consumer) {
+    Header.Builder builder = Header.builder();
     if (consumer != null) {
-      consumer.accept(header);
+      consumer.accept(builder);
     }
-    return encode(jwt, signer, header);
+    return encode(jwt, signer, builder);
   }
 
-  private String encode(JWT jwt, Signer signer, Header header) {
+  private String encode(JWT jwt, Signer signer, Header.Builder builder) {
     Objects.requireNonNull(jwt);
     Objects.requireNonNull(signer);
 
-    List<String> parts = new ArrayList<>(3);
-    // Set this after we pass the header to the consumer to ensure it isn't tampered with, only the signer can set the algorithm.
-    header.algorithm = signer.getAlgorithm();
-    parts.add(base64Encode(Mapper.serialize(header)));
-    parts.add(base64Encode(Mapper.serialize(jwt)));
+    // The signer dictates the algorithm; caller cannot override.
+    builder.alg(signer.getAlgorithm());
+    Header header = builder.build();
 
-    byte[] signature = signer.sign(String.join(".", parts));
+    Map<String, Object> headerMap = new LinkedHashMap<>(header.toSerializableMap());
+    Map<String, Object> claimsMap = new LinkedHashMap<>(jwt.toSerializableMap());
+
+    List<String> parts = new ArrayList<>(3);
+    parts.add(base64Encode(Mapper.serialize(headerMap)));
+    parts.add(base64Encode(Mapper.serialize(claimsMap)));
+
+    byte[] message = String.join(".", parts).getBytes(StandardCharsets.UTF_8);
+    byte[] signature = signer.sign(message);
     parts.add(base64Encode(signature));
 
     return String.join(".", parts);

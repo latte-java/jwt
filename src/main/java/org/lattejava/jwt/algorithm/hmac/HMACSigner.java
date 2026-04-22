@@ -210,14 +210,14 @@ public class HMACSigner implements Signer {
   }
 
   @Override
-  public byte[] sign(String message) {
+  public byte[] sign(byte[] message) {
     Objects.requireNonNull(message);
 
     try {
       String jcaName = org.lattejava.jwt.internal.JCAAlgorithmMapping.toJCA(algorithm);
       Mac mac = Mac.getInstance(jcaName);
       mac.init(new SecretKeySpec(secret, jcaName));
-      return mac.doFinal(message.getBytes(StandardCharsets.UTF_8));
+      return mac.doFinal(message);
     } catch (InvalidKeyException | NoSuchAlgorithmException e) {
       throw new JWTSigningException("An unexpected exception occurred when attempting to sign the JWT", e);
     }

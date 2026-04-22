@@ -22,6 +22,8 @@ import org.lattejava.jwt.Signer;
 import org.lattejava.jwt.Verifier;
 import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.JWT;
+import org.lattejava.jwt.JWTDecoder;
+import org.lattejava.jwt.JWTEncoder;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertFalse;
@@ -54,19 +56,19 @@ public class HMACVerifierTest extends BaseJWTTest {
 
   @Test
   public void test_wrongSecret() {
-    JWT jwt = new JWT().setSubject("123456789");
+    JWT jwt = JWT.builder().subject("123456789").build();
     Signer signer = HMACSigner.newSHA256Signer("super-secret-key-that-is-at-least-32-bytes-long!!");
-    String encodedJWT = JWT.getEncoder().encode(jwt, signer);
+    String encodedJWT = new JWTEncoder().encode(jwt, signer);
 
     expectException(InvalidJWTSignatureException.class, () ->
-        JWT.getDecoder().decode(encodedJWT, HMACVerifier.newVerifier("wrong-secret-key-that-is-at-least-32-bytes-long!!")));
+        new JWTDecoder().decode(encodedJWT, HMACVerifier.newVerifier("wrong-secret-key-that-is-at-least-32-bytes-long!!")));
   }
 
   @Test
   public void test_tamperedSignature() {
-    JWT jwt = new JWT().setSubject("123456789");
+    JWT jwt = JWT.builder().subject("123456789").build();
     Signer signer = HMACSigner.newSHA256Signer("super-secret-key-that-is-at-least-32-bytes-long!!");
-    String encodedJWT = JWT.getEncoder().encode(jwt, signer);
+    String encodedJWT = new JWTEncoder().encode(jwt, signer);
 
     // Flip the last character of the signature
     char lastChar = encodedJWT.charAt(encodedJWT.length() - 1);
@@ -74,6 +76,6 @@ public class HMACVerifierTest extends BaseJWTTest {
     String tampered = encodedJWT.substring(0, encodedJWT.length() - 1) + flipped;
 
     expectException(InvalidJWTSignatureException.class, () ->
-        JWT.getDecoder().decode(tampered, HMACVerifier.newVerifier("super-secret-key-that-is-at-least-32-bytes-long!!")));
+        new JWTDecoder().decode(tampered, HMACVerifier.newVerifier("super-secret-key-that-is-at-least-32-bytes-long!!")));
   }
 }

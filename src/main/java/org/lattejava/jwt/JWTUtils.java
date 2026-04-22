@@ -73,12 +73,15 @@ public class JWTUtils {
    * @param encodedJWT the encoded JWT
    * @return a Header object
    */
+  @SuppressWarnings("unchecked")
   public static Header decodeHeader(String encodedJWT) {
     Objects.requireNonNull(encodedJWT);
 
     String[] parts = encodedJWT.split("\\.");
     if (parts.length == 3 || (parts.length == 2 && encodedJWT.endsWith("."))) {
-      return Mapper.deserialize(Base64.getUrlDecoder().decode(parts[0]), Header.class);
+      // TODO Checkpoint 5: route through JSONProcessor; this shim uses the legacy Mapper for compile-only fidelity.
+      Map<String, Object> raw = Mapper.deserialize(Base64.getUrlDecoder().decode(parts[0]), Map.class);
+      return Header.fromMap(raw);
     }
 
     throw new InvalidJWTException("The encoded JWT is not properly formatted. Expected a three part dot separated string.");
@@ -93,12 +96,15 @@ public class JWTUtils {
    * @param encodedJWT the encoded JWT
    * @return a JWT object
    */
+  @SuppressWarnings("unchecked")
   public static JWT decodePayload(String encodedJWT) {
     Objects.requireNonNull(encodedJWT);
 
     String[] parts = encodedJWT.split("\\.");
     if (parts.length == 3 || (parts.length == 2 && encodedJWT.endsWith("."))) {
-      return Mapper.deserialize(Base64.getUrlDecoder().decode(parts[1]), JWT.class);
+      // TODO Checkpoint 5: route through JSONProcessor; this shim uses the legacy Mapper for compile-only fidelity.
+      Map<String, Object> raw = Mapper.deserialize(Base64.getUrlDecoder().decode(parts[1]), Map.class);
+      return JWT.fromMap(raw, null);
     }
 
     throw new InvalidJWTException("The encoded JWT is not properly formatted. Expected a three part dot separated string.");

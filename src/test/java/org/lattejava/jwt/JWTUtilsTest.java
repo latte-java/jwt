@@ -43,12 +43,12 @@ import static org.testng.Assert.assertTrue;
 public class JWTUtilsTest extends BaseTest {
   @Test
   public void decodePayload() {
-    JWT jwt = new JWT().setSubject("123456789");
+    JWT jwt = JWT.builder().subject("123456789").build();
 
     // HMAC signed
-    String encodedJWT = JWT.getEncoder().encode(jwt, HMACSigner.newSHA512Signer("super-secret-key-1-that-is-at-least-64-bytes-long-for-sha512-algorithm-compat-req!!"));
-    assertEquals(JWTUtils.decodePayload(encodedJWT).subject, "123456789");
-    assertEquals(JWTUtils.decodeHeader(encodedJWT).algorithm, Algorithm.HS512);
+    String encodedJWT = new org.lattejava.jwt.JWTEncoder().encode(jwt, HMACSigner.newSHA512Signer("super-secret-key-1-that-is-at-least-64-bytes-long-for-sha512-algorithm-compat-req!!"));
+    assertEquals(JWTUtils.decodePayload(encodedJWT).subject(), "123456789");
+    assertEquals(JWTUtils.decodeHeader(encodedJWT).alg(), Algorithm.HS512);
   }
 
   @Test

@@ -226,13 +226,13 @@ public class ECSigner implements Signer {
   }
 
   @Override
-  public byte[] sign(String message) {
+  public byte[] sign(byte[] message) {
     Objects.requireNonNull(message);
 
     try {
       Signature signature = Signature.getInstance(org.lattejava.jwt.internal.JCAAlgorithmMapping.toJCA(algorithm) + "inP1363Format");
       signature.initSign(privateKey);
-      signature.update((message).getBytes(StandardCharsets.UTF_8));
+      signature.update(message);
       return signature.sign();
     } catch (InvalidKeyException | NoSuchAlgorithmException | SignatureException e) {
       throw new JWTSigningException("An unexpected exception occurred when attempting to sign the JWT", e);

@@ -21,6 +21,7 @@ import org.lattejava.jwt.InvalidKeyLengthException;
 import org.lattejava.jwt.Verifier;
 import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.JWT;
+import org.lattejava.jwt.JWTDecoder;
 import org.lattejava.jwt.pem.PEM;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -109,9 +110,9 @@ public class RSAPSSVerifierTest extends BaseJWTTest {
 
 
     Verifier verifier = RSAPSSVerifier.newVerifier(publicKeyPEM);
-    JWT jwt = JWT.getDecoder().decode(encodedJWT, verifier);
+    JWT jwt = new JWTDecoder().decode(encodedJWT, verifier);
     assertNotNull(jwt);
-    assertEquals(jwt.subject, "1234567890");
+    assertEquals(jwt.subject(), "1234567890");
     assertEquals(jwt.getString("name"), "John Doe");
     assertEquals(jwt.getBoolean("admin"), Boolean.TRUE);
   }
