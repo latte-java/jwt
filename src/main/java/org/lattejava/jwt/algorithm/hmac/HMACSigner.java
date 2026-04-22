@@ -62,10 +62,10 @@ public class HMACSigner implements Signer {
 
   // RFC 7518 Section 3.2: "A key of the same size as the hash output or larger MUST be used with this algorithm."
   private static void assertMinimumSecretLength(Algorithm algorithm, byte[] secret) {
-    int minimumLength = switch (algorithm) {
-      case HS256 -> 32;
-      case HS384 -> 48;
-      case HS512 -> 64;
+    int minimumLength = switch (algorithm.name()) {
+      case "HS256" -> 32;
+      case "HS384" -> 48;
+      case "HS512" -> 64;
       default -> 0;
     };
     if (secret.length < minimumLength) {
@@ -214,8 +214,9 @@ public class HMACSigner implements Signer {
     Objects.requireNonNull(message);
 
     try {
-      Mac mac = Mac.getInstance(algorithm.getName());
-      mac.init(new SecretKeySpec(secret, algorithm.getName()));
+      String jcaName = org.lattejava.jwt.internal.JCAAlgorithmMapping.toJCA(algorithm);
+      Mac mac = Mac.getInstance(jcaName);
+      mac.init(new SecretKeySpec(secret, jcaName));
       return mac.doFinal(message.getBytes(StandardCharsets.UTF_8));
     } catch (InvalidKeyException | NoSuchAlgorithmException e) {
       throw new JWTSigningException("An unexpected exception occurred when attempting to sign the JWT", e);

@@ -231,8 +231,8 @@ public class RSAPSSSigner implements Signer {
 
     try {
       Signature signature = Signature.getInstance("RSASSA-PSS");
-      String digestName = algorithm.getDigest();
-      signature.setParameter(new PSSParameterSpec(digestName, "MGF1", new MGF1ParameterSpec(digestName), algorithm.getSaltLength(), 1));
+      String digestName = org.lattejava.jwt.internal.JCAAlgorithmMapping.pssDigestName(algorithm);
+      signature.setParameter(new PSSParameterSpec(digestName, "MGF1", new MGF1ParameterSpec(digestName), org.lattejava.jwt.internal.JCAAlgorithmMapping.pssSaltLength(algorithm), 1));
       signature.initSign(privateKey);
       signature.update(message.getBytes(StandardCharsets.UTF_8));
       return signature.sign();

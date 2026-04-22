@@ -230,7 +230,7 @@ public class ECSigner implements Signer {
     Objects.requireNonNull(message);
 
     try {
-      Signature signature = Signature.getInstance(algorithm.getName() + "inP1363Format");
+      Signature signature = Signature.getInstance(org.lattejava.jwt.internal.JCAAlgorithmMapping.toJCA(algorithm) + "inP1363Format");
       signature.initSign(privateKey);
       signature.update((message).getBytes(StandardCharsets.UTF_8));
       return signature.sign();

@@ -119,8 +119,8 @@ public class RSAVerifier implements Verifier {
   @Override
   @SuppressWarnings("Duplicates")
   public boolean canVerify(Algorithm algorithm) {
-    return switch (algorithm) {
-      case RS256, RS384, RS512 -> true;
+    return switch (algorithm.name()) {
+      case "RS256", "RS384", "RS512" -> true;
       default -> false;
     };
   }
@@ -131,7 +131,7 @@ public class RSAVerifier implements Verifier {
     Objects.requireNonNull(signature);
 
     try {
-      Signature verifier = Signature.getInstance(algorithm.getName());
+      Signature verifier = Signature.getInstance(org.lattejava.jwt.internal.JCAAlgorithmMapping.toJCA(algorithm));
       verifier.initVerify(publicKey);
       verifier.update(message);
       // Depending upon the JCE provider, an invalid signature may cause verify() to return false

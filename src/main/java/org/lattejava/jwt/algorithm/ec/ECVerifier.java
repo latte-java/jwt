@@ -136,17 +136,17 @@ public class ECVerifier implements Verifier {
     Objects.requireNonNull(algorithm);
     Objects.requireNonNull(message);
     Objects.requireNonNull(signature);
-    int expectedLength = switch (algorithm) {
-      case ES256 -> 64;
-      case ES384 -> 96;
-      case ES512 -> 132;
+    int expectedLength = switch (algorithm.name()) {
+      case "ES256" -> 64;
+      case "ES384" -> 96;
+      case "ES512" -> 132;
       default -> throw new InvalidJWTSignatureException();
     };
     if (signature.length != expectedLength) {
       throw new InvalidJWTSignatureException();
     }
     try {
-      Signature verifier = Signature.getInstance(algorithm.getName() + "inP1363Format");
+      Signature verifier = Signature.getInstance(org.lattejava.jwt.internal.JCAAlgorithmMapping.toJCA(algorithm) + "inP1363Format");
       verifier.initVerify(publicKey);
       verifier.update(message);
 

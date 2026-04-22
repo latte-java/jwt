@@ -122,8 +122,8 @@ public class RSAPSSVerifier implements Verifier {
   @Override
   @SuppressWarnings("Duplicates")
   public boolean canVerify(Algorithm algorithm) {
-    return switch (algorithm) {
-      case PS256, PS384, PS512 -> true;
+    return switch (algorithm.name()) {
+      case "PS256", "PS384", "PS512" -> true;
       default -> false;
     };
   }
@@ -135,8 +135,8 @@ public class RSAPSSVerifier implements Verifier {
 
     try {
       Signature verifier = Signature.getInstance("RSASSA-PSS");
-      String digestName = algorithm.getDigest();
-      verifier.setParameter(new PSSParameterSpec(digestName, "MGF1", new MGF1ParameterSpec(digestName), algorithm.getSaltLength(), 1));
+      String digestName = org.lattejava.jwt.internal.JCAAlgorithmMapping.pssDigestName(algorithm);
+      verifier.setParameter(new PSSParameterSpec(digestName, "MGF1", new MGF1ParameterSpec(digestName), org.lattejava.jwt.internal.JCAAlgorithmMapping.pssSaltLength(algorithm), 1));
       verifier.initVerify(publicKey);
       verifier.update(message);
       // Depending upon the JCE provider, an invalid signature may cause verify() to return false

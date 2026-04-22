@@ -218,20 +218,20 @@ public class JWTUtils {
   public static String generateJWS_kid(String algorithm, JSONWebKey key) {
     Map<String, Object> thumbPrint = new LinkedHashMap<>(4);
 
-    switch (key.kty) {
-      case EC:
+    switch (key.kty.name()) {
+      case "EC":
         thumbPrint.put("crv", key.crv);
         thumbPrint.put("kty", key.kty);
         thumbPrint.put("x", key.x);
         thumbPrint.put("y", key.y);
         break;
-      case RSA:
-      case RSASSA_PSS:
+      case "RSA":
+      case "RSASSA_PSS":
         thumbPrint.put("e", key.e);
         thumbPrint.put("kty", key.kty);
         thumbPrint.put("n", key.n);
         break;
-      case OKP:
+      case "OKP":
         thumbPrint.put("crv", key.crv);
         thumbPrint.put("kty", key.kty);
         thumbPrint.put("x", key.x);

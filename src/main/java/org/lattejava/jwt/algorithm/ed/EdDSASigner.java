@@ -134,7 +134,7 @@ public class EdDSASigner implements Signer {
     Objects.requireNonNull(message);
 
     try {
-      Signature signature = Signature.getInstance(algorithm.getName());
+      Signature signature = Signature.getInstance(org.lattejava.jwt.internal.JCAAlgorithmMapping.toJCA(algorithm));
       signature.initSign(privateKey);
       signature.update((message).getBytes(StandardCharsets.UTF_8));
 

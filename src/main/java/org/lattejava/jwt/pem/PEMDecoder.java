@@ -286,7 +286,7 @@ public class PEMDecoder {
       throw new InvalidKeyException("Could not decode the private key. Expected an EC, ED or RSA key type but found OID [" + algorithmOID.decode() + "] and was unable to match that to a supported algorithm.");
     }
 
-    PrivateKey privateKey = KeyFactory.getInstance(type.getAlgorithm()).generatePrivate(new PKCS8EncodedKeySpec(bytes));
+    PrivateKey privateKey = KeyFactory.getInstance(jcaKeyFactoryName(algorithmOID.decode(), type)).generatePrivate(new PKCS8EncodedKeySpec(bytes));
 
     // Attempt to extract the public key if available
     if (privateKey instanceof ECPrivateKey) {
@@ -365,7 +365,7 @@ public class PEMDecoder {
       throw new InvalidKeyException("Could not decode the X.509 public key. Expected at 2 values in the DER encoded sequence but found [" + sequence.length + "]");
     }
 
-    return new PEM(KeyFactory.getInstance(type.getAlgorithm()).generatePublic(new X509EncodedKeySpec(bytes)));
+    return new PEM(KeyFactory.getInstance(jcaKeyFactoryName(algorithmOID.decode(), type)).generatePublic(new X509EncodedKeySpec(bytes)));
   }
 
   private byte[] getKeyBytes(String key, String keyPrefix, String keySuffix) {
@@ -393,6 +393,33 @@ public class PEMDecoder {
             .writeValue(new DerValue(Tag.Sequence, algorithmIdentifier))
             .writeValue(new DerValue(Tag.BitString, publicKeyBytes))))
         .toByteArray();
+  }
+
+  /**
+   * Map a DER algorithm OID + resolved {@link KeyType} to the JCA algorithm
+   * string consumed by {@link KeyFactory#getInstance(String)}.
+   *
+   * <p>Temporary scaffold introduced in Checkpoint 1: the legacy 6.x
+   * {@code KeyType} enum carried this string as a field; the 7.0 interface
+   * does not. Checkpoint 9 (PEM/DER X.509 enhancements) will refactor this
+   * lookup into the DER subsystem proper.</p>
+   *
+   * @param oid the algorithm OID extracted from the DER stream
+   * @param type the resolved {@code KeyType} (RSA, EC, OKP)
+   * @return the JCA name (e.g. {@code "RSA"}, {@code "RSASSA-PSS"}, {@code "EC"}, {@code "EdDSA"})
+   */
+  private String jcaKeyFactoryName(String oid, KeyType type) {
+    // PSS-specific OID maps to JCA "RSASSA-PSS" KeyFactory (provider-dependent;
+    // matches the 6.x enum behavior so existing call sites and tests keep
+    // working). All other RSA OIDs use the generic "RSA" KeyFactory.
+    if (org.lattejava.jwt.der.ObjectIdentifier.RSASSA_PSS_ENCRYPTION.equals(oid)) {
+      return "RSASSA-PSS";
+    }
+    if (type == KeyType.OKP) {
+      // 6.x KeyType.OKP.algorithm was "EdDSA"; preserve that for KeyFactory.
+      return "EdDSA";
+    }
+    return type.name();
   }
 
   private PublicKey getPublicKeyFromPrivateEC(DerValue bitString, ECPrivateKey privateKey) throws InvalidKeySpecException, IOException, NoSuchAlgorithmException {

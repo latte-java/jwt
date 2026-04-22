@@ -124,9 +124,9 @@ public class EdDSAVerifier implements Verifier {
     Objects.requireNonNull(message);
     Objects.requireNonNull(signature);
 
-    int expectedLength = switch (algorithm) {
-      case Ed25519 -> 64;
-      case Ed448 -> 114;
+    int expectedLength = switch (algorithm.name()) {
+      case "Ed25519" -> 64;
+      case "Ed448" -> 114;
       default -> throw new InvalidJWTSignatureException();
     };
     if (signature.length != expectedLength) {
@@ -134,7 +134,7 @@ public class EdDSAVerifier implements Verifier {
     }
 
     try {
-      Signature verifier = Signature.getInstance(algorithm.getName());
+      Signature verifier = Signature.getInstance(org.lattejava.jwt.internal.JCAAlgorithmMapping.toJCA(algorithm));
       verifier.initVerify(publicKey);
       verifier.update(message);
 

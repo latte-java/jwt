@@ -57,20 +57,20 @@ public class OpenIDConnect {
     Objects.requireNonNull(algorithm);
 
     MessageDigest messageDigest;
-    int leftMostBits = switch (algorithm) {
-      case ES256, HS256, PS256, RS256 -> {
+    int leftMostBits = switch (algorithm.name()) {
+      case "ES256", "HS256", "PS256", "RS256" -> {
         messageDigest = getDigest("SHA-256");
         yield 128; // 32 * 8 / 2 = 256
       }
-      case ES384, HS384, PS384, RS384 -> {
+      case "ES384", "HS384", "PS384", "RS384" -> {
         messageDigest = getDigest("SHA-384");
         yield 192; // 48 * 8 / 2 = 192
       }
-      case Ed25519, ES512, HS512, PS512, RS512 -> {
+      case "Ed25519", "ES512", "HS512", "PS512", "RS512" -> {
         messageDigest = getDigest("SHA-512");
         yield 256; // 64 * 8 / 2 = 256
       }
-      case Ed448 -> {
+      case "Ed448" -> {
         // Ed448 uses a 114 byte SHAKE256 hash. The recommended hash length here is the same, see discussion thread:
         // - https://bitbucket.org/openid/connect/issues/1125
         // The JCA does not ship with SHAKE256, expect this to exception if you have not registered a provider with support for this algorithm (such as BC)
