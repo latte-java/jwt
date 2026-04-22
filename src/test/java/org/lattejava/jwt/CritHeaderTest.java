@@ -52,9 +52,9 @@ public class CritHeaderTest {
         b -> b.parameter("crit", critValue).parameter("b64", Boolean.FALSE));
   }
 
-  // Use case: crit listing "b64"; decoder configured with "b64" in criticalHeaders -> accepted.
   @Test
   public void crit_listedInCriticalHeaders_accepted() {
+    // Use case: crit listing "b64"; decoder configured with "b64" in criticalHeaders -> accepted.
     String token = encodeWithCrit(Collections.singletonList("b64"));
     JWTDecoder decoder = new JWTDecoder.Builder()
         .criticalHeaders(new HashSet<>(Collections.singletonList("b64")))
@@ -63,9 +63,9 @@ public class CritHeaderTest {
     assertNotNull(jwt);
   }
 
-  // Use case: crit listing an unknown parameter name -> InvalidJWTException.
   @Test
   public void crit_unrecognized_rejected() {
+    // Use case: crit listing an unknown parameter name -> InvalidJWTException.
     String token = encodeWithCrit(Collections.singletonList("unknown-ext"));
     JWTDecoder decoder = new JWTDecoder.Builder()
         .criticalHeaders(new HashSet<>(Collections.singletonList("b64")))
@@ -78,17 +78,17 @@ public class CritHeaderTest {
     }
   }
 
-  // Use case: crit is an empty array -> accepted (no required critical parameters).
   @Test
   public void crit_emptyArray_accepted() {
+    // Use case: crit is an empty array -> accepted (no required critical parameters).
     String token = encodeWithCrit(Collections.emptyList());
     JWT jwt = new JWTDecoder().decode(token, VerifierResolver.of(HMACVerifier.newVerifier(SECRET)));
     assertNotNull(jwt);
   }
 
-  // Use case: crit listing multiple values; one unknown -> InvalidJWTException.
   @Test
   public void crit_multipleNames_partialUnknown_rejected() {
+    // Use case: crit listing multiple values; one unknown -> InvalidJWTException.
     String token = encodeWithCrit(Arrays.asList("b64", "unknown-ext"));
     JWTDecoder decoder = new JWTDecoder.Builder()
         .criticalHeaders(new HashSet<>(Collections.singletonList("b64")))

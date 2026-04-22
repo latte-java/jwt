@@ -42,27 +42,27 @@ import static org.testng.Assert.assertSame;
  */
 public class VerifierResolverTest {
 
-  // Use case: VerifierResolver.of returns the verifier when canVerify is true.
   @Test
   public void of_returnsVerifierWhenCanVerify() {
+    // Use case: VerifierResolver.of returns the verifier when canVerify is true.
     Verifier v = new RecordingVerifier(true);
     VerifierResolver resolver = VerifierResolver.of(v);
     Header header = Header.builder().alg(Algorithm.HS256).build();
     assertSame(resolver.resolve(header), v);
   }
 
-  // Use case: VerifierResolver.of re-checks canVerify; when false, returns null.
   @Test
   public void of_returnsNullWhenCannotVerify() {
+    // Use case: VerifierResolver.of re-checks canVerify; when false, returns null.
     Verifier v = new RecordingVerifier(false);
     VerifierResolver resolver = VerifierResolver.of(v);
     Header header = Header.builder().alg(Algorithm.HS256).build();
     assertNull(resolver.resolve(header));
   }
 
-  // Use case: VerifierResolver.byKid with a header that has no kid returns null.
   @Test
   public void byKid_noKidInHeader_returnsNull() {
+    // Use case: VerifierResolver.byKid with a header that has no kid returns null.
     Map<String, Verifier> map = new HashMap<>();
     map.put("k1", new RecordingVerifier(true));
     VerifierResolver resolver = VerifierResolver.byKid(map);
@@ -70,9 +70,9 @@ public class VerifierResolverTest {
     assertNull(resolver.resolve(header));
   }
 
-  // Use case: VerifierResolver.byKid resolves the verifier for the header's kid when present.
   @Test
   public void byKid_kidMatch_returnsVerifier() {
+    // Use case: VerifierResolver.byKid resolves the verifier for the header's kid when present.
     Verifier v1 = new RecordingVerifier(true);
     Verifier v2 = new RecordingVerifier(true);
     Map<String, Verifier> map = new HashMap<>();
@@ -83,9 +83,9 @@ public class VerifierResolverTest {
     assertSame(resolver.resolve(header), v2);
   }
 
-  // Use case: VerifierResolver.byKid with an unknown kid returns null.
   @Test
   public void byKid_unknownKid_returnsNull() {
+    // Use case: VerifierResolver.byKid with an unknown kid returns null.
     Map<String, Verifier> map = new HashMap<>();
     map.put("k1", new RecordingVerifier(true));
     VerifierResolver resolver = VerifierResolver.byKid(map);
@@ -93,9 +93,9 @@ public class VerifierResolverTest {
     assertNull(resolver.resolve(header));
   }
 
-  // Use case: VerifierResolver.from delegates to an arbitrary Function<Header, Verifier>.
   @Test
   public void from_arbitraryLambda_delegates() {
+    // Use case: VerifierResolver.from delegates to an arbitrary Function<Header, Verifier>.
     Verifier v = new RecordingVerifier(true);
     AtomicReference<Header> seen = new AtomicReference<>();
     VerifierResolver resolver = VerifierResolver.from(h -> {

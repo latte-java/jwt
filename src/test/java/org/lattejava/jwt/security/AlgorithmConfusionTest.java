@@ -77,11 +77,11 @@ public class AlgorithmConfusionTest extends BaseJWTTest {
     };
   }
 
-  // Use case: Algorithm "none" attack -- DataProvider over case variants -- each
-  // produces a non-standard Algorithm whose name does not match any built-in
-  // verifier; all rejected with MissingVerifierException.
   @Test(dataProvider = "noneCaseVariants")
   public void noneAlgorithm_alwaysRejected(String alg) {
+    // Use case: Algorithm "none" attack -- DataProvider over case variants -- each
+    // produces a non-standard Algorithm whose name does not match any built-in
+    // verifier; all rejected with MissingVerifierException.
     String header = b64("{\"alg\":\"" + alg + "\",\"typ\":\"JWT\"}");
     String payload = b64("{\"sub\":\"abc\"}");
     String signature = b64("anything");
@@ -96,10 +96,10 @@ public class AlgorithmConfusionTest extends BaseJWTTest {
   // RSA public key abused as HMAC secret (ports 6.x test_vulnerability_HMAC_forgery)
   // ---------------------------------------------------------------------
 
-  // Use case: Algorithm confusion -- RSA public key material used as an HMAC
-  // secret; a single RSA verifier rejects (canVerify returns false for HS*).
   @Test
   public void hmacForgeryWithRsaPublicKey_singleRsaVerifierRejects() throws Exception {
+    // Use case: Algorithm confusion -- RSA public key material used as an HMAC
+    // secret; a single RSA verifier rejects (canVerify returns false for HS*).
     JWT jwt = JWT.builder().subject("123456789").build();
     String rsaPub = new String(Files.readAllBytes(Paths.get("src/test/resources/rsa_public_key_2048.pem")));
     // Forge an HMAC-signed token using the RSA public key bytes as the "shared secret".
@@ -110,12 +110,12 @@ public class AlgorithmConfusionTest extends BaseJWTTest {
         new JWTDecoder().decode(forged, VerifierResolver.of(rsaVerifier)));
   }
 
-  // Use case: Algorithm confusion -- forged HMAC token passed to
-  // Verifiers.anyOf(rsaVerifier, hmacVerifier). The HMAC verifier is selected
-  // via canVerify, signature verification fails, InvalidJWTSignatureException
-  // propagates immediately (fail-fast, no fall-through).
   @Test
   public void hmacForgery_anyOf_failsFastOnHmacVerifier() throws Exception {
+    // Use case: Algorithm confusion -- forged HMAC token passed to
+    // Verifiers.anyOf(rsaVerifier, hmacVerifier). The HMAC verifier is selected
+    // via canVerify, signature verification fails, InvalidJWTSignatureException
+    // propagates immediately (fail-fast, no fall-through).
     JWT jwt = JWT.builder().subject("123456789").build();
     String rsaPub = new String(Files.readAllBytes(Paths.get("src/test/resources/rsa_public_key_2048.pem")));
     String forged = new JWTEncoder().encode(jwt, HMACSigner.newSHA512Signer(rsaPub));
@@ -128,12 +128,12 @@ public class AlgorithmConfusionTest extends BaseJWTTest {
         new JWTDecoder().decode(forged, VerifierResolver.of(composite)));
   }
 
-  // Use case: Algorithm confusion -- forged HMAC token routed via
-  // Map<String, Verifier> with the kid pointing at a real-shared-secret
-  // HMAC verifier. The verifier rejects because the forged signature was
-  // produced with the RSA public-key bytes, not the real secret.
   @Test
   public void hmacForgery_kidMap_realSecretVerifier_rejects() throws Exception {
+    // Use case: Algorithm confusion -- forged HMAC token routed via
+    // Map<String, Verifier> with the kid pointing at a real-shared-secret
+    // HMAC verifier. The verifier rejects because the forged signature was
+    // produced with the RSA public-key bytes, not the real secret.
     JWT jwt = JWT.builder().subject("123456789").build();
     String rsaPub = new String(Files.readAllBytes(Paths.get("src/test/resources/rsa_public_key_2048.pem")));
     String forged = new JWTEncoder().encode(jwt, HMACSigner.newSHA512Signer(rsaPub), b -> b.kid("hmac"));
@@ -149,10 +149,10 @@ public class AlgorithmConfusionTest extends BaseJWTTest {
   // Cross-algorithm rejection
   // ---------------------------------------------------------------------
 
-  // Use case: Cross-algorithm -- EC-signed token presented to RSA verifier.
-  // RSA verifier's canVerify returns false for ES* -> MissingVerifierException.
   @Test
   public void crossAlgorithm_ecToken_rsaVerifier_rejected() throws Exception {
+    // Use case: Cross-algorithm -- EC-signed token presented to RSA verifier.
+    // RSA verifier's canVerify returns false for ES* -> MissingVerifierException.
     JWT jwt = JWT.builder().subject("123").build();
     String encoded = new JWTEncoder().encode(jwt, ECSigner.newSHA256Signer(readFile("ec_private_key_p_256.pem")));
 
@@ -162,9 +162,9 @@ public class AlgorithmConfusionTest extends BaseJWTTest {
         new JWTDecoder().decode(encoded, VerifierResolver.of(rsaVerifier)));
   }
 
-  // Use case: Cross-algorithm -- RSA-signed token presented to EC verifier.
   @Test
   public void crossAlgorithm_rsaToken_ecVerifier_rejected() throws Exception {
+    // Use case: Cross-algorithm -- RSA-signed token presented to EC verifier.
     JWT jwt = JWT.builder().subject("123").build();
     String rsaPriv = new String(Files.readAllBytes(Paths.get("src/test/resources/rsa_private_key_2048.pem")));
     String encoded = new JWTEncoder().encode(jwt, RSASigner.newSHA256Signer(rsaPriv));

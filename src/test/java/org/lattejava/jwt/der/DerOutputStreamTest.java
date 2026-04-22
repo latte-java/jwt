@@ -31,18 +31,18 @@ import static org.testng.Assert.assertNotNull;
  * @author Daniel DeGroff
  */
 public class DerOutputStreamTest {
-  // Use case: writeValue(byte[]) injects raw, already-DER-encoded bytes verbatim.
   @Test
   public void writeValue_rawBytes() throws Exception {
+    // Use case: writeValue(byte[]) injects raw, already-DER-encoded bytes verbatim.
     byte[] raw = new byte[]{0x02, 0x01, 0x05}; // INTEGER 5
     DerOutputStream os = new DerOutputStream();
     os.writeValue(raw);
     assertEquals(os.toByteArray(), raw);
   }
 
-  // Use case: zero-length value (NULL) writes as [tag, 0x00] with no body.
   @Test
   public void writeValue_zeroLength() throws Exception {
+    // Use case: zero-length value (NULL) writes as [tag, 0x00] with no body.
     DerOutputStream os = new DerOutputStream();
     os.writeValue(DerValue.newNull());
     assertEquals(os.toByteArray(), new byte[]{0x05, 0x00});

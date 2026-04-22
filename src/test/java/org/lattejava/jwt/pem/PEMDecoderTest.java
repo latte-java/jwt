@@ -39,10 +39,10 @@ import static org.testng.Assert.assertTrue;
  * @author Daniel DeGroff
  */
 public class PEMDecoderTest {
-  // Use case: decodeTBSCertificateFields parses serial / validity / issuer / subject from a
-  // DER-encoded cert without going through CertificateFactory.
   @Test
   public void decodeTBSCertificateFields_roundTrip() throws Exception {
+    // Use case: decodeTBSCertificateFields parses serial / validity / issuer / subject from a
+    // DER-encoded cert without going through CertificateFactory.
     KeyPair kp = X509CertificateBuilderTest.generateKeyPair(Algorithm.RS256);
     Instant notBefore = Instant.parse("2024-06-01T12:00:00Z");
     Instant notAfter = notBefore.plus(180, ChronoUnit.DAYS);

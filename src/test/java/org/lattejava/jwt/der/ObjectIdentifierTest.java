@@ -92,9 +92,9 @@ public class ObjectIdentifierTest extends BaseJWTTest {
     };
   }
 
-  // Use case: encode produces the expected DER value bytes for single/two/three-byte arcs and DN OIDs.
   @Test(dataProvider = "encodeOIDs")
   public void encode_matches_expected(String oid, int[] expected) {
+    // Use case: encode produces the expected DER value bytes for single/two/three-byte arcs and DN OIDs.
     byte[] bytes = ObjectIdentifier.encode(oid);
     byte[] exp = new byte[expected.length];
     for (int i = 0; i < expected.length; i++) {
@@ -103,17 +103,17 @@ public class ObjectIdentifierTest extends BaseJWTTest {
     assertEquals(bytes, exp, "encoding mismatch for " + oid);
   }
 
-  // Use case: encode then decode round-trips for every entry in the data provider.
   @Test(dataProvider = "encodeOIDs")
   public void encode_decode_roundtrip(String oid, int[] expected) throws DerDecodingException {
+    // Use case: encode then decode round-trips for every entry in the data provider.
     byte[] encoded = ObjectIdentifier.encode(oid);
     String decoded = new ObjectIdentifier(encoded).decode();
     assertEquals(decoded, oid);
   }
 
-  // Use case: malformed OID strings throw IllegalArgumentException.
   @Test
   public void encode_rejects_malformed() {
+    // Use case: malformed OID strings throw IllegalArgumentException.
     assertThrows(IllegalArgumentException.class, () -> ObjectIdentifier.encode(""));
     assertThrows(IllegalArgumentException.class, () -> ObjectIdentifier.encode("1"));
     assertThrows(IllegalArgumentException.class, () -> ObjectIdentifier.encode("3.0.1"));
@@ -121,9 +121,9 @@ public class ObjectIdentifierTest extends BaseJWTTest {
     assertThrows(IllegalArgumentException.class, () -> ObjectIdentifier.encode("a.b.c"));
   }
 
-  // Use case: DN-attribute OID constants exist and have the expected values.
   @Test
   public void dn_attribute_constants() {
+    // Use case: DN-attribute OID constants exist and have the expected values.
     assertEquals(ObjectIdentifier.X_520_DN_COMMON_NAME, "2.5.4.3");
     assertEquals(ObjectIdentifier.X_520_DN_COUNTRY, "2.5.4.6");
     assertEquals(ObjectIdentifier.X_520_DN_LOCALITY, "2.5.4.7");

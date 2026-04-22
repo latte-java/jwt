@@ -138,9 +138,9 @@ public class RFC7515VectorsTest extends BaseJWTTest {
         .build();
   }
 
-  // Use case: RFC 7515 Appendix A.1 -- HS256 published vector verifies.
   @Test
   public void rfc7515_appendixA1_hs256_verifies() {
+    // Use case: RFC 7515 Appendix A.1 -- HS256 published vector verifies.
     Verifier v = HMACVerifier.newVerifier(HS256_KEY);
     JWT jwt = vectorClockDecoder().decode(HS256_JWS, VerifierResolver.of(v));
     assertNotNull(jwt);
@@ -149,32 +149,32 @@ public class RFC7515VectorsTest extends BaseJWTTest {
     assertEquals(jwt.getBoolean("http://example.com/is_root"), Boolean.TRUE);
   }
 
-  // Use case: RFC 7515 Appendix A.2 -- RS256 published vector verifies with the
-  // published RSA public key.
   @Test
   public void rfc7515_appendixA2_rs256_verifies() {
+    // Use case: RFC 7515 Appendix A.2 -- RS256 published vector verifies with the
+    // published RSA public key.
     Verifier v = RSAVerifier.newVerifier(rsaPublic(RS256_N, RS256_E));
     JWT jwt = vectorClockDecoder().decode(RS256_JWS, VerifierResolver.of(v));
     assertNotNull(jwt);
     assertEquals(jwt.issuer(), "joe");
   }
 
-  // Use case: RFC 7515 Appendix A.3 -- ES256 published vector verifies.
-  // Signing is randomized so we only verify; this is the spec contract.
   @Test
   public void rfc7515_appendixA3_es256_verifies() {
+    // Use case: RFC 7515 Appendix A.3 -- ES256 published vector verifies.
+    // Signing is randomized so we only verify; this is the spec contract.
     Verifier v = ECVerifier.newVerifier(ecPublic("secp256r1", ES256_X, ES256_Y));
     JWT jwt = vectorClockDecoder().decode(ES256_JWS, VerifierResolver.of(v));
     assertNotNull(jwt);
     assertEquals(jwt.issuer(), "joe");
   }
 
-  // Use case: RFC 7515 Appendix A.4 -- ES512 published vector verifies.
-  // Note A.4 uses a non-JSON payload "Payload"; we decodeUnsecured-with-verify
-  // is not applicable. Decode would fail because the payload is not a JSON
-  // object. We exercise the verifier directly using the signing input bytes.
   @Test
   public void rfc7515_appendixA4_es512_verifies() {
+    // Use case: RFC 7515 Appendix A.4 -- ES512 published vector verifies.
+    // Note A.4 uses a non-JSON payload "Payload"; we decodeUnsecured-with-verify
+    // is not applicable. Decode would fail because the payload is not a JSON
+    // object. We exercise the verifier directly using the signing input bytes.
     Verifier v = ECVerifier.newVerifier(ecPublic("secp521r1", ES512_X, ES512_Y));
     String[] parts = ES512_JWS.split("\\.");
     assertEquals(parts.length, 3);

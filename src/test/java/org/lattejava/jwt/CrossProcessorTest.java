@@ -59,9 +59,9 @@ public class CrossProcessorTest extends BaseJWTTest {
     };
   }
 
-  // Use case: encode with one processor, decode with another -- claims match.
   @Test(dataProvider = "processorPairs")
   public void crossProcessorRoundTrip(String label, JSONProcessor encodeProc, JSONProcessor decodeProc) {
+    // Use case: encode with one processor, decode with another -- claims match.
     Instant exp = Instant.ofEpochSecond(Instant.now().getEpochSecond() + 3600);
     JWT jwt = JWT.builder()
         .subject("abc")
@@ -84,9 +84,9 @@ public class CrossProcessorTest extends BaseJWTTest {
     assertEquals(countN.longValue(), 42L, label);
   }
 
-  // Use case: BigInteger beyond Long.MAX_VALUE survives round-trip across processors.
   @Test(dataProvider = "processorPairs")
   public void crossProcessor_bigIntegerOverLongMax(String label, JSONProcessor encodeProc, JSONProcessor decodeProc) {
+    // Use case: BigInteger beyond Long.MAX_VALUE survives round-trip across processors.
     BigInteger huge = BigInteger.valueOf(Long.MAX_VALUE).add(BigInteger.TEN.pow(20));
     JWT jwt = JWT.builder().subject("abc").claim("huge", huge).build();
     String token = new JWTEncoder(encodeProc).encode(jwt, HMACSigner.newSHA256Signer(SECRET));
@@ -99,9 +99,9 @@ public class CrossProcessorTest extends BaseJWTTest {
     assertEquals(asBigInt, huge, label);
   }
 
-  // Use case: BigDecimal with high precision survives round-trip across processors.
   @Test(dataProvider = "processorPairs")
   public void crossProcessor_bigDecimalHighPrecision(String label, JSONProcessor encodeProc, JSONProcessor decodeProc) {
+    // Use case: BigDecimal with high precision survives round-trip across processors.
     BigDecimal precise = new BigDecimal("3.14159265358979323846264338327950288419716939937510");
     JWT jwt = JWT.builder().subject("abc").claim("pi", precise).build();
     String token = new JWTEncoder(encodeProc).encode(jwt, HMACSigner.newSHA256Signer(SECRET));

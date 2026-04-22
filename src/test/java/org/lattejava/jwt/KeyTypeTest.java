@@ -49,53 +49,53 @@ public class KeyTypeTest {
     };
   }
 
-  // Use case: All 4 standard constants exist and name() returns the exact kty value
   @Test(dataProvider = "standardKeyTypes")
   public void standardConstantNameMatches(KeyType keyType, String expectedName) {
+    // Use case: All 4 standard constants exist and name() returns the exact kty value
     assertEquals(keyType.name(), expectedName);
   }
 
-  // Use case: of() returns interned constant for standard names (reference equality with ==)
   @Test(dataProvider = "standardKeyTypes")
   public void ofReturnsInternedStandardConstant(KeyType keyType, String name) {
+    // Use case: of() returns interned constant for standard names (reference equality with ==)
     assertSame(KeyType.of(name), keyType);
   }
 
-  // Use case: equals/hashCode contract -- two instances with the same name are equal
   @Test
   public void equalsAndHashCodeForSameName() {
+    // Use case: equals/hashCode contract -- two instances with the same name are equal
     KeyType a = KeyType.of("MY_KTY");
     KeyType b = KeyType.of("MY_KTY");
     assertEquals(a, b);
     assertEquals(a.hashCode(), b.hashCode());
   }
 
-  // Use case: of() returns a new instance for unknown names
   @Test
   public void ofReturnsNewInstanceForUnknownNames() {
+    // Use case: of() returns a new instance for unknown names
     KeyType a = KeyType.of("MY_KTY");
     KeyType b = KeyType.of("MY_KTY");
     assertNotSame(a, b);
   }
 
-  // Use case: Case sensitivity -- "rsa" vs "RSA" -- exact-case lookup
   @Test
   public void caseSensitivityForStandardNames() {
+    // Use case: Case sensitivity -- "rsa" vs "RSA" -- exact-case lookup
     KeyType lower = KeyType.of("rsa");
     assertNotSame(lower, KeyType.RSA);
     assertNotEquals(lower, KeyType.RSA);
     assertEquals(lower.name(), "rsa");
   }
 
-  // Use case: of(null) throws NullPointerException
   @Test(expectedExceptions = NullPointerException.class)
   public void ofNullThrows() {
+    // Use case: of(null) throws NullPointerException
     KeyType.of(null);
   }
 
-  // Use case: standardValues() returns all 4 standard key types
   @Test
   public void standardValuesContainsAllStandardKeyTypes() {
+    // Use case: standardValues() returns all 4 standard key types
     KeyType[] values = KeyType.standardValues();
     assertEquals(values.length, 4);
     for (Object[] row : standardKeyTypes()) {
@@ -111,17 +111,17 @@ public class KeyTypeTest {
     }
   }
 
-  // Use case: equals returns false for null and other types
   @Test
   public void equalsFalseForNullAndDifferentType() {
+    // Use case: equals returns false for null and other types
     KeyType a = KeyType.of("X");
     assertFalse(a.equals(null));
     assertFalse(a.equals("X"));
   }
 
-  // Use case: KeyType.OCT name() returns the lowercase "oct" per RFC 7517 §6.4
   @Test
   public void octIsLowercase() {
+    // Use case: KeyType.OCT name() returns the lowercase "oct" per RFC 7517 §6.4
     assertEquals(KeyType.OCT.name(), "oct");
   }
 }

@@ -66,10 +66,10 @@ public class VerifiersAnyOfTest {
     }
   }
 
-  // Use case: First matching verifier is used (ordered delegation). Two verifiers,
-  // each accepting a distinct algorithm; signatures from each round-trip through anyOf.
   @Test
   public void anyOf_picksMatchingDelegate() {
+    // Use case: First matching verifier is used (ordered delegation). Two verifiers,
+    // each accepting a distinct algorithm; signatures from each round-trip through anyOf.
     Verifier hmac = HMACVerifier.newVerifier(HMAC_SECRET_32);
     Verifier rsa = RSAVerifier.newVerifier(readFile("rsa_public_key_2048.pem"));
     Verifier composite = Verifiers.anyOf(hmac, rsa);
@@ -86,9 +86,9 @@ public class VerifiersAnyOfTest {
     composite.verify(Algorithm.RS256, msg, rsaSigner.sign(msg));
   }
 
-  // Use case: No matching verifier throws MissingVerifierException.
   @Test
   public void anyOf_noMatchThrowsMissingVerifier() {
+    // Use case: No matching verifier throws MissingVerifierException.
     Verifier hmac = HMACVerifier.newVerifier(HMAC_SECRET_32);
     Verifier composite = Verifiers.anyOf(hmac);
 
@@ -99,9 +99,9 @@ public class VerifiersAnyOfTest {
             new byte[]{0}));
   }
 
-  // Use case: Single verifier behaves identically to direct use.
   @Test
   public void anyOf_singleVerifierBehavesAsPassThrough() {
+    // Use case: Single verifier behaves identically to direct use.
     Verifier hmac = HMACVerifier.newVerifier(HMAC_SECRET_32);
     Verifier composite = Verifiers.anyOf(hmac);
     assertTrue(composite.canVerify(Algorithm.HS256));
@@ -111,11 +111,11 @@ public class VerifiersAnyOfTest {
     composite.verify(Algorithm.HS256, msg, signer.sign(msg));
   }
 
-  // Use case: Fail-fast -- first canVerify match that fails verify propagates the
-  // exception immediately. The second verifier (which would have matched and might
-  // even succeed) is NOT consulted.
   @Test
   public void anyOf_failFastOnFirstMatchInvalidSignature() {
+    // Use case: Fail-fast -- first canVerify match that fails verify propagates the
+    // exception immediately. The second verifier (which would have matched and might
+    // even succeed) is NOT consulted.
     Verifier first = HMACVerifier.newVerifier(HMAC_SECRET_32);
     AtomicInteger secondCalls = new AtomicInteger();
     Verifier second = new Verifier() {
@@ -137,11 +137,11 @@ public class VerifiersAnyOfTest {
         "Second verifier must not be invoked once first match throws");
   }
 
-  // Use case: Empty list -- spec doesn't say; defaulted to throw IllegalArgumentException
-  // at construction so the caller sees the misuse immediately rather than later
-  // discovering that every verify() call throws MissingVerifierException.
   @Test
   public void anyOf_emptyVarargsThrowsAtConstruction() {
+    // Use case: Empty list -- spec doesn't say; defaulted to throw IllegalArgumentException
+    // at construction so the caller sees the misuse immediately rather than later
+    // discovering that every verify() call throws MissingVerifierException.
     assertThrows(IllegalArgumentException.class, () -> Verifiers.anyOf());
   }
 
@@ -162,10 +162,10 @@ public class VerifiersAnyOfTest {
     assertThrows(NullPointerException.class, () -> Verifiers.anyOf(hmac, null));
   }
 
-  // Use case: Custom Algorithm impl with broken equals still works because the dispatch
-  // is keyed on Algorithm.name() (per spec §6).
   @Test
   public void anyOf_customAlgorithmWithBrokenEqualsRoutedByName() {
+    // Use case: Custom Algorithm impl with broken equals still works because the dispatch
+    // is keyed on Algorithm.name() (per spec §6).
     // Custom algorithm whose name is "HS256" but whose equals() always returns false.
     Algorithm broken = new Algorithm() {
       @Override public String name() { return "HS256"; }

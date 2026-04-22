@@ -54,9 +54,9 @@ public class DecodeUnsecuredTest {
 
   // ---- defenses that DO run ----
 
-  // Use case: maxInputBytes still enforced under decodeUnsecured.
   @Test
   public void maxInputBytes_fires() {
+    // Use case: maxInputBytes still enforced under decodeUnsecured.
     String header = b64("{\"alg\":\"none\"}");
     StringBuilder big = new StringBuilder();
     while (big.length() < 1024) big.append("aaaaaaaaaa");
@@ -72,9 +72,9 @@ public class DecodeUnsecuredTest {
     }
   }
 
-  // Use case: base64url strictness still enforced under decodeUnsecured.
   @Test
   public void base64UrlStrictness_fires() {
+    // Use case: base64url strictness still enforced under decodeUnsecured.
     String header = b64("{\"alg\":\"none\"}") + "+";
     String payload = b64("{\"sub\":\"abc\"}");
     String token = header + "." + payload + ".";
@@ -86,9 +86,9 @@ public class DecodeUnsecuredTest {
     }
   }
 
-  // Use case: 3-segment split still enforced; 2-segment input -> MissingSignatureException.
   @Test
   public void segmentCount_twoSegments_missingSignature() {
+    // Use case: 3-segment split still enforced; 2-segment input -> MissingSignatureException.
     String header = b64("{\"alg\":\"none\"}");
     String payload = b64("{\"sub\":\"abc\"}");
     String token = header + "." + payload;
@@ -100,9 +100,9 @@ public class DecodeUnsecuredTest {
     }
   }
 
-  // Use case: 4+-segment input -> InvalidJWTException.
   @Test
   public void segmentCount_fourSegments_invalid() {
+    // Use case: 4+-segment input -> InvalidJWTException.
     String header = b64("{\"alg\":\"none\"}");
     String payload = b64("{\"sub\":\"abc\"}");
     String token = header + "." + payload + ".s.x";
@@ -114,9 +114,9 @@ public class DecodeUnsecuredTest {
     }
   }
 
-  // Use case: 3-segment "header.payload." (empty signature) is accepted.
   @Test
   public void segmentCount_emptyThirdSegment_accepted() {
+    // Use case: 3-segment "header.payload." (empty signature) is accepted.
     String header = b64("{\"alg\":\"none\"}");
     String payload = b64("{\"sub\":\"abc\"}");
     String token = header + "." + payload + ".";
@@ -125,9 +125,9 @@ public class DecodeUnsecuredTest {
     assertEquals(jwt.subject(), "abc");
   }
 
-  // Use case: maxNestingDepth still enforced under decodeUnsecured.
   @Test
   public void maxNestingDepth_fires() {
+    // Use case: maxNestingDepth still enforced under decodeUnsecured.
     StringBuilder nested = new StringBuilder();
     for (int i = 0; i < 30; i++) nested.append("{\"a\":");
     nested.append("1");
@@ -146,9 +146,9 @@ public class DecodeUnsecuredTest {
     }
   }
 
-  // Use case: maxNumberLength still enforced under decodeUnsecured.
   @Test
   public void maxNumberLength_fires() {
+    // Use case: maxNumberLength still enforced under decodeUnsecured.
     StringBuilder digits = new StringBuilder();
     for (int i = 0; i < 1500; i++) digits.append('1');
     String header = b64("{\"alg\":\"none\"}");
@@ -164,9 +164,9 @@ public class DecodeUnsecuredTest {
     }
   }
 
-  // Use case: duplicate JSON keys rejected by default under decodeUnsecured.
   @Test
   public void duplicateJsonKeys_defaultRejection_fires() {
+    // Use case: duplicate JSON keys rejected by default under decodeUnsecured.
     String header = b64("{\"alg\":\"none\"}");
     String payload = b64("{\"sub\":\"abc\",\"sub\":\"def\"}");
     String token = header + "." + payload + ".";
@@ -178,9 +178,9 @@ public class DecodeUnsecuredTest {
     }
   }
 
-  // Use case: Header.fromMap shape validation still runs (e.g. crit not an array).
   @Test
   public void headerShapeValidation_fires() {
+    // Use case: Header.fromMap shape validation still runs (e.g. crit not an array).
     String header = b64("{\"alg\":\"none\",\"crit\":\"notAnArray\"}");
     String payload = b64("{\"sub\":\"abc\"}");
     String token = header + "." + payload + ".";
@@ -192,9 +192,9 @@ public class DecodeUnsecuredTest {
     }
   }
 
-  // Use case: expectedType still enforced under decodeUnsecured.
   @Test
   public void expectedType_fires() {
+    // Use case: expectedType still enforced under decodeUnsecured.
     String header = b64("{\"alg\":\"none\",\"typ\":\"JWT\"}");
     String payload = b64("{\"sub\":\"abc\"}");
     String token = header + "." + payload + ".";
@@ -210,10 +210,10 @@ public class DecodeUnsecuredTest {
 
   // ---- defenses that DO NOT run ----
 
-  // Use case: signature verification is skipped -- a real signed token with
-  // a tampered signature still parses under decodeUnsecured.
   @Test
   public void signatureVerification_doesNotRun() {
+    // Use case: signature verification is skipped -- a real signed token with
+    // a tampered signature still parses under decodeUnsecured.
     JWT jwt = JWT.builder().subject("abc").build();
     String real = new JWTEncoder().encode(jwt, HMACSigner.newSHA256Signer(SECRET));
     String tampered = real.substring(0, real.lastIndexOf('.') + 1) + "Zm9vYmFy"; // bogus sig
@@ -223,9 +223,9 @@ public class DecodeUnsecuredTest {
     assertEquals(decoded.subject(), "abc");
   }
 
-  // Use case: expectedAlgorithms whitelist is NOT applied under decodeUnsecured.
   @Test
   public void expectedAlgorithms_doesNotRun() {
+    // Use case: expectedAlgorithms whitelist is NOT applied under decodeUnsecured.
     String header = b64("{\"alg\":\"none\"}");
     String payload = b64("{\"sub\":\"abc\"}");
     String token = header + "." + payload + ".";
@@ -237,10 +237,10 @@ public class DecodeUnsecuredTest {
     assertNotNull(jwt);
   }
 
-  // Use case: crit understood-parameters check is NOT applied under decodeUnsecured
-  // (decodeUnsecured returns successfully even when crit lists an unknown name).
   @Test
   public void crit_doesNotRun() {
+    // Use case: crit understood-parameters check is NOT applied under decodeUnsecured
+    // (decodeUnsecured returns successfully even when crit lists an unknown name).
     String header = b64("{\"alg\":\"none\",\"crit\":[\"unknown-ext\"],\"unknown-ext\":1}");
     String payload = b64("{\"sub\":\"abc\"}");
     String token = header + "." + payload + ".";
@@ -249,9 +249,9 @@ public class DecodeUnsecuredTest {
     assertNotNull(jwt);
   }
 
-  // Use case: time validation does NOT run -- an expired token still parses.
   @Test
   public void timeValidation_doesNotRun() {
+    // Use case: time validation does NOT run -- an expired token still parses.
     long pastEpoch = Instant.parse("2000-01-01T00:00:00Z").getEpochSecond();
     String header = b64("{\"alg\":\"none\"}");
     String payload = b64("{\"sub\":\"abc\",\"exp\":" + pastEpoch + "}");
@@ -262,9 +262,9 @@ public class DecodeUnsecuredTest {
     assertEquals(jwt.expiresAt(), Instant.ofEpochSecond(pastEpoch));
   }
 
-  // Use case: verifier resolution does NOT run -- decodeUnsecured needs no resolver.
   @Test
   public void verifierResolution_doesNotRun() {
+    // Use case: verifier resolution does NOT run -- decodeUnsecured needs no resolver.
     JWT jwt = JWT.builder().subject("abc").build();
     String token = new JWTEncoder().encode(jwt, HMACSigner.newSHA256Signer(SECRET));
     JWT decoded = new JWTDecoder().decodeUnsecured(token);

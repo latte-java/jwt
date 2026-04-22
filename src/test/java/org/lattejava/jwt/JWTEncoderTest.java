@@ -117,9 +117,9 @@ public class JWTEncoderTest {
     };
   }
 
-  // Use case: every supported algorithm round-trips encode -> decode and preserves all claims.
   @Test(dataProvider = "algorithms")
   public void roundTrip(Algorithm alg, Supplier<Signer> signerFactory, Supplier<Verifier> verifierFactory) {
+    // Use case: every supported algorithm round-trips encode -> decode and preserves all claims.
     Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
     JWT original = JWT.builder()
         .subject("subject-" + alg.name())
@@ -140,11 +140,11 @@ public class JWTEncoderTest {
         "round-trip claims should match: original=" + original + " decoded=" + decoded);
   }
 
-  // Use case: HeaderCustomizer can set typ and arbitrary parameters; the encoded header's
-  // alg still equals signer.algorithm() (both as a runtime check and because HeaderCustomizer
-  // has no .alg() method -- compile-time guarantee).
   @Test
   public void customizer_setsTypAndParameter_butNotAlg() {
+    // Use case: HeaderCustomizer can set typ and arbitrary parameters; the encoded header's
+    // alg still equals signer.algorithm() (both as a runtime check and because HeaderCustomizer
+    // has no .alg() method -- compile-time guarantee).
     JWT jwt = JWT.builder().subject("abc").build();
     Signer signer = HMACSigner.newSHA256Signer(HMAC_SECRET_32);
 
@@ -161,10 +161,10 @@ public class JWTEncoderTest {
     assertEquals(h.alg().name(), signer.algorithm().name());
   }
 
-  // Use case: HeaderCustomizer.parameter("alg", x) is rejected at runtime as
-  // defense-in-depth (the type system already prevents .alg(...) calls).
   @Test
   public void customizer_parameterAlg_rejected() {
+    // Use case: HeaderCustomizer.parameter("alg", x) is rejected at runtime as
+    // defense-in-depth (the type system already prevents .alg(...) calls).
     JWT jwt = JWT.builder().subject("abc").build();
     Signer signer = HMACSigner.newSHA256Signer(HMAC_SECRET_32);
     try {
@@ -175,9 +175,9 @@ public class JWTEncoderTest {
     }
   }
 
-  // Use case: encoder pre-populates kid from signer.kid() when the signer has one.
   @Test
   public void encoder_preserves_signerKid() {
+    // Use case: encoder pre-populates kid from signer.kid() when the signer has one.
     JWT jwt = JWT.builder().subject("abc").build();
     Signer signer = HMACSigner.newSHA256Signer(HMAC_SECRET_32.getBytes(), "key-1");
     String encoded = new JWTEncoder().encode(jwt, signer);
@@ -186,9 +186,9 @@ public class JWTEncoderTest {
     assertEquals(decoded.header().kid(), "key-1");
   }
 
-  // Use case: HeaderCustomizer.kid(null) clears the signer-derived kid.
   @Test
   public void customizer_kidNull_clears() {
+    // Use case: HeaderCustomizer.kid(null) clears the signer-derived kid.
     JWT jwt = JWT.builder().subject("abc").build();
     Signer signer = HMACSigner.newSHA256Signer(HMAC_SECRET_32.getBytes(), "key-1");
     String encoded = new JWTEncoder().encode(jwt, signer, b -> b.kid(null));
@@ -197,9 +197,9 @@ public class JWTEncoderTest {
     assertEquals(decoded.header().kid(), null);
   }
 
-  // Use case: HeaderCustomizer.kid("override") replaces signer-derived kid.
   @Test
   public void customizer_kidOverride() {
+    // Use case: HeaderCustomizer.kid("override") replaces signer-derived kid.
     JWT jwt = JWT.builder().subject("abc").build();
     Signer signer = HMACSigner.newSHA256Signer(HMAC_SECRET_32.getBytes(), "key-1");
     String encoded = new JWTEncoder().encode(jwt, signer, b -> b.kid("override"));
@@ -208,9 +208,9 @@ public class JWTEncoderTest {
     assertEquals(decoded.header().kid(), "override");
   }
 
-  // Use case: the encoded JWT is exactly three '.'-separated segments.
   @Test
   public void encoded_threeSegments() {
+    // Use case: the encoded JWT is exactly three '.'-separated segments.
     JWT jwt = JWT.builder().subject("abc").build();
     String encoded = new JWTEncoder().encode(jwt, HMACSigner.newSHA256Signer(HMAC_SECRET_32));
     assertNotNull(encoded);

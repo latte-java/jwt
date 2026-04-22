@@ -33,9 +33,9 @@ import static org.testng.Assert.assertTrue;
  * @author Daniel DeGroff
  */
 public class DerInputStreamTest {
-  // Use case: Zero-length DER values (e.g. NULL, empty OCTET STRING) are returned without error.
   @Test
   public void zero_length_value() throws Exception {
+    // Use case: Zero-length DER values (e.g. NULL, empty OCTET STRING) are returned without error.
     // NULL: tag 0x05, length 0
     byte[] bytes = new byte[]{0x05, 0x00};
     DerValue v = new DerInputStream(bytes).readDerValue();
@@ -44,9 +44,9 @@ public class DerInputStreamTest {
     assertEquals(v.toByteArray().length, 0);
   }
 
-  // Use case: A SEQUENCE containing a NULL and an INTEGER with zero-length values is parsed.
   @Test
   public void zero_length_in_sequence() throws Exception {
+    // Use case: A SEQUENCE containing a NULL and an INTEGER with zero-length values is parsed.
     byte[] bytes = new byte[]{
         0x30, 0x04,         // SEQUENCE, length 4
         0x05, 0x00,         //   NULL

@@ -75,20 +75,20 @@ public class SHAKE256Test {
     };
   }
 
-  // Use case: NIST CAVP KAT vectors match for empty / abc / variable lengths.
   @Test(dataProvider = "katVectors")
   public void katVector(String name, byte[] input, int outputBytes, String expectedHex) {
+    // Use case: NIST CAVP KAT vectors match for empty / abc / variable lengths.
     byte[] actual = SHAKE256.digest(input, outputBytes);
     assertEquals(actual.length, outputBytes, name + " length");
     assertEquals(HEX.formatHex(actual), expectedHex, name);
   }
 
-  // Use case: 128-byte squeeze (extends past first sponge block) is internally
-  // consistent: re-running the bundled implementation produces identical bytes
-  // and the prefix matches the 64-byte output (SHAKE is a stream cipher of
-  // sorts; the first N bytes of any longer squeeze equal the squeeze of N).
   @Test
   public void variableLength_128() {
+    // Use case: 128-byte squeeze (extends past first sponge block) is internally
+    // consistent: re-running the bundled implementation produces identical bytes
+    // and the prefix matches the 64-byte output (SHAKE is a stream cipher of
+    // sorts; the first N bytes of any longer squeeze equal the squeeze of N).
     byte[] long128 = SHAKE256.digest(new byte[0], 128);
     byte[] short64 = SHAKE256.digest(new byte[0], 64);
     byte[] prefix = new byte[64];
@@ -98,11 +98,11 @@ public class SHAKE256Test {
     assertEquals(HEX.formatHex(short64), EMPTY_KAT_64);
   }
 
-  // Use case: bundled implementation matches BouncyCastle's JCE-registered
-  // SHAKE256 (which produces a fixed 64-byte output) for both empty and
-  // randomized inputs (cross-validation).
   @Test
   public void crossValidationAgainstBouncyCastle() {
+    // Use case: bundled implementation matches BouncyCastle's JCE-registered
+    // SHAKE256 (which produces a fixed 64-byte output) for both empty and
+    // randomized inputs (cross-validation).
     Random r = new Random(0xCAFEBABEL);
     for (int trial = 0; trial < 64; trial++) {
       int inLen = r.nextInt(300);
@@ -114,10 +114,10 @@ public class SHAKE256Test {
     }
   }
 
-  // Use case: 57-byte output (used by Ed448 at_hash/c_hash) — verified against
-  // the 64-byte BC reference (truncated to 57).
   @Test
   public void shake256_57Bytes() {
+    // Use case: 57-byte output (used by Ed448 at_hash/c_hash) — verified against
+    // the 64-byte BC reference (truncated to 57).
     byte[] input = "openid-connect-at-hash-input".getBytes(StandardCharsets.UTF_8);
     byte[] expected64 = bcShake64(input);
     byte[] actual = SHAKE256.digest(input, 57);
@@ -127,10 +127,10 @@ public class SHAKE256Test {
     assertEquals(actual, expected57);
   }
 
-  // Use case: A registered "SHAKE256" provider that returns wrong bytes is
-  // detected by the probe self-test and the library falls back to bundled.
   @Test
   public void brokenProviderFallsBackToBundled() throws Exception {
+    // Use case: A registered "SHAKE256" provider that returns wrong bytes is
+    // detected by the probe self-test and the library falls back to bundled.
     Provider broken = new BrokenShakeProvider();
     Security.insertProviderAt(broken, 1);
     try {
@@ -155,10 +155,10 @@ public class SHAKE256Test {
     }
   }
 
-  // Use case: When no SHAKE256 provider is registered (stock JDK), the
-  // bundled implementation is used and produces correct output.
   @Test
   public void noProviderUsesBundled() {
+    // Use case: When no SHAKE256 provider is registered (stock JDK), the
+    // bundled implementation is used and produces correct output.
     SHAKE256.resetProviderCacheForTesting();
     try {
       byte[] expected = bcShake64("hello".getBytes(StandardCharsets.UTF_8));
@@ -169,15 +169,15 @@ public class SHAKE256Test {
     }
   }
 
-  // Use case: outputBytes <= 0 is rejected.
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void rejectsNonPositiveOutputBytes() {
+    // Use case: outputBytes <= 0 is rejected.
     SHAKE256.digest(new byte[0], 0);
   }
 
-  // Use case: null input is rejected.
   @Test(expectedExceptions = NullPointerException.class)
   public void rejectsNullInput() {
+    // Use case: null input is rejected.
     SHAKE256.digest(null, 32);
   }
 

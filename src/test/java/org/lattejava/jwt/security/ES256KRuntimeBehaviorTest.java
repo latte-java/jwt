@@ -57,21 +57,21 @@ import static org.testng.Assert.fail;
  * @author The Latte Project
  */
 public class ES256KRuntimeBehaviorTest extends BaseTest {
-  // Use case: ES256K constant defined and accessible.
   @Test
   public void es256KConstantDefined() {
+    // Use case: ES256K constant defined and accessible.
     assertNotNull(Algorithm.ES256K);
     assertEquals(Algorithm.ES256K.name(), "ES256K");
   }
 
-  // Use case: ES256K signing requires a JCE provider for secp256k1.
-  // On FIPS mode (BC-FIPS, which supports secp256k1) signing succeeds.
-  // On stock JDK 17+ without BouncyCastle, secp256k1 is not in SunEC
-  // and we either:
-  //   (a) cannot even generate a key pair -> test is skipped, or
-  //   (b) generate a key via BC if registered, then sign succeeds.
   @Test
   public void es256KSign_withProvider_succeeds() throws Exception {
+    // Use case: ES256K signing requires a JCE provider for secp256k1.
+    // On FIPS mode (BC-FIPS, which supports secp256k1) signing succeeds.
+    // On stock JDK 17+ without BouncyCastle, secp256k1 is not in SunEC
+    // and we either:
+    //   (a) cannot even generate a key pair -> test is skipped, or
+    //   (b) generate a key via BC if registered, then sign succeeds.
     KeyPair kp;
     try {
       KeyPairGenerator g = KeyPairGenerator.getInstance("EC");
@@ -103,11 +103,11 @@ public class ES256KRuntimeBehaviorTest extends BaseTest {
     verifier.verify(Algorithm.ES256K, message, sig);
   }
 
-  // Use case: ES256K sign on JDK without secp256k1 throws NoSuchAlgorithmException
-  // wrapped as JWTSigningException. Documented failure mode -- only assertable
-  // when secp256k1 is genuinely unavailable in the active JCA.
   @Test
   public void es256KSign_withoutProvider_documentedFailure() throws Exception {
+    // Use case: ES256K sign on JDK without secp256k1 throws NoSuchAlgorithmException
+    // wrapped as JWTSigningException. Documented failure mode -- only assertable
+    // when secp256k1 is genuinely unavailable in the active JCA.
     boolean secp256k1Available;
     try {
       KeyPairGenerator g = KeyPairGenerator.getInstance("EC");

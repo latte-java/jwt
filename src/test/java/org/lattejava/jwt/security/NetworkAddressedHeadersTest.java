@@ -106,10 +106,10 @@ public class NetworkAddressedHeadersTest extends BaseJWTTest {
     return serverSocket.getLocalPort();
   }
 
-  // Use case: JWT with jku header referencing localhost:<probe> decodes
-  // without issuing any network connection.
   @Test
   public void jkuHeader_notDereferenced() throws Exception {
+    // Use case: JWT with jku header referencing localhost:<probe> decodes
+    // without issuing any network connection.
     String jkuUrl = "http://127.0.0.1:" + probePort() + "/keys.json";
     JWT jwt = JWT.builder().subject("abc").build();
     String token = new JWTEncoder().encode(
@@ -124,10 +124,10 @@ public class NetworkAddressedHeadersTest extends BaseJWTTest {
         "Decoder must not dereference jku; observed " + connectionCount.get() + " connections");
   }
 
-  // Use case: JWT with x5u header referencing a remote URL decodes without
-  // issuing any network connection.
   @Test
   public void x5uHeader_notDereferenced() throws Exception {
+    // Use case: JWT with x5u header referencing a remote URL decodes without
+    // issuing any network connection.
     String x5uUrl = "http://127.0.0.1:" + probePort() + "/cert.pem";
     JWT jwt = JWT.builder().subject("abc").build();
     String token = new JWTEncoder().encode(
@@ -142,10 +142,10 @@ public class NetworkAddressedHeadersTest extends BaseJWTTest {
         "Decoder must not dereference x5u; observed " + connectionCount.get() + " connections");
   }
 
-  // Use case: JWT with inline jwk header parses the jwk map into
-  // Header.parameters() but does not construct a Verifier from it.
   @Test
   public void inlineJwkHeader_parsedNotConsumed() throws Exception {
+    // Use case: JWT with inline jwk header parses the jwk map into
+    // Header.parameters() but does not construct a Verifier from it.
     Map<String, Object> jwk = new LinkedHashMap<>();
     jwk.put("kty", "oct");
     jwk.put("k", "wantToBeAVerifier");
@@ -169,11 +169,11 @@ public class NetworkAddressedHeadersTest extends BaseJWTTest {
     assertEquals(connectionCount.get(), 0);
   }
 
-  // Use case: Explicit opt-in -- VerifierResolver.from(h -> ...) lets the
-  // caller construct a Verifier from h.get("jwk"). The library does not do
-  // this on the caller's behalf; this test shows the supported escape hatch.
   @Test
   public void inlineJwk_explicitOptInPath_works() throws Exception {
+    // Use case: Explicit opt-in -- VerifierResolver.from(h -> ...) lets the
+    // caller construct a Verifier from h.get("jwk"). The library does not do
+    // this on the caller's behalf; this test shows the supported escape hatch.
     Map<String, Object> jwk = new LinkedHashMap<>();
     jwk.put("kty", "oct");
     jwk.put("alg", "HS256");

@@ -63,11 +63,11 @@ public class X509CertificateBuilderTest extends BaseJWTTest {
     };
   }
 
-  // Use case: For each supported signature algorithm, X509CertificateBuilder produces a
-  // certificate that round-trips through CertificateFactory and preserves subject,
-  // issuer, validity, serial, and public key.
   @Test(dataProvider = "signatureAlgorithms")
   public void roundTrip_perAlgorithm(Algorithm algorithm) throws Exception {
+    // Use case: For each supported signature algorithm, X509CertificateBuilder produces a
+    // certificate that round-trips through CertificateFactory and preserves subject,
+    // issuer, validity, serial, and public key.
     KeyPair kp = generateKeyPair(algorithm);
     Instant notBefore = Instant.parse("2024-01-01T00:00:00Z");
     Instant notAfter = notBefore.plus(365, ChronoUnit.DAYS);
@@ -98,9 +98,9 @@ public class X509CertificateBuilderTest extends BaseJWTTest {
     parsed.verify(kp.getPublic());
   }
 
-  // Use case: validity with notBefore > notAfter is rejected at build time.
   @Test
   public void invalidValidity_rejected() throws Exception {
+    // Use case: validity with notBefore > notAfter is rejected at build time.
     KeyPair kp = generateKeyPair(Algorithm.RS256);
     Instant t = Instant.parse("2024-01-01T00:00:00Z");
     X509CertificateBuilder b = new X509CertificateBuilder()
@@ -112,9 +112,9 @@ public class X509CertificateBuilderTest extends BaseJWTTest {
     assertThrows(IllegalStateException.class, () -> b.build(kp.getPrivate(), Algorithm.RS256));
   }
 
-  // Use case: missing subject is rejected.
   @Test
   public void missingSubject_rejected() throws Exception {
+    // Use case: missing subject is rejected.
     KeyPair kp = generateKeyPair(Algorithm.RS256);
     Instant now = Instant.parse("2024-01-01T00:00:00Z");
     X509CertificateBuilder b = new X509CertificateBuilder()
@@ -125,9 +125,9 @@ public class X509CertificateBuilderTest extends BaseJWTTest {
     assertThrows(IllegalStateException.class, () -> b.build(kp.getPrivate(), Algorithm.RS256));
   }
 
-  // Use case: missing public key is rejected.
   @Test
   public void missingPublicKey_rejected() throws Exception {
+    // Use case: missing public key is rejected.
     KeyPair kp = generateKeyPair(Algorithm.RS256);
     Instant now = Instant.parse("2024-01-01T00:00:00Z");
     X509CertificateBuilder b = new X509CertificateBuilder()
@@ -138,9 +138,9 @@ public class X509CertificateBuilderTest extends BaseJWTTest {
     assertThrows(IllegalStateException.class, () -> b.build(kp.getPrivate(), Algorithm.RS256));
   }
 
-  // Use case: missing serial number is rejected.
   @Test
   public void missingSerial_rejected() throws Exception {
+    // Use case: missing serial number is rejected.
     KeyPair kp = generateKeyPair(Algorithm.RS256);
     Instant now = Instant.parse("2024-01-01T00:00:00Z");
     X509CertificateBuilder b = new X509CertificateBuilder()
@@ -151,9 +151,9 @@ public class X509CertificateBuilderTest extends BaseJWTTest {
     assertThrows(IllegalStateException.class, () -> b.build(kp.getPrivate(), Algorithm.RS256));
   }
 
-  // Use case: buildPEM produces a PEM-formatted certificate string that decodes back to a cert.
   @Test
   public void buildPEM_roundTrip() throws Exception {
+    // Use case: buildPEM produces a PEM-formatted certificate string that decodes back to a cert.
     KeyPair kp = generateKeyPair(Algorithm.ES256);
     Instant now = Instant.parse("2024-01-01T00:00:00Z");
     String pem = new X509CertificateBuilder()
@@ -172,9 +172,9 @@ public class X509CertificateBuilderTest extends BaseJWTTest {
     assertEquals(((X509Certificate) decoded.certificate).getSerialNumber(), BigInteger.valueOf(99));
   }
 
-  // Use case: validity beyond the 2050 boundary uses GeneralizedTime for notAfter (RFC 5280 §4.1.2.5).
   @Test
   public void validity_acrossBoundary() throws Exception {
+    // Use case: validity beyond the 2050 boundary uses GeneralizedTime for notAfter (RFC 5280 §4.1.2.5).
     KeyPair kp = generateKeyPair(Algorithm.ES256);
     Instant notBefore = Instant.parse("2049-12-31T00:00:00Z"); // UTCTime
     Instant notAfter = Instant.parse("2050-06-01T00:00:00Z"); // GeneralizedTime

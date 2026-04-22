@@ -56,10 +56,10 @@ public class JSONWebKeySetHelperTest extends BaseTest {
     JSONWebKeySetHelper.setMaxRedirects(JSONWebKeySetHelper.DEFAULT_MAX_REDIRECTS);
   }
 
-  // Use case: HTTP (not HTTPS) URL accepted (no scheme restriction by default)
-  // Use case: JWKS endpoint response with mixed key types (RSA, EC) parses without error
   @Test
   public void retrieve_keys_over_http_succeeds() throws Exception {
+    // Use case: HTTP (not HTTPS) URL accepted (no scheme restriction by default)
+    // Use case: JWKS endpoint response with mixed key types (RSA, EC) parses without error
     String body = "{\"keys\":["
         + "{\"kty\":\"RSA\",\"kid\":\"a\",\"n\":\"AQAB\",\"e\":\"AQAB\"},"
         + "{\"kty\":\"EC\",\"kid\":\"b\",\"crv\":\"P-256\",\"x\":\"AAAA\",\"y\":\"AAAA\"}"
@@ -78,9 +78,9 @@ public class JSONWebKeySetHelperTest extends BaseTest {
     assertEquals(keys.get(1).kid(), "b");
   }
 
-  // Use case: Response of exactly maxResponseBytes accepted
   @Test
   public void response_exactly_at_max_response_bytes_is_accepted() throws Exception {
+    // Use case: Response of exactly maxResponseBytes accepted
     // A 256-byte body that is valid JSON (the JWK parser will reject it for
     // missing structure, but we are testing the size cap path -- a valid
     // body is supplied via the JSON-shaped padding).
@@ -104,9 +104,9 @@ public class JSONWebKeySetHelperTest extends BaseTest {
     assertEquals(keys.size(), 0);
   }
 
-  // Use case: Response of maxResponseBytes + 1 rejected with ResponseTooLargeException
   @Test
   public void response_one_byte_over_cap_is_rejected() throws Exception {
+    // Use case: Response of maxResponseBytes + 1 rejected with ResponseTooLargeException
     int cap = 128;
     startHttpServer(server -> server
         .listenOn(PORT)
@@ -125,9 +125,9 @@ public class JSONWebKeySetHelperTest extends BaseTest {
     }
   }
 
-  // Use case: 3 sequential 301 redirects followed, 4th response returned
   @Test
   public void three_redirects_are_followed() throws Exception {
+    // Use case: 3 sequential 301 redirects followed, 4th response returned
     String body = "{\"keys\":[]}";
     startHttpServer(server -> server
         .listenOn(PORT)
@@ -158,9 +158,9 @@ public class JSONWebKeySetHelperTest extends BaseTest {
     assertEquals(keys.size(), 0);
   }
 
-  // Use case: 4 sequential redirects rejected (default maxRedirects=3)
   @Test
   public void four_redirects_are_rejected() throws Exception {
+    // Use case: 4 sequential redirects rejected (default maxRedirects=3)
     startHttpServer(server -> server
         .listenOn(PORT)
         .handleURI("/r1")
@@ -185,10 +185,10 @@ public class JSONWebKeySetHelperTest extends BaseTest {
     }
   }
 
-  // Use case: Redirect to a final body that exceeds maxResponseBytes still rejected
-  // cleanly (size cap applies per-hop)
   @Test
   public void per_hop_size_cap_enforced_after_redirect() throws Exception {
+    // Use case: Redirect to a final body that exceeds maxResponseBytes still rejected
+    // cleanly (size cap applies per-hop)
     int cap = 128;
     startHttpServer(server -> server
         .listenOn(PORT)

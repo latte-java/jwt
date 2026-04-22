@@ -66,24 +66,24 @@ public class JWKThumbprintTest {
         .build();
   }
 
-  // Use case: RFC 7638 §3.1 RSA SHA-256 thumbprint matches the documented bytes.
   @Test
   public void rfc7638RSA_S256() {
+    // Use case: RFC 7638 §3.1 RSA SHA-256 thumbprint matches the documented bytes.
     String thumbprint = JWTUtils.generateJWS_kid_S256(rfc7638Rsa());
     assertEquals(thumbprint, "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs");
   }
 
-  // Use case: RFC 8037 §A.3 Ed25519 OKP SHA-256 thumbprint matches RFC.
   @Test
   public void rfc8037Ed25519_S256() {
+    // Use case: RFC 8037 §A.3 Ed25519 OKP SHA-256 thumbprint matches RFC.
     String thumbprint = JWTUtils.generateJWS_kid_S256(rfc8037Ed25519());
     assertEquals(thumbprint, "kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k");
   }
 
-  // Use case: EC P-256 thumbprint is pinned (compute reference via the
-  // canonical "{\"crv\":\"P-256\",\"kty\":\"EC\",\"x\":...,\"y\":...}").
   @Test
   public void ecP256_S256() {
+    // Use case: EC P-256 thumbprint is pinned (compute reference via the
+    // canonical "{\"crv\":\"P-256\",\"kty\":\"EC\",\"x\":...,\"y\":...}").
     JSONWebKey k = JSONWebKey.builder()
         .kty(KeyType.EC)
         .crv("P-256")
@@ -96,9 +96,9 @@ public class JWKThumbprintTest {
         "cn-I_WNMClehiVp51i_0VpOENW1upEerA8sEam5hn-s");
   }
 
-  // Use case: EC P-384 thumbprint is deterministic and stable.
   @Test
   public void ecP384_S256_deterministic() {
+    // Use case: EC P-384 thumbprint is deterministic and stable.
     JSONWebKey k = JSONWebKey.builder()
         .kty(KeyType.EC)
         .crv("P-384")
@@ -110,9 +110,9 @@ public class JWKThumbprintTest {
     assertEquals(t1, t2);
   }
 
-  // Use case: EC P-521 thumbprint is deterministic and stable.
   @Test
   public void ecP521_S256_deterministic() {
+    // Use case: EC P-521 thumbprint is deterministic and stable.
     JSONWebKey k = JSONWebKey.builder()
         .kty(KeyType.EC)
         .crv("P-521")
@@ -124,15 +124,15 @@ public class JWKThumbprintTest {
     assertEquals(t1, t2);
   }
 
-  // Use case: JSONProcessor independence — thumbprint is computed via the
-  // internal CanonicalJSONWriter, NOT the user's JSONProcessor; therefore the
-  // output is independent of which processor is configured. We exercise this
-  // by computing the RSA thumbprint twice (the JSONProcessor configuration is
-  // global static state) and asserting the value matches the RFC 7638 vector
-  // even after constructing a JSONWebKey from a Map (which exercises the
-  // processor path).
   @Test
   public void jsonProcessorIndependence() {
+    // Use case: JSONProcessor independence — thumbprint is computed via the
+    // internal CanonicalJSONWriter, NOT the user's JSONProcessor; therefore the
+    // output is independent of which processor is configured. We exercise this
+    // by computing the RSA thumbprint twice (the JSONProcessor configuration is
+    // global static state) and asserting the value matches the RFC 7638 vector
+    // even after constructing a JSONWebKey from a Map (which exercises the
+    // processor path).
     JSONWebKey k1 = rfc7638Rsa();
     String t1 = JWTUtils.generateJWS_kid_S256(k1);
     assertEquals(t1, "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs");
@@ -148,10 +148,10 @@ public class JWKThumbprintTest {
     assertEquals(t2, t1, "thumbprint must be insensitive to JSONWebKey field-set order");
   }
 
-  // Use case: SHA-1 (legacy generateJWS_kid default) thumbprint differs from
-  // SHA-256 and is stable. Pinned from the existing JWTUtilsTest vectors.
   @Test
   public void sha1Thumbprints() {
+    // Use case: SHA-1 (legacy generateJWS_kid default) thumbprint differs from
+    // SHA-256 and is stable. Pinned from the existing JWTUtilsTest vectors.
     JSONWebKey k = rfc7638Rsa();
     String s1 = JWTUtils.generateJWS_kid(k);
     String s256 = JWTUtils.generateJWS_kid_S256(k);
@@ -159,18 +159,18 @@ public class JWKThumbprintTest {
     assertEquals(s1, "nMGlFRw9Y5POaSOaIaRBc9P2nfA");
   }
 
-  // Use case: explicit-algorithm overload with SHA-256 produces same as _S256.
   @Test
   public void explicitAlgorithm_S256() {
+    // Use case: explicit-algorithm overload with SHA-256 produces same as _S256.
     JSONWebKey k = rfc7638Rsa();
     assertEquals(
         JWTUtils.generateJWS_kid("SHA-256", k),
         JWTUtils.generateJWS_kid_S256(k));
   }
 
-  // Use case: unsupported kty throws IllegalArgumentException.
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void unsupportedKty() {
+    // Use case: unsupported kty throws IllegalArgumentException.
     // kty defaults to null when not set on the builder.
     JSONWebKey k = JSONWebKey.builder().build();
     JWTUtils.generateJWS_kid_S256(k);

@@ -86,9 +86,9 @@ public class SegmentCountTest {
     };
   }
 
-  // Use case: spec §14 segment-count matrix -- authenticated decode path.
   @Test(dataProvider = "segmentCases")
   public void segmentCounts(String input, Class<? extends Exception> expected, String description) {
+    // Use case: spec §14 segment-count matrix -- authenticated decode path.
     JWTDecoder decoder = new JWTDecoder();
     Verifier verifier = HMACVerifier.newVerifier(SECRET);
     try {
@@ -102,18 +102,18 @@ public class SegmentCountTest {
     }
   }
 
-  // Use case: "a.b.c" proceeds through the full sig flow on a real signed token.
   @Test
   public void threeSegments_realToken_succeeds() {
+    // Use case: "a.b.c" proceeds through the full sig flow on a real signed token.
     JWT jwt = JWT.builder().subject("abc").build();
     String encoded = new JWTEncoder().encode(jwt, HMACSigner.newSHA256Signer(SECRET));
     JWT decoded = new JWTDecoder().decode(encoded, VerifierResolver.of(HMACVerifier.newVerifier(SECRET)));
     assertNotNull(decoded);
   }
 
-  // Use case: "a.b." (empty signature) is structurally valid for decodeUnsecured.
   @Test
   public void threeSegmentsEmptySig_decodeUnsecured_succeeds() {
+    // Use case: "a.b." (empty signature) is structurally valid for decodeUnsecured.
     String[] hp = validHeaderAndPayload();
     String token = hp[0] + "." + hp[1] + ".";
     JWT decoded = new JWTDecoder().decodeUnsecured(token);

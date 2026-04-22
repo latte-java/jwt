@@ -48,10 +48,10 @@ import static org.testng.Assert.fail;
  */
 public class LatteJSONProcessorTest {
 
-  // Use case: Round-trip serialization of every JSON type (string, integer, decimal,
-  // boolean true/false, null, nested object, nested array)
   @DataProvider(name = "jsonTypes")
   public Object[][] jsonTypes() {
+    // Use case: Round-trip serialization of every JSON type (string, integer, decimal,
+    // boolean true/false, null, nested object, nested array)
     Map<String, Object> nestedObj = new LinkedHashMap<>();
     nestedObj.put("inner", "value");
 
@@ -80,9 +80,9 @@ public class LatteJSONProcessorTest {
     assertTrue(result.containsKey(key));
   }
 
-  // Use case: Nested structures (objects within arrays within objects)
   @Test
   public void nestedStructures() throws Exception {
+    // Use case: Nested structures (objects within arrays within objects)
     JSONProcessor jp = new LatteJSONProcessor();
 
     Map<String, Object> innermost = new LinkedHashMap<>();
@@ -104,10 +104,10 @@ public class LatteJSONProcessorTest {
     assertEquals(result, outer);
   }
 
-  // Use case: Unicode string escaping (multi-byte characters, control characters,
-  // surrogate pairs, named escapes)
   @DataProvider(name = "unicodeStrings")
   public Object[][] unicodeStrings() {
+    // Use case: Unicode string escaping (multi-byte characters, control characters,
+    // surrogate pairs, named escapes)
     return new Object[][]{
         {"ascii", "plain text"},
         {"backslash", "back\\slash"},
@@ -138,9 +138,9 @@ public class LatteJSONProcessorTest {
     assertEquals(result.get("k"), value, "label=" + label);
   }
 
-  // Use case: Empty objects and arrays
   @Test
   public void emptyObject() throws Exception {
+    // Use case: Empty objects and arrays
     JSONProcessor jp = new LatteJSONProcessor();
     Map<String, Object> empty = new LinkedHashMap<>();
     byte[] bytes = jp.serialize(empty);
@@ -168,9 +168,9 @@ public class LatteJSONProcessorTest {
     assertEquals(result.get("obj"), new LinkedHashMap<>());
   }
 
-  // Use case: Large numbers (BigInteger beyond Long.MAX_VALUE, BigDecimal high precision)
   @Test
   public void bigIntegerBeyondLong() throws Exception {
+    // Use case: Large numbers (BigInteger beyond Long.MAX_VALUE, BigDecimal high precision)
     JSONProcessor jp = new LatteJSONProcessor();
     BigInteger huge = BigInteger.valueOf(Long.MAX_VALUE).add(BigInteger.TEN);
     Map<String, Object> input = new LinkedHashMap<>();
@@ -191,9 +191,9 @@ public class LatteJSONProcessorTest {
     assertTrue(result.get("pi") instanceof BigDecimal);
   }
 
-  // Use case: Top-level non-object input throws JSONProcessingException (per §4 javadoc)
   @DataProvider(name = "topLevelNonObject")
   public Object[][] topLevelNonObject() {
+    // Use case: Top-level non-object input throws JSONProcessingException (per §4 javadoc)
     return new Object[][]{
         {"[1,2,3]"},
         {"\"hello\""},
@@ -211,9 +211,9 @@ public class LatteJSONProcessorTest {
         () -> jp.deserialize(json.getBytes(StandardCharsets.UTF_8)));
   }
 
-  // Use case: Malformed JSON input -- DataProvider over variants
   @DataProvider(name = "malformedJson")
   public Object[][] malformedJson() {
+    // Use case: Malformed JSON input -- DataProvider over variants
     return new Object[][]{
         {"unterminatedString", "{\"a\":\"foo"},
         {"unterminatedObject", "{\"a\":1"},
@@ -252,18 +252,18 @@ public class LatteJSONProcessorTest {
     }
   }
 
-  // Use case: Duplicate JSON key in payload rejected by default
   @Test
   public void duplicateKeysRejectedByDefault() {
+    // Use case: Duplicate JSON key in payload rejected by default
     JSONProcessor jp = new LatteJSONProcessor();
     String json = "{\"a\":1,\"a\":2}";
     expectThrows(JSONProcessingException.class,
         () -> jp.deserialize(json.getBytes(StandardCharsets.UTF_8)));
   }
 
-  // Use case: Duplicate JSON key accepted when allowDuplicateJSONKeys=true
   @Test
   public void duplicateKeysAcceptedWhenAllowed() throws Exception {
+    // Use case: Duplicate JSON key accepted when allowDuplicateJSONKeys=true
     JSONProcessor jp = new LatteJSONProcessor(16, 1000, true);
     String json = "{\"a\":1,\"a\":2}";
     Map<String, Object> result = jp.deserialize(json.getBytes(StandardCharsets.UTF_8));
@@ -271,18 +271,18 @@ public class LatteJSONProcessorTest {
     assertEquals(result.get("a"), BigInteger.valueOf(2));
   }
 
-  // Use case: Default constructor uses spec defaults (16 / 1000 / false)
   @Test
   public void defaultConstructorUsesSpecDefaults() {
+    // Use case: Default constructor uses spec defaults (16 / 1000 / false)
     JSONProcessor jp = new LatteJSONProcessor();
     // default rejects duplicates
     expectThrows(JSONProcessingException.class,
         () -> jp.deserialize("{\"a\":1,\"a\":2}".getBytes(StandardCharsets.UTF_8)));
   }
 
-  // Use case: depth=16 accepted, depth=17 rejected -- DataProvider on the boundary
   @DataProvider(name = "depthBoundary")
   public Object[][] depthBoundary() {
+    // Use case: depth=16 accepted, depth=17 rejected -- DataProvider on the boundary
     return new Object[][]{
         {16, true},   // accepted
         {17, false},  // rejected
@@ -317,9 +317,9 @@ public class LatteJSONProcessorTest {
     }
   }
 
-  // Use case: depth boundary with arrays counts toward the same nesting limit
   @Test
   public void arrayDepthCounts() {
+    // Use case: depth boundary with arrays counts toward the same nesting limit
     JSONProcessor jp = new LatteJSONProcessor();
     // Build {"a":[[[...1...]]]} -- 1 object + N arrays = N+1 nesting levels
     int arrays = 16; // total depth = 17 -> rejected
@@ -332,13 +332,13 @@ public class LatteJSONProcessorTest {
         () -> jp.deserialize(sb.toString().getBytes(StandardCharsets.UTF_8)));
   }
 
-  // Use case: number digit-run boundary: 1000 accepted / 1001 rejected
-  // DataProvider over (length, form, position) to cover integer / decimal / integer-with-exponent
-  // in both header and payload positions (here the "position" determines where in the JSON the
-  // number lives, but functionally it's the same parser path -- both header & payload pass
-  // through deserialize()).
   @DataProvider(name = "numberLengthBoundary")
   public Object[][] numberLengthBoundary() {
+    // Use case: number digit-run boundary: 1000 accepted / 1001 rejected
+    // DataProvider over (length, form, position) to cover integer / decimal / integer-with-exponent
+    // in both header and payload positions (here the "position" determines where in the JSON the
+    // number lives, but functionally it's the same parser path -- both header & payload pass
+    // through deserialize()).
     return new Object[][]{
         // {label, lengthOfDigitRun, form, position, expectedAccepted}
         {"int-1000-payload", 1000, "integer", "payload", true},
@@ -419,11 +419,11 @@ public class LatteJSONProcessorTest {
     return sb.toString();
   }
 
-  // Use case: Number digit-run measured includes integer + decimal + exponent digits
-  // (sign chars excluded). Verify a number with negative sign and negative exponent stays
-  // within limits for a 1000-digit total.
   @Test
   public void numberLengthExcludesSignChars() throws Exception {
+    // Use case: Number digit-run measured includes integer + decimal + exponent digits
+    // (sign chars excluded). Verify a number with negative sign and negative exponent stays
+    // within limits for a 1000-digit total.
     JSONProcessor jp = new LatteJSONProcessor();
     // 1 + 998 integer digits + 'e' + '-' + 1 exponent digit = 1000 digit chars
     StringBuilder digits = new StringBuilder().append('1');
@@ -434,10 +434,10 @@ public class LatteJSONProcessorTest {
     assertTrue(result.containsKey("n"));
   }
 
-  // Use case: serialize() handles String, Number (Integer/Long/BigInteger/Double/BigDecimal),
-  // Boolean, null, Map, List
   @Test
   public void serializeAllSupportedTypes() throws Exception {
+    // Use case: serialize() handles String, Number (Integer/Long/BigInteger/Double/BigDecimal),
+    // Boolean, null, Map, List
     JSONProcessor jp = new LatteJSONProcessor();
     Map<String, Object> input = new LinkedHashMap<>();
     input.put("str", "hi");
@@ -465,18 +465,18 @@ public class LatteJSONProcessorTest {
     assertEquals(result.get("listVal"), List.of("a", "b"));
   }
 
-  // Use case: serialize() rejects unsupported value types
   @Test
   public void serializeRejectsUnsupportedType() {
+    // Use case: serialize() rejects unsupported value types
     JSONProcessor jp = new LatteJSONProcessor();
     Map<String, Object> input = new LinkedHashMap<>();
     input.put("k", new Object());
     expectThrows(JSONProcessingException.class, () -> jp.serialize(input));
   }
 
-  // Use case: deserialized objects use LinkedHashMap (preserves insertion order)
   @Test
   public void deserializedObjectIsLinkedHashMap() throws Exception {
+    // Use case: deserialized objects use LinkedHashMap (preserves insertion order)
     JSONProcessor jp = new LatteJSONProcessor();
     String json = "{\"z\":1,\"a\":2,\"m\":3}";
     Map<String, Object> result = jp.deserialize(json.getBytes(StandardCharsets.UTF_8));
@@ -485,9 +485,9 @@ public class LatteJSONProcessorTest {
     assertEquals(keys, Arrays.asList("z", "a", "m"));
   }
 
-  // Use case: Constructor validates parameters
   @Test
   public void constructorRejectsNonPositiveDepth() {
+    // Use case: Constructor validates parameters
     expectThrows(IllegalArgumentException.class,
         () -> new LatteJSONProcessor(0, 1000, false));
   }
@@ -498,9 +498,9 @@ public class LatteJSONProcessorTest {
         () -> new LatteJSONProcessor(16, 0, false));
   }
 
-  // Use case: Whitespace between tokens is permitted (RFC 8259 §2)
   @Test
   public void whitespaceBetweenTokensAccepted() throws Exception {
+    // Use case: Whitespace between tokens is permitted (RFC 8259 §2)
     JSONProcessor jp = new LatteJSONProcessor();
     String json = "  {  \"a\"  :  1  ,  \"b\"  :  [  1  ,  2  ]  }  ";
     Map<String, Object> result = jp.deserialize(json.getBytes(StandardCharsets.UTF_8));
@@ -508,9 +508,9 @@ public class LatteJSONProcessorTest {
     assertEquals(result.get("b"), Arrays.asList(BigInteger.ONE, BigInteger.valueOf(2)));
   }
 
-  // Use case: Integer with positive exponent without decimal point parses as decimal
   @Test
   public void integerWithExponentParsesAsDecimal() throws Exception {
+    // Use case: Integer with positive exponent without decimal point parses as decimal
     JSONProcessor jp = new LatteJSONProcessor();
     String json = "{\"n\":1e3}";
     Map<String, Object> result = jp.deserialize(json.getBytes(StandardCharsets.UTF_8));
@@ -518,9 +518,9 @@ public class LatteJSONProcessorTest {
         "expected BigDecimal, got " + result.get("n").getClass());
   }
 
-  // Use case: Negative numbers parse correctly
   @Test
   public void negativeNumbers() throws Exception {
+    // Use case: Negative numbers parse correctly
     JSONProcessor jp = new LatteJSONProcessor();
     String json = "{\"i\":-42,\"d\":-3.14}";
     Map<String, Object> result = jp.deserialize(json.getBytes(StandardCharsets.UTF_8));
@@ -528,9 +528,9 @@ public class LatteJSONProcessorTest {
     assertEquals(result.get("d"), new BigDecimal("-3.14"));
   }
 
-  // Use case: Zero parses correctly (single-digit integer is a special case)
   @Test
   public void zero() throws Exception {
+    // Use case: Zero parses correctly (single-digit integer is a special case)
     JSONProcessor jp = new LatteJSONProcessor();
     String json = "{\"n\":0}";
     Map<String, Object> result = jp.deserialize(json.getBytes(StandardCharsets.UTF_8));

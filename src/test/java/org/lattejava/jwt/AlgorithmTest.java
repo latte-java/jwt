@@ -61,47 +61,47 @@ public class AlgorithmTest {
     };
   }
 
-  // Use case: All 15 standard constants exist and name() returns the exact JWA string
   @Test(dataProvider = "standardAlgorithms")
   public void standardConstantNameMatches(Algorithm algorithm, String expectedName) {
+    // Use case: All 15 standard constants exist and name() returns the exact JWA string
     assertEquals(algorithm.name(), expectedName);
   }
 
-  // Use case: of() returns interned constant for standard names (reference equality with ==)
   @Test(dataProvider = "standardAlgorithms")
   public void ofReturnsInternedStandardConstant(Algorithm algorithm, String name) {
+    // Use case: of() returns interned constant for standard names (reference equality with ==)
     assertSame(Algorithm.of(name), algorithm);
   }
 
-  // Use case: equals/hashCode contract -- two instances with the same name are equal
   @Test
   public void equalsAndHashCodeForSameName() {
+    // Use case: equals/hashCode contract -- two instances with the same name are equal
     Algorithm a = Algorithm.of("MY_ALG");
     Algorithm b = Algorithm.of("MY_ALG");
     assertEquals(a, b);
     assertEquals(a.hashCode(), b.hashCode());
   }
 
-  // Use case: of() returns a new instance for unknown names (not interned)
   @Test
   public void ofReturnsNewInstanceForUnknownNames() {
+    // Use case: of() returns a new instance for unknown names (not interned)
     Algorithm a = Algorithm.of("MY_ALG");
     Algorithm b = Algorithm.of("MY_ALG");
     assertNotSame(a, b);
   }
 
-  // Use case: Case sensitivity -- "rs256" vs "RS256" -- exact-case lookup
   @Test
   public void caseSensitivityForStandardNames() {
+    // Use case: Case sensitivity -- "rs256" vs "RS256" -- exact-case lookup
     Algorithm lower = Algorithm.of("rs256");
     assertNotSame(lower, Algorithm.RS256);
     assertNotEquals(lower, Algorithm.RS256);
     assertEquals(lower.name(), "rs256");
   }
 
-  // Use case: A standard constant equals a custom one with the same name (equals by name())
   @Test
   public void equalsAcrossStandardAndCustomWithSameName() {
+    // Use case: A standard constant equals a custom one with the same name (equals by name())
     Algorithm custom = new TestAlgorithm("RS256");
     // The standard constant equals a custom Algorithm with the same name only if both
     // sides honor name()-based equality. StandardAlgorithm.equals only compares to other
@@ -116,21 +116,21 @@ public class AlgorithmTest {
     assertEquals(custom.name(), "RS256");
   }
 
-  // Use case: of(null) throws NullPointerException
   @Test(expectedExceptions = NullPointerException.class)
   public void ofNullThrows() {
+    // Use case: of(null) throws NullPointerException
     Algorithm.of(null);
   }
 
-  // Use case: name() never returns null on standard constants
   @Test(dataProvider = "standardAlgorithms")
   public void nameNeverNull(Algorithm algorithm, String expectedName) {
+    // Use case: name() never returns null on standard constants
     assertNotEquals(algorithm.name(), null);
   }
 
-  // Use case: standardValues() returns all 15 standard algorithms
   @Test
   public void standardValuesContainsAllStandardAlgorithms() {
+    // Use case: standardValues() returns all 15 standard algorithms
     Algorithm[] values = Algorithm.standardValues();
     assertEquals(values.length, 15);
     for (Object[] row : standardAlgorithms()) {
@@ -146,25 +146,25 @@ public class AlgorithmTest {
     }
   }
 
-  // Use case: equals returns false for null and other types
   @Test
   public void equalsFalseForNullAndDifferentType() {
+    // Use case: equals returns false for null and other types
     Algorithm a = Algorithm.of("X");
     assertFalse(a.equals(null));
     assertFalse(a.equals("X"));
   }
 
-  // Use case: of("none") returns a non-standard Algorithm with name() == "none"
   @Test
   public void ofNoneReturnsNonStandardAlgorithm() {
+    // Use case: of("none") returns a non-standard Algorithm with name() == "none"
     Algorithm none = Algorithm.of("none");
     assertEquals(none.name(), "none");
     assertNotSame(none, Algorithm.of("none"));
   }
 
-  // Use case: of("EdDSA") returns a non-standard Algorithm (no constant per RFC 9864)
   @Test
   public void ofEdDSAReturnsNonStandardAlgorithm() {
+    // Use case: of("EdDSA") returns a non-standard Algorithm (no constant per RFC 9864)
     Algorithm eddsa = Algorithm.of("EdDSA");
     assertEquals(eddsa.name(), "EdDSA");
     assertNotSame(eddsa, Algorithm.Ed25519);

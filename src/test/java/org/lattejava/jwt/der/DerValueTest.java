@@ -39,9 +39,9 @@ import static org.testng.Assert.assertTrue;
  * @author The Latte Project
  */
 public class DerValueTest {
-  // Use case: newBitString prepends a zero pad byte and getBitStringBytes round-trips it back.
   @Test
   public void bitString_round_trip() {
+    // Use case: newBitString prepends a zero pad byte and getBitStringBytes round-trips it back.
     byte[] payload = new byte[]{(byte) 0xDE, (byte) 0xAD, (byte) 0xBE, (byte) 0xEF};
     DerValue v = DerValue.newBitString(payload);
     assertEquals(v.tag.value, Tag.BitString);
@@ -54,57 +54,57 @@ public class DerValueTest {
     assertEquals(round, payload);
   }
 
-  // Use case: getBitStringBytes rejects non-zero pad byte.
   @Test
   public void bitString_nonZeroPad_rejected() {
+    // Use case: getBitStringBytes rejects non-zero pad byte.
     DerValue v = new DerValue(Tag.BitString, new byte[]{0x03, 0x06});
     assertThrows(IllegalArgumentException.class, v::getBitStringBytes);
   }
 
-  // Use case: getBitStringBytes errors when called on a non-BitString value.
   @Test
   public void bitString_wrongTag_rejected() {
+    // Use case: getBitStringBytes errors when called on a non-BitString value.
     DerValue v = new DerValue(Tag.OctetString, new byte[]{1, 2, 3});
     assertThrows(IllegalStateException.class, v::getBitStringBytes);
   }
 
-  // Use case: newNull produces a NULL tag with zero-length body.
   @Test
   public void nullValue_zeroLengthBody() {
+    // Use case: newNull produces a NULL tag with zero-length body.
     DerValue v = DerValue.newNull();
     assertEquals(v.tag.value, Tag.Null);
     assertEquals(v.getLength(), 0);
     assertEquals(v.toByteArray().length, 0);
   }
 
-  // Use case: newASCIIString uses PrintableString tag (19 / 0x13) with US-ASCII body.
   @Test
   public void asciiString_round_trip() {
+    // Use case: newASCIIString uses PrintableString tag (19 / 0x13) with US-ASCII body.
     DerValue v = DerValue.newASCIIString("Latte");
     assertEquals(v.tag.value, Tag.PrintableString);
     assertEquals(v.toByteArray(), "Latte".getBytes(StandardCharsets.US_ASCII));
   }
 
-  // Use case: newUTF8String uses tag 12 (0x0C) with UTF-8 bytes.
   @Test
   public void utf8String_round_trip() {
+    // Use case: newUTF8String uses tag 12 (0x0C) with UTF-8 bytes.
     DerValue v = DerValue.newUTF8String("naïve\u4e2d");
     assertEquals(v.tag.value, Tag.UTFString);
     assertEquals(v.toByteArray(), "naïve\u4e2d".getBytes(StandardCharsets.UTF_8));
   }
 
-  // Use case: newUTCTime formats as yyMMddHHmmssZ and emits tag 23.
   @Test
   public void utcTime_format() {
+    // Use case: newUTCTime formats as yyMMddHHmmssZ and emits tag 23.
     Instant t = Instant.parse("2024-04-22T10:30:45Z");
     DerValue v = DerValue.newUTCTime(t);
     assertEquals(v.tag.value, Tag.UTCTime);
     assertEquals(new String(v.toByteArray(), StandardCharsets.US_ASCII), "240422103045Z");
   }
 
-  // Use case: newGeneralizedTime formats as yyyyMMddHHmmssZ and emits tag 24.
   @Test
   public void generalizedTime_format() {
+    // Use case: newGeneralizedTime formats as yyyyMMddHHmmssZ and emits tag 24.
     Instant t = Instant.parse("2050-04-22T10:30:45Z");
     DerValue v = DerValue.newGeneralizedTime(t);
     assertEquals(v.tag.value, Tag.GeneralizedTime);
@@ -125,18 +125,18 @@ public class DerValueTest {
     };
   }
 
-  // Use case: 2050-01-01 boundary — strictly before -> UTCTime, on/after -> GeneralizedTime (RFC 5280 §4.1.2.5).
   @Test(dataProvider = "timeBoundary")
   public void chooseTimeEncoding_boundary(Instant t, int expectedTag) {
+    // Use case: 2050-01-01 boundary — strictly before -> UTCTime, on/after -> GeneralizedTime (RFC 5280 §4.1.2.5).
     DerValue v = t.isBefore(DerValue.TIME_ENCODING_BOUNDARY)
         ? DerValue.newUTCTime(t)
         : DerValue.newGeneralizedTime(t);
     assertEquals(v.tag.value, expectedTag);
   }
 
-  // Use case: DerValue(Tag, DerOutputStream) wraps the inner stream's bytes as the value.
   @Test
   public void constructorFromStream_wrapsBytes() throws Exception {
+    // Use case: DerValue(Tag, DerOutputStream) wraps the inner stream's bytes as the value.
     DerOutputStream inner = new DerOutputStream();
     inner.writeValue(new DerValue(Tag.Integer, new byte[]{0x01}));
     DerValue v = new DerValue(new Tag(Tag.Sequence), inner);

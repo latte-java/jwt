@@ -112,9 +112,9 @@ public class TagTest {
     assertTrue(new Tag(0b00010111).isPrimitive());
   }
 
-  // Use case: Sequence and Set constants encode the constructed bit per ASN.1 / DER (X.690 §8.10).
   @Test
   public void sequence_and_set_constants_are_constructed() {
+    // Use case: Sequence and Set constants encode the constructed bit per ASN.1 / DER (X.690 §8.10).
     // Sequence raw byte 0x30 -> tag number 16, constructed
     Tag seq = new Tag(Tag.Sequence);
     assertTrue(seq.isConstructed(), "Tag.Sequence must encode the constructed bit");
@@ -128,9 +128,9 @@ public class TagTest {
     assertEquals(Tag.Set, 0x31);
   }
 
-  // Use case: GeneralizedTime and UTFString constants exist with the standard values.
   @Test
   public void new_tag_constants() {
+    // Use case: GeneralizedTime and UTFString constants exist with the standard values.
     assertEquals(Tag.GeneralizedTime, 24);
     assertEquals(Tag.UTFString, 12);
 

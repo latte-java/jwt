@@ -90,10 +90,10 @@ public class JWTDecoderTest {
     };
   }
 
-  // Use case: time validation matrix (exp/nbf x clock skew).
   @Test(dataProvider = "timeCases")
   public void timeValidation(String subject, Long expOffset, Long nbfOffset, long skewSec,
                              Instant fakeNow, Class<? extends Exception> expectedException) {
+    // Use case: time validation matrix (exp/nbf x clock skew).
     JWT.Builder b = JWT.builder().subject(subject).issuedAt(fakeNow);
     if (expOffset != null) b.expiresAt(fakeNow.plusSeconds(expOffset));
     if (nbfOffset != null) b.notBefore(fakeNow.plusSeconds(nbfOffset));
@@ -137,9 +137,9 @@ public class JWTDecoderTest {
     };
   }
 
-  // Use case: expectedType case-insensitive match, mismatch, missing typ.
   @Test(dataProvider = "expectedTypeCases")
   public void expectedType(String expected, String headerTyp, boolean shouldThrow) {
+    // Use case: expectedType case-insensitive match, mismatch, missing typ.
     JWT jwt = JWT.builder().subject("abc").build();
     String encoded = headerTyp == null
         ? new JWTEncoder().encode(jwt, signer(), b -> b.typ(null))
@@ -162,9 +162,9 @@ public class JWTDecoderTest {
   // expectedAlgorithms (set, miss, broken-equals custom Algorithm)
   // ---------------------------------------------------------------------
 
-  // Use case: expectedAlgorithms set; header alg in set -> accepted.
   @Test
   public void expectedAlgorithms_match_accepted() {
+    // Use case: expectedAlgorithms set; header alg in set -> accepted.
     JWT jwt = JWT.builder().subject("abc").build();
     String encoded = new JWTEncoder().encode(jwt, signer());
 
@@ -175,9 +175,9 @@ public class JWTDecoderTest {
     assertNotNull(decoded);
   }
 
-  // Use case: expectedAlgorithms set; header alg NOT in set -> rejected before verifier selection.
   @Test
   public void expectedAlgorithms_miss_rejected() {
+    // Use case: expectedAlgorithms set; header alg NOT in set -> rejected before verifier selection.
     JWT jwt = JWT.builder().subject("abc").build();
     String encoded = new JWTEncoder().encode(jwt, signer());
 
@@ -192,10 +192,10 @@ public class JWTDecoderTest {
     }
   }
 
-  // Use case: expectedAlgorithms with a custom Algorithm whose equals is Object-identity
-  // still matches by name() per spec §5 footnote.
   @Test
   public void expectedAlgorithms_brokenEquals_matchesByName() {
+    // Use case: expectedAlgorithms with a custom Algorithm whose equals is Object-identity
+    // still matches by name() per spec §5 footnote.
     JWT jwt = JWT.builder().subject("abc").build();
     String encoded = new JWTEncoder().encode(jwt, signer());
 
@@ -210,9 +210,9 @@ public class JWTDecoderTest {
   // Size / depth / number-length boundaries
   // ---------------------------------------------------------------------
 
-  // Use case: maxInputBytes boundary -- exactly N accepted, N+1 rejected.
   @Test
   public void maxInputBytes_boundary() {
+    // Use case: maxInputBytes boundary -- exactly N accepted, N+1 rejected.
     JWT jwt = JWT.builder().subject("abc").build();
     String encoded = new JWTEncoder().encode(jwt, signer());
     int len = encoded.getBytes(StandardCharsets.UTF_8).length;
@@ -229,9 +229,9 @@ public class JWTDecoderTest {
     }
   }
 
-  // Use case: maxNestingDepth boundary -- depth N accepted, depth N+1 rejected.
   @Test
   public void maxNestingDepth_boundary() {
+    // Use case: maxNestingDepth boundary -- depth N accepted, depth N+1 rejected.
     StringBuilder nested = new StringBuilder();
     int depth = 6;
     for (int i = 0; i < depth; i++) nested.append("{\"a\":");
@@ -256,9 +256,9 @@ public class JWTDecoderTest {
     }
   }
 
-  // Use case: maxNumberLength boundary -- a 1001-digit JSON number rejected when limit is 1000.
   @Test
   public void maxNumberLength_boundary() {
+    // Use case: maxNumberLength boundary -- a 1001-digit JSON number rejected when limit is 1000.
     StringBuilder digits = new StringBuilder();
     for (int i = 0; i < 1001; i++) digits.append('1');
 
@@ -284,9 +284,9 @@ public class JWTDecoderTest {
   // Duplicate JSON keys
   // ---------------------------------------------------------------------
 
-  // Use case: duplicate JSON keys rejected by default; accepted when allowDuplicateJSONKeys=true.
   @Test
   public void duplicateJsonKeys_default_vs_opt_in() {
+    // Use case: duplicate JSON keys rejected by default; accepted when allowDuplicateJSONKeys=true.
     String header = b64("{\"alg\":\"HS256\"}");
     String payload = b64("{\"sub\":\"abc\",\"sub\":\"def\"}");
     String unsignedPrefix = header + "." + payload;
@@ -309,9 +309,9 @@ public class JWTDecoderTest {
   // Tampered payload
   // ---------------------------------------------------------------------
 
-  // Use case: tampered payload (signature unchanged) -> InvalidJWTSignatureException.
   @Test
   public void tamperedPayload_rejected() {
+    // Use case: tampered payload (signature unchanged) -> InvalidJWTSignatureException.
     JWT jwt = JWT.builder().subject("abc").build();
     String encoded = new JWTEncoder().encode(jwt, signer());
 
@@ -331,9 +331,9 @@ public class JWTDecoderTest {
   // Custom validator
   // ---------------------------------------------------------------------
 
-  // Use case: custom validator throws when issuer does not match expected.
   @Test
   public void customValidator_issuerMismatch_throws() {
+    // Use case: custom validator throws when issuer does not match expected.
     JWT jwt = JWT.builder().subject("abc").issuer("evil-issuer").build();
     String encoded = new JWTEncoder().encode(jwt, signer());
 
@@ -349,9 +349,9 @@ public class JWTDecoderTest {
     }
   }
 
-  // Use case: custom validator runs and accepts a valid issuer.
   @Test
   public void customValidator_issuerMatch_passes() {
+    // Use case: custom validator runs and accepts a valid issuer.
     JWT jwt = JWT.builder().subject("abc").issuer("good").build();
     String encoded = new JWTEncoder().encode(jwt, signer());
 
@@ -365,12 +365,12 @@ public class JWTDecoderTest {
   // Signature-before-parse ordering (spec §5 step 9 < step 10)
   // ---------------------------------------------------------------------
 
-  // Use case: a token with valid header, BAD signature, and a payload that would
-  // throw on parse (e.g. malformed JSON) must surface the signature failure FIRST,
-  // not the JSON parse failure -- this is the spec §5 ordering guarantee that
-  // unauthenticated payloads are never parsed into JWT objects.
   @Test
   public void signatureBeforeParseOrdering() {
+    // Use case: a token with valid header, BAD signature, and a payload that would
+    // throw on parse (e.g. malformed JSON) must surface the signature failure FIRST,
+    // not the JSON parse failure -- this is the spec §5 ordering guarantee that
+    // unauthenticated payloads are never parsed into JWT objects.
     String header = b64("{\"alg\":\"HS256\"}");
     // Payload that is NOT valid JSON -- if parsing ran first, this would throw
     // JSONProcessingException; the spec requires that the signature failure surface first.
@@ -396,9 +396,9 @@ public class JWTDecoderTest {
   // crit understood-parameters check
   // ---------------------------------------------------------------------
 
-  // Use case: crit listing an unknown name -> InvalidJWTException.
   @Test
   public void crit_unrecognized_rejected() {
+    // Use case: crit listing an unknown name -> InvalidJWTException.
     JWT jwt = JWT.builder().subject("abc").build();
     String encoded = new JWTEncoder().encode(jwt, signer(),
         b -> b.parameter("crit", Collections.singletonList("foo")).parameter("foo", "bar"));
@@ -411,9 +411,9 @@ public class JWTDecoderTest {
     }
   }
 
-  // Use case: crit listing a name registered in criticalHeaders -> accepted.
   @Test
   public void crit_registered_accepted() {
+    // Use case: crit listing a name registered in criticalHeaders -> accepted.
     JWT jwt = JWT.builder().subject("abc").build();
     String encoded = new JWTEncoder().encode(jwt, signer(),
         b -> b.parameter("crit", Collections.singletonList("foo")).parameter("foo", "bar"));
