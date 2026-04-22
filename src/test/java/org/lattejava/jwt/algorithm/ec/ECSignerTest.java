@@ -120,8 +120,8 @@ public class ECSignerTest extends BaseJWTTest {
     expectException(InvalidKeyTypeException.class, () -> ECSigner.newSHA512Signer(readFile("ec_private_key_p_384.pem")));
 
     // With kid — only matching curve/algorithm
-    assertEquals(ECSigner.newSHA256Signer(readFile("ec_private_key_p_256.pem"), "abc").getKid(), "abc");
-    assertEquals(ECSigner.newSHA384Signer(readFile("ec_private_key_p_384.pem"), "abc").getKid(), "abc");
-    assertEquals(ECSigner.newSHA512Signer(readFile("ec_private_key_p_521.pem"), "abc").getKid(), "abc");
+    assertEquals(ECSigner.newSHA256Signer(readFile("ec_private_key_p_256.pem"), "abc").kid(), "abc");
+    assertEquals(ECSigner.newSHA384Signer(readFile("ec_private_key_p_384.pem"), "abc").kid(), "abc");
+    assertEquals(ECSigner.newSHA512Signer(readFile("ec_private_key_p_521.pem"), "abc").kid(), "abc");
   }
 }
