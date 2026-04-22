@@ -44,6 +44,24 @@ public class DerOutputStream {
     }
   }
 
+  /**
+   * Write raw, already-DER-encoded bytes (tag + length + content) directly into this
+   * stream. Useful for embedding pre-computed encodings such as the result of
+   * {@code PublicKey.getEncoded()} (which is already a SubjectPublicKeyInfo SEQUENCE)
+   * without re-parsing.
+   *
+   * @param bytes the raw DER-encoded bytes to inject
+   * @return {@code this} for chaining
+   */
+  public DerOutputStream writeValue(byte[] bytes) throws DerEncodingException {
+    try {
+      os.write(bytes);
+      return this;
+    } catch (IOException e) {
+      throw new DerEncodingException(e);
+    }
+  }
+
   private void writeLength(int length) {
     // When the length is less than 128, the length can be represented in a single byte
     // - additional bytes are necessary for values greater than or equal to 128

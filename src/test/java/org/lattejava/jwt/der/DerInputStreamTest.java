@@ -33,6 +33,33 @@ import static org.testng.Assert.assertTrue;
  * @author Daniel DeGroff
  */
 public class DerInputStreamTest {
+  // Use case: Zero-length DER values (e.g. NULL, empty OCTET STRING) are returned without error.
+  @Test
+  public void zero_length_value() throws Exception {
+    // NULL: tag 0x05, length 0
+    byte[] bytes = new byte[]{0x05, 0x00};
+    DerValue v = new DerInputStream(bytes).readDerValue();
+    assertEquals(v.tag.value, Tag.Null);
+    assertEquals(v.getLength(), 0);
+    assertEquals(v.toByteArray().length, 0);
+  }
+
+  // Use case: A SEQUENCE containing a NULL and an INTEGER with zero-length values is parsed.
+  @Test
+  public void zero_length_in_sequence() throws Exception {
+    byte[] bytes = new byte[]{
+        0x30, 0x04,         // SEQUENCE, length 4
+        0x05, 0x00,         //   NULL
+        0x04, 0x00          //   OCTET STRING (zero length)
+    };
+    DerValue[] seq = new DerInputStream(bytes).getSequence();
+    assertEquals(seq.length, 2);
+    assertEquals(seq[0].tag.value, Tag.Null);
+    assertEquals(seq[0].getLength(), 0);
+    assertEquals(seq[1].tag.value, Tag.OctetString);
+    assertEquals(seq[1].getLength(), 0);
+  }
+
   @Test
   public void bitstring_with_ignored_bits() throws Exception {
     // Assert the example encoding provided here:

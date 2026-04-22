@@ -18,6 +18,7 @@ package org.lattejava.jwt.der;
 
 import org.lattejava.jwt.Buildable;
 
+import java.io.ByteArrayOutputStream;
 import java.util.Arrays;
 import java.util.Objects;
 
@@ -26,6 +27,24 @@ import java.util.Objects;
  */
 @SuppressWarnings("unused")
 public class ObjectIdentifier implements Buildable<ObjectIdentifier> {
+  /** X.520 country (C) — DN attribute type. */
+  public static final String X_520_DN_COUNTRY = "2.5.4.6";
+
+  /** X.520 commonName (CN) — DN attribute type. */
+  public static final String X_520_DN_COMMON_NAME = "2.5.4.3";
+
+  /** X.520 localityName (L) — DN attribute type. */
+  public static final String X_520_DN_LOCALITY = "2.5.4.7";
+
+  /** X.520 stateOrProvinceName (ST) — DN attribute type. */
+  public static final String X_520_DN_STATE = "2.5.4.8";
+
+  /** X.520 organizationName (O) — DN attribute type. */
+  public static final String X_520_DN_ORGANIZATION = "2.5.4.10";
+
+  /** X.520 organizationalUnitName (OU) — DN attribute type. */
+  public static final String X_520_DN_ORGANIZATIONAL_UNIT = "2.5.4.11";
+
   /**
    * Elliptic curve / 256 bit / secp256r1 / prime256v1
    * X9.62/SECG curve over a 256 bit prime field
@@ -111,6 +130,84 @@ public class ObjectIdentifier implements Buildable<ObjectIdentifier> {
 
   public ObjectIdentifier(byte[] value) {
     this.value = value;
+  }
+
+  /**
+   * Encode a dot-notation OID string (e.g. {@code "1.2.840.113549.1.1.11"}) to its DER
+   * value bytes (without the surrounding tag/length).
+   *
+   * <p>Encoding rules per X.690 §8.19: the first two arcs are combined as
+   * {@code 40*a + b}; subsequent arcs are encoded base-128 with the high bit set on
+   * every byte except the last (variable length, including the three-byte case for
+   * arcs &gt;= 16384).</p>
+   *
+   * @param oid the dot-notation OID string
+   * @return the DER value bytes (caller wraps with the OID tag and length)
+   * @throws IllegalArgumentException if {@code oid} is malformed
+   */
+  public static byte[] encode(String oid) {
+    Objects.requireNonNull(oid, "oid");
+    String[] arcs = oid.split("\\.");
+    if (arcs.length < 2) {
+      throw new IllegalArgumentException("OID must have at least two arcs: " + oid);
+    }
+    long first;
+    long second;
+    try {
+      first = Long.parseLong(arcs[0]);
+      second = Long.parseLong(arcs[1]);
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException("Invalid arc in OID: " + oid, e);
+    }
+    if (first < 0 || first > 2) {
+      throw new IllegalArgumentException("First OID arc must be 0, 1, or 2: " + oid);
+    }
+    if (second < 0 || (first < 2 && second > 39)) {
+      throw new IllegalArgumentException("Second OID arc out of range: " + oid);
+    }
+
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    writeBase128(out, 40L * first + second);
+    for (int i = 2; i < arcs.length; i++) {
+      long arc;
+      try {
+        arc = Long.parseLong(arcs[i]);
+      } catch (NumberFormatException e) {
+        throw new IllegalArgumentException("Invalid arc in OID: " + oid, e);
+      }
+      if (arc < 0) {
+        throw new IllegalArgumentException("Negative arc in OID: " + oid);
+      }
+      writeBase128(out, arc);
+    }
+    return out.toByteArray();
+  }
+
+  /**
+   * Write a single arc value as base-128 with the continuation bit (0x80) set on every
+   * byte except the last (least-significant). Single-byte values 0..127 emit a single
+   * byte with the high bit cleared. Two-byte values 128..16383 emit two bytes; three-byte
+   * values 16384..2097151 emit three bytes; etc.
+   */
+  private static void writeBase128(ByteArrayOutputStream out, long value) {
+    if (value < 0x80L) {
+      out.write((int) (value & 0x7F));
+      return;
+    }
+    // Find the number of base-128 bytes required.
+    int bytesNeeded = 0;
+    long tmp = value;
+    while (tmp > 0) {
+      bytesNeeded++;
+      tmp >>>= 7;
+    }
+    for (int i = bytesNeeded - 1; i >= 0; i--) {
+      int septet = (int) ((value >>> (7 * i)) & 0x7F);
+      if (i != 0) {
+        septet |= 0x80;
+      }
+      out.write(septet);
+    }
   }
 
   /**

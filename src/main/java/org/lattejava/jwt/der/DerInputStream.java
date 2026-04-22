@@ -101,6 +101,11 @@ public class DerInputStream {
 
   public byte[] toByteArray() {
     try {
+      // Zero-length buffer needs no read; ByteArrayInputStream.read returns -1 at EOF
+      // even when the requested length is zero.
+      if (length == 0) {
+        return new byte[0];
+      }
       byte[] buffer = new byte[length];
       data.reset();
       int actualLength = data.read(buffer);

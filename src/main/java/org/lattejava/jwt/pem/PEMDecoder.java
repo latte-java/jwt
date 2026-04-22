@@ -27,6 +27,7 @@ import org.lattejava.jwt.internal.KeyUtils;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.InvalidAlgorithmParameterException;
@@ -46,6 +47,10 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.RSAPrivateCrtKeySpec;
 import java.security.spec.RSAPublicKeySpec;
 import java.security.spec.X509EncodedKeySpec;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.Objects;
 
@@ -366,6 +371,103 @@ public class PEMDecoder {
     }
 
     return new PEM(KeyFactory.getInstance(jcaKeyFactoryName(algorithmOID.decode(), type)).generatePublic(new X509EncodedKeySpec(bytes)));
+  }
+
+  /**
+   * Parse the TBSCertificate fields out of a DER-encoded X.509 certificate without
+   * relying on {@link CertificateFactory}. Supports v1 (no version field) and v3
+   * (explicit [0] EXPLICIT version) layouts.
+   *
+   * <p>Returned fields: {@code serialNumber}, {@code issuer} (raw DN bytes from the DER
+   * encoding), {@code subject} (raw DN bytes), {@code notBefore} and {@code notAfter}
+   * (decoded UTCTime / GeneralizedTime). Use this when you need certificate
+   * metadata without materialising an {@link java.security.cert.X509Certificate}.</p>
+   *
+   * @param derCertificate the full DER-encoded X.509 certificate bytes
+   * @return the parsed TBS field record
+   */
+  public TBSFields decodeTBSCertificateFields(byte[] derCertificate) {
+    Objects.requireNonNull(derCertificate, "derCertificate");
+    try {
+      // Parse outer Certificate SEQUENCE { tbsCertificate, signatureAlgorithm, signatureValue }.
+      DerValue[] outer = new DerInputStream(derCertificate).getSequence();
+      if (outer.length < 1) {
+        throw new PEMDecoderException("Malformed certificate: outer SEQUENCE has " + outer.length + " elements");
+      }
+      // outer[0] is TBSCertificate (a SEQUENCE). Its toByteArray() returns the SEQUENCE's
+      // body (children), which we walk as a list of DerValues.
+      java.util.List<DerValue> tbs = parseValues(outer[0].toByteArray());
+
+      int idx = 0;
+      // Optional [0] EXPLICIT version
+      if (!tbs.isEmpty() && tbs.get(0).tag.rawByte == (byte) 0xA0) {
+        idx++;
+      }
+      BigInteger serial = tbs.get(idx++).getBigInteger();
+      // signature AlgorithmIdentifier (SEQUENCE) -- skip
+      idx++;
+      byte[] issuer = encodeSequenceOf(tbs.get(idx++));
+      // validity SEQUENCE { notBefore, notAfter }
+      java.util.List<DerValue> validity = parseValues(tbs.get(idx++).toByteArray());
+      Instant notBefore = decodeTime(validity.get(0));
+      Instant notAfter = decodeTime(validity.get(1));
+      byte[] subject = encodeSequenceOf(tbs.get(idx));
+
+      return new TBSFields(serial, issuer, subject, notBefore, notAfter);
+    } catch (Exception e) {
+      throw new PEMDecoderException(e);
+    }
+  }
+
+  /**
+   * Walk a sequence-of-DerValues blob (no outer SEQUENCE tag/length): keep reading
+   * tag/length/value triples until exhausted.
+   */
+  private static java.util.List<DerValue> parseValues(byte[] body) throws Exception {
+    java.util.List<DerValue> out = new java.util.ArrayList<>();
+    DerInputStream s = new DerInputStream(body);
+    while (s.data.available() > 0) {
+      out.add(s.readDerValue());
+    }
+    return out;
+  }
+
+  private static byte[] encodeSequenceOf(DerValue dv) throws Exception {
+    // Re-emit the value as full DER (preserve original tag + length + content) so
+    // callers can pass it to e.g. javax.security.auth.x500.X500Principal if they wish.
+    return new DerOutputStream()
+        .writeValue(dv)
+        .toByteArray();
+  }
+
+  private static Instant decodeTime(DerValue v) {
+    String s = new String(v.toByteArray(), StandardCharsets.US_ASCII);
+    if (v.tag.value == Tag.UTCTime) {
+      DateTimeFormatter f = DateTimeFormatter.ofPattern("yyMMddHHmmss'Z'");
+      LocalDateTime ldt = LocalDateTime.parse(s, f);
+      // 2-digit year: 50-99 -> 1950-1999, 00-49 -> 2000-2049 (X.690 §11.8)
+      int year = ldt.getYear();
+      if (year >= 2000 + 50) {
+        ldt = ldt.withYear(year - 100);
+      }
+      return ldt.toInstant(ZoneOffset.UTC);
+    } else if (v.tag.value == Tag.GeneralizedTime) {
+      DateTimeFormatter f = DateTimeFormatter.ofPattern("yyyyMMddHHmmss'Z'");
+      return LocalDateTime.parse(s, f).toInstant(ZoneOffset.UTC);
+    }
+    throw new IllegalArgumentException("Unexpected time tag: " + v.tag);
+  }
+
+  /**
+   * Field record for a parsed TBSCertificate. Distinguished names are returned in
+   * raw DER form (the encoded {@code Name} SEQUENCE) so callers can hand them to
+   * higher-level X.500 APIs without re-parsing.
+   */
+  public record TBSFields(BigInteger serialNumber,
+                          byte[] issuerDer,
+                          byte[] subjectDer,
+                          Instant notBefore,
+                          Instant notAfter) {
   }
 
   private byte[] getKeyBytes(String key, String keyPrefix, String keySuffix) {

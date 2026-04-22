@@ -111,4 +111,35 @@ public class TagTest {
     assertTrue(new Tag(0b00010111).is(Tag.UTCTime));
     assertTrue(new Tag(0b00010111).isPrimitive());
   }
+
+  // Use case: Sequence and Set constants encode the constructed bit per ASN.1 / DER (X.690 §8.10).
+  @Test
+  public void sequence_and_set_constants_are_constructed() {
+    // Sequence raw byte 0x30 -> tag number 16, constructed
+    Tag seq = new Tag(Tag.Sequence);
+    assertTrue(seq.isConstructed(), "Tag.Sequence must encode the constructed bit");
+    assertEquals(seq.value, 16);
+    assertEquals(Tag.Sequence, 0x30);
+
+    // Set raw byte 0x31 -> tag number 17, constructed (always constructed per X.690)
+    Tag set = new Tag(Tag.Set);
+    assertTrue(set.isConstructed(), "Tag.Set must encode the constructed bit");
+    assertEquals(set.value, 17);
+    assertEquals(Tag.Set, 0x31);
+  }
+
+  // Use case: GeneralizedTime and UTFString constants exist with the standard values.
+  @Test
+  public void new_tag_constants() {
+    assertEquals(Tag.GeneralizedTime, 24);
+    assertEquals(Tag.UTFString, 12);
+
+    Tag gt = new Tag(Tag.GeneralizedTime);
+    assertTrue(gt.isPrimitive());
+    assertEquals(gt.value, 24);
+
+    Tag utf = new Tag(Tag.UTFString);
+    assertTrue(utf.isPrimitive());
+    assertEquals(utf.value, 12);
+  }
 }

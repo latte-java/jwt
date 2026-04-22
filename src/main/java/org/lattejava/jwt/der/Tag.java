@@ -30,6 +30,14 @@ public class Tag {
   public static final int BitString = 3;
 
   /**
+   * GeneralizedTime Tag
+   * <p>
+   * 24 decimal, 0x18 hex. Used by RFC 5280 §4.1.2.5 for dates &gt;= 2050-01-01.
+   * </p>
+   */
+  public static final int GeneralizedTime = 24;
+
+  /**
    * Integer Tag
    */
   public static final int Integer = 2;
@@ -71,10 +79,11 @@ public class Tag {
   /**
    * Set and Set of
    * <p>
-   * 17 decimal, 0x11 hex
+   * 17 decimal (universal tag number), 0x11 hex. Set is always constructed per ASN.1 / DER, so the
+   * encoded raw byte presents as <code>0x31</code> (49 decimal) — bit 6 (constructed) is set.
    * </p>
    */
-  public static final int Set = 17;
+  public static final int Set = 49;
 
   /**
    * UTCTime Tag
@@ -83,6 +92,14 @@ public class Tag {
    * </p>
    */
   public static final int UTCTime = 23;
+
+  /**
+   * UTF-8 String Tag
+   * <p>
+   * 12 decimal, 0x0C hex.
+   * </p>
+   */
+  public static final int UTFString = 12;
 
   /**
    * True if this Tag is primitive. False if this Tag is constructed.
@@ -165,6 +182,8 @@ public class Tag {
       case Sequence -> "Sequence";
       case Set -> "Set";
       case UTCTime -> "UTCTime";
+      case GeneralizedTime -> "GeneralizedTime";
+      case UTFString -> "UTF8String";
       default -> "Other";
     };
   }
