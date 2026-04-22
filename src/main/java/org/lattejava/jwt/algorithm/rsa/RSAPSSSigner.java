@@ -1,30 +1,35 @@
 /*
- * Copyright (c) 2020-2025, FusionAuth, All Rights Reserved
+ * Copyright (c) 2026, The Latte Project, All Rights Reserved
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to permit
+ * persons to whom the Software is furnished to do so, subject to the
+ * following conditions:
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ * The above copyright notice and this permission notice shall be included
+ * in all copies or substantial portions of the Software.
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
- * either express or implied. See the License for the specific
- * language governing permissions and limitations under the License.
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+ * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+ * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+ * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
 package org.lattejava.jwt.algorithm.rsa;
 
-import org.lattejava.jwt.InvalidKeyLengthException;
+import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.InvalidKeyTypeException;
 import org.lattejava.jwt.JWTSigningException;
 import org.lattejava.jwt.MissingPrivateKeyException;
 import org.lattejava.jwt.Signer;
-import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.pem.PEM;
 
-import java.nio.charset.StandardCharsets;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
@@ -32,14 +37,17 @@ import java.security.PrivateKey;
 import java.security.Signature;
 import java.security.SignatureException;
 import java.security.interfaces.RSAPrivateKey;
-import java.security.spec.MGF1ParameterSpec;
-import java.security.spec.PSSParameterSpec;
 import java.util.Objects;
 
 /**
- * This class can sign a JWT using an RSA Private key.
+ * RSASSA-PSS {@link Signer} for the {@code PS256} / {@code PS384}
+ * / {@code PS512} JWA algorithms (RFC 7518 §3.5).
  *
- * @author Daniel DeGroff
+ * <p>Each call to {@link #sign(byte[])} obtains a fresh
+ * {@link Signature} instance and configures it with the explicit
+ * {@code PSSParameterSpec} mandated by spec §6.</p>
+ *
+ * @author The Latte Project
  */
 public class RSAPSSSigner implements Signer {
   private final Algorithm algorithm;
@@ -51,193 +59,100 @@ public class RSAPSSSigner implements Signer {
   private RSAPSSSigner(Algorithm algorithm, PrivateKey privateKey, String kid) {
     Objects.requireNonNull(algorithm);
     Objects.requireNonNull(privateKey);
-
-    this.algorithm = algorithm;
-    this.kid = kid;
-
-    if (!(privateKey instanceof RSAPrivateKey)) {
+    if (!(privateKey instanceof RSAPrivateKey rsa)) {
       throw new InvalidKeyTypeException("Expecting a private key of type [RSAPrivateKey], but found [" + privateKey.getClass().getSimpleName() + "].");
     }
-
-    this.privateKey = (RSAPrivateKey) privateKey;
-    int keyLength = this.privateKey.getModulus().bitLength();
-    // We would normally expect 2048, but it is possible for an RSA key to be generated of length 2047.
-    if (keyLength < 2047) {
-      throw new InvalidKeyLengthException("Key length of [" + keyLength + "] is less than the required key length of 2048 bits.");
-    }
-  }
-
-  private RSAPSSSigner(Algorithm algorithm, String privateKey, String kid) {
-    Objects.requireNonNull(algorithm);
-    Objects.requireNonNull(privateKey);
-
     this.algorithm = algorithm;
     this.kid = kid;
-    PEM pem = PEM.decode(privateKey);
+    this.privateKey = rsa;
+    RSAFamily.assertMinimumModulus(this.privateKey.getModulus().bitLength());
+  }
+
+  private RSAPSSSigner(Algorithm algorithm, String pemPrivateKey, String kid) {
+    Objects.requireNonNull(algorithm);
+    Objects.requireNonNull(pemPrivateKey);
+    PEM pem = PEM.decode(pemPrivateKey);
     if (pem.privateKey == null) {
       throw new MissingPrivateKeyException("The provided PEM encoded string did not contain a private key.");
     }
-
-    if (!(pem.privateKey instanceof RSAPrivateKey)) {
+    if (!(pem.privateKey instanceof RSAPrivateKey rsa)) {
       throw new InvalidKeyTypeException("Expecting a private key of type [RSAPrivateKey], but found [" + pem.privateKey.getClass().getSimpleName() + "].");
     }
-
-    this.privateKey = pem.getPrivateKey();
-    int keyLength = this.privateKey.getModulus().bitLength();
-    // We would normally expect 2048, but it is possible for an RSA key to be generated of length 2047.
-    if (keyLength < 2047) {
-      throw new InvalidKeyLengthException("Key length of [" + keyLength + "] is less than the required key length of 2048 bits.");
-    }
+    this.algorithm = algorithm;
+    this.kid = kid;
+    this.privateKey = rsa;
+    RSAFamily.assertMinimumModulus(this.privateKey.getModulus().bitLength());
   }
 
-  /**
-   * Build a new RSA signer using a SHA-256 hash.
-   *
-   * @param privateKey The private key PEM expected to be in PKCS#1 or PKCS#8 format.
-   * @return a new RSA signer.
-   */
-  public static RSAPSSSigner newSHA256Signer(String privateKey) {
-    return new RSAPSSSigner(Algorithm.PS256, privateKey, null);
+  public static RSAPSSSigner newSHA256Signer(String pemPrivateKey) {
+    return new RSAPSSSigner(Algorithm.PS256, pemPrivateKey, null);
   }
 
-  /**
-   * Build a new RSA signer using a SHA-256 hash.
-   *
-   * @param privateKey The private key PEM expected to be in PKCS#1 or PKCS#8 format.
-   * @param kid        The key identifier. This will be used by the JWTEncoder to write the 'kid' header.
-   * @return a new RSA signer.
-   */
-  public static RSAPSSSigner newSHA256Signer(String privateKey, String kid) {
-    return new RSAPSSSigner(Algorithm.PS256, privateKey, kid);
+  public static RSAPSSSigner newSHA256Signer(String pemPrivateKey, String kid) {
+    return new RSAPSSSigner(Algorithm.PS256, pemPrivateKey, kid);
   }
 
-  /**
-   * Build a new RSA signer using a SHA-256 hash.
-   *
-   * @param privateKey The private key.
-   * @return a new RSA signer.
-   */
   public static RSAPSSSigner newSHA256Signer(PrivateKey privateKey) {
     return new RSAPSSSigner(Algorithm.PS256, privateKey, null);
   }
 
-  /**
-   * Build a new RSA signer using a SHA-256 hash.
-   *
-   * @param privateKey The private key.
-   * @param kid        The key identifier. This will be used by the JWTEncoder to write the 'kid' header.
-   * @return a new RSA signer.
-   */
   public static RSAPSSSigner newSHA256Signer(PrivateKey privateKey, String kid) {
     return new RSAPSSSigner(Algorithm.PS256, privateKey, kid);
   }
 
-  /**
-   * Build a new RSA signer using a SHA-384 hash.
-   *
-   * @param privateKey The private key PEM expected to be in PKCS#1 or PKCS#8 format.
-   * @return a new RSA signer.
-   */
-  public static RSAPSSSigner newSHA384Signer(String privateKey) {
-    return new RSAPSSSigner(Algorithm.PS384, privateKey, null);
+  public static RSAPSSSigner newSHA384Signer(String pemPrivateKey) {
+    return new RSAPSSSigner(Algorithm.PS384, pemPrivateKey, null);
   }
 
-  /**
-   * Build a new RSA signer using a SHA-384 hash.
-   *
-   * @param privateKey The private key PEM expected to be in PKCS#1 or PKCS#8 format.
-   * @param kid        The key identifier. This will be used by the JWTEncoder to write the 'kid' header.
-   * @return a new RSA signer.
-   */
-  public static RSAPSSSigner newSHA384Signer(String privateKey, String kid) {
-    return new RSAPSSSigner(Algorithm.PS384, privateKey, kid);
+  public static RSAPSSSigner newSHA384Signer(String pemPrivateKey, String kid) {
+    return new RSAPSSSigner(Algorithm.PS384, pemPrivateKey, kid);
   }
 
-  /**
-   * Build a new RSA signer using a SHA-384 hash.
-   *
-   * @param privateKey The private key.
-   * @return a new RSA signer.
-   */
   public static RSAPSSSigner newSHA384Signer(PrivateKey privateKey) {
     return new RSAPSSSigner(Algorithm.PS384, privateKey, null);
   }
 
-  /**
-   * Build a new RSA signer using a SHA-384 hash.
-   *
-   * @param privateKey The private key.
-   * @param kid        The key identifier. This will be used by the JWTEncoder to write the 'kid' header.
-   * @return a new RSA signer.
-   */
   public static RSAPSSSigner newSHA384Signer(PrivateKey privateKey, String kid) {
     return new RSAPSSSigner(Algorithm.PS384, privateKey, kid);
   }
 
-  /**
-   * Build a new RSA signer using a SHA-512 hash.
-   *
-   * @param privateKey The private key PEM expected to be in PKCS#1 or PKCS#8 format.
-   * @return a new RSA signer.
-   */
-  public static RSAPSSSigner newSHA512Signer(String privateKey) {
-    return new RSAPSSSigner(Algorithm.PS512, privateKey, null);
+  public static RSAPSSSigner newSHA512Signer(String pemPrivateKey) {
+    return new RSAPSSSigner(Algorithm.PS512, pemPrivateKey, null);
   }
 
-  /**
-   * Build a new RSA signer using a SHA-512 hash.
-   *
-   * @param privateKey The private key PEM expected to be in PKCS#1 or PKCS#8 format.
-   * @param kid        The key identifier. This will be used by the JWTEncoder to write the 'kid' header.
-   * @return a new RSA signer.
-   */
-  public static RSAPSSSigner newSHA512Signer(String privateKey, String kid) {
-    return new RSAPSSSigner(Algorithm.PS512, privateKey, kid);
+  public static RSAPSSSigner newSHA512Signer(String pemPrivateKey, String kid) {
+    return new RSAPSSSigner(Algorithm.PS512, pemPrivateKey, kid);
   }
 
-  /**
-   * Build a new RSA signer using a SHA-512 hash.
-   *
-   * @param privateKey The private key.
-   * @return a new RSA signer.
-   */
   public static RSAPSSSigner newSHA512Signer(PrivateKey privateKey) {
     return new RSAPSSSigner(Algorithm.PS512, privateKey, null);
   }
 
-  /**
-   * Build a new RSA signer using a SHA-512 hash.
-   *
-   * @param privateKey The private key.
-   * @param kid        The key identifier. This will be used by the JWTEncoder to write the 'kid' header.
-   * @return a new RSA signer.
-   */
   public static RSAPSSSigner newSHA512Signer(PrivateKey privateKey, String kid) {
     return new RSAPSSSigner(Algorithm.PS512, privateKey, kid);
   }
 
   @Override
-  public Algorithm getAlgorithm() {
+  public Algorithm algorithm() {
     return algorithm;
   }
 
   @Override
-  public String getKid() {
+  public String kid() {
     return kid;
   }
 
+  @Override
   public byte[] sign(byte[] message) {
     Objects.requireNonNull(message);
-
     try {
       Signature signature = Signature.getInstance("RSASSA-PSS");
-      String digestName = org.lattejava.jwt.internal.JCAAlgorithmMapping.pssDigestName(algorithm);
-      signature.setParameter(new PSSParameterSpec(digestName, "MGF1", new MGF1ParameterSpec(digestName), org.lattejava.jwt.internal.JCAAlgorithmMapping.pssSaltLength(algorithm), 1));
+      signature.setParameter(RSAFamily.pssParameterSpec(algorithm));
       signature.initSign(privateKey);
       signature.update(message);
       return signature.sign();
-    } catch (InvalidKeyException | NoSuchAlgorithmException | SignatureException |
-             InvalidAlgorithmParameterException e) {
+    } catch (InvalidKeyException | NoSuchAlgorithmException | SignatureException
+             | InvalidAlgorithmParameterException e) {
       throw new JWTSigningException("An unexpected exception occurred when attempting to sign the JWT", e);
     }
   }
