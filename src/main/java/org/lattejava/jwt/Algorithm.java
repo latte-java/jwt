@@ -23,9 +23,6 @@
 
 package org.lattejava.jwt;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonValue;
-
 import java.util.Objects;
 
 /**
@@ -52,7 +49,6 @@ public interface Algorithm {
    *
    * @return the JWA algorithm name (never null for any built-in instance)
    */
-  @JsonValue
   String name();
 
   // --- Standard constants (15 total, ordered by family) ---
@@ -100,7 +96,6 @@ public interface Algorithm {
    * @return the interned constant or a new instance
    * @throws NullPointerException if {@code name} is null
    */
-  @JsonCreator
   static Algorithm of(String name) {
     Objects.requireNonNull(name, "name");
     return switch (name) {

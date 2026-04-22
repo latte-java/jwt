@@ -28,7 +28,6 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collections;
@@ -316,16 +315,6 @@ public class JWTDecoder {
     return this;
   }
 
-  /**
-   * Subclass hook used by {@code TimeMachineJWTDecoder} (legacy).
-   *
-   * @deprecated TODO Checkpoint 8: replaced by {@link Builder#clock(Clock)} /
-   *     {@link Builder#fixedTime(Instant)}.
-   */
-  @Deprecated
-  protected ZonedDateTime now() {
-    return ZonedDateTime.now(clock);
-  }
 
   // -------------------------------------------------------------------
   // Internals
@@ -441,7 +430,7 @@ public class JWTDecoder {
 
   private void enforceTimeClaims(JWT jwt) {
     long skewSeconds = Math.max(clockSkew.getSeconds(), legacyClockSkewSeconds);
-    Instant now = now().toInstant();
+    Instant now = Instant.now(clock);
     Instant nowMinusSkew = skewSeconds > 0 ? now.minusSeconds(skewSeconds) : now;
     if (jwt.isExpired(nowMinusSkew)) {
       throw new JWTExpiredException();

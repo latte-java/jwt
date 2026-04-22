@@ -23,9 +23,6 @@
 
 package org.lattejava.jwt;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonValue;
-
 import java.util.Objects;
 
 import static org.lattejava.jwt.der.ObjectIdentifier.EC_ENCRYPTION;
@@ -52,7 +49,6 @@ public interface KeyType {
    *
    * @return the kty name, e.g. {@code "RSA"}, {@code "EC"}, {@code "OKP"}, {@code "oct"}
    */
-  @JsonValue
   String name();
 
   /**
@@ -107,7 +103,6 @@ public interface KeyType {
    * @return the interned constant or a new instance
    * @throws NullPointerException if {@code name} is null
    */
-  @JsonCreator
   static KeyType of(String name) {
     Objects.requireNonNull(name, "name");
     return switch (name) {

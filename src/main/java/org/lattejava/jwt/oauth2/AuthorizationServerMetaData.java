@@ -23,9 +23,6 @@
 
 package org.lattejava.jwt.oauth2;
 
-import com.fasterxml.jackson.annotation.JsonAnyGetter;
-import com.fasterxml.jackson.annotation.JsonAnySetter;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.lattejava.jwt.LatteJSONProcessor;
 
 import java.util.ArrayList;
@@ -89,7 +86,6 @@ public class AuthorizationServerMetaData {
 
   public String op_tos_uri;
 
-  @JsonAnySetter
   public Map<String, Object> otherClaims = new LinkedHashMap<>();
 
   public String registration_endpoint;
@@ -116,7 +112,6 @@ public class AuthorizationServerMetaData {
 
   public List<String> ui_locales_supported;
 
-  @JsonAnyGetter
   public Map<String, Object> getOtherClaims() {
     return otherClaims;
   }
@@ -126,7 +121,6 @@ public class AuthorizationServerMetaData {
    * under their specified names; non-registered claims are emitted from
    * {@link #otherClaims}.
    */
-  @JsonIgnore
   public Map<String, Object> toSerializableMap() {
     Map<String, Object> out = new LinkedHashMap<>();
     putIfPresent(out, "authorization_endpoint", authorization_endpoint);
