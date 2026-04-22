@@ -1,53 +1,68 @@
 /*
- * Copyright (c) 2016-2019, FusionAuth, All Rights Reserved
+ * Copyright (c) 2026, The Latte Project, All Rights Reserved
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to permit
+ * persons to whom the Software is furnished to do so, subject to the
+ * following conditions:
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ * The above copyright notice and this permission notice shall be included
+ * in all copies or substantial portions of the Software.
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
- * either express or implied. See the License for the specific
- * language governing permissions and limitations under the License.
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+ * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+ * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+ * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
 package org.lattejava.jwt;
 
 /**
- * JWT Signer.
+ * A {@code Signer} produces a signature for the JWT signing-input bytes
+ * (header.payload encoded as UTF-8). See spec §6 for the full contract.
  *
- * @author Daniel DeGroff
+ * <p>Implementations MUST be safe to share across threads. Each call to
+ * {@link #sign(byte[])} MUST obtain a fresh JCA primitive
+ * ({@code Mac}/{@code Signature}) and MUST NOT cache and reuse it across
+ * threads -- the JDK explicitly documents these as not thread-safe.</p>
+ *
+ * @author The Latte Project
  */
 public interface Signer {
 
   /**
-   * Return the algorithm supported by this signer.
+   * Returns the JWA algorithm for this signer.
    *
-   * @return the algorithm.
+   * @return the algorithm
    */
-  Algorithm getAlgorithm();
+  Algorithm algorithm();
 
   /**
-   * Return the kid used for this signer.
+   * Sign the provided message and return the signature.
    *
-   * @return the kid
-   */
-  default String getKid() {
-    throw new UnsupportedOperationException();
-  }
-
-  /**
-   * Sign the provided message bytes and return the signature.
-   *
-   * <p>As of 7.0, the Signer contract takes raw bytes (the JWT signing input
-   * bytes -- the dot-joined header and payload segments). Encoding to
-   * {@code byte[]} is the encoder's responsibility.</p>
-   *
-   * @param message The signing-input bytes to sign.
-   * @return The message signature in a byte array.
+   * @param message The message bytes to sign (header.payload encoded as UTF-8).
+   * @return The signature bytes.
+   * @throws InvalidKeyLengthException if the signer's key is too short for its algorithm
+   * @throws InvalidKeyTypeException if the signer's key is not compatible with its algorithm
+   * @throws JWTSigningException if an underlying JCE operation fails (e.g.,
+   *         {@code NoSuchAlgorithmException} from a missing JCE provider for
+   *         Ed25519 / Ed448 / ES256K on an unsupported JDK)
    */
   byte[] sign(byte[] message);
+
+  /**
+   * Returns the key ID for this signer, or {@code null} if no key ID is set.
+   * The encoder uses this to populate the {@code "kid"} header parameter.
+   *
+   * @return the kid, or {@code null}
+   */
+  default String kid() {
+    return null;
+  }
 }

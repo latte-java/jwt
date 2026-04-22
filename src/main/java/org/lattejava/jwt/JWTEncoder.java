@@ -47,7 +47,7 @@ public class JWTEncoder {
    * @return the encoded JWT string.
    */
   public String encode(JWT jwt, Signer signer) {
-    return encode(jwt, signer, b -> b.kid(signer.getKid()));
+    return encode(jwt, signer, b -> b.kid(signer.kid()));
   }
 
   /**
@@ -87,7 +87,7 @@ public class JWTEncoder {
     Objects.requireNonNull(signer);
 
     // The signer dictates the algorithm; caller cannot override.
-    builder.alg(signer.getAlgorithm());
+    builder.alg(signer.algorithm());
     Header header = builder.build();
 
     Map<String, Object> headerMap = new LinkedHashMap<>(header.toSerializableMap());
