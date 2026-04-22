@@ -17,8 +17,8 @@
 package org.lattejava.jwt;
 
 import org.lattejava.jwt.internal.HexUtils;
+import org.lattejava.jwt.internal.JWKThumbprint;
 import org.lattejava.jwt.jwks.JSONWebKey;
-import org.lattejava.jwt.json.Mapper;
 import org.lattejava.jwt.pem.PEM;
 
 import java.nio.charset.StandardCharsets;
@@ -27,9 +27,6 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Base64;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Objects;
 
 /**
  * Helper to generate new HMAC secrets, EC and RSA public / private key pairs and other fun things.
@@ -62,52 +59,6 @@ public class JWTUtils {
   public static String convertThumbprintToFingerprint(String x5tHash) {
     byte[] bytes = Base64.getUrlDecoder().decode(x5tHash.getBytes(StandardCharsets.UTF_8));
     return HexUtils.fromBytes(bytes);
-  }
-
-  /**
-   * WARNING!! This is not a secure or safe way to decode a JWT, this will not perform any validation on the signature.
-   * <p>
-   * Consider the header returned from this method as un-trustworthy. This is intended for utility and a nice way to
-   * read the JWT header, but do not use it in production to verify the integrity.
-   *
-   * @param encodedJWT the encoded JWT
-   * @return a Header object
-   */
-  @SuppressWarnings("unchecked")
-  public static Header decodeHeader(String encodedJWT) {
-    Objects.requireNonNull(encodedJWT);
-
-    String[] parts = encodedJWT.split("\\.");
-    if (parts.length == 3 || (parts.length == 2 && encodedJWT.endsWith("."))) {
-      // TODO Checkpoint 5: route through JSONProcessor; this shim uses the legacy Mapper for compile-only fidelity.
-      Map<String, Object> raw = Mapper.deserialize(Base64.getUrlDecoder().decode(parts[0]), Map.class);
-      return Header.fromMap(raw);
-    }
-
-    throw new InvalidJWTException("The encoded JWT is not properly formatted. Expected a three part dot separated string.");
-  }
-
-  /**
-   * WARNING!! This is not a secure or safe way to decode a JWT, this will not perform any validation on the signature.
-   * <p>
-   * Consider the JWT returned from this method as un-trustworthy. This is intended for utility and a nice way to
-   * read the JWT, but do not use it in production to verify the claims contained in this JWT.
-   *
-   * @param encodedJWT the encoded JWT
-   * @return a JWT object
-   */
-  @SuppressWarnings("unchecked")
-  public static JWT decodePayload(String encodedJWT) {
-    Objects.requireNonNull(encodedJWT);
-
-    String[] parts = encodedJWT.split("\\.");
-    if (parts.length == 3 || (parts.length == 2 && encodedJWT.endsWith("."))) {
-      // TODO Checkpoint 5: route through JSONProcessor; this shim uses the legacy Mapper for compile-only fidelity.
-      Map<String, Object> raw = Mapper.deserialize(Base64.getUrlDecoder().decode(parts[1]), Map.class);
-      return JWT.fromMap(raw, null);
-    }
-
-    throw new InvalidJWTException("The encoded JWT is not properly formatted. Expected a three part dot separated string.");
   }
 
   /**
@@ -222,31 +173,7 @@ public class JWTUtils {
    * @return the base64url-encoded JWK Thumbprint
    */
   public static String generateJWS_kid(String algorithm, JSONWebKey key) {
-    Map<String, Object> thumbPrint = new LinkedHashMap<>(4);
-
-    switch (key.kty.name()) {
-      case "EC":
-        thumbPrint.put("crv", key.crv);
-        thumbPrint.put("kty", key.kty);
-        thumbPrint.put("x", key.x);
-        thumbPrint.put("y", key.y);
-        break;
-      case "RSA":
-      case "RSASSA_PSS":
-        thumbPrint.put("e", key.e);
-        thumbPrint.put("kty", key.kty);
-        thumbPrint.put("n", key.n);
-        break;
-      case "OKP":
-        thumbPrint.put("crv", key.crv);
-        thumbPrint.put("kty", key.kty);
-        thumbPrint.put("x", key.x);
-        break;
-      default:
-        throw new IllegalArgumentException("Unsupported key type [" + key.kty + "]");
-    }
-
-    return digest(algorithm, Mapper.serialize(thumbPrint));
+    return JWKThumbprint.compute(algorithm, key);
   }
 
   /**

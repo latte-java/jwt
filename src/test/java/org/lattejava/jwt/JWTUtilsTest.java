@@ -41,14 +41,16 @@ import static org.testng.Assert.assertTrue;
  * @author Daniel DeGroff
  */
 public class JWTUtilsTest extends BaseTest {
+  // Spec §10: decodeHeader/decodePayload moved to JWTDecoder.decodeUnsecured().
   @Test
   public void decodePayload() {
     JWT jwt = JWT.builder().subject("123456789").build();
 
     // HMAC signed
     String encodedJWT = new org.lattejava.jwt.JWTEncoder().encode(jwt, HMACSigner.newSHA512Signer("super-secret-key-1-that-is-at-least-64-bytes-long-for-sha512-algorithm-compat-req!!"));
-    assertEquals(JWTUtils.decodePayload(encodedJWT).subject(), "123456789");
-    assertEquals(JWTUtils.decodeHeader(encodedJWT).alg(), Algorithm.HS512);
+    JWT decoded = new JWTDecoder().decodeUnsecured(encodedJWT);
+    assertEquals(decoded.subject(), "123456789");
+    assertEquals(decoded.header().alg(), Algorithm.HS512);
   }
 
   @Test
