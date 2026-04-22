@@ -69,7 +69,7 @@ public class ECVerifierTest extends BaseJWTTest {
 
   private void assertECVerifier(Verifier verifier, Algorithm expectedAlgorithm) {
     // Only the curve-matching algorithm should return true
-    for (Algorithm alg : Algorithm.values()) {
+    for (Algorithm alg : Algorithm.standardValues()) {
       if (alg == expectedAlgorithm) {
         assertTrue(verifier.canVerify(alg), "Expected canVerify(" + alg + ") to be true");
       } else {

@@ -49,25 +49,25 @@ public class BouncyCastleProviderTest {
   public void jca() {
     Security.insertProviderAt(new BouncyCastleFipsProvider(), 1);
 
-    for (Algorithm algorithm : Algorithm.values()) {
+    for (Algorithm algorithm : Algorithm.standardValues()) {
       try {
-        Mac mac = Mac.getInstance(algorithm.getName());
+        Mac mac = Mac.getInstance(algorithm.name());
 //        System.out.println(mac.getClass());
-        System.out.println("For algo [" + algorithm.getName() + "] " + mac.getProvider().getClass());
+        System.out.println("For algo [" + algorithm.name() + "] " + mac.getProvider().getClass());
 //        System.out.println();
       } catch (NoSuchAlgorithmException e) {
-        System.out.println("Missing mac algo [" + algorithm.getName() + "]");
+        System.out.println("Missing mac algo [" + algorithm.name() + "]");
       }
     }
 
-    for (Algorithm algorithm : Algorithm.values()) {
+    for (Algorithm algorithm : Algorithm.standardValues()) {
       try {
-        Signature signature = Signature.getInstance(algorithm.getName());
+        Signature signature = Signature.getInstance(algorithm.name());
 //        System.out.println(signature.getClass());
-        System.out.println("For algo [" + algorithm.getName() + "] " + signature.getProvider().getClass());
+        System.out.println("For algo [" + algorithm.name() + "] " + signature.getProvider().getClass());
 //        System.out.println();
       } catch (NoSuchAlgorithmException e) {
-        System.out.println("Missing signature algo [" + algorithm.getName() + "]");
+        System.out.println("Missing signature algo [" + algorithm.name() + "]");
       }
     }
 
