@@ -1,26 +1,32 @@
 /*
- * Copyright (c) 2016-2025, FusionAuth, All Rights Reserved
+ * Copyright (c) 2026, The Latte Project, All Rights Reserved
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to permit
+ * persons to whom the Software is furnished to do so, subject to the
+ * following conditions:
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ * The above copyright notice and this permission notice shall be included
+ * in all copies or substantial portions of the Software.
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
- * either express or implied. See the License for the specific
- * language governing permissions and limitations under the License.
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+ * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+ * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+ * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
 package org.lattejava.jwt.algorithm.hmac;
 
+import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.InvalidJWTSignatureException;
-import org.lattejava.jwt.InvalidKeyLengthException;
 import org.lattejava.jwt.JWTVerifierException;
 import org.lattejava.jwt.Verifier;
-import org.lattejava.jwt.Algorithm;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -34,43 +40,41 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Objects;
 
 /**
- * This class is used to verify a JWT signed with an HMAC algorithm.
+ * HMAC-based {@link Verifier} for the {@code HS256} / {@code HS384} /
+ * {@code HS512} JWA algorithms (RFC 7518 §3.2).
  *
- * @author Daniel DeGroff
+ * <p>Signature comparison uses
+ * {@link MessageDigest#isEqual(byte[], byte[])} -- documented as
+ * constant-time since JDK 7u40 (JDK-8006276) -- per the spec §6
+ * HMAC constant-time contract.</p>
+ *
+ * <p>Each call to {@link #verify(Algorithm, byte[], byte[])} obtains a
+ * fresh {@link Mac} instance per the spec §6 thread-safety contract.</p>
+ *
+ * @author The Latte Project
  */
 public class HMACVerifier implements Verifier {
   private final byte[] secret;
-
-  private HMACVerifier(String secret) {
-    Objects.requireNonNull(secret);
-    this.secret = secret.getBytes(StandardCharsets.UTF_8);
-  }
 
   private HMACVerifier(byte[] secret) {
     Objects.requireNonNull(secret);
     this.secret = secret;
   }
 
-  /**
-   * Return a new instance of the HMAC Verifier with the provided secret.
-   *
-   * @param secret The secret.
-   * @return a new instance of the HMAC verifier.
-   */
+  private HMACVerifier(String secret) {
+    this(secret == null ? null : secret.getBytes(StandardCharsets.UTF_8));
+  }
+
   public static HMACVerifier newVerifier(String secret) {
-    Objects.requireNonNull(secret);
     return new HMACVerifier(secret);
   }
 
-  /**
-   * Return a new instance of the HMAC Verifier with the provided secret.
-   *
-   * @param path The path to the secret.
-   * @return a new instance of the HMAC verifier.
-   */
+  public static HMACVerifier newVerifier(byte[] bytes) {
+    return new HMACVerifier(bytes);
+  }
+
   public static HMACVerifier newVerifier(Path path) {
     Objects.requireNonNull(path);
-
     try {
       return new HMACVerifier(Files.readAllBytes(path));
     } catch (IOException e) {
@@ -78,32 +82,7 @@ public class HMACVerifier implements Verifier {
     }
   }
 
-  /**
-   * Return a new instance of the HMAC Verifier with the provided secret.
-   *
-   * @param bytes The bytes of the secret.
-   * @return a new instance of the HMAC verifier.
-   */
-  public static HMACVerifier newVerifier(byte[] bytes) {
-    Objects.requireNonNull(bytes);
-    return new HMACVerifier(bytes);
-  }
-
-  // RFC 7518 Section 3.2: "A key of the same size as the hash output or larger MUST be used with this algorithm."
-  private static void assertMinimumSecretLength(Algorithm algorithm, byte[] secret) {
-    int minimumLength = switch (algorithm.name()) {
-      case "HS256" -> 32;
-      case "HS384" -> 48;
-      case "HS512" -> 64;
-      default -> 0;
-    };
-    if (secret.length < minimumLength) {
-      throw new InvalidKeyLengthException("Secret length of [" + secret.length + "] bytes is less than the required length of [" + minimumLength + "] bytes for algorithm [" + algorithm.name() + "].");
-    }
-  }
-
   @Override
-  @SuppressWarnings("Duplicates")
   public boolean canVerify(Algorithm algorithm) {
     return switch (algorithm.name()) {
       case "HS256", "HS384", "HS512" -> true;
@@ -116,15 +95,14 @@ public class HMACVerifier implements Verifier {
     Objects.requireNonNull(algorithm);
     Objects.requireNonNull(message);
     Objects.requireNonNull(signature);
-    assertMinimumSecretLength(algorithm, secret);
+    HMACFamily.assertMinimumSecretLength(algorithm, secret);
 
+    String jcaName = HMACFamily.toJCA(algorithm);
     try {
-      String jcaName = org.lattejava.jwt.internal.JCAAlgorithmMapping.toJCA(algorithm);
       Mac mac = Mac.getInstance(jcaName);
       mac.init(new SecretKeySpec(secret, jcaName));
-      byte[] actualSignature = mac.doFinal(message);
-
-      if (!MessageDigest.isEqual(signature, actualSignature)) {
+      byte[] expected = mac.doFinal(message);
+      if (!MessageDigest.isEqual(signature, expected)) {
         throw new InvalidJWTSignatureException();
       }
     } catch (InvalidKeyException | NoSuchAlgorithmException e) {

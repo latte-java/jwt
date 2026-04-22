@@ -1,25 +1,32 @@
 /*
- * Copyright (c) 2016-2020, FusionAuth, All Rights Reserved
+ * Copyright (c) 2026, The Latte Project, All Rights Reserved
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to permit
+ * persons to whom the Software is furnished to do so, subject to the
+ * following conditions:
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ * The above copyright notice and this permission notice shall be included
+ * in all copies or substantial portions of the Software.
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
- * either express or implied. See the License for the specific
- * language governing permissions and limitations under the License.
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+ * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+ * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+ * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
 package org.lattejava.jwt.algorithm.hmac;
 
+import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.InvalidKeyLengthException;
 import org.lattejava.jwt.JWTSigningException;
 import org.lattejava.jwt.Signer;
-import org.lattejava.jwt.Algorithm;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -29,9 +36,13 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Objects;
 
 /**
- * This class can sign and verify a JWT that was signed using HMAC.
+ * HMAC-based {@link Signer} for the {@code HS256} / {@code HS384} /
+ * {@code HS512} JWA algorithms (RFC 7518 §3.2).
  *
- * @author Daniel DeGroff
+ * <p>Each call to {@link #sign(byte[])} obtains a fresh {@link Mac}
+ * instance per the spec §6 thread-safety contract.</p>
+ *
+ * @author The Latte Project
  */
 public class HMACSigner implements Signer {
   private final Algorithm algorithm;
@@ -43,7 +54,7 @@ public class HMACSigner implements Signer {
   private HMACSigner(Algorithm algorithm, byte[] secret, String kid) {
     Objects.requireNonNull(algorithm);
     Objects.requireNonNull(secret);
-    assertMinimumSecretLength(algorithm, secret);
+    HMACFamily.assertMinimumSecretLength(algorithm, secret);
 
     this.algorithm = algorithm;
     this.kid = kid;
@@ -51,170 +62,72 @@ public class HMACSigner implements Signer {
   }
 
   private HMACSigner(Algorithm algorithm, String secret, String kid) {
-    Objects.requireNonNull(algorithm);
-    Objects.requireNonNull(secret);
-
-    this.algorithm = algorithm;
-    this.kid = kid;
-    this.secret = secret.getBytes(StandardCharsets.UTF_8);
-    assertMinimumSecretLength(algorithm, this.secret);
+    this(algorithm, secret == null ? null : secret.getBytes(StandardCharsets.UTF_8), kid);
   }
 
-  // RFC 7518 Section 3.2: "A key of the same size as the hash output or larger MUST be used with this algorithm."
-  private static void assertMinimumSecretLength(Algorithm algorithm, byte[] secret) {
-    int minimumLength = switch (algorithm.name()) {
-      case "HS256" -> 32;
-      case "HS384" -> 48;
-      case "HS512" -> 64;
-      default -> 0;
-    };
-    if (secret.length < minimumLength) {
-      throw new InvalidKeyLengthException("Secret length of [" + secret.length + "] bytes is less than the required length of [" + minimumLength + "] bytes for algorithm [" + algorithm.name() + "].");
-    }
-  }
-
-  /**
-   * Build a new HMAC signer using a SHA-256 hash.
-   *
-   * @param secret The secret used to generate the HMAC hash.
-   * @return a new HMAC signer.
-   */
   public static HMACSigner newSHA256Signer(byte[] secret) {
-    return newSHA256Signer(secret, null);
+    return new HMACSigner(Algorithm.HS256, secret, null);
   }
 
-  /**
-   * Build a new HMAC signer using a SHA-256 hash.
-   *
-   * @param secret The secret used to generate the HMAC hash.
-   * @return a new HMAC signer.
-   */
   public static HMACSigner newSHA256Signer(String secret) {
-    return newSHA256Signer(secret, null);
+    return new HMACSigner(Algorithm.HS256, secret, null);
   }
 
-  /**
-   * Build a new HMAC signer using a SHA-256 hash.
-   *
-   * @param secret The secret used to generate the HMAC hash.
-   * @param kid    The key identifier. This will be used by the JWTEncoder to write the 'kid' header.
-   * @return a new HMAC signer.
-   */
   public static HMACSigner newSHA256Signer(byte[] secret, String kid) {
     return new HMACSigner(Algorithm.HS256, secret, kid);
   }
 
-  /**
-   * Build a new HMAC signer using a SHA-256 hash.
-   *
-   * @param secret The secret used to generate the HMAC hash.
-   * @param kid    The key identifier. This will be used by the JWTEncoder to write the 'kid' header.
-   * @return a new HMAC signer.
-   */
   public static HMACSigner newSHA256Signer(String secret, String kid) {
     return new HMACSigner(Algorithm.HS256, secret, kid);
   }
 
-  /**
-   * Build a new HMAC signer using a SHA-384 hash.
-   *
-   * @param secret The secret used to generate the HMAC hash.
-   * @return a new HMAC signer.
-   */
   public static HMACSigner newSHA384Signer(byte[] secret) {
-    return newSHA384Signer(secret, null);
+    return new HMACSigner(Algorithm.HS384, secret, null);
   }
 
-  /**
-   * Build a new HMAC signer using a SHA-384 hash.
-   *
-   * @param secret The secret used to generate the HMAC hash.
-   * @return a new HMAC signer.
-   */
   public static HMACSigner newSHA384Signer(String secret) {
-    return newSHA384Signer(secret, null);
+    return new HMACSigner(Algorithm.HS384, secret, null);
   }
 
-  /**
-   * Build a new HMAC signer using a SHA-384 hash.
-   *
-   * @param secret The secret used to generate the HMAC hash.
-   * @param kid    The key identifier. This will be used by the JWTEncoder to write the 'kid' header.
-   * @return a new HMAC signer.
-   */
   public static HMACSigner newSHA384Signer(byte[] secret, String kid) {
     return new HMACSigner(Algorithm.HS384, secret, kid);
   }
 
-  /**
-   * Build a new HMAC signer using a SHA-384 hash.
-   *
-   * @param secret The secret used to generate the HMAC hash.
-   * @param kid    The key identifier. This will be used by the JWTEncoder to write the 'kid' header.
-   * @return a new HMAC signer.
-   */
   public static HMACSigner newSHA384Signer(String secret, String kid) {
     return new HMACSigner(Algorithm.HS384, secret, kid);
   }
 
-  /**
-   * Build a new HMAC signer using a SHA-512 hash.
-   *
-   * @param secret The secret used to generate the HMAC hash.
-   * @return a new HMAC signer.
-   */
   public static HMACSigner newSHA512Signer(byte[] secret) {
-    return newSHA512Signer(secret, null);
+    return new HMACSigner(Algorithm.HS512, secret, null);
   }
 
-  /**
-   * Build a new HMAC signer using a SHA-512 hash.
-   *
-   * @param secret The secret used to generate the HMAC hash.
-   * @return a new HMAC signer.
-   */
   public static HMACSigner newSHA512Signer(String secret) {
-    return newSHA512Signer(secret, null);
+    return new HMACSigner(Algorithm.HS512, secret, null);
   }
 
-  /**
-   * Build a new HMAC signer using a SHA-512 hash.
-   *
-   * @param secret The secret used to generate the HMAC hash.
-   * @param kid    The key identifier. This will be used by the JWTEncoder to write the 'kid' header.
-   * @return a new HMAC signer.
-   */
   public static HMACSigner newSHA512Signer(byte[] secret, String kid) {
     return new HMACSigner(Algorithm.HS512, secret, kid);
   }
 
-  /**
-   * Build a new HMAC signer using a SHA-512 hash.
-   *
-   * @param secret The secret used to generate the HMAC hash.
-   * @param kid    The key identifier. This will be used by the JWTEncoder to write the 'kid' header.
-   * @return a new HMAC signer.
-   */
   public static HMACSigner newSHA512Signer(String secret, String kid) {
     return new HMACSigner(Algorithm.HS512, secret, kid);
   }
 
   @Override
-  public Algorithm getAlgorithm() {
+  public Algorithm algorithm() {
     return algorithm;
   }
 
   @Override
-  public String getKid() {
+  public String kid() {
     return kid;
   }
 
   @Override
   public byte[] sign(byte[] message) {
     Objects.requireNonNull(message);
-
+    String jcaName = HMACFamily.toJCA(algorithm);
     try {
-      String jcaName = org.lattejava.jwt.internal.JCAAlgorithmMapping.toJCA(algorithm);
       Mac mac = Mac.getInstance(jcaName);
       mac.init(new SecretKeySpec(secret, jcaName));
       return mac.doFinal(message);
