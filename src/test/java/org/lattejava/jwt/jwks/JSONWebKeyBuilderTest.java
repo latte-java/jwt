@@ -180,9 +180,13 @@ public class JSONWebKeyBuilderTest extends BaseJWTTest {
     JSONWebKey jwk = JSONWebKey.build(publicKey);
 
     Signer signer = RSASigner.newSHA256Signer(privateKey);
+    // LatteJSONProcessor does not reflect over POJOs (Jackson does); convert the JWK to a plain Map first.
+    @SuppressWarnings("unchecked")
+    Map<String, Object> jwkAsMap = org.lattejava.jwt.json.Mapper.deserialize(
+        org.lattejava.jwt.json.Mapper.serialize(jwk), Map.class);
     String encodedJWT = new org.lattejava.jwt.JWTEncoder().encode(jwt, signer, b -> {
       b.parameter("cty", "application/json");
-      b.parameter("jwk", jwk);
+      b.parameter("jwk", jwkAsMap);
     });
 
     Header header = JWTUtils.decodeHeader(encodedJWT);
