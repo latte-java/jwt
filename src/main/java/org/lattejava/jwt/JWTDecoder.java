@@ -333,11 +333,11 @@ public class JWTDecoder {
     Instant now = Instant.now(clock);
     Instant nowMinusSkew = skewSeconds > 0 ? now.minusSeconds(skewSeconds) : now;
     if (jwt.isExpired(nowMinusSkew)) {
-      throw new JWTExpiredException();
+      throw new JWTExpiredException(jwt.expiresAt(), now, clockSkew);
     }
     Instant nowPlusSkew = skewSeconds > 0 ? now.plusSeconds(skewSeconds) : now;
     if (jwt.isUnavailableForProcessing(nowPlusSkew)) {
-      throw new JWTUnavailableForProcessingException();
+      throw new JWTUnavailableForProcessingException(jwt.notBefore(), now, clockSkew);
     }
   }
 
