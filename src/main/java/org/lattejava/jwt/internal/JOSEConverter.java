@@ -24,7 +24,6 @@
 package org.lattejava.jwt.internal;
 
 import org.lattejava.jwt.InvalidJWTSignatureException;
-import org.lattejava.jwt.JWTSigningException;
 
 /**
  * Conversion between ECDSA signatures in JOSE concatenation form
@@ -52,20 +51,22 @@ public final class JOSEConverter {
    * @param curveIntLength the curve-order length in bytes (32 / 48 / 66 / 32
    *                       for P-256 / P-384 / P-521 / secp256k1)
    * @return the {@code 2 * curveIntLength}-byte JOSE-format signature
-   * @throws JWTSigningException if {@code der} is not a well-formed DER
-   *                             ECDSA signature, or if either integer
-   *                             exceeds {@code curveIntLength} bytes
+   * @throws IllegalStateException if {@code der} is not a well-formed DER
+   *                               ECDSA signature, or if either integer
+   *                               exceeds {@code curveIntLength} bytes.
+   *                               This indicates a library or provider
+   *                               bug — callers should not catch this.
    */
   public static byte[] derToJose(byte[] der, int curveIntLength) {
     if (der == null) {
-      throw new JWTSigningException("DER signature is null", null);
+      throw new IllegalStateException("DER signature is null");
     }
     if (curveIntLength <= 0) {
-      throw new JWTSigningException("Invalid curve integer length [" + curveIntLength + "]", null);
+      throw new IllegalStateException("Invalid curve integer length [" + curveIntLength + "]");
     }
     int idx = 0;
     if (der.length < 8 || (der[idx++] & 0xFF) != 0x30) {
-      throw new JWTSigningException("Malformed ECDSA DER signature: missing SEQUENCE tag", null);
+      throw new IllegalStateException("Malformed ECDSA DER signature: missing SEQUENCE tag");
     }
     int seqLen;
     int b = der[idx++] & 0xFF;
@@ -74,25 +75,25 @@ public final class JOSEConverter {
     } else {
       int n = b & 0x7F;
       if (n != 1 || idx >= der.length) {
-        throw new JWTSigningException("Malformed ECDSA DER signature: invalid SEQUENCE length", null);
+        throw new IllegalStateException("Malformed ECDSA DER signature: invalid SEQUENCE length");
       }
       seqLen = der[idx++] & 0xFF;
     }
     if (idx + seqLen != der.length) {
-      throw new JWTSigningException("Malformed ECDSA DER signature: SEQUENCE length mismatch", null);
+      throw new IllegalStateException("Malformed ECDSA DER signature: SEQUENCE length mismatch");
     }
 
     int[] cursor = {idx};
     byte[] rContent = readDerInteger(der, cursor);
     byte[] sContent = readDerInteger(der, cursor);
     if (cursor[0] != der.length) {
-      throw new JWTSigningException("Malformed ECDSA DER signature: trailing bytes after S", null);
+      throw new IllegalStateException("Malformed ECDSA DER signature: trailing bytes after S");
     }
 
     byte[] r = stripLeadingZerosForUnsigned(rContent);
     byte[] s = stripLeadingZerosForUnsigned(sContent);
     if (r.length > curveIntLength || s.length > curveIntLength) {
-      throw new JWTSigningException("ECDSA integer exceeds curve length [" + curveIntLength + "]", null);
+      throw new IllegalStateException("ECDSA integer exceeds curve length [" + curveIntLength + "]");
     }
 
     byte[] out = new byte[2 * curveIntLength];
@@ -148,11 +149,11 @@ public final class JOSEConverter {
   private static byte[] readDerInteger(byte[] der, int[] cursor) {
     int idx = cursor[0];
     if (idx + 2 > der.length || (der[idx] & 0xFF) != 0x02) {
-      throw new JWTSigningException("Malformed ECDSA DER signature: missing INTEGER tag", null);
+      throw new IllegalStateException("Malformed ECDSA DER signature: missing INTEGER tag");
     }
     int len = der[idx + 1] & 0xFF;
     if ((len & 0x80) != 0 || idx + 2 + len > der.length || len == 0) {
-      throw new JWTSigningException("Malformed ECDSA DER signature: invalid INTEGER length", null);
+      throw new IllegalStateException("Malformed ECDSA DER signature: invalid INTEGER length");
     }
     byte[] value = new byte[len];
     System.arraycopy(der, idx + 2, value, 0, len);

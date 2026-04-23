@@ -24,7 +24,6 @@
 package org.lattejava.jwt.internal;
 
 import org.lattejava.jwt.InvalidJWTSignatureException;
-import org.lattejava.jwt.JWTSigningException;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -135,8 +134,8 @@ public class JOSEConverterTest {
   public void derToJose_null_throws() {
     try {
       JOSEConverter.derToJose(null, 32);
-      fail("Expected JWTSigningException");
-    } catch (JWTSigningException expected) {
+      fail("Expected IllegalStateException");
+    } catch (IllegalStateException expected) {
     }
   }
 
@@ -146,8 +145,8 @@ public class JOSEConverterTest {
     byte[] der = new byte[]{0x30, 0x06, 0x02, 0x02, 0x01, 0x02};
     try {
       JOSEConverter.derToJose(der, 32);
-      fail("Expected JWTSigningException");
-    } catch (JWTSigningException expected) {
+      fail("Expected IllegalStateException");
+    } catch (IllegalStateException expected) {
     }
   }
 
@@ -156,8 +155,8 @@ public class JOSEConverterTest {
     byte[] der = new byte[]{0x31, 0x06, 0x02, 0x01, 0x01, 0x02, 0x01, 0x02};
     try {
       JOSEConverter.derToJose(der, 32);
-      fail("Expected JWTSigningException");
-    } catch (JWTSigningException expected) {
+      fail("Expected IllegalStateException");
+    } catch (IllegalStateException expected) {
     }
   }
 
@@ -167,8 +166,8 @@ public class JOSEConverterTest {
     byte[] der = new byte[]{0x30, 0x06, 0x05, 0x01, 0x01, 0x02, 0x01, 0x02};
     try {
       JOSEConverter.derToJose(der, 32);
-      fail("Expected JWTSigningException");
-    } catch (JWTSigningException expected) {
+      fail("Expected IllegalStateException");
+    } catch (IllegalStateException expected) {
     }
   }
 
@@ -178,8 +177,8 @@ public class JOSEConverterTest {
     byte[] der = new byte[]{0x30, 0x10, 0x02, 0x01, 0x01, 0x02, 0x01, 0x02};
     try {
       JOSEConverter.derToJose(der, 32);
-      fail("Expected JWTSigningException");
-    } catch (JWTSigningException expected) {
+      fail("Expected IllegalStateException");
+    } catch (IllegalStateException expected) {
     }
   }
 
@@ -211,8 +210,8 @@ public class JOSEConverterTest {
     System.arraycopy(sTlv, 0, der, p, sTlv.length);
     try {
       JOSEConverter.derToJose(der, 32);
-      fail("Expected JWTSigningException");
-    } catch (JWTSigningException expected) {
+      fail("Expected IllegalStateException");
+    } catch (IllegalStateException expected) {
       assertTrue(expected.getMessage().contains("exceeds"));
     }
   }
