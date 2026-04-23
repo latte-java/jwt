@@ -240,8 +240,10 @@ public final class Header {
 
   /**
    * Mutable, reusable builder for {@link Header}. After {@link #build()} is
-   * called, the builder retains its state and may be modified to produce
-   * additional independent instances.
+   * called, the builder retains its state and may be further modified to
+   * produce additional independent {@link Header} instances; each
+   * {@code build()} call produces a fresh immutable instance with an
+   * independent copy of any collection fields.
    */
   public static final class Builder {
     private Algorithm alg;

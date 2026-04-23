@@ -409,7 +409,7 @@ public class JWTDecoder {
   // -------------------------------------------------------------------
 
   /**
-   * Returns a new {@link Builder} preconfigured with spec §5 defaults. This
+   * Returns a new {@link Builder} preconfigured with library defaults. This
    * is the canonical entry point for advanced decoder construction.
    */
   public static Builder builder() {
@@ -417,8 +417,11 @@ public class JWTDecoder {
   }
 
   /**
-   * Builder for {@link JWTDecoder}. Exposes the full configuration surface
-   * defined in spec §5.
+   * Mutable, reusable builder for {@link JWTDecoder}. After {@link #build()}
+   * is called, the builder retains its state and may be further modified to
+   * produce additional independent {@link JWTDecoder} instances; each
+   * {@code build()} call produces a fresh immutable instance with an
+   * independent copy of any collection fields.
    */
   public static final class Builder {
     private JSONProcessor jsonProcessor;

@@ -473,8 +473,11 @@ public final class JSONWebKey {
   }
 
   /**
-   * Mutable, reusable builder for {@link JSONWebKey}. Calling {@link #build()}
-   * produces a new immutable instance; the builder may be reused.
+   * Mutable, reusable builder for {@link JSONWebKey}. After {@link #build()}
+   * is called, the builder retains its state and may be further modified to
+   * produce additional independent {@link JSONWebKey} instances; each
+   * {@code build()} call produces a fresh immutable instance with an
+   * independent copy of any collection fields.
    */
   public static final class Builder {
     private Algorithm alg;

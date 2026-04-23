@@ -500,8 +500,10 @@ public final class JWT {
 
   /**
    * Mutable, reusable builder for {@link JWT}. After {@link #build()} is
-   * called, the builder retains its state and may be modified to produce
-   * additional independent instances.
+   * called, the builder retains its state and may be further modified to
+   * produce additional independent {@link JWT} instances; each
+   * {@code build()} call produces a fresh immutable instance with an
+   * independent copy of any collection fields.
    */
   public static final class Builder {
     private String issuer;

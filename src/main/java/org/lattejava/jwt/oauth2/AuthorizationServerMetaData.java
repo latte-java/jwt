@@ -387,6 +387,14 @@ public class AuthorizationServerMetaData {
     return new Builder();
   }
 
+  /**
+   * Mutable, reusable builder for {@link AuthorizationServerMetaData}. After
+   * {@link #build()} is called, the builder retains its state and may be
+   * further modified to produce additional independent
+   * {@link AuthorizationServerMetaData} instances; each {@code build()} call
+   * produces a fresh immutable instance with an independent copy of any
+   * collection fields.
+   */
   public static final class Builder {
     private String authorizationEndpoint;
     private List<String> codeChallengeMethodsSupported;
