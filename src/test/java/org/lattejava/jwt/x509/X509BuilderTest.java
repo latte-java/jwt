@@ -21,10 +21,13 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.lattejava.jwt.pem;
+package org.lattejava.jwt.x509;
 
 import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.BaseJWTTest;
+import org.lattejava.jwt.pem.PEM;
+import org.lattejava.jwt.pem.PEMDecoder;
+import org.lattejava.jwt.pem.PEMEncoder;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -46,12 +49,11 @@ import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 /**
- * Tests for {@link X509CertificateBuilder}, the sun.*-free X.509 self-signed
- * certificate builder added in Checkpoint 9.
+ * Tests for {@link X509}, the sun.*-free X.509 self-signed certificate builder.
  *
  * @author The Latte Project
  */
-public class X509CertificateBuilderTest extends BaseJWTTest {
+public class X509BuilderTest extends BaseJWTTest {
 
   @DataProvider(name = "signatureAlgorithms")
   public Object[][] signatureAlgorithms() {
@@ -65,7 +67,7 @@ public class X509CertificateBuilderTest extends BaseJWTTest {
 
   @Test(dataProvider = "signatureAlgorithms")
   public void roundTrip_perAlgorithm(Algorithm algorithm) throws Exception {
-    // Use case: For each supported signature algorithm, X509CertificateBuilder produces a
+    // Use case: For each supported signature algorithm, X509.builder() produces a
     // certificate that round-trips through CertificateFactory and preserves subject,
     // issuer, validity, serial, and public key.
     KeyPair kp = generateKeyPair(algorithm);
@@ -73,7 +75,7 @@ public class X509CertificateBuilderTest extends BaseJWTTest {
     Instant notAfter = notBefore.plus(365, ChronoUnit.DAYS);
     BigInteger serial = new BigInteger("1234567890");
 
-    X509Certificate cert = new X509CertificateBuilder()
+    X509Certificate cert = X509.builder()
         .serialNumber(serial)
         .issuer("CN=Latte Test CA")
         .subject("CN=Latte Test Subject")
@@ -103,7 +105,7 @@ public class X509CertificateBuilderTest extends BaseJWTTest {
     // Use case: validity with notBefore > notAfter is rejected at build time.
     KeyPair kp = generateKeyPair(Algorithm.RS256);
     Instant t = Instant.parse("2024-01-01T00:00:00Z");
-    X509CertificateBuilder b = new X509CertificateBuilder()
+    X509.Builder b = X509.builder()
         .serialNumber(BigInteger.ONE)
         .issuer("CN=A")
         .subject("CN=A")
@@ -117,7 +119,7 @@ public class X509CertificateBuilderTest extends BaseJWTTest {
     // Use case: missing subject is rejected.
     KeyPair kp = generateKeyPair(Algorithm.RS256);
     Instant now = Instant.parse("2024-01-01T00:00:00Z");
-    X509CertificateBuilder b = new X509CertificateBuilder()
+    X509.Builder b = X509.builder()
         .serialNumber(BigInteger.ONE)
         .issuer("CN=A")
         .validity(now, now.plus(30, ChronoUnit.DAYS))
@@ -130,7 +132,7 @@ public class X509CertificateBuilderTest extends BaseJWTTest {
     // Use case: missing public key is rejected.
     KeyPair kp = generateKeyPair(Algorithm.RS256);
     Instant now = Instant.parse("2024-01-01T00:00:00Z");
-    X509CertificateBuilder b = new X509CertificateBuilder()
+    X509.Builder b = X509.builder()
         .serialNumber(BigInteger.ONE)
         .issuer("CN=A")
         .subject("CN=B")
@@ -143,7 +145,7 @@ public class X509CertificateBuilderTest extends BaseJWTTest {
     // Use case: missing serial number is rejected.
     KeyPair kp = generateKeyPair(Algorithm.RS256);
     Instant now = Instant.parse("2024-01-01T00:00:00Z");
-    X509CertificateBuilder b = new X509CertificateBuilder()
+    X509.Builder b = X509.builder()
         .issuer("CN=A")
         .subject("CN=B")
         .validity(now, now.plus(30, ChronoUnit.DAYS))
@@ -152,17 +154,18 @@ public class X509CertificateBuilderTest extends BaseJWTTest {
   }
 
   @Test
-  public void buildPEM_roundTrip() throws Exception {
-    // Use case: buildPEM produces a PEM-formatted certificate string that decodes back to a cert.
+  public void pem_roundTrip() throws Exception {
+    // Use case: a built certificate round-trips through PEM encoding and decoding.
     KeyPair kp = generateKeyPair(Algorithm.ES256);
     Instant now = Instant.parse("2024-01-01T00:00:00Z");
-    String pem = new X509CertificateBuilder()
+    X509Certificate cert = X509.builder()
         .serialNumber(BigInteger.valueOf(99))
         .issuer("CN=PEM Issuer")
         .subject("CN=PEM Subject")
         .validity(now, now.plus(30, ChronoUnit.DAYS))
         .publicKey(kp.getPublic())
-        .buildPEM(kp.getPrivate(), Algorithm.ES256);
+        .build(kp.getPrivate(), Algorithm.ES256);
+    String pem = new PEMEncoder().encode(cert);
 
     assertTrue(pem.contains("-----BEGIN CERTIFICATE-----"));
     assertTrue(pem.contains("-----END CERTIFICATE-----"));
@@ -179,7 +182,7 @@ public class X509CertificateBuilderTest extends BaseJWTTest {
     Instant notBefore = Instant.parse("2049-12-31T00:00:00Z"); // UTCTime
     Instant notAfter = Instant.parse("2050-06-01T00:00:00Z"); // GeneralizedTime
 
-    X509Certificate cert = new X509CertificateBuilder()
+    X509Certificate cert = X509.builder()
         .serialNumber(BigInteger.ONE)
         .issuer("CN=Boundary")
         .subject("CN=Boundary")

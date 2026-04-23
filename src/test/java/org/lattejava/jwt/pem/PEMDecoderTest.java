@@ -18,6 +18,8 @@ package org.lattejava.jwt.pem;
 
 import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.pem.PEM;
+import org.lattejava.jwt.x509.X509;
+import org.lattejava.jwt.x509.X509BuilderTest;
 import org.testng.annotations.Test;
 
 import java.math.BigInteger;
@@ -43,10 +45,10 @@ public class PEMDecoderTest {
   public void decodeTBSCertificateFields_roundTrip() throws Exception {
     // Use case: decodeTBSCertificateFields parses serial / validity / issuer / subject from a
     // DER-encoded cert without going through CertificateFactory.
-    KeyPair kp = X509CertificateBuilderTest.generateKeyPair(Algorithm.RS256);
+    KeyPair kp = X509BuilderTest.generateKeyPair(Algorithm.RS256);
     Instant notBefore = Instant.parse("2024-06-01T12:00:00Z");
     Instant notAfter = notBefore.plus(180, ChronoUnit.DAYS);
-    X509Certificate cert = new X509CertificateBuilder()
+    X509Certificate cert = X509.builder()
         .serialNumber(BigInteger.valueOf(424242))
         .issuer("CN=TBS Issuer")
         .subject("CN=TBS Subject")
