@@ -61,7 +61,7 @@ import static org.testng.Assert.assertNotSame;
  *
  * @author Daniel DeGroff
  */
-public class JSONWebKeyBuilderTest extends BaseJWTTest {
+public class JSONWebKeyFromTest extends BaseJWTTest {
     @Test
     public void builder_parameter_rejects_registered_names() {
         Arrays.asList(
@@ -81,7 +81,7 @@ public class JSONWebKeyBuilderTest extends BaseJWTTest {
                 "x",
                 "x5c",
                 "x5t",
-                "x5t_256",
+                "x5t#S256",
                 "y"
         ).forEach(key -> expectException(JSONWebKeyException.class,
                 () -> JSONWebKey.builder().parameter(key, "Nunya, Business")));
@@ -91,45 +91,45 @@ public class JSONWebKeyBuilderTest extends BaseJWTTest {
     public void ec_private() throws Exception {
         // EC 256 Private key - PKCS#8 encapsulated already
         ECPrivateKey key = PEM.decode(Paths.get("src/test/resources/ec_private_prime256v1_p_256_openssl_pkcs8.pem")).getPrivateKey();
-        assertJSONEquals(JSONWebKey.build(key), "src/test/resources/jwk/ec_private_prime256v1_p_256_openssl_pkcs8.json");
+        assertJSONEquals(JSONWebKey.from(key), "src/test/resources/jwk/ec_private_prime256v1_p_256_openssl_pkcs8.json");
     }
 
     @Test
     public void ec_public() throws Exception {
         // EC 256 Public key
         ECPublicKey ecPublic_p256 = PEM.decode(Paths.get("src/test/resources/ec_public_key_p_256.pem")).getPublicKey();
-        assertJSONEquals(JSONWebKey.build(ecPublic_p256), "src/test/resources/jwk/ec_public_key_p_256.json");
+        assertJSONEquals(JSONWebKey.from(ecPublic_p256), "src/test/resources/jwk/ec_public_key_p_256.json");
 
         // EC 256 Certificate
         Certificate ec_certificate_p256 = PEM.decode(Paths.get("src/test/resources/ec_certificate_p_256.pem")).getCertificate();
-        assertJSONEquals(JSONWebKey.build(ec_certificate_p256), "src/test/resources/jwk/ec_certificate_p_256.json");
+        assertJSONEquals(JSONWebKey.from(ec_certificate_p256), "src/test/resources/jwk/ec_certificate_p_256.json");
 
         // EC 384 Public key
         ECPublicKey ecPublic_p384 = PEM.decode(Paths.get("src/test/resources/ec_public_key_p_384.pem")).getPublicKey();
-        assertJSONEquals(JSONWebKey.build(ecPublic_p384), "src/test/resources/jwk/ec_public_key_p_384.json");
+        assertJSONEquals(JSONWebKey.from(ecPublic_p384), "src/test/resources/jwk/ec_public_key_p_384.json");
 
         // EC 384 Certificate
         Certificate ec_certificate_p384 = PEM.decode(Paths.get("src/test/resources/ec_certificate_p_384.pem")).getCertificate();
-        assertJSONEquals(JSONWebKey.build(ec_certificate_p384), "src/test/resources/jwk/ec_certificate_p_384.json");
+        assertJSONEquals(JSONWebKey.from(ec_certificate_p384), "src/test/resources/jwk/ec_certificate_p_384.json");
 
         // EC 521 Public key
         ECPublicKey ecPublic_p512 = PEM.decode(Paths.get("src/test/resources/ec_public_key_p_521.pem")).getPublicKey();
-        assertJSONEquals(JSONWebKey.build(ecPublic_p512), "src/test/resources/jwk/ec_public_key_p_521.json");
+        assertJSONEquals(JSONWebKey.from(ecPublic_p512), "src/test/resources/jwk/ec_public_key_p_521.json");
 
         // EC 521 Certificate
         Certificate ec_certificate_p512 = PEM.decode(Paths.get("src/test/resources/ec_certificate_p_521.pem")).getCertificate();
-        assertJSONEquals(JSONWebKey.build(ec_certificate_p512), "src/test/resources/jwk/ec_certificate_p_521.json");
+        assertJSONEquals(JSONWebKey.from(ec_certificate_p512), "src/test/resources/jwk/ec_certificate_p_521.json");
 
         // EC Reference P-521
         ECPublicKey ec521key = PEM.decode(Paths.get("src/test/resources/ec_public_p_521_reference.pem")).getPublicKey();
-        assertJSONEquals(JSONWebKey.build(ec521key), "src/test/resources/jwk/ec_public_p_521_reference.json");
+        assertJSONEquals(JSONWebKey.from(ec521key), "src/test/resources/jwk/ec_public_p_521_reference.json");
     }
 
     @Test
     public void extra_properties() throws Exception {
         // EC 256 Public key
         ECPublicKey ecPublic_p256 = PEM.decode(Paths.get("src/test/resources/ec_public_key_p_256.pem")).getPublicKey();
-        JSONWebKey base = JSONWebKey.build(ecPublic_p256);
+        JSONWebKey base = JSONWebKey.from(ecPublic_p256);
         JSONWebKey withExtras = JSONWebKey.builder()
                 .alg(base.alg())
                 .crv(base.crv())
@@ -142,7 +142,7 @@ public class JSONWebKeyBuilderTest extends BaseJWTTest {
                 .x(base.x()).y(base.y())
                 .x5c(base.x5c())
                 .x5t(base.x5t())
-                .x5t_256(base.x5t_256())
+                .x5tS256(base.x5tS256())
                 .parameter("more", "cowbell")
                 .parameter("boom", "goes the dynamite")
                 .build();
@@ -153,7 +153,7 @@ public class JSONWebKeyBuilderTest extends BaseJWTTest {
     public void rsa_private() throws Exception {
         // RSA private key
         RSAPrivateKey privateKey = PEM.decode(Paths.get("src/test/resources/rsa_private_key_jwk_control.pem")).getPrivateKey();
-        assertJSONEquals(JSONWebKey.build(privateKey), "src/test/resources/jwk/rsa_private_key_jwk_control.json");
+        assertJSONEquals(JSONWebKey.from(privateKey), "src/test/resources/jwk/rsa_private_key_jwk_control.json");
     }
 
     @Test
@@ -162,7 +162,7 @@ public class JSONWebKeyBuilderTest extends BaseJWTTest {
         RSAPrivateKey privateKey = PEM.decode(Paths.get("src/test/resources/rsa_pss_private_key_2048.pem")).getPrivateKey();
         // Note that the alg property in the JWK is optional, and with an RSA key we don't know the algorithm.
         // - This key could be used with PS256, PS384 or PS512.
-        assertJSONEquals(JSONWebKey.build(privateKey), "src/test/resources/jwk/rsa_pss_private_key_2048.json");
+        assertJSONEquals(JSONWebKey.from(privateKey), "src/test/resources/jwk/rsa_pss_private_key_2048.json");
 
         // See!
         Signer signer = RSAPSSSigner.newSHA256Signer(privateKey);
@@ -184,11 +184,11 @@ public class JSONWebKeyBuilderTest extends BaseJWTTest {
         RSAPublicKey publicKey = PEM.decode(Paths.get("src/test/resources/rsa_pss_public_key_2048.pem")).getPublicKey();
         // Note that the alg property in the JWK is optional, and with an RSA key we don't know the algorithm.
         // - This key could be used with PS256, PS384 or PS512.
-        assertJSONEquals(JSONWebKey.build(publicKey), "src/test/resources/jwk/rsa_pss_public_key_2048.json");
+        assertJSONEquals(JSONWebKey.from(publicKey), "src/test/resources/jwk/rsa_pss_public_key_2048.json");
 
         // X.509 cert, the certificate will contain the algorithm 'SHA256withRSAandMGF1' so we will expect PS256 in the JWK
         Certificate certificate = PEM.decode(Paths.get("src/test/resources/rsa_pss_public_key_2048_certificate.pem")).certificate;
-        assertJSONEquals(JSONWebKey.build(certificate), "src/test/resources/jwk/rsa_pss_public_key_2048_certificate.json");
+        assertJSONEquals(JSONWebKey.from(certificate), "src/test/resources/jwk/rsa_pss_public_key_2048_certificate.json");
     }
 
     @Test
@@ -197,7 +197,7 @@ public class JSONWebKeyBuilderTest extends BaseJWTTest {
 
         RSAPrivateKey privateKey = PEM.decode(Paths.get("src/test/resources/rsa_private_key_2048.pem")).getPrivateKey();
         RSAPublicKey publicKey = PEM.decode(Paths.get("src/test/resources/rsa_public_key_2048.pem")).getPublicKey();
-        JSONWebKey jwk = JSONWebKey.build(publicKey);
+        JSONWebKey jwk = JSONWebKey.from(publicKey);
 
         Signer signer = RSASigner.newSHA256Signer(privateKey);
         // JSONWebKey exposes a Map view via toSerializableMap() -- no Jackson needed.
@@ -220,52 +220,52 @@ public class JSONWebKeyBuilderTest extends BaseJWTTest {
     public void rsa_public() throws Exception {
         // PKCS#1 RSA PEM Encoded Public Key
         RSAPublicKey pkcs1PublicKey = PEM.decode(Paths.get("src/test/resources/rsa_public_key_2048.pem")).getPublicKey();
-        assertJSONEquals(JSONWebKey.build(pkcs1PublicKey), "src/test/resources/jwk/rsa_public_key_2048.json");
+        assertJSONEquals(JSONWebKey.from(pkcs1PublicKey), "src/test/resources/jwk/rsa_public_key_2048.json");
 
         // X.509 RSA PEM Encoded Public Key
         RSAPublicKey x509PublicKey = PEM.decode(Paths.get("src/test/resources/rsa_public_key_x509.pem")).getPublicKey();
-        assertJSONEquals(JSONWebKey.build(x509PublicKey), "src/test/resources/jwk/rsa_public_key_x509.json");
+        assertJSONEquals(JSONWebKey.from(x509PublicKey), "src/test/resources/jwk/rsa_public_key_x509.json");
 
         // X.509 PEM encoded
         Certificate cert1 = PEM.decode(Paths.get("src/test/resources/rsa_certificate_2048.pem")).certificate;
-        assertJSONEquals(JSONWebKey.build(cert1), "src/test/resources/jwk/rsa_certificate_2048.json");
+        assertJSONEquals(JSONWebKey.from(cert1), "src/test/resources/jwk/rsa_certificate_2048.json");
 
         // Perform the same test again using a PEM version of the certificate to ensure we get the x5t
-        assertJSONEquals(JSONWebKey.build(new String(Files.readAllBytes(Paths.get("src/test/resources/rsa_certificate_2048.pem")))), "src/test/resources/jwk/rsa_certificate_2048.json");
+        assertJSONEquals(JSONWebKey.from(new String(Files.readAllBytes(Paths.get("src/test/resources/rsa_certificate_2048.pem")))), "src/test/resources/jwk/rsa_certificate_2048.json");
 
         // X509 certificate with a chain, not yet calculating the x5c chain
         Certificate cert2 = PEM.decode(Paths.get("src/test/resources/rsa_certificate_gd_bundle_g2.pem")).certificate;
-        assertJSONEquals(JSONWebKey.build(cert2), "src/test/resources/jwk/rsa_certificate_gd_bundle_g2.json");
+        assertJSONEquals(JSONWebKey.from(cert2), "src/test/resources/jwk/rsa_certificate_gd_bundle_g2.json");
     }
 
     @Test
     public void eddsa_private() throws Exception {
         // ed25519
         EdECPrivateKey key25519 = PEM.decode(Paths.get("src/test/resources/ed_dsa_ed25519_private_key.pem")).getPrivateKey();
-        assertJSONEquals(JSONWebKey.build(key25519), "src/test/resources/jwk/ed_dsa_ed25519_private_key.json");
+        assertJSONEquals(JSONWebKey.from(key25519), "src/test/resources/jwk/ed_dsa_ed25519_private_key.json");
 
         // ed448
         EdECPrivateKey key448 = PEM.decode(Paths.get("src/test/resources/ed_dsa_ed448_private_key.pem")).getPrivateKey();
-        assertJSONEquals(JSONWebKey.build(key448), "src/test/resources/jwk/ed_dsa_ed448_private_key.json");
+        assertJSONEquals(JSONWebKey.from(key448), "src/test/resources/jwk/ed_dsa_ed448_private_key.json");
     }
 
     @Test
     public void eddsa_public() throws Exception {
         // ed25519
         EdECPublicKey key25519 = PEM.decode(Paths.get("src/test/resources/ed_dsa_ed25519_public_key.pem")).getPublicKey();
-        assertJSONEquals(JSONWebKey.build(key25519), "src/test/resources/jwk/ed_dsa_ed25519_public_key.json");
+        assertJSONEquals(JSONWebKey.from(key25519), "src/test/resources/jwk/ed_dsa_ed25519_public_key.json");
 
         // X.509 PEM encoded
         Certificate cert25519 = PEM.decode(Paths.get("src/test/resources/ed_dsa_ed25519_certificate.pem")).certificate;
-        assertJSONEquals(JSONWebKey.build(cert25519), "src/test/resources/jwk/ed_dsa_ed25519_certificate.json");
+        assertJSONEquals(JSONWebKey.from(cert25519), "src/test/resources/jwk/ed_dsa_ed25519_certificate.json");
 
         // ed448
         EdECPublicKey key448 = PEM.decode(Paths.get("src/test/resources/ed_dsa_ed448_public_key.pem")).getPublicKey();
-        assertJSONEquals(JSONWebKey.build(key448), "src/test/resources/jwk/ed_dsa_ed448_public_key.json");
+        assertJSONEquals(JSONWebKey.from(key448), "src/test/resources/jwk/ed_dsa_ed448_public_key.json");
 
         // X.509 PEM encoded
         Certificate cert448 = PEM.decode(Paths.get("src/test/resources/ed_dsa_ed448_certificate.pem")).certificate;
-        assertJSONEquals(JSONWebKey.build(cert448), "src/test/resources/jwk/ed_dsa_ed448_certificate.json");
+        assertJSONEquals(JSONWebKey.from(cert448), "src/test/resources/jwk/ed_dsa_ed448_certificate.json");
     }
 
     @Test

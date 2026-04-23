@@ -60,7 +60,7 @@ public final class JSONWebKey {
   static final Set<String> REGISTERED_PARAMETER_NAMES = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
       "alg", "crv", "kid", "kty", "use", "key_ops", "x5u",
       "d", "dp", "dq", "e", "n", "p", "q", "qi",
-      "x", "y", "x5c", "x5t", "x5t#S256", "x5t_256"
+      "x", "y", "x5c", "x5t", "x5t#S256"
   )));
 
   private final Algorithm alg;
@@ -99,7 +99,7 @@ public final class JSONWebKey {
 
   private final String x5t;
 
-  private final String x5t_256;
+  private final String x5tS256;
 
   private final String x5u;
 
@@ -124,7 +124,7 @@ public final class JSONWebKey {
     this.x = b.x;
     this.x5c = b.x5c == null ? null : Collections.unmodifiableList(new java.util.ArrayList<>(b.x5c));
     this.x5t = b.x5t;
-    this.x5t_256 = b.x5t_256;
+    this.x5tS256 = b.x5tS256;
     this.x5u = b.x5u;
     this.y = b.y;
   }
@@ -199,8 +199,8 @@ public final class JSONWebKey {
     return x5t;
   }
 
-  public String x5t_256() {
-    return x5t_256;
+  public String x5tS256() {
+    return x5tS256;
   }
 
   public String x5u() {
@@ -247,8 +247,7 @@ public final class JSONWebKey {
       case "x5c": return x5c;
       case "x5t": return x5t;
       case "x5t#S256":
-      case "x5t_256":
-        return x5t_256;
+        return x5tS256;
       default: return other.get(name);
     }
   }
@@ -256,7 +255,7 @@ public final class JSONWebKey {
   // ---------- Serialization ----------
 
   /**
-   * Map suitable for JSON serialization. The Java field {@code x5t_256} is
+   * Map suitable for JSON serialization. The Java field {@code x5tS256} is
    * emitted under the wire-form key {@code "x5t#S256"} per RFC 7517 §4.9.
    */
   public Map<String, Object> toSerializableMap() {
@@ -280,7 +279,7 @@ public final class JSONWebKey {
     if (y != null) out.put("y", y);
     if (x5c != null) out.put("x5c", x5c);
     if (x5t != null) out.put("x5t", x5t);
-    if (x5t_256 != null) out.put("x5t#S256", x5t_256);
+    if (x5tS256 != null) out.put("x5t#S256", x5tS256);
     for (Map.Entry<String, Object> entry : other.entrySet()) {
       if (entry.getValue() != null) {
         out.put(entry.getKey(), entry.getValue());
@@ -291,7 +290,7 @@ public final class JSONWebKey {
 
   /**
    * Build a {@link JSONWebKey} from a parsed JSON map. Reads {@code "x5t#S256"}
-   * into the {@code x5t_256} field and {@code "key_ops"}/{@code "x5u"} into
+   * into the {@code x5tS256} field and {@code "key_ops"}/{@code "x5u"} into
    * their typed fields.
    */
   @SuppressWarnings("unchecked")
@@ -350,7 +349,7 @@ public final class JSONWebKey {
           b.x5c = chain;
           break;
         case "x5t":  b.x5t = value.toString(); break;
-        case "x5t#S256": b.x5t_256 = value.toString(); break;
+        case "x5t#S256": b.x5tS256 = value.toString(); break;
         default:
           b.other.put(name, value);
           break;
@@ -382,7 +381,7 @@ public final class JSONWebKey {
         .y(y)
         .x5c(x5c)
         .x5t(x5t)
-        .x5t_256(x5t_256);
+        .x5tS256(x5tS256);
     for (Map.Entry<String, Object> entry : other.entrySet()) {
       b.parameter(entry.getKey(), entry.getValue());
     }
@@ -391,19 +390,19 @@ public final class JSONWebKey {
 
   // ---------- Static convenience methods ----------
 
-  public static JSONWebKey build(String encodedPEM) {
+  public static JSONWebKey from(String encodedPEM) {
     return new JSONWebKeyConverter().build(encodedPEM);
   }
 
-  public static JSONWebKey build(Certificate certificate) {
+  public static JSONWebKey from(Certificate certificate) {
     return new JSONWebKeyConverter().build(certificate);
   }
 
-  public static JSONWebKey build(PrivateKey privateKey) {
+  public static JSONWebKey from(PrivateKey privateKey) {
     return new JSONWebKeyConverter().build(privateKey);
   }
 
-  public static JSONWebKey build(PublicKey publicKey) {
+  public static JSONWebKey from(PublicKey publicKey) {
     return new JSONWebKeyConverter().build(publicKey);
   }
 
@@ -453,7 +452,7 @@ public final class JSONWebKey {
         && Objects.equals(x, that.x)
         && Objects.equals(x5c, that.x5c)
         && Objects.equals(x5t, that.x5t)
-        && Objects.equals(x5t_256, that.x5t_256)
+        && Objects.equals(x5tS256, that.x5tS256)
         && Objects.equals(y, that.y)
         && Objects.equals(other, that.other);
   }
@@ -464,7 +463,7 @@ public final class JSONWebKey {
   @Override
   public int hashCode() {
     return Objects.hash(algName(alg), crv, d, dp, dq, e, kid, ktyName(kty), n, p, q, qi,
-        use, key_ops, x5u, x, x5c, x5t, x5t_256, y, other);
+        use, key_ops, x5u, x, x5c, x5t, x5tS256, y, other);
   }
 
   // ---------- Builder ----------
@@ -496,7 +495,7 @@ public final class JSONWebKey {
     private String x;
     private List<String> x5c;
     private String x5t;
-    private String x5t_256;
+    private String x5tS256;
     private String x5u;
     private String y;
 
@@ -521,7 +520,7 @@ public final class JSONWebKey {
     public Builder y(String v)               { this.y = v; return this; }
     public Builder x5c(List<String> v)       { this.x5c = v; return this; }
     public Builder x5t(String v)             { this.x5t = v; return this; }
-    public Builder x5t_256(String v)         { this.x5t_256 = v; return this; }
+    public Builder x5tS256(String v)         { this.x5tS256 = v; return this; }
 
     /**
      * Add a custom (non-registered) JWK parameter. Registered parameters MUST

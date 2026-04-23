@@ -56,7 +56,7 @@ import static org.lattejava.jwt.jwks.JWKUtils.base64EncodeUint;
 /**
  * Internal helper that converts Java key material (PEM, PrivateKey,
  * PublicKey, Certificate) into {@link JSONWebKey} instances. Package-private
- * by design — external callers should use the {@code JSONWebKey.build(...)}
+ * by design — external callers should use the {@code JSONWebKey.from(...)}
  * overloads instead.
  *
  * @author Daniel DeGroff
@@ -226,7 +226,7 @@ class JSONWebKeyConverter {
           .x(base.x()).y(base.y())
           .x5c(Collections.singletonList(encodedCertificate))
           .x5t(JWTUtils.generateJWS_x5t(encodedCertificate))
-          .x5t_256(JWTUtils.generateJWS_x5t("SHA-256", encodedCertificate))
+          .x5tS256(JWTUtils.generateJWS_x5t("SHA-256", encodedCertificate))
           .build();
     } catch (CertificateEncodingException e) {
       throw new JSONWebKeyException("Failed to decode X.509 certificate.", e);

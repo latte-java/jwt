@@ -140,7 +140,7 @@ public interface Algorithm {
   /**
    * Look up by name returning {@code null} for unrecognized names. Provided as
    * a temporary back-compat shim for 6.x callers (notably
-   * {@code JSONWebKey.build(...)} and the EdDSA signer/verifier constructors).
+   * {@code JSONWebKey.from(...)} and the EdDSA signer/verifier constructors).
    * Accepts both JWA names ({@code "RS256"}) and the JCA signature/curve names
    * ({@code "SHA256withRSA"}, {@code "Ed25519"}) the legacy enum recognised.
    * New code should use {@link #of(String)} or compare {@link #name()} directly.

@@ -49,7 +49,7 @@ import static org.testng.Assert.fail;
  *   <li>{@link JSONWebKey#toString()} <em>always</em> redacts d/dp/dq/p/q/qi.</li>
  *   <li>{@link JSONWebKey#toPublicJSONWebKey()} returns a brand-new instance
  *       with private key material removed.</li>
- *   <li>The Java field {@code x5t_256} maps to/from the wire-form key
+ *   <li>The Java field {@code x5tS256} maps to/from the wire-form key
  *       {@code "x5t#S256"} (RFC 7517 §4.9).</li>
  *   <li>{@code fromMap} understands {@code key_ops} (array of strings) and
  *       {@code x5u} as typed parameters.</li>
@@ -238,7 +238,7 @@ public class JSONWebKeyTest {
         .x5u("https://example.test/cert")
         .x5c(Arrays.asList("MIIB..."))
         .x5t("thumb-sha1")
-        .x5t_256("thumb-sha256")
+        .x5tS256("thumb-sha256")
         .build();
 
     JSONWebKey pub = k.toPublicJSONWebKey();
@@ -247,14 +247,14 @@ public class JSONWebKeyTest {
     assertEquals(pub.x5u(), "https://example.test/cert");
     assertEquals(pub.x5c(), Arrays.asList("MIIB..."));
     assertEquals(pub.x5t(), "thumb-sha1");
-    assertEquals(pub.x5t_256(), "thumb-sha256");
+    assertEquals(pub.x5tS256(), "thumb-sha256");
   }
 
   // ---------- x5t#S256 wire-form mapping ----------
 
   @Test
   public void fromMap_reads_x5t_S256_wire_key() {
-    // Use case: fromMap reads "x5t#S256" into the x5t_256 field
+    // Use case: fromMap reads "x5t#S256" into the x5tS256 field
     Map<String, Object> wire = new LinkedHashMap<>();
     wire.put("kty", "RSA");
     wire.put("n", "AQAB");
@@ -262,25 +262,25 @@ public class JSONWebKeyTest {
     wire.put("x5t#S256", "abc123");
 
     JSONWebKey k = JSONWebKey.fromMap(wire);
-    assertEquals(k.x5t_256(), "abc123");
+    assertEquals(k.x5tS256(), "abc123");
     // Must not leak into the custom-parameters bag.
     assertFalse(k.other().containsKey("x5t#S256"));
   }
 
   @Test
   public void toJSON_emits_x5t_S256_wire_key() {
-    // Use case: toJSON emits x5t_256 under the wire-form "x5t#S256" key
+    // Use case: toJSON emits x5tS256 under the wire-form "x5t#S256" key
     JSONWebKey k = JSONWebKey.builder()
         .kty(KeyType.RSA)
         .n("AQAB")
         .e("AQAB")
-        .x5t_256("thumb")
+        .x5tS256("thumb")
         .build();
 
     String j = k.toJSON();
     assertTrue(j.contains("\"x5t#S256\":\"thumb\""), j);
-    // Must not also emit the Java-form "x5t_256".
-    assertFalse(j.contains("x5t_256"), j);
+    // Must not also emit the Java-form "x5tS256".
+    assertFalse(j.contains("x5tS256"), j);
   }
 
   @Test
@@ -289,7 +289,7 @@ public class JSONWebKeyTest {
     String json = "{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"X\",\"y\":\"Y\",\"x5t#S256\":\"thumb\"}";
     Map<String, Object> map = new LatteJSONProcessor().deserialize(json.getBytes());
     JSONWebKey k = JSONWebKey.fromMap(map);
-    assertEquals(k.x5t_256(), "thumb");
+    assertEquals(k.x5tS256(), "thumb");
     String back = k.toJSON();
     assertTrue(back.contains("\"x5t#S256\":\"thumb\""), back);
   }
@@ -344,7 +344,7 @@ public class JSONWebKeyTest {
     return new Object[][] {
         {"alg"}, {"crv"}, {"kid"}, {"kty"}, {"use"}, {"key_ops"}, {"x5u"},
         {"d"}, {"dp"}, {"dq"}, {"e"}, {"n"}, {"p"}, {"q"}, {"qi"},
-        {"x"}, {"y"}, {"x5c"}, {"x5t"}, {"x5t#S256"}, {"x5t_256"}
+        {"x"}, {"y"}, {"x5c"}, {"x5t"}, {"x5t#S256"}
     };
   }
 
@@ -389,7 +389,7 @@ public class JSONWebKeyTest {
         .x("X")
         .y("Y")
         .kid("ec-1")
-        .x5t_256("thumb")
+        .x5tS256("thumb")
         .build();
 
     assertEquals(k.kty(), KeyType.EC);
@@ -398,7 +398,7 @@ public class JSONWebKeyTest {
     assertEquals(k.x(), "X");
     assertEquals(k.y(), "Y");
     assertEquals(k.kid(), "ec-1");
-    assertEquals(k.x5t_256(), "thumb");
+    assertEquals(k.x5tS256(), "thumb");
   }
 
   @Test
