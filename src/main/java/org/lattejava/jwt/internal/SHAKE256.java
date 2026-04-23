@@ -146,8 +146,10 @@ public final class SHAKE256 {
           return out;
         }
       } catch (Exception ignore) {
-        // partial digests not returned, etc. Fall back to fixed-length.
-        // Note: md is now in an indeterminate state; rebuild.
+        // API-variant probe: not every provider implements the variable-length digest(buf, off, len) API
+        // for SHAKE256. Any failure (UnsupportedOperationException, DigestException, provider-specific
+        // RuntimeExceptions) means this API path isn't available and we fall through to the fixed-length
+        // digest() below. md is now in an indeterminate state after a partial digest attempt; rebuild.
         md = MessageDigest.getInstance("SHAKE256", p);
         md.update(input);
       }

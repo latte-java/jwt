@@ -122,7 +122,9 @@ public abstract class AbstractHttpHelper {
             errorBody.close();
           }
         } catch (IOException ignored) {
-          // best-effort
+          // Best-effort drain/close of the redirect hop's error stream so the connection can be reused.
+          // Only close() can throw here (getErrorStream() returns null, not throws), and an IOException
+          // draining a hop we've already chosen to abandon is not actionable.
         }
         current = buildURLConnection(nextURL.toString());
         redirectsFollowed++;
