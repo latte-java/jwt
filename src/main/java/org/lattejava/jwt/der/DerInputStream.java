@@ -114,7 +114,10 @@ public class DerInputStream {
       }
       return buffer;
     } catch (IOException e) {
-      throw new RuntimeException(e);
+      // Reading from a ByteArrayInputStream cannot raise an IOException
+      // under normal circumstances. If this fires, it's a library or JVM
+      // bug rather than bad DER input.
+      throw new IllegalStateException("Unexpected IO error reading DER from in-memory buffer", e);
     }
   }
 

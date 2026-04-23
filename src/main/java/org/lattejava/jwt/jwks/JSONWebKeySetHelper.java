@@ -196,9 +196,7 @@ public class JSONWebKeySetHelper extends AbstractHttpHelper {
     } catch (JSONProcessingException e) {
       throw new JSONWebKeySetException("Failed to parse JSON response.", e);
     } catch (java.io.IOException e) {
-      // Propagate IO failures (including ResponseTooLargeException) so the
-      // caller's exception wrapper can decorate them.
-      throw new RuntimeException(e);
+      throw new JSONWebKeySetException("Failed to read JWKS response", e);
     }
   }
 
