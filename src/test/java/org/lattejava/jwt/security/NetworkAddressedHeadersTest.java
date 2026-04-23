@@ -49,9 +49,9 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 /**
- * Spec §14 "Network-addressed headers (jku / x5u / jwk)" — proves that the
- * decoder never dereferences {@code jku}, {@code x5u}, or inline {@code jwk}
- * header parameters during decode.
+ * Network-addressed headers (jku / x5u / jwk): proves that the decoder never
+ * dereferences {@code jku}, {@code x5u}, or inline {@code jwk} header
+ * parameters during decode.
  *
  * <p>The strategy is to bind a real {@link ServerSocket} on a chosen
  * {@code 127.0.0.1:PORT} and assert that no inbound TCP connection is ever

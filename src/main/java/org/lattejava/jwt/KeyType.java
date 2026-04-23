@@ -39,8 +39,6 @@ import static org.lattejava.jwt.der.ObjectIdentifier.RSA_ENCRYPTION;
  * {@link #OCT}) are interned: {@code KeyType.of("RSA") == KeyType.RSA}.
  * For custom key types, use {@link #of(String)} or implement this interface.</p>
  *
- * <p>See spec §7 in {@code specs/7.0-architecture.md} for the full design.</p>
- *
  * @author The Latte Project
  */
 public interface KeyType {
@@ -73,24 +71,6 @@ public interface KeyType {
   KeyType OCT = new StandardKeyType("oct");
 
   /**
-   * Legacy 6.x compatibility constant for RSASSA-PSS keys. Spec §7 states that
-   * RSA-PSS keys use {@code "kty": "RSA"} on the wire (the IANA "JSON Web Key
-   * Types" registry does not include {@code "RSASSA-PSS"}). This constant is
-   * retained as a temporary scaffold so that 6.x callers compile and existing
-   * thumbprint vectors continue to round-trip while the surrounding code is
-   * migrated. New code MUST use {@link #RSA}.
-   *
-   * <p>The {@link #name()} value is intentionally the legacy Java identifier
-   * {@code "RSASSA_PSS"} (underscore, not hyphen) -- this is what the 6.x
-   * Jackson default-serialized enum produced and what the JWK thumbprint test
-   * vectors hashed against.</p>
-   *
-   * @deprecated Removed in a later checkpoint. Use {@link #RSA}.
-   */
-  @Deprecated
-  KeyType RSASSA_PSS = new StandardKeyType("RSASSA_PSS");
-
-  /**
    * Look up a KeyType by name. Returns the pre-built standard constant if the
    * name matches one of the 4 standard key types (enabling {@code ==}
    * comparison for standard key types). Returns a new instance for
@@ -121,15 +101,12 @@ public interface KeyType {
     return new KeyType[]{RSA, EC, OKP, OCT};
   }
 
-  // --- Legacy 6.x compatibility shims (temporary; removed in later checkpoints) ---
-
   /**
    * Resolve a {@code KeyType} from a known cryptographic OID. Returns
-   * {@code null} for unknown OIDs. Used by the legacy {@code PEMDecoder} to map
-   * a DER-encoded algorithm identifier to a JCA key family. Will be replaced by
-   * the JCA algorithm name lookup in a later checkpoint.
+   * {@code null} for unknown OIDs. Used by {@code PEMDecoder} to map a
+   * DER-encoded algorithm identifier to a JCA key family.
    *
-   * <p>Note: {@code RSASSA_PSS_ENCRYPTION} maps to {@link #RSA} -- per spec §7,
+   * <p>Note: {@code RSASSA_PSS_ENCRYPTION} maps to {@link #RSA} because
    * RSA-PSS keys use {@code "kty": "RSA"} on the wire. Internal callers that
    * need to know the OID is PSS-specific should branch on the OID directly,
    * not on the returned {@code KeyType}.</p>
@@ -137,7 +114,7 @@ public interface KeyType {
    * @param oid the OID dotted-decimal string
    * @return the matching standard {@code KeyType} or {@code null}
    */
-  static KeyType getKeyTypeFromOid(String oid) {
+  static KeyType forOid(String oid) {
     Objects.requireNonNull(oid);
     return switch (oid) {
       case EC_ENCRYPTION -> EC;

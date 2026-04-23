@@ -35,7 +35,7 @@ import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
 /**
- * Tests for the Algorithm interface and StandardAlgorithm implementation per spec §1.
+ * Tests for the Algorithm interface and StandardAlgorithm implementation.
  *
  * @author The Latte Project
  */
@@ -106,7 +106,7 @@ public class AlgorithmTest {
     // The standard constant equals a custom Algorithm with the same name only if both
     // sides honor name()-based equality. StandardAlgorithm.equals only compares to other
     // StandardAlgorithm instances; the custom side may use Object identity. The defense
-    // against hostile equals impls is that the decoder keys by name() (spec §16). For
+    // against hostile equals impls is that the decoder keys by name(). For
     // this test, just confirm that two StandardAlgorithm instances with the same name
     // are equal (which is the documented StandardAlgorithm contract).
     Algorithm a = Algorithm.of("CUSTOM_X");

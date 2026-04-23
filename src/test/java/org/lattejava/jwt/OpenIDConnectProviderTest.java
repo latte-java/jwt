@@ -46,7 +46,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 /**
- * Spec §14 OIDC provider-preference matrix for the bundled SHAKE256 path.
+ * OIDC provider-preference matrix for the bundled SHAKE256 path.
  *
  * <p>Cases:
  * <ul>

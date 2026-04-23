@@ -40,7 +40,7 @@ import java.util.Objects;
  * {@code HS512} JWA algorithms (RFC 7518 §3.2).
  *
  * <p>Each call to {@link #sign(byte[])} obtains a fresh {@link Mac}
- * instance per the spec §6 thread-safety contract.</p>
+ * instance ({@link Mac} is not thread-safe).</p>
  *
  * @author The Latte Project
  */

@@ -20,6 +20,7 @@ import org.lattejava.jwt.BaseJWTTest;
 import org.lattejava.jwt.InvalidJWTSignatureException;
 import org.lattejava.jwt.Signer;
 import org.lattejava.jwt.Verifier;
+import org.lattejava.jwt.VerifierResolver;
 import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.JWT;
 import org.lattejava.jwt.JWTDecoder;
@@ -61,7 +62,7 @@ public class HMACVerifierTest extends BaseJWTTest {
     String encodedJWT = new JWTEncoder().encode(jwt, signer);
 
     expectException(InvalidJWTSignatureException.class, () ->
-        new JWTDecoder().decode(encodedJWT, HMACVerifier.newVerifier("wrong-secret-key-that-is-at-least-32-bytes-long!!")));
+        new JWTDecoder().decode(encodedJWT, VerifierResolver.of(HMACVerifier.newVerifier("wrong-secret-key-that-is-at-least-32-bytes-long!!"))));
   }
 
   @Test
@@ -76,6 +77,6 @@ public class HMACVerifierTest extends BaseJWTTest {
     String tampered = encodedJWT.substring(0, encodedJWT.length() - 1) + flipped;
 
     expectException(InvalidJWTSignatureException.class, () ->
-        new JWTDecoder().decode(tampered, HMACVerifier.newVerifier("super-secret-key-that-is-at-least-32-bytes-long!!")));
+        new JWTDecoder().decode(tampered, VerifierResolver.of(HMACVerifier.newVerifier("super-secret-key-that-is-at-least-32-bytes-long!!"))));
   }
 }

@@ -31,9 +31,9 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.fail;
 
 /**
- * Spec §5 "Base64URL Strictness": every segment must use only the URL-safe
- * alphabet {@code A-Z a-z 0-9 - _}; padding, whitespace, and non-URL-safe
- * characters ({@code +}, {@code /}, {@code =}) must be rejected with
+ * Base64URL strictness: every segment must use only the URL-safe alphabet
+ * {@code A-Z a-z 0-9 - _}; padding, whitespace, and non-URL-safe characters
+ * ({@code +}, {@code /}, {@code =}) must be rejected with
  * {@link InvalidJWTException} before any parsing.
  *
  * @author The Latte Project

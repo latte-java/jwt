@@ -34,14 +34,18 @@ import org.lattejava.jwt.algorithm.rsa.RSAPSSVerifier;
 import org.lattejava.jwt.algorithm.rsa.RSASigner;
 import org.lattejava.jwt.algorithm.rsa.RSAVerifier;
 import org.lattejava.jwt.pem.PEM;
+import org.testng.SkipException;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.security.KeyPairGenerator;
+import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.spec.ECGenParameterSpec;
 import java.util.function.Supplier;
 
 import static org.testng.Assert.assertEquals;
@@ -51,7 +55,7 @@ import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 /**
- * Coverage of the {@code Signers} factory contract from spec §6 / §14:
+ * Coverage of the {@code Signers} factory contract:
  * <ul>
  *   <li>{@code forHMAC} accepts only HS* algorithms; rejects asymmetric algorithms with
  *       {@link IllegalArgumentException} so a misplaced PEM cannot become an HMAC secret.</li>
@@ -63,7 +67,7 @@ import static org.testng.Assert.assertTrue;
  *
  * @author The Latte Project
  */
-public class SignersTest {
+public class SignersTest extends BaseTest {
   private static final String HMAC_SECRET_32 = "super-secret-key-that-is-at-least-32-bytes-long!!";
   private static final String HMAC_SECRET_64 =
       "super-secret-key-that-is-at-least-64-bytes-long-for-sha512-algorithm-compat-requirement!!";
@@ -306,6 +310,59 @@ public class SignersTest {
     byte[] sig = signer.sign(msg);
     PublicKey pub = PEM.decode(readFile("rsa_pss_public_key_2048.pem")).publicKey;
     RSAPSSVerifier.newVerifier(pub).verify(Algorithm.PS256, msg, sig);
+  }
+
+  @Test
+  public void forAsymmetric_privateKey_es256k() throws Exception {
+    // Use case: Signers.forAsymmetric(ES256K, secp256k1PrivateKey) must produce a signer
+    // whose algorithm() == ES256K and that round-trips with ECVerifier. Previously the
+    // dispatch routed ES256K to ECSigner.newSHA256Signer (which constructs with
+    // Algorithm.ES256) causing ECFamily.assertCurveMatchesAlgorithm to reject the
+    // secp256k1 curve against ES256 -- rendering the factory unusable for ES256K.
+    java.security.KeyPair kp;
+    try {
+      KeyPairGenerator g = KeyPairGenerator.getInstance("EC");
+      g.initialize(new ECGenParameterSpec("secp256k1"));
+      kp = g.generateKeyPair();
+    } catch (NoSuchAlgorithmException | java.security.InvalidAlgorithmParameterException e) {
+      throw new SkipException("secp256k1 KeyPairGenerator unavailable in this JCA profile");
+    }
+
+    Signer signer = Signers.forAsymmetric(Algorithm.ES256K, kp.getPrivate());
+    assertSame(signer.algorithm(), Algorithm.ES256K);
+
+    byte[] msg = "message".getBytes(StandardCharsets.UTF_8);
+    byte[] sig;
+    try {
+      sig = signer.sign(msg);
+    } catch (org.lattejava.jwt.JWTSigningException e) {
+      // Some JCA profiles can generate secp256k1 keys but lack a SHA256withECDSA
+      // provider that accepts them. This matches ES256KRuntimeBehaviorTest's documented
+      // fallback. The factory contract (algorithm() tag) is still verified above.
+      Throwable root = e.getCause();
+      if (root instanceof NoSuchAlgorithmException || root instanceof java.security.NoSuchProviderException) {
+        return;
+      }
+      throw e;
+    }
+
+    Verifier verifier = ECVerifier.newVerifier(kp.getPublic());
+    verifier.verify(Algorithm.ES256K, msg, sig);
+  }
+
+  @Test
+  public void forAsymmetric_privateKey_es256k_kidPropagated() throws Exception {
+    java.security.KeyPair kp;
+    try {
+      KeyPairGenerator g = KeyPairGenerator.getInstance("EC");
+      g.initialize(new ECGenParameterSpec("secp256k1"));
+      kp = g.generateKeyPair();
+    } catch (NoSuchAlgorithmException | java.security.InvalidAlgorithmParameterException e) {
+      throw new SkipException("secp256k1 KeyPairGenerator unavailable in this JCA profile");
+    }
+    Signer signer = Signers.forAsymmetric(Algorithm.ES256K, kp.getPrivate(), "btc-kid");
+    assertSame(signer.algorithm(), Algorithm.ES256K);
+    assertEquals(signer.kid(), "btc-kid");
   }
 
   @Test

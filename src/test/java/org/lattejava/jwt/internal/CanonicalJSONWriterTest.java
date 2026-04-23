@@ -35,7 +35,7 @@ import static org.testng.Assert.expectThrows;
 import static org.testng.Assert.assertFalse;
 
 /**
- * Tests for {@link CanonicalJSONWriter} per spec §10.
+ * Tests for {@link CanonicalJSONWriter}.
  *
  * @author The Latte Project
  */

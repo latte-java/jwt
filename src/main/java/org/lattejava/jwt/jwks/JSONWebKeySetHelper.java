@@ -40,7 +40,7 @@ import java.util.function.Consumer;
 /**
  * Fetches JSON Web Keys from a JWKS endpoint or via OpenID Connect discovery.
  *
- * <p>Response hardening (spec §8):</p>
+ * <p>Response hardening:</p>
  * <ul>
  *   <li>{@code maxResponseBytes} -- 1 MiB by default; per-hop body cap.</li>
  *   <li>{@code maxRedirects} -- 3 by default; manual hop counting via

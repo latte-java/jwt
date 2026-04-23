@@ -185,8 +185,7 @@ public final class Header {
   }
 
   /**
-   * Structural validation of the {@code crit} header parameter per spec §3
-   * "Critical Header Parameter — Structural validation". The
+   * Structural validation of the {@code crit} header parameter. The
    * understood-parameters check is performed by {@code JWTDecoder}, not here.
    */
   private static void validateCrit(Object value) {

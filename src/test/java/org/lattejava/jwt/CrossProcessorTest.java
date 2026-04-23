@@ -38,9 +38,9 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 /**
- * Spec §14 "Cross-processor compatibility" — encode with one JSONProcessor,
- * decode with another, in both directions. Custom claims with BigInteger and
- * BigDecimal must survive the round trip without numeric narrowing.
+ * Cross-processor compatibility: encode with one JSONProcessor, decode with
+ * another, in both directions. Custom claims with BigInteger and BigDecimal
+ * must survive the round trip without numeric narrowing.
  *
  * @author The Latte Project
  */

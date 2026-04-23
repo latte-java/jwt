@@ -40,15 +40,14 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 
 /**
- * Spec §14 "Wire-format Compatibility Tests" -- RFC 7515 Appendix A test
- * vectors verify correctly. Each vector is the canonical published example
- * from RFC 7515.
+ * Wire-format compatibility: RFC 7515 Appendix A test vectors verify
+ * correctly. Each vector is the canonical published example from RFC 7515.
  *
  * <p>For ES256 and ES512 only verification is exercised (per RFC 7515
  * Appendix A.3 / A.4 the signing operation is randomized, so the
  * library cannot reproduce the published signature byte-for-byte; but
  * verifying the published signature with the published key is the
- * spec-anchoring contract).</p>
+ * contract exercised here).</p>
  *
  * @author The Latte Project
  */
@@ -162,7 +161,7 @@ public class RFC7515VectorsTest extends BaseJWTTest {
   @Test
   public void rfc7515_appendixA3_es256_verifies() {
     // Use case: RFC 7515 Appendix A.3 -- ES256 published vector verifies.
-    // Signing is randomized so we only verify; this is the spec contract.
+    // Signing is randomized so we only verify; that is what RFC 7515 requires.
     Verifier v = ECVerifier.newVerifier(ecPublic("secp256r1", ES256_X, ES256_Y));
     JWT jwt = vectorClockDecoder().decode(ES256_JWS, VerifierResolver.of(v));
     assertNotNull(jwt);

@@ -24,11 +24,9 @@
 package org.lattejava.jwt.algorithm.rsa;
 
 import org.lattejava.jwt.Algorithm;
-import org.lattejava.jwt.InvalidKeyTypeException;
 import org.lattejava.jwt.JWTSigningException;
-import org.lattejava.jwt.MissingPrivateKeyException;
 import org.lattejava.jwt.Signer;
-import org.lattejava.jwt.pem.PEM;
+import org.lattejava.jwt.algorithm.KeyCoercion;
 
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
@@ -44,8 +42,9 @@ import java.util.Objects;
  * / {@code PS512} JWA algorithms (RFC 7518 §3.5).
  *
  * <p>Each call to {@link #sign(byte[])} obtains a fresh
- * {@link Signature} instance and configures it with the explicit
- * {@code PSSParameterSpec} mandated by spec §6.</p>
+ * {@link Signature} instance and configures it with an explicit
+ * {@code PSSParameterSpec} so the parameters are not inherited from the
+ * JCA provider's defaults.</p>
  *
  * @author The Latte Project
  */
@@ -59,28 +58,18 @@ public class RSAPSSSigner implements Signer {
   private RSAPSSSigner(Algorithm algorithm, PrivateKey privateKey, String kid) {
     Objects.requireNonNull(algorithm);
     Objects.requireNonNull(privateKey);
-    if (!(privateKey instanceof RSAPrivateKey rsa)) {
-      throw new InvalidKeyTypeException("Expecting a private key of type [RSAPrivateKey], but found [" + privateKey.getClass().getSimpleName() + "].");
-    }
     this.algorithm = algorithm;
     this.kid = kid;
-    this.privateKey = rsa;
+    this.privateKey = KeyCoercion.asPrivate(privateKey, RSAPrivateKey.class);
     RSAFamily.assertMinimumModulus(this.privateKey.getModulus().bitLength());
   }
 
   private RSAPSSSigner(Algorithm algorithm, String pemPrivateKey, String kid) {
     Objects.requireNonNull(algorithm);
     Objects.requireNonNull(pemPrivateKey);
-    PEM pem = PEM.decode(pemPrivateKey);
-    if (pem.privateKey == null) {
-      throw new MissingPrivateKeyException("The provided PEM encoded string did not contain a private key.");
-    }
-    if (!(pem.privateKey instanceof RSAPrivateKey rsa)) {
-      throw new InvalidKeyTypeException("Expecting a private key of type [RSAPrivateKey], but found [" + pem.privateKey.getClass().getSimpleName() + "].");
-    }
     this.algorithm = algorithm;
     this.kid = kid;
-    this.privateKey = rsa;
+    this.privateKey = KeyCoercion.privateFromPem(pemPrivateKey, RSAPrivateKey.class);
     RSAFamily.assertMinimumModulus(this.privateKey.getModulus().bitLength());
   }
 

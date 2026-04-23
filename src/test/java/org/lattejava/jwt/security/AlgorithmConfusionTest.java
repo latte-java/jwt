@@ -49,8 +49,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Spec §14 "Algorithm confusion and `none`" — security suite that
- * proves the decoder rejects every documented algorithm-confusion path.
+ * Algorithm confusion and {@code none}: security suite that proves the
+ * decoder rejects every documented algorithm-confusion path.
  *
  * @author The Latte Project
  */

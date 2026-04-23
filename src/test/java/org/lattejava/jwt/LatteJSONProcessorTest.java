@@ -42,7 +42,7 @@ import static org.testng.Assert.expectThrows;
 import static org.testng.Assert.fail;
 
 /**
- * Tests for {@link LatteJSONProcessor} per spec §4 and §14.
+ * Tests for {@link LatteJSONProcessor}.
  *
  * @author The Latte Project
  */
@@ -193,7 +193,7 @@ public class LatteJSONProcessorTest {
 
   @DataProvider(name = "topLevelNonObject")
   public Object[][] topLevelNonObject() {
-    // Use case: Top-level non-object input throws JSONProcessingException (per §4 javadoc)
+    // Use case: Top-level non-object input throws JSONProcessingException (per JSONProcessor javadoc)
     return new Object[][]{
         {"[1,2,3]"},
         {"\"hello\""},
@@ -273,7 +273,7 @@ public class LatteJSONProcessorTest {
 
   @Test
   public void defaultConstructorUsesSpecDefaults() {
-    // Use case: Default constructor uses spec defaults (16 / 1000 / false)
+    // Use case: Default constructor uses the documented defaults (16 / 1000 / false)
     JSONProcessor jp = new LatteJSONProcessor();
     // default rejects duplicates
     expectThrows(JSONProcessingException.class,

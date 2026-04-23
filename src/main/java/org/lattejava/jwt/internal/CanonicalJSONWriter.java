@@ -42,7 +42,8 @@ import java.util.Map;
  * (including nested {@link Map} or {@link java.util.List}) causes
  * {@link IllegalArgumentException}.
  *
- * <p>Package-private. Never exposed via public API; see spec §10.
+ * <p>Package-private. Never exposed via public API so thumbprint canonicalization
+ * cannot be influenced by a user-supplied {@link JSONProcessor}.
  *
  * @author The Latte Project
  */

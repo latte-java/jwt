@@ -25,11 +25,9 @@ package org.lattejava.jwt.algorithm.rsa;
 
 import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.InvalidJWTSignatureException;
-import org.lattejava.jwt.InvalidKeyTypeException;
 import org.lattejava.jwt.JWTVerifierException;
-import org.lattejava.jwt.MissingPublicKeyException;
 import org.lattejava.jwt.Verifier;
-import org.lattejava.jwt.pem.PEM;
+import org.lattejava.jwt.algorithm.KeyCoercion;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -48,8 +46,9 @@ import java.util.Objects;
  * / {@code PS512} JWA algorithms (RFC 7518 §3.5).
  *
  * <p>Each call to {@link #verify(Algorithm, byte[], byte[])} obtains a
- * fresh {@link Signature} instance and configures it with the explicit
- * {@code PSSParameterSpec} mandated by spec §6.</p>
+ * fresh {@link Signature} instance and configures it with an explicit
+ * {@code PSSParameterSpec} so the parameters are not inherited from the
+ * JCA provider's defaults.</p>
  *
  * @author The Latte Project
  */
@@ -58,23 +57,13 @@ public class RSAPSSVerifier implements Verifier {
 
   private RSAPSSVerifier(PublicKey publicKey) {
     Objects.requireNonNull(publicKey);
-    if (!(publicKey instanceof RSAPublicKey rsa)) {
-      throw new InvalidKeyTypeException("Expecting a public key of type [RSAPublicKey], but found [" + publicKey.getClass().getSimpleName() + "].");
-    }
-    this.publicKey = rsa;
+    this.publicKey = KeyCoercion.asPublic(publicKey, RSAPublicKey.class);
     RSAFamily.assertMinimumModulus(this.publicKey.getModulus().bitLength());
   }
 
   private RSAPSSVerifier(String pemPublicKey) {
     Objects.requireNonNull(pemPublicKey);
-    PEM pem = PEM.decode(pemPublicKey);
-    if (pem.publicKey == null) {
-      throw new MissingPublicKeyException("The provided PEM encoded string did not contain a public key.");
-    }
-    if (!(pem.publicKey instanceof RSAPublicKey rsa)) {
-      throw new InvalidKeyTypeException("Expecting a public key of type [RSAPublicKey], but found [" + pem.publicKey.getClass().getSimpleName() + "].");
-    }
-    this.publicKey = rsa;
+    this.publicKey = KeyCoercion.publicFromPem(pemPublicKey, RSAPublicKey.class);
     RSAFamily.assertMinimumModulus(this.publicKey.getModulus().bitLength());
   }
 

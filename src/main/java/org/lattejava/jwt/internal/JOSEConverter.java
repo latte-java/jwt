@@ -32,10 +32,9 @@ import org.lattejava.jwt.JWTSigningException;
  * integers) and ASN.1 DER {@code SEQUENCE { INTEGER r, INTEGER s }} as
  * produced and consumed by {@code java.security.Signature}.
  *
- * <p>See spec §6 "ECDSA Signature Format" -- this conversion is a known
- * CVE surface in JWT libraries (Auth0 Node 2015, historical nimbus). The
- * implementation here exists in one place so it can be audited against a
- * single contract and tested directly.</p>
+ * <p>This conversion is a known CVE surface in JWT libraries (Auth0 Node 2015,
+ * historical nimbus). The implementation here exists in one place so it can be
+ * audited against a single contract and tested directly.</p>
  *
  * @author The Latte Project
  */

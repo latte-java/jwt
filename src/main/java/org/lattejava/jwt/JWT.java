@@ -419,8 +419,7 @@ public final class JWT {
    * Returns true if the claim fields of this JWT equal the claim fields of the
    * other JWT. The {@link Header} is intentionally not consulted, and the
    * {@code audienceWireForm} (STRING vs ARRAY framing) is intentionally
-   * ignored - audience is compared by list contents. See spec §16 settled
-   * question "claimsEquals wire-form sensitive? No".
+   * ignored - audience is compared by list contents.
    */
   public boolean claimsEquals(JWT other) {
     if (this == other) return true;
@@ -598,9 +597,9 @@ public final class JWT {
     /**
      * Add a claim. If the name matches a registered claim (iss, sub, aud, exp,
      * nbf, iat, jti), the value is routed to the corresponding typed setter
-     * with type coercion (see spec §2 "Builder.claim() Coercion Rules"). A
-     * value that cannot be coerced throws {@link IllegalArgumentException}.
-     * Unrecognized names are stored in {@code customClaims}.
+     * with type coercion. A value that cannot be coerced throws
+     * {@link IllegalArgumentException}. Unrecognized names are stored in
+     * {@code customClaims}.
      */
     public Builder claim(String name, Object value) {
       Objects.requireNonNull(name, "name");

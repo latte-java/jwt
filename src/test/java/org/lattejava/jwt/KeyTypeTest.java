@@ -34,7 +34,7 @@ import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
 /**
- * Tests for the KeyType interface and StandardKeyType implementation per spec §7.
+ * Tests for the KeyType interface and StandardKeyType implementation.
  *
  * @author The Latte Project
  */

@@ -35,9 +35,8 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.fail;
 
 /**
- * Spec §14 "Segment count" matrix: confirms how the decoder treats every
- * structural segment-count permutation. Built from the table in
- * specs/7.0-architecture.md §5 step 3.
+ * Segment-count matrix: confirms how the decoder treats every structural
+ * segment-count permutation.
  *
  * @author The Latte Project
  */
@@ -88,7 +87,7 @@ public class SegmentCountTest {
 
   @Test(dataProvider = "segmentCases")
   public void segmentCounts(String input, Class<? extends Exception> expected, String description) {
-    // Use case: spec §14 segment-count matrix -- authenticated decode path.
+    // Use case: segment-count matrix -- authenticated decode path.
     JWTDecoder decoder = new JWTDecoder();
     Verifier verifier = HMACVerifier.newVerifier(SECRET);
     try {

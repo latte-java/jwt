@@ -41,14 +41,14 @@ import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 /**
- * Coverage of {@code Verifiers.anyOf} from spec §6 / §14:
+ * Coverage of {@code Verifiers.anyOf}:
  * <ul>
  *   <li>{@code canVerify} returns true if ANY delegate's {@code canVerify} is true.</li>
  *   <li>{@code verify} invokes the FIRST matching delegate; the exception from that
  *       delegate propagates (no fall-through to subsequent verifiers).</li>
  *   <li>{@code MissingVerifierException} is thrown if no delegate matches.</li>
  *   <li>Empty list at construction time is rejected with
- *       {@link IllegalArgumentException} (defaulted from spec).</li>
+ *       {@link IllegalArgumentException} so misuse surfaces immediately.</li>
  *   <li>Custom {@code Algorithm} implementations with broken {@code equals} still
  *       work because the dispatch is keyed on {@code Algorithm.name()}.</li>
  * </ul>
@@ -139,9 +139,8 @@ public class VerifiersAnyOfTest {
 
   @Test
   public void anyOf_emptyVarargsThrowsAtConstruction() {
-    // Use case: Empty list -- spec doesn't say; defaulted to throw IllegalArgumentException
-    // at construction so the caller sees the misuse immediately rather than later
-    // discovering that every verify() call throws MissingVerifierException.
+    // Use case: Empty list rejected at construction so the caller sees the misuse immediately
+    // rather than later discovering that every verify() call throws MissingVerifierException.
     assertThrows(IllegalArgumentException.class, () -> Verifiers.anyOf());
   }
 
@@ -165,7 +164,7 @@ public class VerifiersAnyOfTest {
   @Test
   public void anyOf_customAlgorithmWithBrokenEqualsRoutedByName() {
     // Use case: Custom Algorithm impl with broken equals still works because the dispatch
-    // is keyed on Algorithm.name() (per spec §6).
+    // is keyed on Algorithm.name().
     // Custom algorithm whose name is "HS256" but whose equals() always returns false.
     Algorithm broken = new Algorithm() {
       @Override public String name() { return "HS256"; }

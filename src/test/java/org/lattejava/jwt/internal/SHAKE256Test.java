@@ -40,7 +40,7 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 /**
- * Tests for {@link SHAKE256} per spec §10.
+ * Tests for {@link SHAKE256}.
  *
  * <p>NIST CAVP SHAKE256 KAT vectors plus cross-validation against
  * BouncyCastle's {@code SHAKEDigest(256)} (test-scope only) and

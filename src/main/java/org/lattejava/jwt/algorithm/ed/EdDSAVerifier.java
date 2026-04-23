@@ -25,11 +25,9 @@ package org.lattejava.jwt.algorithm.ed;
 
 import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.InvalidJWTSignatureException;
-import org.lattejava.jwt.InvalidKeyTypeException;
 import org.lattejava.jwt.JWTVerifierException;
-import org.lattejava.jwt.MissingPublicKeyException;
 import org.lattejava.jwt.Verifier;
-import org.lattejava.jwt.pem.PEM;
+import org.lattejava.jwt.algorithm.KeyCoercion;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -52,7 +50,7 @@ import java.util.Objects;
  * be cross-used (Ed25519 key handed an Ed448-tagged signature).</p>
  *
  * <p>Each call to {@link #verify(Algorithm, byte[], byte[])} obtains a
- * fresh {@link Signature} instance per the spec §6 thread-safety contract.</p>
+ * fresh {@link Signature} instance ({@link Signature} is not thread-safe).</p>
  *
  * @author The Latte Project
  */
@@ -63,23 +61,13 @@ public class EdDSAVerifier implements Verifier {
 
   private EdDSAVerifier(PublicKey publicKey) {
     Objects.requireNonNull(publicKey);
-    if (!(publicKey instanceof EdECPublicKey ed)) {
-      throw new InvalidKeyTypeException("Expecting a public key of type [EdECPublicKey], but found [" + publicKey.getClass().getSimpleName() + "].");
-    }
-    this.publicKey = ed;
+    this.publicKey = KeyCoercion.asPublic(publicKey, EdECPublicKey.class);
     this.algorithm = EdDSAFamily.algorithmForCurveName(this.publicKey.getParams().getName());
   }
 
   private EdDSAVerifier(String pemPublicKey) {
     Objects.requireNonNull(pemPublicKey);
-    PEM pem = PEM.decode(pemPublicKey);
-    if (pem.publicKey == null) {
-      throw new MissingPublicKeyException("The provided PEM encoded string did not contain a public key.");
-    }
-    if (!(pem.publicKey instanceof EdECPublicKey ed)) {
-      throw new InvalidKeyTypeException("Expecting a public key of type [EdECPublicKey], but found [" + pem.publicKey.getClass().getSimpleName() + "].");
-    }
-    this.publicKey = ed;
+    this.publicKey = KeyCoercion.publicFromPem(pemPublicKey, EdECPublicKey.class);
     this.algorithm = EdDSAFamily.algorithmForCurveName(this.publicKey.getParams().getName());
   }
 

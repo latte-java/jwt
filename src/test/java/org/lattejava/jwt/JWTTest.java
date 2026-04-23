@@ -48,7 +48,7 @@ import static org.testng.Assert.expectThrows;
 import static org.testng.Assert.fail;
 
 /**
- * Tests for {@link JWT} per spec §2 and §14.
+ * Tests for {@link JWT}.
  *
  * @author The Latte Project
  */
@@ -466,8 +466,8 @@ public class JWTTest {
 
   @Test
   public void claimsEquals_ignores_audience_wire_form() {
-    // Use case: claimsEquals with aud=["foo"] STRING vs aud=["foo"] ARRAY -> true
-    // (per spec §16 settled row "claimsEquals wire-form sensitive? No")
+    // Use case: claimsEquals with aud=["foo"] STRING vs aud=["foo"] ARRAY -> true.
+    // Audience wire form is intentionally ignored by claimsEquals.
     JWT stringForm = JWT.builder().audience("foo").build();
     JWT arrayForm = JWT.builder().audience(Collections.singletonList("foo")).build();
     assertTrue(stringForm.claimsEquals(arrayForm));

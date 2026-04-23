@@ -24,12 +24,10 @@
 package org.lattejava.jwt.algorithm.ec;
 
 import org.lattejava.jwt.Algorithm;
-import org.lattejava.jwt.InvalidKeyTypeException;
 import org.lattejava.jwt.JWTSigningException;
-import org.lattejava.jwt.MissingPrivateKeyException;
 import org.lattejava.jwt.Signer;
+import org.lattejava.jwt.algorithm.KeyCoercion;
 import org.lattejava.jwt.internal.JOSEConverter;
-import org.lattejava.jwt.pem.PEM;
 
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
@@ -44,8 +42,8 @@ import java.util.Objects;
  * / {@code ES256K} JWA algorithms (RFC 7518 §3.4 and RFC 8812 §3.2).
  *
  * <p>Each call to {@link #sign(byte[])} obtains a fresh {@link Signature}
- * instance (spec §6 thread-safety contract), produces a DER-encoded ECDSA
- * signature, then converts it to JOSE {@code R || S} fixed-length form
+ * instance ({@link Signature} is not thread-safe), produces a DER-encoded
+ * ECDSA signature, then converts it to JOSE {@code R || S} fixed-length form
  * via {@link JOSEConverter#derToJose(byte[], int)}.</p>
  *
  * @author The Latte Project
@@ -60,28 +58,18 @@ public class ECSigner implements Signer {
   private ECSigner(Algorithm algorithm, PrivateKey privateKey, String kid) {
     Objects.requireNonNull(algorithm);
     Objects.requireNonNull(privateKey);
-    if (!(privateKey instanceof ECPrivateKey ec)) {
-      throw new InvalidKeyTypeException("Expecting a private key of type [ECPrivateKey], but found [" + privateKey.getClass().getSimpleName() + "].");
-    }
     this.algorithm = algorithm;
     this.kid = kid;
-    this.privateKey = ec;
+    this.privateKey = KeyCoercion.asPrivate(privateKey, ECPrivateKey.class);
     ECFamily.assertCurveMatchesAlgorithm(this.privateKey.getParams(), algorithm);
   }
 
   private ECSigner(Algorithm algorithm, String pemPrivateKey, String kid) {
     Objects.requireNonNull(algorithm);
     Objects.requireNonNull(pemPrivateKey);
-    PEM pem = PEM.decode(pemPrivateKey);
-    if (pem.privateKey == null) {
-      throw new MissingPrivateKeyException("The provided PEM encoded string did not contain a private key.");
-    }
-    if (!(pem.privateKey instanceof ECPrivateKey ec)) {
-      throw new InvalidKeyTypeException("Expecting a private key of type [ECPrivateKey], but found [" + pem.privateKey.getClass().getSimpleName() + "].");
-    }
     this.algorithm = algorithm;
     this.kid = kid;
-    this.privateKey = ec;
+    this.privateKey = KeyCoercion.privateFromPem(pemPrivateKey, ECPrivateKey.class);
     ECFamily.assertCurveMatchesAlgorithm(this.privateKey.getParams(), algorithm);
   }
 

@@ -36,7 +36,7 @@ import java.util.function.Function;
 /**
  * Shared HTTP helper for JWKS / discovery / metadata fetches.
  *
- * <h3>Response hardening (spec §8)</h3>
+ * <h3>Response hardening</h3>
  * <ul>
  *   <li>Per-hop body cap via {@link LimitedInputStream} -- response read
  *       aborts mid-stream once {@code maxResponseBytes} is exceeded.</li>
@@ -121,7 +121,7 @@ public abstract class AbstractHttpHelper {
           if (errorBody != null) {
             errorBody.close();
           }
-        } catch (Exception ignored) {
+        } catch (IOException ignored) {
           // best-effort
         }
         current = buildURLConnection(nextURL.toString());

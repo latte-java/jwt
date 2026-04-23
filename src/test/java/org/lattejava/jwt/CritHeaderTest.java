@@ -35,10 +35,9 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.fail;
 
 /**
- * Spec §3 + §5 "crit" understood-parameters check. Structural shape
- * validation of the {@code crit} array itself is covered in
- * {@link HeaderTest}; this class tests the decoder's runtime understanding
- * set.
+ * {@code crit} understood-parameters check. Structural shape validation
+ * of the {@code crit} array itself is covered in {@link HeaderTest}; this
+ * class tests the decoder's runtime understanding set.
  *
  * @author The Latte Project
  */

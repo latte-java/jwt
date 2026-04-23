@@ -25,10 +25,10 @@ package org.lattejava.jwt;
 
 /**
  * Subset of {@link Header.Builder} exposed to {@link JWTEncoder#encode}
- * callers. Per spec §5, this interface intentionally omits {@code alg()} --
- * the algorithm is always determined by the {@link Signer} and cannot be
- * overridden by the caller. The type system enforces that the header
- * {@code alg} matches the actual signing algorithm.
+ * callers. This interface intentionally omits {@code alg()} -- the algorithm
+ * is always determined by the {@link Signer} and cannot be overridden by the
+ * caller. The type system enforces that the header {@code alg} matches the
+ * actual signing algorithm.
  *
  * <p>{@link #kid(String)} can be called to override or clear (pass
  * {@code null}) the {@code kid} inherited from the signer. Other parameters
@@ -62,9 +62,9 @@ public interface HeaderCustomizer {
    * Set an arbitrary header parameter. Passing a {@code null} value clears
    * the parameter. The parameter name must NOT be {@code "alg"}; attempting
    * to set {@code "alg"} via this method throws
-   * {@link IllegalArgumentException} so that the spec invariant
-   * "header.alg() == signer.algorithm()" is preserved at runtime in case a
-   * caller routes the literal string {@code "alg"} through here.
+   * {@link IllegalArgumentException} so the invariant
+   * {@code header.alg() == signer.algorithm()} is preserved at runtime even
+   * when a caller routes the literal string {@code "alg"} through here.
    *
    * @param name  the parameter name
    * @param value the parameter value, or null to clear

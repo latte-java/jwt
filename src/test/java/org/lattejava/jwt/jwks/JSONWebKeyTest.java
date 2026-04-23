@@ -43,7 +43,7 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 /**
- * Direct contract tests for {@link JSONWebKey} per spec §14:
+ * Direct contract tests for {@link JSONWebKey}:
  *
  * <ul>
  *   <li>{@link JSONWebKey#toString()} <em>always</em> redacts d/dp/dq/p/q/qi.</li>

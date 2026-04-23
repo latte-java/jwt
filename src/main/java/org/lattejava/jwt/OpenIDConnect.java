@@ -84,7 +84,7 @@ public class OpenIDConnect {
       case "Ed448":
         // Ed448 uses a 114-byte SHAKE256 hash; recommended at_hash/c_hash length is half of that = 57 bytes.
         // See https://bitbucket.org/openid/connect/issues/1125. SHAKE256 is implemented internally
-        // (FIPS 202) with optional JCE-provider preference for FIPS deployments. See spec §10.
+        // (FIPS 202) with optional JCE-provider preference for FIPS deployments.
         leftMostBytes = SHAKE256.digest(input, 57);
         break;
       default:

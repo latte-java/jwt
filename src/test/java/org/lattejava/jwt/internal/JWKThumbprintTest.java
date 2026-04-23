@@ -33,7 +33,7 @@ import static org.testng.Assert.assertNotEquals;
 
 /**
  * Tests for {@code JWTUtils.generateJWS_kid*} thumbprints computed via
- * {@link CanonicalJSONWriter} per spec §10.
+ * {@link CanonicalJSONWriter}.
  *
  * <p>Vectors:
  * <ul>

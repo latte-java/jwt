@@ -38,10 +38,10 @@ import static org.testng.Assert.assertNull;
 import static org.testng.Assert.fail;
 
 /**
- * Validates each row of the spec §5 "Defenses that still run" matrix for
- * {@link JWTDecoder#decodeUnsecured(String)}. For every defense we assert
- * either that it fires (when applicable to unsecured) or that it does NOT
- * fire (when explicitly skipped per the matrix).
+ * Validates which defenses still run on {@link JWTDecoder#decodeUnsecured(String)}.
+ * For every defense we assert either that it fires (when applicable to unsecured)
+ * or that it does NOT fire (when explicitly skipped because the token is not
+ * authenticated).
  *
  * @author The Latte Project
  */

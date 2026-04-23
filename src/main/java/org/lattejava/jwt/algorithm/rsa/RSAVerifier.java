@@ -25,11 +25,9 @@ package org.lattejava.jwt.algorithm.rsa;
 
 import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.InvalidJWTSignatureException;
-import org.lattejava.jwt.InvalidKeyTypeException;
 import org.lattejava.jwt.JWTVerifierException;
-import org.lattejava.jwt.MissingPublicKeyException;
 import org.lattejava.jwt.Verifier;
-import org.lattejava.jwt.pem.PEM;
+import org.lattejava.jwt.algorithm.KeyCoercion;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -47,7 +45,7 @@ import java.util.Objects;
  * / {@code RS512} JWA algorithms (RFC 7518 §3.3).
  *
  * <p>Each call to {@link #verify(Algorithm, byte[], byte[])} obtains a
- * fresh {@link Signature} instance per the spec §6 thread-safety contract.</p>
+ * fresh {@link Signature} instance ({@link Signature} is not thread-safe).</p>
  *
  * @author The Latte Project
  */
@@ -56,23 +54,13 @@ public class RSAVerifier implements Verifier {
 
   private RSAVerifier(PublicKey publicKey) {
     Objects.requireNonNull(publicKey);
-    if (!(publicKey instanceof RSAPublicKey rsa)) {
-      throw new InvalidKeyTypeException("Expecting a public key of type [RSAPublicKey], but found [" + publicKey.getClass().getSimpleName() + "].");
-    }
-    this.publicKey = rsa;
+    this.publicKey = KeyCoercion.asPublic(publicKey, RSAPublicKey.class);
     RSAFamily.assertMinimumModulus(this.publicKey.getModulus().bitLength());
   }
 
   private RSAVerifier(String pemPublicKey) {
     Objects.requireNonNull(pemPublicKey);
-    PEM pem = PEM.decode(pemPublicKey);
-    if (pem.publicKey == null) {
-      throw new MissingPublicKeyException("The provided PEM encoded string did not contain a public key.");
-    }
-    if (!(pem.publicKey instanceof RSAPublicKey rsa)) {
-      throw new InvalidKeyTypeException("Expecting a public key of type [RSAPublicKey], but found [" + pem.publicKey.getClass().getSimpleName() + "].");
-    }
-    this.publicKey = rsa;
+    this.publicKey = KeyCoercion.publicFromPem(pemPublicKey, RSAPublicKey.class);
     RSAFamily.assertMinimumModulus(this.publicKey.getModulus().bitLength());
   }
 

@@ -41,7 +41,7 @@ public class OpenIdConnectTest extends BaseTest {
     assertEquals(at_hash("dNZX1hEZ9wBCzNL40Upu646bdzQA", Algorithm.RS512), "8xltSlOGYrWy8W9yNvRlEth1i_bXW-JROWPLvCv5zog");
 
     assertEquals(at_hash("dNZX1hEZ9wBCzNL40Upu646bdzQA", Algorithm.Ed25519), "8xltSlOGYrWy8W9yNvRlEth1i_bXW-JROWPLvCv5zog");
-    // Spec §10: SHAKE256 is bundled, so Ed448 at_hash works on stock JDK without BC registered.
+    // SHAKE256 is bundled, so Ed448 at_hash works on stock JDK without BC registered.
     assertEquals(at_hash("dNZX1hEZ9wBCzNL40Upu646bdzQA", Algorithm.Ed448), "ACuRpk9jl5IEa3yqpBCNNOCpBEI7qjud6mc80cs6vWX2fcqpsk8RozYBKTUuSS6SqJhw302xFZeM");
 
     // Controls
@@ -67,7 +67,7 @@ public class OpenIdConnectTest extends BaseTest {
 
     assertEquals(c_hash("dNZX1hEZ9wBCzNL40Upu646bdzQA", Algorithm.Ed25519), "8xltSlOGYrWy8W9yNvRlEth1i_bXW-JROWPLvCv5zog");
 
-    // Spec §10: SHAKE256 is bundled, so Ed448 c_hash works on stock JDK without BC registered.
+    // SHAKE256 is bundled, so Ed448 c_hash works on stock JDK without BC registered.
     assertEquals(c_hash("dNZX1hEZ9wBCzNL40Upu646bdzQA", Algorithm.Ed448), "ACuRpk9jl5IEa3yqpBCNNOCpBEI7qjud6mc80cs6vWX2fcqpsk8RozYBKTUuSS6SqJhw302xFZeM");
 
     // Controls

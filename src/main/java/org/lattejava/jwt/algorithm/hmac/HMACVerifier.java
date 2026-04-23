@@ -45,11 +45,11 @@ import java.util.Objects;
  *
  * <p>Signature comparison uses
  * {@link MessageDigest#isEqual(byte[], byte[])} -- documented as
- * constant-time since JDK 7u40 (JDK-8006276) -- per the spec §6
- * HMAC constant-time contract.</p>
+ * constant-time since JDK 7u40 (JDK-8006276) -- to avoid leaking the
+ * valid MAC via comparison-timing side channels.</p>
  *
  * <p>Each call to {@link #verify(Algorithm, byte[], byte[])} obtains a
- * fresh {@link Mac} instance per the spec §6 thread-safety contract.</p>
+ * fresh {@link Mac} instance ({@link Mac} is not thread-safe).</p>
  *
  * @author The Latte Project
  */

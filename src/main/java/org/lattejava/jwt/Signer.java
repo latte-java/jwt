@@ -25,7 +25,7 @@ package org.lattejava.jwt;
 
 /**
  * A {@code Signer} produces a signature for the JWT signing-input bytes
- * (header.payload encoded as UTF-8). See spec §6 for the full contract.
+ * (header.payload encoded as UTF-8).
  *
  * <p>Implementations MUST be safe to share across threads. Each call to
  * {@link #sign(byte[])} MUST obtain a fresh JCA primitive

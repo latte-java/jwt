@@ -34,10 +34,10 @@ import java.io.IOException;
 import java.util.Map;
 
 /**
- * Test-scope reference {@link JSONProcessor} backed by Jackson, per spec §4
- * "User-provided Example (Jackson)". Used by the cross-processor compatibility
- * tests to prove that a JWT encoded with one processor decodes correctly with
- * another, including BigInteger/BigDecimal numeric round-trips.
+ * Test-scope reference {@link JSONProcessor} backed by Jackson. Used by the
+ * cross-processor compatibility tests to prove that a JWT encoded with one
+ * processor decodes correctly with another, including BigInteger/BigDecimal
+ * numeric round-trips.
  *
  * <p>This class lives under {@code src/test/java} on purpose -- the production
  * library is zero-dependency. After CP11 the Jackson dependency moves to

@@ -38,7 +38,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 /**
- * Decodes a compact JWS into a {@link JWT} per spec §5 "Decode Flow".
+ * Decodes a compact JWS into a {@link JWT}.
  *
  * <p>Defaults: {@code clockSkew=Duration.ZERO},
  * {@code maxInputBytes=262144}, {@code maxNestingDepth=16},
@@ -52,13 +52,13 @@ import java.util.function.Consumer;
  * @author The Latte Project
  */
 public class JWTDecoder {
-  /** Spec §5 default: 256 KiB. */
+  /** Default: 256 KiB. */
   static final int DEFAULT_MAX_INPUT_BYTES = 262_144;
 
-  /** Spec §5 default: 16. */
+  /** Default: 16. */
   static final int DEFAULT_MAX_NESTING_DEPTH = 16;
 
-  /** Spec §5 default: 1000. */
+  /** Default: 1000. */
   static final int DEFAULT_MAX_NUMBER_LENGTH = 1000;
 
   private final JSONProcessor jsonProcessor;
@@ -66,18 +66,19 @@ public class JWTDecoder {
   private final Duration clockSkew;
   private final Set<String> criticalHeaders;
   private final String expectedType;
-  /** Internally keyed by Algorithm.name() per spec §5 footnote. */
+  /** Internally keyed by {@code Algorithm.name()} so hostile {@code equals}
+   * implementations on custom {@link Algorithm}s cannot subvert the whitelist. */
   private final Set<String> expectedAlgorithmNames;
   private final int maxInputBytes;
 
-  /** Constructs a decoder with all spec §5 defaults. */
+  /** Constructs a decoder with all defaults. */
   public JWTDecoder() {
     this(builderDefaults().materialize());
   }
 
   /**
-   * Constructs a decoder using the supplied {@link JSONProcessor} (spec §5
-   * defaults for everything else).
+   * Constructs a decoder using the supplied {@link JSONProcessor} (defaults
+   * for everything else).
    *
    * @param jsonProcessor the JSON processor; must be non-null
    */
@@ -86,8 +87,8 @@ public class JWTDecoder {
   }
 
   /**
-   * Constructs a decoder with the supplied symmetric clock skew (spec §5
-   * defaults for everything else).
+   * Constructs a decoder with the supplied symmetric clock skew (defaults
+   * for everything else).
    *
    * @param clockSkew clock skew applied symmetrically to {@code exp}/{@code nbf};
    *                  must be non-null and non-negative
@@ -98,7 +99,7 @@ public class JWTDecoder {
 
   /**
    * Constructs a decoder with the supplied {@link JSONProcessor} and
-   * symmetric clock skew (spec §5 defaults for everything else).
+   * symmetric clock skew (defaults for everything else).
    *
    * @param jsonProcessor the JSON processor; must be non-null
    * @param clockSkew     clock skew applied symmetrically to {@code exp}/{@code nbf};
@@ -131,14 +132,14 @@ public class JWTDecoder {
   }
 
   // -------------------------------------------------------------------
-  // Public decode API (spec §5)
+  // Public decode API
   // -------------------------------------------------------------------
 
   /**
    * Decode a JWT, resolving the {@link Verifier} via the supplied
-   * {@link VerifierResolver}. See spec §5 for the full decode flow and the
-   * spec §5 ordering guarantee that signature verification runs BEFORE
-   * payload deserialization.
+   * {@link VerifierResolver}. Signature verification runs BEFORE payload
+   * deserialization so a malformed payload cannot be observed until the
+   * signature has been validated.
    *
    * @param encodedJWT the compact JWS string; must be non-null
    * @param resolver   the verifier resolver; must be non-null
@@ -209,9 +210,9 @@ public class JWTDecoder {
 
   /**
    * <strong>WARNING: This method does NOT verify the JWT signature.</strong>
-   * See spec §5 for the security caveats and the "Defenses that still run"
-   * matrix. The returned {@link JWT} has its header and claims populated
-   * but the token's authenticity has not been validated.
+   * The returned {@link JWT} has its header and claims populated but the
+   * token's authenticity has not been validated. Size and structural defenses
+   * still run (input size cap, segment count, base64url strictness, typ check).
    *
    * @param encodedJWT the compact JWS string; must be non-null
    * @return a {@link JWT} populated from the unverified token
@@ -221,7 +222,7 @@ public class JWTDecoder {
 
     Segments segments = parseSegments(encodedJWT, /* requireSignature */ false);
     Header header = parseHeader(segments.headerB64);
-    enforceExpectedType(header);   // typ check still runs (spec §5 matrix)
+    enforceExpectedType(header);   // typ check still runs on unsecured decode
     return parsePayload(segments.payloadB64, header);
   }
 
@@ -273,10 +274,10 @@ public class JWTDecoder {
       enforceStrictBase64Url(signatureB64, "signature");
     } else if (requireSignature) {
       // For authenticated decode we still pass empty bytes through to the
-      // verifier (per spec §5 step 3); built-in verifiers reject. We do not
-      // raise MissingSignatureException here -- the spec says "a.b." is
-      // structurally valid; the rejection is handled by the verifier path.
-      // Resolver may still return null first -> MissingVerifierException.
+      // verifier; built-in verifiers reject. We do not raise
+      // MissingSignatureException here -- "a.b." is structurally valid, so
+      // the rejection is handled by the verifier path. Resolver may still
+      // return null first -> MissingVerifierException.
     }
 
     return new Segments(headerB64, payloadB64, signatureB64);
@@ -448,7 +449,7 @@ public class JWTDecoder {
      * Override the {@link Clock} used for time validation.
      *
      * <p><strong>Tests and time travelers only.</strong> Production code must
-     * leave this at {@link Clock#systemUTC()}. See spec §5.</p>
+     * leave this at {@link Clock#systemUTC()}.</p>
      */
     public Builder clock(Clock clock) {
       this.clock = Objects.requireNonNull(clock, "clock");
@@ -533,7 +534,7 @@ public class JWTDecoder {
       if (!jsonProcessorExplicit) {
         // Default LatteJSONProcessor honors the parse-DoS limits configured
         // on this builder. Caller-supplied processors are expected to enforce
-        // their own limits per spec §5.
+        // their own limits.
         this.jsonProcessor = new LatteJSONProcessor(
             maxNestingDepth, maxNumberLength, allowDuplicateJSONKeys);
       }

@@ -29,8 +29,7 @@ import java.util.Objects;
 import java.util.function.Consumer;
 
 /**
- * Encodes a {@link JWT} into a compact JWS string per spec §5
- * "Encode Flow":
+ * Encodes a {@link JWT} into a compact JWS string:
  *
  * <ol>
  *   <li>Build {@link Header} -- pre-populated with {@code alg} from

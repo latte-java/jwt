@@ -36,9 +36,10 @@ import java.util.Map;
  * RFC 7638 / RFC 8037 JWK Thumbprint computation routed through the internal
  * {@link CanonicalJSONWriter} (NOT the user-pluggable {@code JSONProcessor}).
  *
- * <p>Spec §10. This class is the internal entry point used by
+ * <p>This class is the internal entry point used by
  * {@code JWTUtils.generateJWS_kid*}; {@link CanonicalJSONWriter} itself
- * remains package-private per the spec's design.
+ * remains package-private so no user-pluggable JSON serializer can
+ * influence thumbprint bytes.
  *
  * @author The Latte Project
  */
@@ -101,7 +102,6 @@ public final class JWKThumbprint {
         m.put("y", key.y());
         return m;
       case "RSA":
-      case "RSASSA_PSS":
         m.put("e", key.e());
         m.put("kty", ktyName);
         m.put("n", key.n());

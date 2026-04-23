@@ -18,6 +18,7 @@ package org.lattejava.jwt.algorithm;
 
 import org.lattejava.jwt.Signer;
 import org.lattejava.jwt.Verifier;
+import org.lattejava.jwt.VerifierResolver;
 import org.lattejava.jwt.JWT;
 import org.lattejava.jwt.JWTDecoder;
 import org.lattejava.jwt.JWTEncoder;
@@ -90,7 +91,7 @@ public class VerifierTest {
 
       // Implicit call to verifier.verify and get a JWT back
       try {
-        JWT jwt = new JWTDecoder().decode(algorithm.second(), algorithm.first().second());
+        JWT jwt = new JWTDecoder().decode(algorithm.second(), VerifierResolver.of(algorithm.first().second()));
         assertNotNull(jwt);
         assertEquals(jwt.subject(), "123456789");
       } catch (Exception e) {

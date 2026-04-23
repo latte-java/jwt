@@ -41,7 +41,7 @@ import static org.testng.Assert.assertTrue;
  * @author Daniel DeGroff
  */
 public class JWTUtilsTest extends BaseTest {
-  // Spec §10: decodeHeader/decodePayload moved to JWTDecoder.decodeUnsecured().
+  // decodeHeader/decodePayload moved to JWTDecoder.decodeUnsecured().
   @Test
   public void decodePayload() {
     JWT jwt = JWT.builder().subject("123456789").build();
@@ -374,25 +374,6 @@ public class JWTUtilsTest extends BaseTest {
     // SHA-256
     assertEquals(JWTUtils.generateJWS_kid_S256(rsaKey), "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs");
     assertEquals(JWTUtils.generateJWS_kid("SHA-256", rsaKey), "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs");
-  }
-
-  @Test
-  public void jws_kid_pssControl() {
-    // Same elements as rsa control, but we have a different key type,
-    // so we'll get different sha values.
-    JSONWebKey pssKey = JSONWebKey.builder()
-        .kty(KeyType.RSASSA_PSS)
-        .n("0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw")
-        .e("AQAB")
-        .build();
-
-    // SHA-1
-    assertEquals(JWTUtils.generateJWS_kid(pssKey), "cQP8OQaKDsN3IcB7kS48XMywclQ");
-    assertEquals(JWTUtils.generateJWS_kid("SHA-1", pssKey), "cQP8OQaKDsN3IcB7kS48XMywclQ");
-
-    // SHA-256
-    assertEquals(JWTUtils.generateJWS_kid_S256(pssKey), "BAQAQh9ReyFN-FTuSC_vWqCvGb7Bdn3apRpnnT-BtRw");
-    assertEquals(JWTUtils.generateJWS_kid("SHA-256", pssKey), "BAQAQh9ReyFN-FTuSC_vWqCvGb7Bdn3apRpnnT-BtRw");
   }
 
   @Test

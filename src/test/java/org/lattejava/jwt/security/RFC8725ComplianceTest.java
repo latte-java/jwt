@@ -59,8 +59,7 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 /**
- * RFC 8725 (BCP 225) compliance suite. Each test method maps directly to one
- * row of the spec §15 compliance matrix and documents the BCP item it
+ * RFC 8725 (BCP 225) compliance suite. Each test documents the BCP item it
  * validates with a {@code // RFC 8725 §X.Y - <item>} comment.
  *
  * @author The Latte Project

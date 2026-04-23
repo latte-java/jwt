@@ -16,8 +16,6 @@
 
 package org.lattejava.jwt.pem;
 
-import org.lattejava.jwt.Buildable;
-
 import java.nio.file.Path;
 import java.security.Key;
 import java.security.PrivateKey;
@@ -28,7 +26,7 @@ import java.util.Objects;
 /**
  * @author Daniel DeGroff
  */
-public class PEM implements Buildable<PEM> {
+public class PEM {
   // PEM Encoded EC Private key End Tag
   public static final String EC_PRIVATE_KEY_PREFIX = "-----BEGIN EC PRIVATE KEY-----";
 

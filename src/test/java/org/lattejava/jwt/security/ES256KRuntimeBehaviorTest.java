@@ -44,10 +44,10 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.fail;
 
 /**
- * Spec §14 "ES256K runtime behavior" — verifies the ES256K algorithm
- * constant exists and that signing under the FIPS / no-BC profile fails as
- * documented (NoSuchAlgorithmException wrapped as JWTSigningException), while
- * signing succeeds when BouncyCastle is registered.
+ * ES256K runtime behavior: verifies the ES256K algorithm constant exists
+ * and that signing under the FIPS / no-BC profile fails as documented
+ * (NoSuchAlgorithmException wrapped as JWTSigningException), while signing
+ * succeeds when BouncyCastle is registered.
  *
  * <p>This test gates on whether a {@code secp256k1} KeyPairGenerator is
  * available in the active JCA configuration. JDK 16+ removed

@@ -6,7 +6,7 @@ jacksonVersion = "2.21.2"
 slf4jVersion = "2.0.17"
 testngVersion = "7.11.0"
 
-project(group: "org.lattejava", name: "latte-jwt", version: "1.0.0", licenses: ["MIT"]) {
+project(group: "org.lattejava", name: "jwt", version: "1.0.0", licenses: ["MIT"]) {
   workflow {
     standard()
   }
@@ -18,12 +18,11 @@ project(group: "org.lattejava", name: "latte-jwt", version: "1.0.0", licenses: [
 
   dependencies {
     group(name: "compile") {
-
+      // Ha! Just kidding. This is pure Java - no dependencies.
     }
     group(name: "test-compile", export: false) {
       dependency(id: "com.fasterxml.jackson.core:jackson-core:${jacksonVersion}")
       dependency(id: "com.fasterxml.jackson.core:jackson-databind:${jacksonVersion}")
-      //dependency(id: "com.fasterxml.jackson.core:jackson-annotations:2.21.0")
       dependency(id: "org.bouncycastle:bc-fips:2.1.2")
       dependency(id: "org.testng:testng:${testngVersion}")
       // Gets rid of SLF warnings on test run
@@ -40,12 +39,11 @@ project(group: "org.lattejava", name: "latte-jwt", version: "1.0.0", licenses: [
 }
 
 // Plugins
-dependency = loadPlugin(id: "org.lattejava.plugin:dependency:0.1.3")
-java = loadPlugin(id: "org.lattejava.plugin:java:0.1.3")
-javaTestNG = loadPlugin(id: "org.lattejava.plugin:java-testng:0.1.3")
-idea = loadPlugin(id: "org.lattejava.plugin:idea:0.1.3")
-release = loadPlugin(id: "org.lattejava.plugin:release-git:0.1.3")
-pom = loadPlugin(id: "org.lattejava.plugin:pom:0.1.3")
+dependency = loadPlugin(id: "org.lattejava.plugin:dependency:0.1.5")
+java = loadPlugin(id: "org.lattejava.plugin:java:0.1.6")
+javaTestNG = loadPlugin(id: "org.lattejava.plugin:java-testng:0.1.6")
+idea = loadPlugin(id: "org.lattejava.plugin:idea:0.1.5")
+release = loadPlugin(id: "org.lattejava.plugin:release-git:0.1.5")
 
 java.settings.javaVersion = "21"
 javaTestNG.settings.javaVersion = "21"
@@ -97,8 +95,6 @@ target(name: "print-dependency-tree", description: "Prints the dependency tree")
   dependency.printFull()
 }
 
-target(name: "publish", description: "Publish to MVN repo", dependsOn: ["clean", "build"]) {
-  if (new ProcessBuilder('mvn', 'clean', 'deploy', '-Prelease').inheritIO().start().waitFor() != 0) {
-    fail("deploy failed")
-  }
+target(name: "print-dependency-tree", description: "Prints the dependency tree") {
+  dependency.printFull()
 }

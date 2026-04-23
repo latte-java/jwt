@@ -286,7 +286,7 @@ public class PEMDecoder {
     }
 
     ObjectIdentifier algorithmOID = new DerInputStream(sequence[1].toByteArray()).getOID();
-    KeyType type = KeyType.getKeyTypeFromOid(algorithmOID.decode());
+    KeyType type = KeyType.forOid(algorithmOID.decode());
     if (type == null) {
       throw new InvalidKeyException("Could not decode the private key. Expected an EC, ED or RSA key type but found OID [" + algorithmOID.decode() + "] and was unable to match that to a supported algorithm.");
     }
@@ -365,7 +365,7 @@ public class PEMDecoder {
     DerInputStream der = new DerInputStream(sequence[0].toByteArray());
     ObjectIdentifier algorithmOID = der.getOID();
 
-    KeyType type = KeyType.getKeyTypeFromOid(algorithmOID.decode());
+    KeyType type = KeyType.forOid(algorithmOID.decode());
     if (type == null) {
       throw new InvalidKeyException("Could not decode the X.509 public key. Expected at 2 values in the DER encoded sequence but found [" + sequence.length + "]");
     }

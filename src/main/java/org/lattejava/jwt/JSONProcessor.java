@@ -32,8 +32,6 @@ import java.util.Map;
  * may invoke {@link #serialize(Map)} / {@link #deserialize(byte[])}
  * concurrently on a single {@code JSONProcessor} instance.
  *
- * <p>See spec §4 for the full contract.
- *
  * @author The Latte Project
  */
 public interface JSONProcessor {

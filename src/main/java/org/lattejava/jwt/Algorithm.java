@@ -38,8 +38,6 @@ import java.util.Objects;
  * {@code Algorithm.of("RS256") == Algorithm.RS256}. For custom algorithms,
  * use {@link #of(String)} or implement this interface directly.</p>
  *
- * <p>See spec §1 in {@code specs/7.0-architecture.md} for the full design.</p>
- *
  * @author The Latte Project
  */
 public interface Algorithm {

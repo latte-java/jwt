@@ -157,7 +157,7 @@ public class JWTEncoderTest {
     Header h = decoded.header();
     assertEquals(h.typ(), "at+jwt");
     assertEquals(h.get("cty"), "application/json");
-    // Spec invariant: header.alg().name() == signer.algorithm().name()
+    // Invariant: header.alg().name() == signer.algorithm().name()
     assertEquals(h.alg().name(), signer.algorithm().name());
   }
 

@@ -39,8 +39,6 @@ import java.util.Objects;
  * {@code forAsymmetric}) is rejected with {@link IllegalArgumentException} so a
  * misplaced key cannot be silently coerced into the wrong algorithm family.
  *
- * <p>See spec §6 ("Signers / Verifiers Factories") for the full contract.</p>
- *
  * @author The Latte Project
  */
 public final class Signers {
@@ -150,9 +148,10 @@ public final class Signers {
       case "PS256" -> RSAPSSSigner.newSHA256Signer(pemPrivateKey, kid);
       case "PS384" -> RSAPSSSigner.newSHA384Signer(pemPrivateKey, kid);
       case "PS512" -> RSAPSSSigner.newSHA512Signer(pemPrivateKey, kid);
-      case "ES256", "ES256K" -> ECSigner.newSHA256Signer(pemPrivateKey, kid);
+      case "ES256" -> ECSigner.newSHA256Signer(pemPrivateKey, kid);
       case "ES384" -> ECSigner.newSHA384Signer(pemPrivateKey, kid);
       case "ES512" -> ECSigner.newSHA512Signer(pemPrivateKey, kid);
+      case "ES256K" -> ECSigner.newSecp256k1Signer(pemPrivateKey, kid);
       case "Ed25519", "Ed448" -> EdDSASigner.newSigner(pemPrivateKey, kid);
       default -> throw new IllegalArgumentException(
           "forAsymmetric requires an asymmetric algorithm (RS*/PS*/ES*/Ed*); got " + algorithm.name());
@@ -189,9 +188,10 @@ public final class Signers {
       case "PS256" -> RSAPSSSigner.newSHA256Signer(privateKey, kid);
       case "PS384" -> RSAPSSSigner.newSHA384Signer(privateKey, kid);
       case "PS512" -> RSAPSSSigner.newSHA512Signer(privateKey, kid);
-      case "ES256", "ES256K" -> ECSigner.newSHA256Signer(privateKey, kid);
+      case "ES256" -> ECSigner.newSHA256Signer(privateKey, kid);
       case "ES384" -> ECSigner.newSHA384Signer(privateKey, kid);
       case "ES512" -> ECSigner.newSHA512Signer(privateKey, kid);
+      case "ES256K" -> ECSigner.newSecp256k1Signer(privateKey, kid);
       case "Ed25519", "Ed448" -> EdDSASigner.newSigner(privateKey, kid);
       default -> throw new IllegalArgumentException(
           "forAsymmetric requires an asymmetric algorithm (RS*/PS*/ES*/Ed*); got " + algorithm.name());

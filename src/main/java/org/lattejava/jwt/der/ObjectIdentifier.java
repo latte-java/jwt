@@ -16,8 +16,6 @@
 
 package org.lattejava.jwt.der;
 
-import org.lattejava.jwt.Buildable;
-
 import java.io.ByteArrayOutputStream;
 import java.util.Arrays;
 import java.util.Objects;
@@ -26,7 +24,7 @@ import java.util.Objects;
  * @author Daniel DeGroff
  */
 @SuppressWarnings("unused")
-public class ObjectIdentifier implements Buildable<ObjectIdentifier> {
+public class ObjectIdentifier {
   /** X.520 country (C) — DN attribute type. */
   public static final String X_520_DN_COUNTRY = "2.5.4.6";
 

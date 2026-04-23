@@ -24,11 +24,9 @@
 package org.lattejava.jwt.algorithm.ed;
 
 import org.lattejava.jwt.Algorithm;
-import org.lattejava.jwt.InvalidKeyTypeException;
 import org.lattejava.jwt.JWTSigningException;
-import org.lattejava.jwt.MissingPrivateKeyException;
 import org.lattejava.jwt.Signer;
-import org.lattejava.jwt.pem.PEM;
+import org.lattejava.jwt.algorithm.KeyCoercion;
 
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
@@ -44,7 +42,7 @@ import java.util.Objects;
  *
  * <p>The JWA algorithm is derived from the key's curve at construction.
  * Each call to {@link #sign(byte[])} obtains a fresh {@link Signature}
- * instance per the spec §6 thread-safety contract.</p>
+ * instance ({@link Signature} is not thread-safe).</p>
  *
  * @author The Latte Project
  */
@@ -57,24 +55,14 @@ public class EdDSASigner implements Signer {
 
   private EdDSASigner(PrivateKey privateKey, String kid) {
     Objects.requireNonNull(privateKey);
-    if (!(privateKey instanceof EdECPrivateKey ed)) {
-      throw new InvalidKeyTypeException("Expecting a private key of type [EdECPrivateKey], but found [" + privateKey.getClass().getSimpleName() + "].");
-    }
-    this.privateKey = ed;
+    this.privateKey = KeyCoercion.asPrivate(privateKey, EdECPrivateKey.class);
     this.kid = kid;
     this.algorithm = EdDSAFamily.algorithmForCurveName(this.privateKey.getParams().getName());
   }
 
   private EdDSASigner(String pemPrivateKey, String kid) {
     Objects.requireNonNull(pemPrivateKey);
-    PEM pem = PEM.decode(pemPrivateKey);
-    if (pem.privateKey == null) {
-      throw new MissingPrivateKeyException("The provided PEM encoded string did not contain a private key.");
-    }
-    if (!(pem.privateKey instanceof EdECPrivateKey ed)) {
-      throw new InvalidKeyTypeException("Expecting a private key of type [EdECPrivateKey], but found [" + pem.privateKey.getClass().getSimpleName() + "].");
-    }
-    this.privateKey = ed;
+    this.privateKey = KeyCoercion.privateFromPem(pemPrivateKey, EdECPrivateKey.class);
     this.kid = kid;
     this.algorithm = EdDSAFamily.algorithmForCurveName(this.privateKey.getParams().getName());
   }

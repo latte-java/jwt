@@ -39,7 +39,7 @@ import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
 /**
- * Tests for {@link Header} per spec §3.
+ * Tests for {@link Header}.
  *
  * @author The Latte Project
  */
@@ -216,7 +216,7 @@ public class HeaderTest {
 
   @Test
   public void fromMap_crit_empty_array_accepted() {
-    // Spec §3 / §16: empty crit accepted.
+    // Empty crit accepted.
     Map<String, Object> map = new LinkedHashMap<>();
     map.put("alg", "HS256");
     map.put("crit", Collections.emptyList());

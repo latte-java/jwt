@@ -52,8 +52,6 @@ import static org.testng.Assert.assertTrue;
  * across threads produces corrupted state and/or intermittent
  * {@code SignatureException}s.
  *
- * <p>Spec §6 thread-safety contract.</p>
- *
  * @author The Latte Project
  */
 public class SignerVerifierThreadSafetyTest extends BaseJWTTest {

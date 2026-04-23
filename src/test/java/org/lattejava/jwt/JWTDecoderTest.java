@@ -43,9 +43,9 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.fail;
 
 /**
- * Comprehensive {@link JWTDecoder} coverage per spec §5 + §14: time
- * validation, expectedType, expectedAlgorithms (incl. broken-equals
- * Algorithm), maxInputBytes/maxNestingDepth/maxNumberLength boundaries,
+ * Comprehensive {@link JWTDecoder} coverage: time validation, expectedType,
+ * expectedAlgorithms (incl. broken-equals Algorithm),
+ * maxInputBytes/maxNestingDepth/maxNumberLength boundaries,
  * allowDuplicateJSONKeys, tampered payload, custom validator, signature-
  * before-parse ordering, and crit understood-parameters check.
  *
@@ -195,7 +195,7 @@ public class JWTDecoderTest {
   @Test
   public void expectedAlgorithms_brokenEquals_matchesByName() {
     // Use case: expectedAlgorithms with a custom Algorithm whose equals is Object-identity
-    // still matches by name() per spec §5 footnote.
+    // still matches by name().
     JWT jwt = JWT.builder().subject("abc").build();
     String encoded = new JWTEncoder().encode(jwt, signer());
 
@@ -362,18 +362,18 @@ public class JWTDecoderTest {
   }
 
   // ---------------------------------------------------------------------
-  // Signature-before-parse ordering (spec §5 step 9 < step 10)
+  // Signature-before-parse ordering
   // ---------------------------------------------------------------------
 
   @Test
   public void signatureBeforeParseOrdering() {
     // Use case: a token with valid header, BAD signature, and a payload that would
     // throw on parse (e.g. malformed JSON) must surface the signature failure FIRST,
-    // not the JSON parse failure -- this is the spec §5 ordering guarantee that
-    // unauthenticated payloads are never parsed into JWT objects.
+    // not the JSON parse failure -- unauthenticated payloads must never be parsed
+    // into JWT objects.
     String header = b64("{\"alg\":\"HS256\"}");
     // Payload that is NOT valid JSON -- if parsing ran first, this would throw
-    // JSONProcessingException; the spec requires that the signature failure surface first.
+    // JSONProcessingException; the signature failure must surface first.
     String poisonPayload = b64("{not-valid-json");
     String unsignedPrefix = header + "." + poisonPayload;
     // Use a wrong signature: random bytes signed by a different key.
@@ -388,7 +388,7 @@ public class JWTDecoderTest {
       // good -- signature verification fired before payload parse
     } catch (JSONProcessingException jpe) {
       throw new AssertionError(
-          "Spec §5 ordering violation: payload parsed BEFORE signature was verified", jpe);
+          "Ordering violation: payload parsed BEFORE signature was verified", jpe);
     }
   }
 

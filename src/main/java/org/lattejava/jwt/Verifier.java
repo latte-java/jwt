@@ -25,7 +25,7 @@ package org.lattejava.jwt;
 
 /**
  * A {@code Verifier} validates a signature against the JWT signing-input
- * bytes. See spec §6 for the full contract.
+ * bytes.
  *
  * <p>Implementations MUST be safe to share across threads. Each call to
  * {@link #verify(Algorithm, byte[], byte[])} MUST obtain a fresh JCA

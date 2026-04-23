@@ -27,10 +27,9 @@ import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.InvalidJWTSignatureException;
 import org.lattejava.jwt.InvalidKeyTypeException;
 import org.lattejava.jwt.JWTVerifierException;
-import org.lattejava.jwt.MissingPublicKeyException;
 import org.lattejava.jwt.Verifier;
+import org.lattejava.jwt.algorithm.KeyCoercion;
 import org.lattejava.jwt.internal.JOSEConverter;
-import org.lattejava.jwt.pem.PEM;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -58,7 +57,7 @@ import java.util.Objects;
  * so they are accepted as-is.</p>
  *
  * <p>Each call to {@link #verify(Algorithm, byte[], byte[])} obtains a
- * fresh {@link Signature} instance (spec §6 thread-safety contract),
+ * fresh {@link Signature} instance ({@link Signature} is not thread-safe),
  * validates that the JOSE signature length matches the curve, converts
  * JOSE {@code R || S} to DER via {@link JOSEConverter#joseToDer(byte[], int)},
  * and verifies.</p>
@@ -72,23 +71,13 @@ public class ECVerifier implements Verifier {
 
   private ECVerifier(PublicKey publicKey) {
     Objects.requireNonNull(publicKey);
-    if (!(publicKey instanceof ECPublicKey ec)) {
-      throw new InvalidKeyTypeException("Expecting a public key of type [ECPublicKey], but found [" + publicKey.getClass().getSimpleName() + "].");
-    }
-    this.publicKey = revalidate(ec);
+    this.publicKey = revalidate(KeyCoercion.asPublic(publicKey, ECPublicKey.class));
     this.algorithm = ECFamily.algorithmForCurve(this.publicKey.getParams());
   }
 
   private ECVerifier(String pemPublicKey) {
     Objects.requireNonNull(pemPublicKey);
-    PEM pem = PEM.decode(pemPublicKey);
-    if (pem.publicKey == null) {
-      throw new MissingPublicKeyException("The provided PEM encoded string did not contain a public key.");
-    }
-    if (!(pem.publicKey instanceof ECPublicKey ec)) {
-      throw new InvalidKeyTypeException("Expecting a public key of type [ECPublicKey], but found [" + pem.publicKey.getClass().getSimpleName() + "].");
-    }
-    this.publicKey = ec;
+    this.publicKey = KeyCoercion.publicFromPem(pemPublicKey, ECPublicKey.class);
     this.algorithm = ECFamily.algorithmForCurve(this.publicKey.getParams());
   }
 

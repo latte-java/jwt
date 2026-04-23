@@ -207,7 +207,7 @@ public class JSONWebKeyFromTest extends BaseJWTTest {
             b.parameter("jwk", jwkAsMap);
         });
 
-        // Spec §10: JWTUtils.decodeHeader removed; use JWTDecoder.decodeUnsecured.
+        // JWTUtils.decodeHeader removed; use JWTDecoder.decodeUnsecured.
         Header header = new org.lattejava.jwt.JWTDecoder().decodeUnsecured(encodedJWT).header();
         assertEquals(header.get("cty"), "application/json");
         assertEquals(((Map<?, ?>) header.get("jwk")).get("e"), jwk.e());

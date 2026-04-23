@@ -34,7 +34,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Built-in zero-dependency {@link JSONProcessor} implementation per spec §4.
+ * Built-in zero-dependency {@link JSONProcessor} implementation.
  *
  * <p>Defaults: {@code maxNestingDepth=16}, {@code maxNumberLength=1000},
  * {@code allowDuplicateJSONKeys=false}.
@@ -49,7 +49,7 @@ public class LatteJSONProcessor implements JSONProcessor {
   private final boolean allowDuplicateJSONKeys;
 
   /**
-   * Constructs a {@code LatteJSONProcessor} with spec defaults
+   * Constructs a {@code LatteJSONProcessor} with defaults
    * (maxNestingDepth=16, maxNumberLength=1000, allowDuplicateJSONKeys=false).
    */
   public LatteJSONProcessor() {

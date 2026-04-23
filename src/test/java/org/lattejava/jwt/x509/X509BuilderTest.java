@@ -196,7 +196,7 @@ public class X509BuilderTest extends BaseJWTTest {
 
   // ---- Helpers ----
 
-  static KeyPair generateKeyPair(Algorithm algorithm) throws Exception {
+  public static KeyPair generateKeyPair(Algorithm algorithm) throws Exception {
     String name = algorithm.name();
     if (name.startsWith("RS")) {
       KeyPairGenerator g = KeyPairGenerator.getInstance("RSA");

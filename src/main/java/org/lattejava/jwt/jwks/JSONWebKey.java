@@ -51,8 +51,6 @@ import java.util.Set;
  * material fields (d, dp, dq, p, q, qi) to {@code "***"}. Use
  * {@link #toJSON()} for the full content.</p>
  *
- * <p>See spec §8 for the design.</p>
- *
  * @author The Latte Project
  */
 public final class JSONWebKey {
