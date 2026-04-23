@@ -80,7 +80,7 @@ public class JSONWebKeyParser {
             parameters.init(new ECGenParameterSpec("secp521r1"));
             break;
           default:
-            throw new UnsupportedOperationException("Unsupported EC algorithm. Support algorithms include P-256, P-384 and P-521.");
+            throw new UnsupportedOperationException("Unsupported EC curve [" + key.crv() + "], expected [P-256], [P-384], or [P-521]");
         }
 
         ECParameterSpec ecParameterSpec = parameters.getParameterSpec(ECParameterSpec.class);
@@ -97,7 +97,7 @@ public class JSONWebKeyParser {
         return publicKey;
       } else if (key.kty() == KeyType.OKP) {
         if (!"Ed25519".equals(key.crv()) && !"Ed448".equals(key.crv())) {
-          throw new UnsupportedOperationException("Only a Ed25519 or Ed448 OKP JSON Web key may be parsed.");
+          throw new UnsupportedOperationException("Unsupported OKP curve [" + key.crv() + "], expected [Ed25519] or [Ed448]");
         }
 
         byte[] bytes = Base64.getUrlDecoder().decode(key.x());
@@ -114,10 +114,10 @@ public class JSONWebKeyParser {
     } catch (JSONWebKeyParserException e) {
       throw e;
     } catch (Exception e) {
-      throw new JSONWebKeyParserException("Failed to parse the provided JSON Web Key", e);
+      throw new JSONWebKeyParserException("Failed to parse JWK", e);
     }
 
-    throw new UnsupportedOperationException("Only RSA, EC or OKP JSON Web Keys may be parsed.");
+    throw new UnsupportedOperationException("Unsupported JWK [kty] [" + key.kty() + "], expected [RSA], [EC], or [OKP]");
   }
 
   /**
@@ -160,7 +160,7 @@ public class JSONWebKeyParser {
       }
     }
 
-    throw new UnsupportedOperationException("Only RSA, EC or OKP JSON Web Keys may be parsed.");
+    throw new UnsupportedOperationException("Unsupported JWK [kty] [" + key.kty() + "], expected [RSA], [EC], or [OKP]");
   }
 
   private void verifyX5cEC(JSONWebKey key, BigInteger expectedXCoordinate, BigInteger expectedYCoordinate) {
@@ -170,18 +170,18 @@ public class JSONWebKeyParser {
     String pem = new PEMEncoder().parseEncodedCertificate(encodedCertificate);
     PublicKey actual = PEM.decode(pem).publicKey;
     if (!(actual instanceof ECPublicKey ecPublicKey)) {
-      throw new JSONWebKeyParserException("The public key found in the [x5c] property does not match the expected key type specified by the [kty] property.");
+      throw new JSONWebKeyParserException("Public key in [x5c] does not match the key type declared in [kty]");
     }
 
     ECPoint point = ecPublicKey.getW();
 
     if (!point.getAffineX().equals(expectedXCoordinate)) {
-      throw new JSONWebKeyParserException("Expected an x coordinate value of [" + expectedXCoordinate + "] but found [" + point.getAffineX() + "].  The certificate found in [x5c] does not match the [x] coordinate property.");
+      throw new JSONWebKeyParserException("Certificate in [x5c] does not match the [x] coordinate: expected [" + expectedXCoordinate + "] but found [" + point.getAffineX() + "]");
     }
 
     //noinspection SuspiciousNameCombination
     if (!point.getAffineY().equals(expectedYCoordinate)) {
-      throw new JSONWebKeyParserException("Expected a y coordinate value of [" + expectedYCoordinate + "] but found [" + point.getAffineY() + "].  The certificate found in [x5c] does not match the [y] coordinate property.");
+      throw new JSONWebKeyParserException("Certificate in [x5c] does not match the [y] coordinate: expected [" + expectedYCoordinate + "] but found [" + point.getAffineY() + "]");
     }
   }
 
@@ -206,15 +206,15 @@ public class JSONWebKeyParser {
     PublicKey actual = PEM.decode(pem).publicKey;
 
     if (!(actual instanceof RSAPublicKey rsaPublicKey)) {
-      throw new JSONWebKeyParserException("The public key found in the [x5c] property does not match the expected key type specified by the [kty] property.");
+      throw new JSONWebKeyParserException("Public key in [x5c] does not match the key type declared in [kty]");
     }
 
     if (!rsaPublicKey.getModulus().equals(expectedModulus)) {
-      throw new JSONWebKeyParserException("Expected a modulus value of [" + expectedModulus + "] but found [" + rsaPublicKey.getModulus() + "].  The certificate found in [x5c] does not match the [n] property.");
+      throw new JSONWebKeyParserException("Certificate in [x5c] does not match [n]: expected [" + expectedModulus + "] but found [" + rsaPublicKey.getModulus() + "]");
     }
 
     if (!rsaPublicKey.getPublicExponent().equals(expectedPublicExponent)) {
-      throw new JSONWebKeyParserException("Expected a public exponent value of [" + expectedPublicExponent + "] but found [" + rsaPublicKey.getPublicExponent() + "].  The certificate found in [x5c] does not match the [e] property.");
+      throw new JSONWebKeyParserException("Certificate in [x5c] does not match [e]: expected [" + expectedPublicExponent + "] but found [" + rsaPublicKey.getPublicExponent() + "]");
     }
   }
 }

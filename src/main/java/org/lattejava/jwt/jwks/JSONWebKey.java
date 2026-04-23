@@ -311,12 +311,12 @@ public final class JSONWebKey {
         case "use":  b.use = value.toString(); break;
         case "key_ops":
           if (!(value instanceof List)) {
-            throw new IllegalArgumentException("JWK parameter [key_ops] must be an array of strings");
+            throw new IllegalArgumentException("JWK [key_ops] must be an array of strings");
           }
           List<String> ops = new java.util.ArrayList<>();
           for (Object element : (List<Object>) value) {
             if (!(element instanceof String)) {
-              throw new IllegalArgumentException("JWK parameter [key_ops] must be an array of strings");
+              throw new IllegalArgumentException("JWK [key_ops] must be an array of strings");
             }
             ops.add((String) element);
           }
@@ -335,12 +335,12 @@ public final class JSONWebKey {
         case "y":    b.y = value.toString(); break;
         case "x5c":
           if (!(value instanceof List)) {
-            throw new IllegalArgumentException("JWK parameter [x5c] must be an array of strings");
+            throw new IllegalArgumentException("JWK [x5c] must be an array of strings");
           }
           List<String> chain = new java.util.ArrayList<>();
           for (Object element : (List<Object>) value) {
             if (!(element instanceof String)) {
-              throw new IllegalArgumentException("JWK parameter [x5c] must be an array of strings");
+              throw new IllegalArgumentException("JWK [x5c] must be an array of strings");
             }
             chain.add((String) element);
           }
@@ -531,7 +531,7 @@ public final class JSONWebKey {
     public Builder parameter(String name, Object value) {
       Objects.requireNonNull(name, "name");
       if (REGISTERED_PARAMETER_NAMES.contains(name)) {
-        throw new JSONWebKeyException("Cannot add a registered JWK parameter [" + name + "]; set it via the typed builder method.");
+        throw new JSONWebKeyException("JWK [" + name + "] is a registered parameter; set it via the typed builder method");
       }
       other.put(name, value);
       return this;

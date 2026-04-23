@@ -103,7 +103,7 @@ public class JSONWebKeySetHelper extends AbstractHttpHelper {
           Object jwksURI = response.get("jwks_uri");
           if (!(jwksURI instanceof String) || ((String) jwksURI).isEmpty()) {
             String endpoint = httpURLConnection.getURL().toString();
-            throw new JSONWebKeySetException("The well-known endpoint [" + endpoint + "] has not defined a JSON Web Key Set endpoint. Missing the [jwks_uri] property.");
+            throw new JSONWebKeySetException("Well-known endpoint [" + endpoint + "] response is missing the [jwks_uri] property");
           }
           return retrieveKeysFromJWKS((String) jwksURI);
         },
@@ -163,13 +163,13 @@ public class JSONWebKeySetHelper extends AbstractHttpHelper {
           Object keys = response.get("keys");
           if (!(keys instanceof List)) {
             String endpoint = httpURLConnection.getURL().toString();
-            throw new JSONWebKeySetException("The JWKS endpoint [" + endpoint + "] returned a response without a [keys] array.");
+            throw new JSONWebKeySetException("JWKS endpoint [" + endpoint + "] response is missing the [keys] array");
           }
           List<JSONWebKey> result = new ArrayList<>();
           for (Object element : (List<Object>) keys) {
             if (!(element instanceof Map)) {
               String endpoint = httpURLConnection.getURL().toString();
-              throw new JSONWebKeySetException("The JWKS endpoint [" + endpoint + "] returned a response with a non-object element in [keys].");
+              throw new JSONWebKeySetException("JWKS endpoint [" + endpoint + "] response contains a non-object element in [keys]");
             }
             result.add(JSONWebKey.fromMap((Map<String, Object>) element));
           }
@@ -194,7 +194,7 @@ public class JSONWebKeySetHelper extends AbstractHttpHelper {
       }
       return processor.deserialize(out.toByteArray());
     } catch (JSONProcessingException e) {
-      throw new JSONWebKeySetException("Failed to parse JSON response.", e);
+      throw new JSONWebKeySetException("Failed to parse JSON response", e);
     } catch (java.io.IOException e) {
       throw new JSONWebKeySetException("Failed to read JWKS response", e);
     }

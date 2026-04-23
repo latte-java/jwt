@@ -76,7 +76,7 @@ class JSONWebKeyConverter {
       return build(pem.publicKey);
     }
 
-    throw new JSONWebKeyException("The provided PEM did not contain a public or private key.");
+    throw new JSONWebKeyException("PEM did not contain a public or private key");
   }
 
   /**
@@ -134,7 +134,7 @@ class JSONWebKeyConverter {
         byte[] publicKeyBytes = KeyUtils.deriveEdDSAPublicKeyFromPrivate(privateKeyBytes, crv);
         b.x(Base64.getUrlEncoder().withoutPadding().encodeToString(publicKeyBytes));
       } catch (Exception e) {
-        throw new JSONWebKeyException("Unable to build the public key for the EdDSA private key using curve [" + crv + "]", e);
+        throw new JSONWebKeyException("Failed to derive EdDSA public key for curve [" + crv + "]", e);
       }
     }
 
@@ -145,7 +145,7 @@ class JSONWebKeyConverter {
     try {
       return KeyUtils.getCurveName(key);
     } catch (Exception e) {
-      throw new JSONWebKeyException("Unable to read the Object Identifier of the public key.", e);
+      throw new JSONWebKeyException("Failed to read OID from the public key", e);
     }
   }
 
@@ -189,7 +189,7 @@ class JSONWebKeyConverter {
         var sequence = new DerInputStream(publicKey.getEncoded()).getSequence();
         publicKeyBytes = sequence[1].toByteArray();
       } catch (DerDecodingException e) {
-        throw new JSONWebKeyException("Unable to read the public key from the DER encoded key.", e);
+        throw new JSONWebKeyException("Failed to read public key from DER encoding", e);
       }
 
       b.x(base64EncodeUint(new BigInteger(publicKeyBytes), keyLength));
@@ -229,7 +229,7 @@ class JSONWebKeyConverter {
           .x5tS256(JWTUtils.generateJWS_x5t("SHA-256", encodedCertificate))
           .build();
     } catch (CertificateEncodingException e) {
-      throw new JSONWebKeyException("Failed to decode X.509 certificate.", e);
+      throw new JSONWebKeyException("Failed to encode X.509 certificate", e);
     }
   }
 
@@ -259,7 +259,7 @@ class JSONWebKeyConverter {
           default -> null;
         };
       } catch (IOException e) {
-        throw new JSONWebKeyException("Failed to decode X.509 certificate signature algorithm parameters to determine the key type.", e);
+        throw new JSONWebKeyException("Failed to decode X.509 signature algorithm parameters", e);
       }
     }
 
