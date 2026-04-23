@@ -500,6 +500,8 @@ public final class JSONWebKey {
     private String x5u;
     private String y;
 
+    private Builder() {}
+
     public Builder alg(Algorithm v)          { this.alg = v; return this; }
     public Builder crv(String v)             { this.crv = v; return this; }
     public Builder kid(String v)             { this.kid = v; return this; }

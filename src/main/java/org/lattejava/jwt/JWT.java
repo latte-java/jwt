@@ -524,6 +524,8 @@ public final class JWT {
 
     private Header header;
 
+    private Builder() {}
+
     public Builder issuer(String issuer) {
       this.issuer = issuer;
       return this;

@@ -101,7 +101,7 @@ public class JWTDecoderTest {
 
     String encoded = new JWTEncoder().encode(jwt, signer());
 
-    JWTDecoder decoder = new JWTDecoder.Builder()
+    JWTDecoder decoder = JWTDecoder.builder()
         .clock(Clock.fixed(fakeNow, ZoneOffset.UTC))
         .clockSkew(Duration.ofSeconds(skewSec))
         .build();
@@ -145,7 +145,7 @@ public class JWTDecoderTest {
         ? new JWTEncoder().encode(jwt, signer(), b -> b.typ(null))
         : new JWTEncoder().encode(jwt, signer(), b -> b.typ(headerTyp));
 
-    JWTDecoder decoder = new JWTDecoder.Builder().expectedType(expected).build();
+    JWTDecoder decoder = JWTDecoder.builder().expectedType(expected).build();
     try {
       decoder.decode(encoded, VerifierResolver.of(verifier()));
       if (shouldThrow) {
@@ -168,7 +168,7 @@ public class JWTDecoderTest {
     JWT jwt = JWT.builder().subject("abc").build();
     String encoded = new JWTEncoder().encode(jwt, signer());
 
-    JWTDecoder decoder = new JWTDecoder.Builder()
+    JWTDecoder decoder = JWTDecoder.builder()
         .expectedAlgorithms(new HashSet<>(Collections.singletonList(Algorithm.HS256)))
         .build();
     JWT decoded = decoder.decode(encoded, VerifierResolver.of(verifier()));
@@ -181,7 +181,7 @@ public class JWTDecoderTest {
     JWT jwt = JWT.builder().subject("abc").build();
     String encoded = new JWTEncoder().encode(jwt, signer());
 
-    JWTDecoder decoder = new JWTDecoder.Builder()
+    JWTDecoder decoder = JWTDecoder.builder()
         .expectedAlgorithms(new HashSet<>(Collections.singletonList(Algorithm.RS256)))
         .build();
     try {
@@ -201,7 +201,7 @@ public class JWTDecoderTest {
 
     Set<Algorithm> set = new HashSet<>();
     set.add(new BrokenEqualsAlgorithm("HS256"));
-    JWTDecoder decoder = new JWTDecoder.Builder().expectedAlgorithms(set).build();
+    JWTDecoder decoder = JWTDecoder.builder().expectedAlgorithms(set).build();
     JWT decoded = decoder.decode(encoded, VerifierResolver.of(verifier()));
     assertNotNull(decoded);
   }
@@ -217,11 +217,11 @@ public class JWTDecoderTest {
     String encoded = new JWTEncoder().encode(jwt, signer());
     int len = encoded.getBytes(StandardCharsets.UTF_8).length;
 
-    new JWTDecoder.Builder().maxInputBytes(len).build()
+    JWTDecoder.builder().maxInputBytes(len).build()
         .decode(encoded, VerifierResolver.of(verifier())); // exactly N -> accepted
 
     try {
-      new JWTDecoder.Builder().maxInputBytes(len - 1).build()
+      JWTDecoder.builder().maxInputBytes(len - 1).build()
           .decode(encoded, VerifierResolver.of(verifier()));
       fail("Expected InvalidJWTException for maxInputBytes < length");
     } catch (InvalidJWTException expected) {
@@ -244,11 +244,11 @@ public class JWTDecoderTest {
     byte[] sig = ((HMACSigner) signer()).sign(unsignedPrefix.getBytes(StandardCharsets.UTF_8));
     String token = unsignedPrefix + "." + Base64.getUrlEncoder().withoutPadding().encodeToString(sig);
 
-    new JWTDecoder.Builder().maxNestingDepth(depth + 5).build()
+    JWTDecoder.builder().maxNestingDepth(depth + 5).build()
         .decode(token, VerifierResolver.of(verifier())); // accepted
 
     try {
-      new JWTDecoder.Builder().maxNestingDepth(2).build()
+      JWTDecoder.builder().maxNestingDepth(2).build()
           .decode(token, VerifierResolver.of(verifier()));
       fail("Expected JSONProcessingException at low depth");
     } catch (JSONProcessingException expected) {
@@ -269,14 +269,14 @@ public class JWTDecoderTest {
     String token = unsignedPrefix + "." + Base64.getUrlEncoder().withoutPadding().encodeToString(sig);
 
     try {
-      new JWTDecoder.Builder().maxNumberLength(1000).build()
+      JWTDecoder.builder().maxNumberLength(1000).build()
           .decode(token, VerifierResolver.of(verifier()));
       fail("Expected JSONProcessingException for over-long number");
     } catch (JSONProcessingException expected) {
       // good
     }
 
-    new JWTDecoder.Builder().maxNumberLength(1001).build()
+    JWTDecoder.builder().maxNumberLength(1001).build()
         .decode(token, VerifierResolver.of(verifier())); // accepted at boundary
   }
 
@@ -300,7 +300,7 @@ public class JWTDecoderTest {
       // good
     }
 
-    JWT decoded = new JWTDecoder.Builder().allowDuplicateJSONKeys(true).build()
+    JWT decoded = JWTDecoder.builder().allowDuplicateJSONKeys(true).build()
         .decode(token, VerifierResolver.of(verifier()));
     assertNotNull(decoded);
   }
@@ -418,7 +418,7 @@ public class JWTDecoderTest {
     String encoded = new JWTEncoder().encode(jwt, signer(),
         b -> b.parameter("crit", Collections.singletonList("foo")).parameter("foo", "bar"));
 
-    JWTDecoder decoder = new JWTDecoder.Builder()
+    JWTDecoder decoder = JWTDecoder.builder()
         .criticalHeaders(new HashSet<>(Collections.singletonList("foo")))
         .build();
     JWT decoded = decoder.decode(encoded, VerifierResolver.of(verifier()));
@@ -442,5 +442,66 @@ public class JWTDecoderTest {
       return name;
     }
     // intentionally inherits Object.equals / Object.hashCode (identity-based)
+  }
+
+  // ---------------------------------------------------------------------
+  // Builder reusability (Javadoc contract: build() produces a new immutable decoder; the builder may be reused)
+  // ---------------------------------------------------------------------
+
+  @Test
+  public void builder_reuse_producesIndependentDecoders() {
+    // Use case: building twice from the same builder with a mutated clockSkew between calls must produce two independent decoders.
+    Instant fakeNow = Instant.parse("2026-04-22T12:00:00Z");
+    JWT jwt = JWT.builder()
+        .subject("s")
+        .issuedAt(fakeNow.minusSeconds(600))
+        .expiresAt(fakeNow.minusSeconds(5))
+        .build();
+    String encoded = new JWTEncoder().encode(jwt, signer());
+
+    JWTDecoder.Builder b = JWTDecoder.builder()
+        .clock(Clock.fixed(fakeNow, ZoneOffset.UTC))
+        .clockSkew(Duration.ZERO);
+    JWTDecoder strict = b.build();
+    try {
+      strict.decode(encoded, VerifierResolver.of(verifier()));
+      fail("Expected JWTExpiredException under strict (zero-skew) decoder.");
+    } catch (JWTExpiredException expected) {
+    }
+
+    b.clockSkew(Duration.ofSeconds(30));
+    JWTDecoder lenient = b.build();
+    assertNotNull(lenient.decode(encoded, VerifierResolver.of(verifier())));
+    try {
+      strict.decode(encoded, VerifierResolver.of(verifier()));
+      fail("Original decoder must not have inherited the mutated clockSkew.");
+    } catch (JWTExpiredException expected) {
+    }
+  }
+
+  @Test
+  public void builder_reuse_criticalHeaders_defensiveCopy() {
+    // Use case: mutating the caller-supplied critical-headers set after build() must not leak into the already-built decoder.
+    HashSet<String> crit = new HashSet<>();
+    crit.add("org.lattejava.test.required");
+    JWTDecoder.Builder b = JWTDecoder.builder().criticalHeaders(crit);
+    JWTDecoder first = b.build();
+
+    crit.add("org.lattejava.test.other");
+    b.criticalHeaders(Collections.emptySet());
+    JWTDecoder second = b.build();
+
+    // Token declares "org.lattejava.test.required" in its crit list. `first` understands it (pass); `second` was built after the set was cleared (reject).
+    JWT jwt = JWT.builder().subject("s").build();
+    String encoded = new JWTEncoder().encode(jwt, signer(), h ->
+        h.parameter("crit", java.util.List.of("org.lattejava.test.required"))
+            .parameter("org.lattejava.test.required", "v"));
+
+    assertNotNull(first.decode(encoded, VerifierResolver.of(verifier())));
+    try {
+      second.decode(encoded, VerifierResolver.of(verifier()));
+      fail("Expected InvalidJWTException: second decoder must not see the original critical-headers set.");
+    } catch (InvalidJWTException expected) {
+    }
   }
 }

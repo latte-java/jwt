@@ -133,7 +133,7 @@ public class RFC7515VectorsTest extends BaseJWTTest {
    * vector's {@code exp}.
    */
   private static JWTDecoder vectorClockDecoder() {
-    return new JWTDecoder.Builder()
+    return JWTDecoder.builder()
         .fixedTime(java.time.Instant.ofEpochSecond(1300819300L))
         .build();
   }

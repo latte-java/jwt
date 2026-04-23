@@ -252,6 +252,8 @@ public final class Header {
 
     private final Map<String, Object> customParameters = new LinkedHashMap<>();
 
+    private Builder() {}
+
     public Builder alg(Algorithm algorithm) {
       this.alg = algorithm;
       return this;

@@ -56,7 +56,7 @@ public class CritHeaderTest {
   public void crit_listedInCriticalHeaders_accepted() {
     // Use case: crit listing "b64"; decoder configured with "b64" in criticalHeaders -> accepted.
     String token = encodeWithCrit(Collections.singletonList("b64"));
-    JWTDecoder decoder = new JWTDecoder.Builder()
+    JWTDecoder decoder = JWTDecoder.builder()
         .criticalHeaders(new HashSet<>(Collections.singletonList("b64")))
         .build();
     JWT jwt = decoder.decode(token, VerifierResolver.of(HMACVerifier.newVerifier(SECRET)));
@@ -67,7 +67,7 @@ public class CritHeaderTest {
   public void crit_unrecognized_rejected() {
     // Use case: crit listing an unknown parameter name -> InvalidJWTException.
     String token = encodeWithCrit(Collections.singletonList("unknown-ext"));
-    JWTDecoder decoder = new JWTDecoder.Builder()
+    JWTDecoder decoder = JWTDecoder.builder()
         .criticalHeaders(new HashSet<>(Collections.singletonList("b64")))
         .build();
     try {
@@ -90,7 +90,7 @@ public class CritHeaderTest {
   public void crit_multipleNames_partialUnknown_rejected() {
     // Use case: crit listing multiple values; one unknown -> InvalidJWTException.
     String token = encodeWithCrit(Arrays.asList("b64", "unknown-ext"));
-    JWTDecoder decoder = new JWTDecoder.Builder()
+    JWTDecoder decoder = JWTDecoder.builder()
         .criticalHeaders(new HashSet<>(Collections.singletonList("b64")))
         .build();
     try {

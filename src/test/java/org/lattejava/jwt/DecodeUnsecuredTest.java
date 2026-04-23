@@ -63,7 +63,7 @@ public class DecodeUnsecuredTest {
     String payload = b64("{\"sub\":\"" + big + "\"}");
     String token = header + "." + payload + ".";
 
-    JWTDecoder decoder = new JWTDecoder.Builder().maxInputBytes(64).build();
+    JWTDecoder decoder = JWTDecoder.builder().maxInputBytes(64).build();
     try {
       decoder.decodeUnsecured(token);
       fail("Expected InvalidJWTException for oversize token");
@@ -137,7 +137,7 @@ public class DecodeUnsecuredTest {
     String payload = b64("{\"sub\":\"abc\",\"deep\":" + nested + "}");
     String token = header + "." + payload + ".";
 
-    JWTDecoder decoder = new JWTDecoder.Builder().maxNestingDepth(8).build();
+    JWTDecoder decoder = JWTDecoder.builder().maxNestingDepth(8).build();
     try {
       decoder.decodeUnsecured(token);
       fail("Expected JSONProcessingException for excessive depth");
@@ -155,7 +155,7 @@ public class DecodeUnsecuredTest {
     String payload = b64("{\"sub\":\"abc\",\"big\":" + digits + "}");
     String token = header + "." + payload + ".";
 
-    JWTDecoder decoder = new JWTDecoder.Builder().maxNumberLength(100).build();
+    JWTDecoder decoder = JWTDecoder.builder().maxNumberLength(100).build();
     try {
       decoder.decodeUnsecured(token);
       fail("Expected JSONProcessingException for over-long number");
@@ -199,7 +199,7 @@ public class DecodeUnsecuredTest {
     String payload = b64("{\"sub\":\"abc\"}");
     String token = header + "." + payload + ".";
 
-    JWTDecoder decoder = new JWTDecoder.Builder().expectedType("at+jwt").build();
+    JWTDecoder decoder = JWTDecoder.builder().expectedType("at+jwt").build();
     try {
       decoder.decodeUnsecured(token);
       fail("Expected InvalidJWTException for typ mismatch");
@@ -230,7 +230,7 @@ public class DecodeUnsecuredTest {
     String payload = b64("{\"sub\":\"abc\"}");
     String token = header + "." + payload + ".";
 
-    JWTDecoder decoder = new JWTDecoder.Builder()
+    JWTDecoder decoder = JWTDecoder.builder()
         .expectedAlgorithms(new HashSet<>(Collections.singletonList(Algorithm.RS256)))
         .build();
     JWT jwt = decoder.decodeUnsecured(token);

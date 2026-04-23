@@ -124,7 +124,7 @@ public class RFC8725ComplianceTest extends BaseJWTTest {
     JWT jwt = JWT.builder().subject("abc").build();
     String token = new JWTEncoder().encode(jwt, HMACSigner.newSHA256Signer(HMAC_SECRET_32));
 
-    JWTDecoder decoder = new JWTDecoder.Builder()
+    JWTDecoder decoder = JWTDecoder.builder()
         .expectedAlgorithms(new HashSet<>(Collections.singletonList(Algorithm.RS256)))
         .build();
     Verifier hmac = HMACVerifier.newVerifier(HMAC_SECRET_32);
@@ -160,7 +160,7 @@ public class RFC8725ComplianceTest extends BaseJWTTest {
         HMACSigner.newSHA256Signer(HMAC_SECRET_32),
         b -> b.typ("at+jwt"));
 
-    JWTDecoder decoder = new JWTDecoder.Builder().expectedType("at+jwt").build();
+    JWTDecoder decoder = JWTDecoder.builder().expectedType("at+jwt").build();
     JWT decoded = decoder.decode(token, VerifierResolver.of(HMACVerifier.newVerifier(HMAC_SECRET_32)));
     assertEquals(decoded.subject(), "abc");
   }
@@ -173,7 +173,7 @@ public class RFC8725ComplianceTest extends BaseJWTTest {
         HMACSigner.newSHA256Signer(HMAC_SECRET_32),
         b -> b.typ("dpop+jwt"));
 
-    JWTDecoder decoder = new JWTDecoder.Builder().expectedType("at+jwt").build();
+    JWTDecoder decoder = JWTDecoder.builder().expectedType("at+jwt").build();
     expectException(InvalidJWTException.class, () ->
         decoder.decode(token, VerifierResolver.of(HMACVerifier.newVerifier(HMAC_SECRET_32))));
   }
@@ -216,7 +216,7 @@ public class RFC8725ComplianceTest extends BaseJWTTest {
         b -> b.typ("at+jwt"));
 
     // Decoder configured for ID tokens (typ=id+jwt) rejects an at+jwt token.
-    JWTDecoder idTokenDecoder = new JWTDecoder.Builder()
+    JWTDecoder idTokenDecoder = JWTDecoder.builder()
         .expectedType("id+jwt")
         .expectedAlgorithms(new HashSet<>(Collections.singletonList(Algorithm.HS256)))
         .build();
@@ -252,7 +252,7 @@ public class RFC8725ComplianceTest extends BaseJWTTest {
   // RFC 8725 §3.4 - Validate cryptographic inputs (maxInputBytes / maxNestingDepth)
   @Test
   public void rfc8725_section_3_4_inputSizeCapped() {
-    JWTDecoder decoder = new JWTDecoder.Builder().maxInputBytes(100).build();
+    JWTDecoder decoder = JWTDecoder.builder().maxInputBytes(100).build();
     String header = b64("{\"alg\":\"HS256\"}");
     String payload = b64("{\"sub\":\"" + "a".repeat(200) + "\"}");
     String token = header + "." + payload + ".sig";

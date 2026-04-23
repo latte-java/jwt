@@ -28,7 +28,6 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -37,7 +36,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
-import java.util.function.Function;
 
 /**
  * Decodes a compact JWS into a {@link JWT} per spec §5 "Decode Flow".
@@ -71,11 +69,6 @@ public class JWTDecoder {
   /** Internally keyed by Algorithm.name() per spec §5 footnote. */
   private final Set<String> expectedAlgorithmNames;
   private final int maxInputBytes;
-
-  // ----- legacy mutable state (TODO Checkpoint 8: remove with legacy decode methods) -----
-  /** @deprecated TODO Checkpoint 8 -- legacy {@link #withClockSkew(int)} state. */
-  @Deprecated
-  private int legacyClockSkewSeconds = 0;
 
   /** Constructs a decoder with all spec §5 defaults. */
   public JWTDecoder() {
@@ -233,90 +226,6 @@ public class JWTDecoder {
   }
 
   // -------------------------------------------------------------------
-  // Legacy decode bridges (TODO Checkpoint 8: delete)
-  // -------------------------------------------------------------------
-
-  /**
-   * @deprecated TODO Checkpoint 8: legacy varargs bridge. Use
-   *     {@link #decode(String, VerifierResolver)} with {@code
-   *     VerifierResolver.of(verifier)} or {@code Verifiers.anyOf(...)}.
-   */
-  @Deprecated
-  public JWT decode(String encodedJWT, Verifier... verifiers) {
-    Objects.requireNonNull(encodedJWT, "encodedJWT");
-    Objects.requireNonNull(verifiers, "verifiers");
-    VerifierResolver resolver = header -> Arrays.stream(verifiers)
-        .filter(v -> v.canVerify(header.alg()))
-        .findFirst()
-        .orElse(null);
-    return decode(encodedJWT, resolver);
-  }
-
-  /**
-   * @deprecated TODO Checkpoint 8: legacy map bridge. Use
-   *     {@link #decode(String, VerifierResolver)} with
-   *     {@link VerifierResolver#byKid(Map)}.
-   */
-  @Deprecated
-  public JWT decode(String encodedJWT, Map<String, Verifier> verifiers) {
-    Objects.requireNonNull(verifiers, "verifiers");
-    return decode(encodedJWT, VerifierResolver.byKid(verifiers));
-  }
-
-  /**
-   * @deprecated TODO Checkpoint 8: legacy function bridge. Use
-   *     {@link #decode(String, VerifierResolver)} with
-   *     {@link VerifierResolver#from(Function)}.
-   */
-  @Deprecated
-  public JWT decode(String encodedJWT, Function<String, Verifier> verifierFunction) {
-    Objects.requireNonNull(verifierFunction, "verifierFunction");
-    VerifierResolver resolver = header -> verifierFunction.apply(header.kid());
-    return decode(encodedJWT, resolver);
-  }
-
-  /**
-   * @deprecated TODO Checkpoint 8: legacy function-with-key-extractor bridge.
-   *     Use {@link #decode(String, VerifierResolver)} with
-   *     {@link VerifierResolver#from(Function)}.
-   */
-  @Deprecated
-  public JWT decode(String encodedJWT,
-                    Function<String, Verifier> verifierFunction,
-                    Function<Header, String> keyFunction) {
-    Objects.requireNonNull(verifierFunction, "verifierFunction");
-    Objects.requireNonNull(keyFunction, "keyFunction");
-    VerifierResolver resolver = header -> verifierFunction.apply(keyFunction.apply(header));
-    return decode(encodedJWT, resolver);
-  }
-
-  /**
-   * @deprecated TODO Checkpoint 8: legacy map-with-key-extractor bridge.
-   *     Use {@link #decode(String, VerifierResolver)} with
-   *     {@link VerifierResolver#from(Function)}.
-   */
-  @Deprecated
-  public JWT decode(String encodedJWT,
-                    Map<String, Verifier> verifiers,
-                    Function<Header, String> keyFunction) {
-    Objects.requireNonNull(verifiers, "verifiers");
-    Objects.requireNonNull(keyFunction, "keyFunction");
-    VerifierResolver resolver = header -> verifiers.get(keyFunction.apply(header));
-    return decode(encodedJWT, resolver);
-  }
-
-  /**
-   * @deprecated TODO Checkpoint 8: legacy mutator. New code uses
-   *     {@link Builder#clockSkew(Duration)} for an immutable decoder.
-   */
-  @Deprecated
-  public JWTDecoder withClockSkew(int clockSkew) {
-    this.legacyClockSkewSeconds = clockSkew;
-    return this;
-  }
-
-
-  // -------------------------------------------------------------------
   // Internals
   // -------------------------------------------------------------------
 
@@ -429,7 +338,7 @@ public class JWTDecoder {
   }
 
   private void enforceTimeClaims(JWT jwt) {
-    long skewSeconds = Math.max(clockSkew.getSeconds(), legacyClockSkewSeconds);
+    long skewSeconds = clockSkew.getSeconds();
     Instant now = Instant.now(clock);
     Instant nowMinusSkew = skewSeconds > 0 ? now.minusSeconds(skewSeconds) : now;
     if (jwt.isExpired(nowMinusSkew)) {
@@ -500,6 +409,14 @@ public class JWTDecoder {
   // -------------------------------------------------------------------
 
   /**
+   * Returns a new {@link Builder} preconfigured with spec §5 defaults. This
+   * is the canonical entry point for advanced decoder construction.
+   */
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  /**
    * Builder for {@link JWTDecoder}. Exposes the full configuration surface
    * defined in spec §5.
    */
@@ -516,7 +433,7 @@ public class JWTDecoder {
     private boolean allowDuplicateJSONKeys = false;
     private boolean jsonProcessorExplicit = false;
 
-    public Builder() {}
+    private Builder() {}
 
     public Builder jsonProcessor(JSONProcessor jsonProcessor) {
       this.jsonProcessor = Objects.requireNonNull(jsonProcessor, "jsonProcessor");
