@@ -86,7 +86,10 @@ public class PEMDecoder {
     try {
       return decode(Files.readAllBytes(path));
     } catch (IOException e) {
-      throw new PEMDecoderException("Unable to read the file from path [" + path.toAbsolutePath() + "]", e);
+      // Echo the path as the caller supplied it rather than resolving
+      // to an absolute path. Callers recognize their own input, and
+      // this avoids leaking filesystem layout into consumer logs.
+      throw new PEMDecoderException("Unable to read file from path [" + path + "]", e);
     }
   }
 

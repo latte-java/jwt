@@ -78,7 +78,7 @@ public class HMACVerifier implements Verifier {
     try {
       return new HMACVerifier(Files.readAllBytes(path));
     } catch (IOException e) {
-      throw new JWTVerifierException("Unable to read the file from path [" + path.toAbsolutePath() + "]", e);
+      throw new JWTVerifierException("Unable to read file from path [" + path + "]", e);
     }
   }
 
