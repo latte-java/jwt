@@ -94,7 +94,7 @@ public class PEMEncoder {
    */
   public String encode(PrivateKey privateKey, PublicKey publicKey) {
     if (privateKey == null && publicKey == null) {
-      throw new PEMEncoderException(new InvalidParameterException("At least one key must be provided, they may not both be null"));
+      throw new PEMEncoderException(new InvalidParameterException("At least one key must be provided"));
     }
 
     Key key = Objects.requireNonNullElse(privateKey, publicKey);
@@ -185,7 +185,7 @@ public class PEMEncoder {
       return encode(null, (PublicKey) key);
     }
 
-    throw new PEMEncoderException(new InvalidParameterException("Unexpected key type. Expecting instance of [PrivateKey | PublicKey], found [" + key.getClass().getCanonicalName() + "]"));
+    throw new PEMEncoderException(new InvalidParameterException("Expected key type [PrivateKey | PublicKey] but found [" + key.getClass().getCanonicalName() + "]"));
   }
 
   /**
@@ -224,14 +224,14 @@ public class PEMEncoder {
         sb.append(PEM.PKCS_8_PRIVATE_KEY_PREFIX).append("\n");
       } else {
         throw new PEMEncoderException(
-            new InvalidParameterException("Unexpected Private Key format, expecting PKCS#1 or PKCS#8 but found " + format + "."));
+            new InvalidParameterException("Expected private key format [PKCS#1] or [PKCS#8] but found [" + format + "]"));
       }
     } else {
       if (format.equals("X.509")) {
         sb.append(PEM.X509_PUBLIC_KEY_PREFIX).append("\n");
       } else {
         throw new PEMEncoderException(
-            new InvalidParameterException("Unexpected Public Key format, expecting X.509 but found " + format + "."));
+            new InvalidParameterException("Expected public key format [X.509] but found [" + format + "]"));
       }
     }
   }

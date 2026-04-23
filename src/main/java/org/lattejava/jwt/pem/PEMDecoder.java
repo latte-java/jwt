@@ -130,7 +130,7 @@ public class PEMDecoder {
       } else if (encodedKey.contains(EC_PRIVATE_KEY_SUFFIX)) {
         return decode_EC_privateKey(encodedKey);
       } else {
-        throw new PEMDecoderException(new InvalidParameterException("Unexpected PEM Format"));
+        throw new PEMDecoderException(new InvalidParameterException("Unexpected PEM format"));
       }
     } catch (CertificateException | InvalidAlgorithmParameterException | InvalidKeyException | InvalidKeySpecException |
              IOException | NoSuchAlgorithmException e) {
@@ -145,7 +145,7 @@ public class PEMDecoder {
 
     // Expecting this EC private key to be version 1, it is not encapsulated in a PKCS#8 container
     if (!version.equals(BigInteger.valueOf(1))) {
-      throw new PEMDecoderException("Expected version [1] but found version of [" + version + "]");
+      throw new PEMDecoderException("Expected version [1] but found [" + version + "]");
     }
 
     // This is an EC private key, encapsulate it in a PKCS#8 format to be compatible with the Java Key Factory
@@ -180,8 +180,7 @@ public class PEMDecoder {
     if (sequence.length == 2) {
       // This is an EC encoded key w/out the context specific values [0] or [1] - this means we don't
       // have enough information to build a PKCS#8 key.
-      throw new PEMDecoderException("Unable to decode the provided PEM, the EC private key does not contain the"
-          + " curve identifier necessary to convert to a PKCS#8 format before building a private key");
+      throw new PEMDecoderException("EC private key does not contain the curve identifier required to convert to PKCS#8 format");
     }
 
     ObjectIdentifier curveOID = sequence[2].getOID();
@@ -225,7 +224,7 @@ public class PEMDecoder {
 
     if (sequence.length < 9) {
       throw new PEMDecoderException(
-          new InvalidKeyException("Could not build a PKCS#1 private key. Expected at least 9 values in the DER encoded sequence."));
+          new InvalidKeyException("Expected at least [9] values in PKCS#1 private key DER sequence but found [" + sequence.length + "]"));
     }
 
     // Ignoring the version value in the sequence
@@ -257,7 +256,7 @@ public class PEMDecoder {
 
     if (sequence.length != 2 || !sequence[0].tag.is(Tag.Integer) || !sequence[1].tag.is(Tag.Integer)) {
       // Expect the following format : [ Integer | Integer ]
-      throw new InvalidKeyException("Could not build this PKCS#1 public key. Expecting values in the DER encoded sequence in the following format [ Integer | Integer ]");
+      throw new InvalidKeyException("Expected PKCS#1 public key DER sequence format [Integer | Integer]");
     }
 
     BigInteger modulus = sequence[0].getBigInteger();
@@ -285,13 +284,13 @@ public class PEMDecoder {
     // EC and RSA will be length 3, EdDSA will be 4 or 5
     if (sequence.length < 3 || !sequence[0].tag.is(Tag.Integer) || !sequence[1].tag.is(Tag.Sequence) || !sequence[2].tag.is(Tag.OctetString)) {
       // Expect the following format : [ Integer | Sequence | OctetString ]
-      throw new InvalidKeyException("Could not decode the private key. Expecting values in the DER encoded sequence in the following format [ Integer | Sequence | OctetString ] or [ Integer | Sequence | OctetString | Attributes ]");
+      throw new InvalidKeyException("Expected private key DER sequence format [Integer | Sequence | OctetString] or [Integer | Sequence | OctetString | Attributes]");
     }
 
     ObjectIdentifier algorithmOID = new DerInputStream(sequence[1].toByteArray()).getOID();
     KeyType type = KeyType.forOid(algorithmOID.decode());
     if (type == null) {
-      throw new InvalidKeyException("Could not decode the private key. Expected an EC, ED or RSA key type but found OID [" + algorithmOID.decode() + "] and was unable to match that to a supported algorithm.");
+      throw new InvalidKeyException("Expected EC, Ed or RSA key type but found OID [" + algorithmOID.decode() + "]");
     }
 
     PrivateKey privateKey = KeyFactory.getInstance(jcaKeyFactoryName(algorithmOID.decode(), type)).generatePrivate(new PKCS8EncodedKeySpec(bytes));
@@ -362,7 +361,7 @@ public class PEMDecoder {
 
     if (sequence.length != 2 || !sequence[0].tag.is(Tag.Sequence) || !sequence[1].tag.is(Tag.BitString)) {
       // Expect the following format : [ Sequence | BitString ]
-      throw new InvalidKeyException("Could not decode the X.509 public key. Expected values in the DER encoded sequence in the following format [ Sequence | BitString ]");
+      throw new InvalidKeyException("Expected X.509 public key DER sequence format [Sequence | BitString]");
     }
 
     DerInputStream der = new DerInputStream(sequence[0].toByteArray());
@@ -370,7 +369,7 @@ public class PEMDecoder {
 
     KeyType type = KeyType.forOid(algorithmOID.decode());
     if (type == null) {
-      throw new InvalidKeyException("Could not decode the X.509 public key. Expected at 2 values in the DER encoded sequence but found [" + sequence.length + "]");
+      throw new InvalidKeyException("Expected [2] values in X.509 public key DER sequence but found [" + sequence.length + "]");
     }
 
     return new PEM(KeyFactory.getInstance(jcaKeyFactoryName(algorithmOID.decode(), type)).generatePublic(new X509EncodedKeySpec(bytes)));
@@ -395,7 +394,7 @@ public class PEMDecoder {
       // Parse outer Certificate SEQUENCE { tbsCertificate, signatureAlgorithm, signatureValue }.
       DerValue[] outer = new DerInputStream(derCertificate).getSequence();
       if (outer.length < 1) {
-        throw new PEMDecoderException("Malformed certificate: outer SEQUENCE has " + outer.length + " elements");
+        throw new PEMDecoderException("Expected at least [1] element in certificate outer sequence but found [" + outer.length + "]");
       }
       // outer[0] is TBSCertificate (a SEQUENCE). Its toByteArray() returns the SEQUENCE's
       // body (children), which we walk as a list of DerValues.
@@ -458,7 +457,7 @@ public class PEMDecoder {
       DateTimeFormatter f = DateTimeFormatter.ofPattern("yyyyMMddHHmmss'Z'");
       return LocalDateTime.parse(s, f).toInstant(ZoneOffset.UTC);
     }
-    throw new IllegalArgumentException("Unexpected time tag: " + v.tag);
+    throw new IllegalArgumentException("Unexpected time tag [" + v.tag + "]");
   }
 
   /**

@@ -147,7 +147,7 @@ public class ObjectIdentifier {
     Objects.requireNonNull(oid, "oid");
     String[] arcs = oid.split("\\.");
     if (arcs.length < 2) {
-      throw new IllegalArgumentException("OID must have at least two arcs: " + oid);
+      throw new IllegalArgumentException("OID must have at least [2] arcs but found [" + oid + "]");
     }
     long first;
     long second;
@@ -155,13 +155,13 @@ public class ObjectIdentifier {
       first = Long.parseLong(arcs[0]);
       second = Long.parseLong(arcs[1]);
     } catch (NumberFormatException e) {
-      throw new IllegalArgumentException("Invalid arc in OID: " + oid, e);
+      throw new IllegalArgumentException("Invalid arc in OID [" + oid + "]", e);
     }
     if (first < 0 || first > 2) {
-      throw new IllegalArgumentException("First OID arc must be 0, 1, or 2: " + oid);
+      throw new IllegalArgumentException("First OID arc must be [0], [1], or [2] but found [" + oid + "]");
     }
     if (second < 0 || (first < 2 && second > 39)) {
-      throw new IllegalArgumentException("Second OID arc out of range: " + oid);
+      throw new IllegalArgumentException("Second OID arc out of range [" + oid + "]");
     }
 
     ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -171,10 +171,10 @@ public class ObjectIdentifier {
       try {
         arc = Long.parseLong(arcs[i]);
       } catch (NumberFormatException e) {
-        throw new IllegalArgumentException("Invalid arc in OID: " + oid, e);
+        throw new IllegalArgumentException("Invalid arc in OID [" + oid + "]", e);
       }
       if (arc < 0) {
-        throw new IllegalArgumentException("Negative arc in OID: " + oid);
+        throw new IllegalArgumentException("Negative arc in OID [" + oid + "]");
       }
       writeBase128(out, arc);
     }
@@ -253,7 +253,7 @@ public class ObjectIdentifier {
     for (int i = 0; i < value.length; i++) {
       // We are not currently handling OIDs that have a node larger than 4 bytes
       if (i - index + 1 > 4) {
-        throw new DerDecodingException("The object identifier contains a node that is larger than 4 bytes. This is not currently supported using this library.");
+        throw new DerDecodingException("Object identifier node larger than [4] bytes is not supported");
       }
 
       byte b = value[i];

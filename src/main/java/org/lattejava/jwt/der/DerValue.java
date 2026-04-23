@@ -194,14 +194,14 @@ public class DerValue {
    */
   public byte[] getBitStringBytes() {
     if (tag.value != Tag.BitString) {
-      throw new IllegalStateException("Not a BIT STRING (tag=" + tag + ")");
+      throw new IllegalStateException("Expected BIT STRING but found tag [" + tag + "]");
     }
     byte[] bytes = value.toByteArray();
     if (bytes.length == 0) {
-      throw new IllegalStateException("Empty BIT STRING value (missing pad byte)");
+      throw new IllegalStateException("Empty BIT STRING value, missing pad byte");
     }
     if (bytes[0] != 0) {
-      throw new IllegalArgumentException("BIT STRING contains " + bytes[0] + " unused bits; expected whole-byte content");
+      throw new IllegalArgumentException("Expected BIT STRING with whole-byte content but found [" + bytes[0] + "] unused bits");
     }
     byte[] out = new byte[bytes.length - 1];
     System.arraycopy(bytes, 1, out, 0, out.length);

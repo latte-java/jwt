@@ -53,14 +53,13 @@ public class DerInputStream {
   public ObjectIdentifier getOID() throws DerDecodingException {
     int tag = data.read();
     if (tag != Tag.ObjectIdentifier) {
-      throw new DerDecodingException("Expected to find an Object Identifier tag " + Tag.ObjectIdentifier + " (" + Tag.hexString(Tag.ObjectIdentifier) + ") " +
-          "but found " + tag + " (" + Tag.hexString(tag) + ")");
+      throw new DerDecodingException("Expected Object Identifier tag [" + Tag.ObjectIdentifier + " / " + Tag.hexString(Tag.ObjectIdentifier) + "] "
+          + "but found [" + tag + " / " + Tag.hexString(tag) + "]");
     }
 
     int length = readLength();
     if (length > data.available()) {
-      throw new DerDecodingException("A DER encoded value indicates it is [" + length + "] bytes long, but only [" + data.available() + "] are available to read in the input stream length. Unable " +
-          "to read the Object Identifier from the stream.");
+      throw new DerDecodingException("Expected [" + length + "] bytes available to read Object Identifier but found [" + data.available() + "]");
     }
 
     byte[] buf = new byte[length];
@@ -72,8 +71,8 @@ public class DerInputStream {
   public DerValue[] getSequence() throws DerDecodingException {
     int tag = data.read();
     if (tag != Tag.Sequence) {
-      throw new DerDecodingException("Expected to find a sequence tag " + Tag.Sequence + " (" + Tag.hexString(Tag.Sequence) + ") " +
-          "but found " + tag + " (" + Tag.hexString(tag) + ")");
+      throw new DerDecodingException("Expected Sequence tag [" + Tag.Sequence + " / " + Tag.hexString(Tag.Sequence) + "] "
+          + "but found [" + tag + " / " + Tag.hexString(tag) + "]");
     }
 
     int length = readLength();
@@ -110,7 +109,7 @@ public class DerInputStream {
       data.reset();
       int actualLength = data.read(buffer);
       if (actualLength != length) {
-        throw new IOException("Failed to read the entire byte array. Expected to read " + length + " bytes, but only read " + actualLength + ".");
+        throw new IOException("Expected to read [" + length + "] bytes but read [" + actualLength + "]");
       }
       return buffer;
     } catch (IOException e) {
@@ -161,7 +160,7 @@ public class DerInputStream {
     try {
       int b = inputStream.read();
       if (b == -1) {
-        throw new IOException("Invalid DER encoding, unable to read length of -1.");
+        throw new IOException("Invalid DER encoding, unable to read length byte");
       }
 
       int length = b;
@@ -178,9 +177,9 @@ public class DerInputStream {
 
       //noinspection ConstantConditions
       if (remaining < 0) {
-        throw new IOException("Invalid DER encoding.");
+        throw new IOException("Invalid DER encoding");
       } else if (remaining > 4) {
-        throw new IOException("Invalid DER encoding, the value is too big.");
+        throw new IOException("Invalid DER encoding, length value too large");
       }
 
       length = inputStream.read() & 0xFF; // 0b11111111 or 255
@@ -198,7 +197,7 @@ public class DerInputStream {
       if (length < 0) {
         throw new IOException("Invalid length bytes");
       } else if (length <= 127) {
-        throw new IOException("Should use short form for length");
+        throw new IOException("Length encoding should use short form");
       }
 
       return length;

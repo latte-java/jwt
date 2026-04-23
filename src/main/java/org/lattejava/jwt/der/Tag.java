@@ -228,7 +228,7 @@ public class Tag {
     }
 
     if (tagClass == null) {
-      throw new IllegalArgumentException("Invalid tag value " + value + ", the tag does not appear to fit into one of the expected classes");
+      throw new IllegalArgumentException("Invalid tag value [" + value + "], does not match any known tag class");
     }
 
     return tagClass;
