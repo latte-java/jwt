@@ -285,23 +285,13 @@ public class JWTDecoder {
 
   private Header parseHeader(String headerB64) {
     byte[] headerJson = strictBase64UrlDecode(headerB64, "header");
-    Map<String, Object> raw;
-    try {
-      raw = jsonProcessor.deserialize(headerJson);
-    } catch (JSONProcessingException e) {
-      throw e;
-    }
+    Map<String, Object> raw = jsonProcessor.deserialize(headerJson);
     return Header.fromMap(raw);
   }
 
   private JWT parsePayload(String payloadB64, Header header) {
     byte[] payloadJson = strictBase64UrlDecode(payloadB64, "payload");
-    Map<String, Object> raw;
-    try {
-      raw = jsonProcessor.deserialize(payloadJson);
-    } catch (JSONProcessingException e) {
-      throw e;
-    }
+    Map<String, Object> raw = jsonProcessor.deserialize(payloadJson);
     return JWT.fromMap(raw, header);
   }
 
