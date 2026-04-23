@@ -128,7 +128,7 @@ class JSONWebKeyConverter {
       b.alg(Algorithm.fromName(crv));
 
       var privateKeyBytes = edPrivateKey.getBytes().orElseThrow(
-          () -> new JSONWebKeyException("Unable to obtain the private key bytes."));
+          () -> new JSONWebKeyException("Failed to obtain private key bytes"));
       b.d(Base64.getUrlEncoder().withoutPadding().encodeToString(privateKeyBytes));
       try {
         byte[] publicKeyBytes = KeyUtils.deriveEdDSAPublicKeyFromPrivate(privateKeyBytes, crv);
