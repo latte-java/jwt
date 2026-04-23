@@ -78,7 +78,7 @@ public final class JWKThumbprint {
     try {
       md = MessageDigest.getInstance(algorithm);
     } catch (NoSuchAlgorithmException e) {
-      throw new IllegalArgumentException("No such algorithm [" + algorithm + "]");
+      throw new IllegalArgumentException("No such algorithm [" + algorithm + "]", e);
     }
     byte[] hash = md.digest(canonical);
     return Base64.getUrlEncoder().withoutPadding().encodeToString(hash);

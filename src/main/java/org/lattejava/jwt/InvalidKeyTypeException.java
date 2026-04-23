@@ -26,4 +26,8 @@ public class InvalidKeyTypeException extends JWTException {
   public InvalidKeyTypeException(String message) {
     super(message);
   }
+
+  public InvalidKeyTypeException(String message, Throwable cause) {
+    super(message, cause);
+  }
 }

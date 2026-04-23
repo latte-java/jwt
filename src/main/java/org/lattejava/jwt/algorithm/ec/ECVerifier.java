@@ -99,7 +99,7 @@ public class ECVerifier implements Verifier {
       }
       return ec;
     } catch (NoSuchAlgorithmException | InvalidKeySpecException e) {
-      throw new InvalidKeyTypeException("Provided EC public key failed re-validation: " + e.getMessage());
+      throw new InvalidKeyTypeException("Provided EC public key failed re-validation.", e);
     }
   }
 
@@ -142,7 +142,7 @@ public class ECVerifier implements Verifier {
       expectedLength = ECFamily.joseSignatureLength(algorithm);
       curveIntLength = ECFamily.curveIntLength(algorithm);
     } catch (IllegalArgumentException e) {
-      throw new InvalidJWTSignatureException();
+      throw new InvalidJWTSignatureException(e);
     }
     if (signature.length != expectedLength) {
       throw new InvalidJWTSignatureException();

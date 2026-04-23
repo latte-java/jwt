@@ -108,7 +108,7 @@ public class EdDSAVerifier implements Verifier {
     try {
       expectedLength = EdDSAFamily.signatureLength(algorithm);
     } catch (IllegalArgumentException e) {
-      throw new InvalidJWTSignatureException();
+      throw new InvalidJWTSignatureException(e);
     }
     if (signature.length != expectedLength) {
       throw new InvalidJWTSignatureException();

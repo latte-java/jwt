@@ -283,7 +283,7 @@ public class JWTUtils {
     try {
       messageDigest = MessageDigest.getInstance(algorithm);
     } catch (NoSuchAlgorithmException e) {
-      throw new IllegalArgumentException("No such algorithm [" + algorithm + "]");
+      throw new IllegalArgumentException("No such algorithm [" + algorithm + "]", e);
     }
 
     byte[] digest = messageDigest.digest(bytes);
