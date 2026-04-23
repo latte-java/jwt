@@ -152,7 +152,7 @@ public final class JWT {
     if (value instanceof String) {
       return (String) value;
     }
-    throw new ClassCastException("Claim [" + name + "] is not a String");
+    throw new InvalidJWTException("Claim [" + name + "] is not a String");
   }
 
   public Integer getInteger(String name) {
@@ -183,7 +183,7 @@ public final class JWT {
     if (value instanceof Boolean) {
       return (Boolean) value;
     }
-    throw new ClassCastException("Claim [" + name + "] is not a Boolean");
+    throw new InvalidJWTException("Claim [" + name + "] is not a Boolean");
   }
 
   public BigDecimal getBigDecimal(String name) {
@@ -200,7 +200,7 @@ public final class JWT {
     if (value instanceof Number) {
       return BigDecimal.valueOf(((Number) value).doubleValue());
     }
-    throw new ClassCastException("Claim [" + name + "] is not a numeric value");
+    throw new InvalidJWTException("Claim [" + name + "] is not a numeric value");
   }
 
   public BigInteger getBigInteger(String name) {
@@ -217,7 +217,7 @@ public final class JWT {
     if (value instanceof Number) {
       return BigInteger.valueOf(((Number) value).longValue());
     }
-    throw new ClassCastException("Claim [" + name + "] is not a numeric value");
+    throw new InvalidJWTException("Claim [" + name + "] is not a numeric value");
   }
 
   public Number getNumber(String name) {
@@ -228,7 +228,7 @@ public final class JWT {
     if (value instanceof Number) {
       return (Number) value;
     }
-    throw new ClassCastException("Claim [" + name + "] is not a Number");
+    throw new InvalidJWTException("Claim [" + name + "] is not a Number");
   }
 
   public Object getObject(String name) {
@@ -244,7 +244,7 @@ public final class JWT {
     if (value instanceof Map) {
       return (Map<String, Object>) value;
     }
-    throw new ClassCastException("Claim [" + name + "] is not a Map");
+    throw new InvalidJWTException("Claim [" + name + "] is not a Map");
   }
 
   @SuppressWarnings("unchecked")
@@ -256,7 +256,7 @@ public final class JWT {
     if (value instanceof List) {
       return (List<Object>) value;
     }
-    throw new ClassCastException("Claim [" + name + "] is not a List");
+    throw new InvalidJWTException("Claim [" + name + "] is not a List");
   }
 
   public <T> List<T> getList(String name, Class<T> elementType) {
