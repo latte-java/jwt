@@ -471,6 +471,29 @@ public class JWTDecoderTest {
   }
 
   @Test
+  public void not_before_exception_exposes_diagnostic_context() {
+    Instant now = Instant.parse("2026-04-22T12:00:00Z");
+    Instant nbf = now.plusSeconds(30);
+    Instant exp = now.plusSeconds(3600);
+    // Use case: library consumers diagnosing clock-sync issues need to see the nbf claim, the clock reading, and the applied skew.
+    JWT jwt = JWT.builder().subject("s").notBefore(nbf).expiresAt(exp).build();
+    String encoded = new JWTEncoder().encode(jwt, signer());
+
+    JWTDecoder decoder = JWTDecoder.builder()
+        .clock(Clock.fixed(now, ZoneOffset.UTC))
+        .clockSkew(Duration.ZERO)
+        .build();
+    try {
+      decoder.decode(encoded, VerifierResolver.of(verifier()));
+      fail("Expected JWTUnavailableForProcessingException");
+    } catch (JWTUnavailableForProcessingException e) {
+      assertEquals(e.getNotBefore(), nbf);
+      assertEquals(e.getNow(), now);
+      assertEquals(e.getClockSkew(), Duration.ZERO);
+    }
+  }
+
+  @Test
   public void builder_reuse_producesIndependentDecoders() {
     // Use case: building twice from the same builder with a mutated clockSkew between calls must produce two independent decoders.
     Instant fakeNow = Instant.parse("2026-04-22T12:00:00Z");
