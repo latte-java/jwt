@@ -39,7 +39,7 @@ import java.util.Objects;
  * {@code forAsymmetric}) is rejected with {@link IllegalArgumentException} so a
  * misplaced key cannot be silently coerced into the wrong algorithm family.
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public final class Signers {
   private Signers() {

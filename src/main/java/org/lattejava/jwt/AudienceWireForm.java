@@ -30,7 +30,7 @@ package org.lattejava.jwt;
  * {@link JWT#toSerializableMap()} can preserve the original form on
  * re-serialization.
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 enum AudienceWireForm {
   /** {@code "aud": "single"} - serialized as a single JSON string. */

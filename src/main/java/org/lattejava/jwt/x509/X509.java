@@ -63,7 +63,7 @@ import java.util.Objects;
  * {@code "ATTR=value"} pairs (CN, C, L, ST, O, OU). Full RFC 4514 parsing
  * is not supported.</p>
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public final class X509 {
   private X509() {}

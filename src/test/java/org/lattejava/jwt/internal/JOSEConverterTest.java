@@ -40,7 +40,7 @@ import static org.testng.Assert.fail;
  * curve lengths, the high-bit-set DER padding edge case, leading-zero JOSE
  * values, and rejection of malformed DER / wrong-length JOSE input.
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public class JOSEConverterTest {
   private static final SecureRandom RNG = new SecureRandom();

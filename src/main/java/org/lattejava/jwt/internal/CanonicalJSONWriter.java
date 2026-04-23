@@ -45,7 +45,7 @@ import java.util.Map;
  * <p>Package-private. Never exposed via public API so thumbprint canonicalization
  * cannot be influenced by a user-supplied {@link JSONProcessor}.
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 final class CanonicalJSONWriter {
 

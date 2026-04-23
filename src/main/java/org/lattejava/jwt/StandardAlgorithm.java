@@ -34,7 +34,7 @@ import java.util.Objects;
  * {@code toString()} that is intentionally minimal -- just the JWA name --
  * rather than the {@code StandardAlgorithm[name=...]} record default.</p>
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 final class StandardAlgorithm implements Algorithm {
   private final String name;

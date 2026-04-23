@@ -36,7 +36,7 @@ import static org.testng.Assert.fail;
  * ({@code +}, {@code /}, {@code =}) must be rejected with
  * {@link InvalidJWTException} before any parsing.
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public class Base64URLStrictnessTest {
   private static final String SECRET = "super-secret-key-that-is-at-least-32-bytes-long!!";

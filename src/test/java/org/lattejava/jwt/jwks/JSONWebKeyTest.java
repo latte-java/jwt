@@ -57,7 +57,7 @@ import static org.testng.Assert.fail;
  *   <li>JWKS-style mixed-type lists round-trip through {@code fromMap}.</li>
  * </ul>
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public class JSONWebKeyTest {
   // ---------- toString redaction ----------

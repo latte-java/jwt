@@ -46,7 +46,7 @@ import static org.testng.Assert.assertTrue;
  * BouncyCastle's {@code SHAKEDigest(256)} (test-scope only) and
  * provider-preference fall-back semantics.</p>
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public class SHAKE256Test {
 

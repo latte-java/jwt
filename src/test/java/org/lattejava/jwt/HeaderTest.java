@@ -41,7 +41,7 @@ import static org.testng.Assert.expectThrows;
 /**
  * Tests for {@link Header}.
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public class HeaderTest {
   // -------------------- Builder --------------------

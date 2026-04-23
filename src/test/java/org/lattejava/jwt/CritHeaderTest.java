@@ -39,7 +39,7 @@ import static org.testng.Assert.fail;
  * of the {@code crit} array itself is covered in {@link HeaderTest}; this
  * class tests the decoder's runtime understanding set.
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public class CritHeaderTest {
   private static final String SECRET = "super-secret-key-that-is-at-least-32-bytes-long!!";

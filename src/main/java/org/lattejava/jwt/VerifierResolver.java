@@ -38,7 +38,7 @@ import java.util.function.Function;
  * the header's algorithm is treated the same as a {@code null} resolver
  * result ({@link MissingVerifierException}).</p>
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public interface VerifierResolver {
   /**

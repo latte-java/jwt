@@ -41,7 +41,7 @@ import java.util.Map;
  *
  * <p>Stateless and thread-safe.
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public class LatteJSONProcessor implements JSONProcessor {
   private final int maxNestingDepth;

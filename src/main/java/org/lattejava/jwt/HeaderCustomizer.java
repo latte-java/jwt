@@ -35,7 +35,7 @@ package org.lattejava.jwt;
  * ({@code typ}, {@code cty}, {@code x5t}, etc.) can be set freely via
  * {@link #typ(String)} and {@link #parameter(String, Object)}.</p>
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public interface HeaderCustomizer {
   /**

@@ -49,7 +49,7 @@ import static org.testng.Assert.fail;
  * allowDuplicateJSONKeys, tampered payload, custom validator, signature-
  * before-parse ordering, and crit understood-parameters check.
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public class JWTDecoderTest {
   private static final String SECRET = "super-secret-key-that-is-at-least-32-bytes-long!!";

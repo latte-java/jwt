@@ -36,7 +36,7 @@ import static org.testng.Assert.assertTrue;
 /**
  * Tests for the new {@link DerValue} factory methods introduced in Checkpoint 9.
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public class DerValueTest {
   @Test

@@ -52,7 +52,7 @@ import static org.testng.Assert.assertTrue;
  * across threads produces corrupted state and/or intermittent
  * {@code SignatureException}s.
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public class SignerVerifierThreadSafetyTest extends BaseJWTTest {
   private static final int THREAD_COUNT = 32;

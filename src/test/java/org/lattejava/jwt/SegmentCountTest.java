@@ -38,7 +38,7 @@ import static org.testng.Assert.fail;
  * Segment-count matrix: confirms how the decoder treats every structural
  * segment-count permutation.
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public class SegmentCountTest {
   private static final String SECRET = "super-secret-key-that-is-at-least-32-bytes-long!!";

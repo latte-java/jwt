@@ -45,7 +45,7 @@ import java.util.Objects;
  * call, and any exception it throws propagates immediately (fail-fast — no
  * fall-through to subsequent verifiers).</p>
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public final class Verifiers {
   private Verifiers() {

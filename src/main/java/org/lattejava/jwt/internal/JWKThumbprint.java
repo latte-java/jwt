@@ -41,7 +41,7 @@ import java.util.Map;
  * remains package-private so no user-pluggable JSON serializer can
  * influence thumbprint bytes.
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public final class JWKThumbprint {
 

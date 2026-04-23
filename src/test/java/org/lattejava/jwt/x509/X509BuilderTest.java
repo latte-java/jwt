@@ -51,7 +51,7 @@ import static org.testng.Assert.assertTrue;
 /**
  * Tests for {@link X509}, the sun.*-free X.509 self-signed certificate builder.
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public class X509BuilderTest extends BaseJWTTest {
 

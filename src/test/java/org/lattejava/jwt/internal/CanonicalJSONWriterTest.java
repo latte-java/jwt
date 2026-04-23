@@ -37,7 +37,7 @@ import static org.testng.Assert.assertFalse;
 /**
  * Tests for {@link CanonicalJSONWriter}.
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public class CanonicalJSONWriterTest {
 

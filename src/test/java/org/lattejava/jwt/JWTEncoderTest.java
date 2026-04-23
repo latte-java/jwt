@@ -56,7 +56,7 @@ import static org.testng.Assert.fail;
  * a DataProvider over (algorithm, signer-supplier, verifier-supplier) and
  * exercises the {@link HeaderCustomizer} surface.
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public class JWTEncoderTest {
   private static final String HMAC_SECRET_32 = "super-secret-key-that-is-at-least-32-bytes-long!!";

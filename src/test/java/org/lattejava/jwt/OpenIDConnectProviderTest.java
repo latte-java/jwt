@@ -60,7 +60,7 @@ import static org.testng.Assert.assertTrue;
  * <p>Each test brackets provider mutations with {@code @BeforeMethod} /
  * {@code @AfterMethod} so the global {@link Security} state is restored.
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public class OpenIDConnectProviderTest extends BaseTest {
 

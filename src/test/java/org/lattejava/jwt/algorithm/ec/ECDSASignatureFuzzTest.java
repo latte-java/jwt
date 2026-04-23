@@ -39,7 +39,7 @@ import java.security.SecureRandom;
  * {@link org.lattejava.jwt.internal.JOSEConverter} that unit tests would
  * miss (e.g., off-by-one padding).
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public class ECDSASignatureFuzzTest extends BaseJWTTest {
   private static final SecureRandom RNG = new SecureRandom();

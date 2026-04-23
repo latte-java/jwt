@@ -28,7 +28,7 @@ package org.lattejava.jwt;
  * HTTP-fetching helper) follows more redirects than allowed by its
  * {@code maxRedirects} configuration.
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public class TooManyRedirectsException extends JWTException {
   public TooManyRedirectsException(String message) {

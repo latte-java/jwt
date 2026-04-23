@@ -30,7 +30,7 @@ import java.util.Objects;
  * code are keyed on {@link #name()}, so two instances with the same kty value
  * compare equal regardless of how they were constructed.
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 final class StandardKeyType implements KeyType {
   private final String name;

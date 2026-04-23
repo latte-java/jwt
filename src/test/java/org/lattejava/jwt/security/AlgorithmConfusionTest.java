@@ -52,7 +52,7 @@ import java.util.Map;
  * Algorithm confusion and {@code none}: security suite that proves the
  * decoder rejects every documented algorithm-confusion path.
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public class AlgorithmConfusionTest extends BaseJWTTest {
   private static final String HMAC_SECRET_32 = "super-secret-key-that-is-at-least-32-bytes-long!!";

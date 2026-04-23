@@ -59,7 +59,7 @@ import static org.testng.Assert.assertTrue;
  * increments a counter on every accepted connection; after decode we assert
  * the counter is still zero.</p>
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public class NetworkAddressedHeadersTest extends BaseJWTTest {
   private static final String SECRET = "super-secret-key-that-is-at-least-32-bytes-long!!";

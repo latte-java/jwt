@@ -39,7 +39,7 @@ package org.lattejava.jwt.internal;
  * against downstream log pipelines that do not themselves escape or
  * size-limit.</p>
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public final class MessageSanitizer {
   private static final int MAX_LENGTH = 256;

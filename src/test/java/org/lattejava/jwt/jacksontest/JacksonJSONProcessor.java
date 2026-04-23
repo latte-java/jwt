@@ -43,7 +43,7 @@ import java.util.Map;
  * library is zero-dependency. After CP11 the Jackson dependency moves to
  * test-scope and only this class (and the cross-processor test) depend on it.</p>
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public class JacksonJSONProcessor implements JSONProcessor {
   private final ObjectMapper mapper;

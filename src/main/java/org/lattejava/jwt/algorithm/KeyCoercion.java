@@ -37,7 +37,7 @@ import java.security.PublicKey;
  * the caller's expected subtype, producing consistent error messages across
  * algorithm families.
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public final class KeyCoercion {
   private KeyCoercion() {

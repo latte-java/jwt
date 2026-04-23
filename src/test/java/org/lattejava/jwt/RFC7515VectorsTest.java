@@ -49,7 +49,7 @@ import static org.testng.Assert.assertNotNull;
  * verifying the published signature with the published key is the
  * contract exercised here).</p>
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public class RFC7515VectorsTest extends BaseJWTTest {
   private static byte[] b64u(String in) {

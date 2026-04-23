@@ -36,7 +36,7 @@ import static org.testng.Assert.assertTrue;
 /**
  * Tests for the KeyType interface and StandardKeyType implementation.
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public class KeyTypeTest {
   @DataProvider(name = "standardKeyTypes")

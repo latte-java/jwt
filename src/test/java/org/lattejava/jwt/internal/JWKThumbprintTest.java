@@ -42,7 +42,7 @@ import static org.testng.Assert.assertNotEquals;
  *   <li>EC P-256/P-384/P-521 thumbprints pinned from the canonical implementation
  * </ul>
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public class JWKThumbprintTest {
 

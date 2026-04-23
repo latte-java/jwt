@@ -29,7 +29,7 @@ package org.lattejava.jwt;
  * declares this in its {@code throws} clause for documentation; the
  * encoder/decoder catch and propagate these directly.
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public class JSONProcessingException extends JWTException {
   public JSONProcessingException(String message) {

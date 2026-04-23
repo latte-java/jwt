@@ -54,7 +54,7 @@ import static org.testng.Assert.fail;
  * {@code secp256k1} from {@code SunEC}; without BC the test paths
  * exercise the documented failure mode rather than skipping.</p>
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public class ES256KRuntimeBehaviorTest extends BaseTest {
   @Test

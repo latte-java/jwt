@@ -38,7 +38,7 @@ import static org.testng.Assert.assertSame;
  * {@code byKid}, {@code from}), the {@code byKid} no-kid behavior, and the
  * defense-in-depth {@code canVerify} re-check on resolved verifiers.
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public class VerifierResolverTest {
 

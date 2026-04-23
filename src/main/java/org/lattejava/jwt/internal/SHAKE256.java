@@ -49,7 +49,7 @@ import java.util.Objects;
  * domain Keccak / FIPS 202 reference (XKCP / tiny_sha3 style). It is
  * deterministically equivalent to any FIPS 202 conformant implementation.
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public final class SHAKE256 {
 

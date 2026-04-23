@@ -44,7 +44,7 @@ import static org.testng.Assert.fail;
 /**
  * Tests for {@link LatteJSONProcessor}.
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public class LatteJSONProcessorTest {
 

@@ -42,7 +42,7 @@ import static org.testng.Assert.assertTrue;
  * another, in both directions. Custom claims with BigInteger and BigDecimal
  * must survive the round trip without numeric narrowing.
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public class CrossProcessorTest extends BaseJWTTest {
   private static final String SECRET = "super-secret-key-that-is-at-least-32-bytes-long!!";

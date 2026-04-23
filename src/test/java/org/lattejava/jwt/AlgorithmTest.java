@@ -37,7 +37,7 @@ import static org.testng.Assert.assertTrue;
 /**
  * Tests for the Algorithm interface and StandardAlgorithm implementation.
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public class AlgorithmTest {
   @DataProvider(name = "standardAlgorithms")

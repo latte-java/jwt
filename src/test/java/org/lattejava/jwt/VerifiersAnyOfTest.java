@@ -53,7 +53,7 @@ import static org.testng.Assert.assertTrue;
  *       work because the dispatch is keyed on {@code Algorithm.name()}.</li>
  * </ul>
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public class VerifiersAnyOfTest {
   private static final String HMAC_SECRET_32 = "super-secret-key-that-is-at-least-32-bytes-long!!";

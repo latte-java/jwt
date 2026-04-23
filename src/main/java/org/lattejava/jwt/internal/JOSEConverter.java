@@ -35,7 +35,7 @@ import org.lattejava.jwt.InvalidJWTSignatureException;
  * historical nimbus). The implementation here exists in one place so it can be
  * audited against a single contract and tested directly.</p>
  *
- * @author The Latte Project
+ * @author Daniel DeGroff
  */
 public final class JOSEConverter {
   private JOSEConverter() {
