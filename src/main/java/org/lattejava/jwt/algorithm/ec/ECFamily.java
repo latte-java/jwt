@@ -69,7 +69,7 @@ final class ECFamily {
       case "ES384" -> "SHA384withECDSA";
       case "ES512" -> "SHA512withECDSA";
       default ->
-          throw new IllegalArgumentException("Not an ECDSA algorithm: [" + algorithm.name() + "]");
+          throw new IllegalArgumentException("Not an ECDSA algorithm [" + algorithm.name() + "]");
     };
   }
 
@@ -84,7 +84,7 @@ final class ECFamily {
       case "ES384" -> 48;
       case "ES512" -> 66;
       default ->
-          throw new IllegalArgumentException("Not an ECDSA algorithm: [" + algorithm.name() + "]");
+          throw new IllegalArgumentException("Not an ECDSA algorithm [" + algorithm.name() + "]");
     };
   }
 
@@ -108,7 +108,7 @@ final class ECFamily {
       case 384 -> Algorithm.ES384;
       case 521 -> Algorithm.ES512;
       default ->
-          throw new InvalidKeyTypeException("Unsupported EC curve with field size [" + fieldSize + "]. Expected 256, 384, or 521.");
+          throw new InvalidKeyTypeException("Unsupported EC curve with field size [" + fieldSize + "], expected 256, 384, or 521");
     };
   }
 
@@ -120,8 +120,8 @@ final class ECFamily {
   static void assertCurveMatchesAlgorithm(ECParameterSpec params, Algorithm algorithm) {
     Algorithm actual = algorithmForCurve(params);
     if (actual != algorithm) {
-      throw new InvalidKeyTypeException("The provided EC key uses curve for algorithm [" + actual.name()
-          + "] which is not compatible with algorithm [" + algorithm.name() + "].");
+      throw new InvalidKeyTypeException("EC key uses curve for algorithm [" + actual.name()
+          + "] but requested algorithm [" + algorithm.name() + "]");
     }
   }
 

@@ -83,9 +83,9 @@ public class ECVerifierTest extends BaseJWTTest {
       ECVerifier.newVerifier(readFile(fileName));
       Assert.fail("Expected [InvalidParameterException] exception");
     } catch (InvalidParameterException e) {
-      assertEquals(e.getMessage(), "Unexpected Public Key Format", "[" + fileName + "]");
+      assertEquals(e.getMessage(), "Unexpected public key format", "[" + fileName + "]");
     } catch (MissingPublicKeyException e) {
-      assertEquals(e.getMessage(), "The provided PEM encoded string did not contain a public key.");
+      assertEquals(e.getMessage(), "PEM did not contain a public key");
     } catch (Exception e) {
       Assert.fail("Unexpected exception when parsing file [" + fileName + "]", e);
     }

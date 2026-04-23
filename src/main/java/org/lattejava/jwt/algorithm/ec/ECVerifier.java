@@ -90,16 +90,16 @@ public class ECVerifier implements Verifier {
   private static ECPublicKey revalidate(ECPublicKey key) {
     byte[] encoded = key.getEncoded();
     if (encoded == null) {
-      throw new InvalidKeyTypeException("EC public key did not provide an X.509 encoding for revalidation.");
+      throw new InvalidKeyTypeException("EC public key did not provide X.509 encoding for revalidation");
     }
     try {
       PublicKey derived = KeyFactory.getInstance("EC").generatePublic(new X509EncodedKeySpec(encoded));
       if (!(derived instanceof ECPublicKey ec)) {
-        throw new InvalidKeyTypeException("Re-derived key is not an ECPublicKey [" + derived.getClass().getSimpleName() + "].");
+        throw new InvalidKeyTypeException("Re-derived key is not an ECPublicKey [" + derived.getClass().getSimpleName() + "]");
       }
       return ec;
     } catch (NoSuchAlgorithmException | InvalidKeySpecException e) {
-      throw new InvalidKeyTypeException("Provided EC public key failed re-validation.", e);
+      throw new InvalidKeyTypeException("EC public key failed re-validation", e);
     }
   }
 

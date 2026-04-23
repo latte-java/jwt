@@ -50,8 +50,8 @@ public final class KeyCoercion {
    */
   public static <T extends PrivateKey> T asPrivate(PrivateKey key, Class<T> expected) {
     if (!expected.isInstance(key)) {
-      throw new InvalidKeyTypeException("Expecting a private key of type [" + expected.getSimpleName()
-          + "], but found [" + key.getClass().getSimpleName() + "].");
+      throw new InvalidKeyTypeException("Expected private key of type [" + expected.getSimpleName()
+          + "] but found [" + key.getClass().getSimpleName() + "]");
     }
     return expected.cast(key);
   }
@@ -63,8 +63,8 @@ public final class KeyCoercion {
    */
   public static <T extends PublicKey> T asPublic(PublicKey key, Class<T> expected) {
     if (!expected.isInstance(key)) {
-      throw new InvalidKeyTypeException("Expecting a public key of type [" + expected.getSimpleName()
-          + "], but found [" + key.getClass().getSimpleName() + "].");
+      throw new InvalidKeyTypeException("Expected public key of type [" + expected.getSimpleName()
+          + "] but found [" + key.getClass().getSimpleName() + "]");
     }
     return expected.cast(key);
   }
@@ -76,7 +76,7 @@ public final class KeyCoercion {
   public static <T extends PrivateKey> T privateFromPem(String pemPrivateKey, Class<T> expected) {
     PEM pem = PEM.decode(pemPrivateKey);
     if (pem.privateKey == null) {
-      throw new MissingPrivateKeyException("The provided PEM encoded string did not contain a private key.");
+      throw new MissingPrivateKeyException("PEM did not contain a private key");
     }
     return asPrivate(pem.privateKey, expected);
   }
@@ -88,7 +88,7 @@ public final class KeyCoercion {
   public static <T extends PublicKey> T publicFromPem(String pemPublicKey, Class<T> expected) {
     PEM pem = PEM.decode(pemPublicKey);
     if (pem.publicKey == null) {
-      throw new MissingPublicKeyException("The provided PEM encoded string did not contain a public key.");
+      throw new MissingPublicKeyException("PEM did not contain a public key");
     }
     return asPublic(pem.publicKey, expected);
   }

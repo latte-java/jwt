@@ -47,14 +47,14 @@ public class ECSignerTest extends BaseJWTTest {
       ECSigner.newSHA256Signer(readFile("rsa_private_key_2048.pem"));
       fail("Expected exception.");
     } catch (InvalidKeyTypeException e) {
-      assertTrue(e.getMessage().startsWith("Expecting a private key of type [ECPrivateKey], but found ["));
+      assertTrue(e.getMessage().startsWith("Expected private key of type [ECPrivateKey] but found ["));
     }
 
     try {
       ECSigner.newSHA256Signer(PEM.decode(readFile("rsa_private_key_2048.pem")).privateKey);
       fail("Expected exception.");
     } catch (InvalidKeyTypeException e) {
-      assertTrue(e.getMessage().startsWith("Expecting a private key of type [ECPrivateKey], but found ["));
+      assertTrue(e.getMessage().startsWith("Expected private key of type [ECPrivateKey] but found ["));
     }
   }
 

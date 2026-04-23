@@ -49,7 +49,7 @@ final class RSAFamily {
       case "RS384" -> "SHA384withRSA";
       case "RS512" -> "SHA512withRSA";
       default ->
-          throw new IllegalArgumentException("Not an RSA-PKCS1 algorithm: [" + algorithm.name() + "]");
+          throw new IllegalArgumentException("Not an RSA-PKCS1 algorithm [" + algorithm.name() + "]");
     };
   }
 
@@ -64,7 +64,7 @@ final class RSAFamily {
       case "PS384" -> new PSSParameterSpec("SHA-384", "MGF1", MGF1ParameterSpec.SHA384, 48, 1);
       case "PS512" -> new PSSParameterSpec("SHA-512", "MGF1", MGF1ParameterSpec.SHA512, 64, 1);
       default ->
-          throw new IllegalArgumentException("Not an RSASSA-PSS algorithm: [" + algorithm.name() + "]");
+          throw new IllegalArgumentException("Not an RSASSA-PSS algorithm [" + algorithm.name() + "]");
     };
   }
 
@@ -75,8 +75,8 @@ final class RSAFamily {
    */
   static void assertMinimumModulus(int bitLength) {
     if (bitLength < 2047) {
-      throw new InvalidKeyLengthException("Key length of [" + bitLength
-          + "] is less than the required key length of 2048 bits.");
+      throw new InvalidKeyLengthException("Key length [" + bitLength
+          + "] bits is less than required 2048 bits");
     }
   }
 }

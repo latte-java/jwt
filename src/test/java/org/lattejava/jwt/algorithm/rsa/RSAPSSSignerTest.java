@@ -37,14 +37,14 @@ public class RSAPSSSignerTest extends BaseJWTTest {
       RSAPSSSigner.newSHA256Signer(readFile("ec_private_key_p_256.pem"));
       fail("Expected exception.");
     } catch (InvalidKeyTypeException e) {
-      assertTrue(e.getMessage().startsWith("Expecting a private key of type [RSAPrivateKey], but found ["));
+      assertTrue(e.getMessage().startsWith("Expected private key of type [RSAPrivateKey] but found ["));
     }
 
     try {
       RSAPSSSigner.newSHA256Signer(PEM.decode(readFile("ec_private_key_p_256.pem")).privateKey);
       fail("Expected exception.");
     } catch (InvalidKeyTypeException e) {
-      assertTrue(e.getMessage().startsWith("Expecting a private key of type [RSAPrivateKey], but found ["));
+      assertTrue(e.getMessage().startsWith("Expected private key of type [RSAPrivateKey] but found ["));
     }
   }
 

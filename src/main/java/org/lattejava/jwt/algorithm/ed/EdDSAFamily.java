@@ -42,13 +42,13 @@ final class EdDSAFamily {
    */
   static Algorithm algorithmForCurveName(String curveName) {
     if (curveName == null) {
-      throw new InvalidKeyTypeException("EdDSA key did not report a curve name.");
+      throw new InvalidKeyTypeException("EdDSA key did not report a curve name");
     }
     return switch (curveName) {
       case "Ed25519" -> Algorithm.Ed25519;
       case "Ed448" -> Algorithm.Ed448;
       default ->
-          throw new InvalidKeyTypeException("Unsupported EdDSA curve [" + curveName + "]. Expected Ed25519 or Ed448.");
+          throw new InvalidKeyTypeException("Unsupported EdDSA curve [" + curveName + "], expected Ed25519 or Ed448");
     };
   }
 
@@ -61,7 +61,7 @@ final class EdDSAFamily {
       case "Ed25519" -> 64;
       case "Ed448" -> 114;
       default ->
-          throw new IllegalArgumentException("Not an EdDSA algorithm: [" + algorithm.name() + "]");
+          throw new IllegalArgumentException("Not an EdDSA algorithm [" + algorithm.name() + "]");
     };
   }
 
@@ -75,7 +75,7 @@ final class EdDSAFamily {
       case "Ed25519" -> "Ed25519";
       case "Ed448" -> "Ed448";
       default ->
-          throw new IllegalArgumentException("Not an EdDSA algorithm: [" + algorithm.name() + "]");
+          throw new IllegalArgumentException("Not an EdDSA algorithm [" + algorithm.name() + "]");
     };
   }
 
@@ -88,8 +88,8 @@ final class EdDSAFamily {
   static void assertCurveMatchesAlgorithm(String curveName, Algorithm algorithm) {
     Algorithm actual = algorithmForCurveName(curveName);
     if (actual != algorithm) {
-      throw new InvalidKeyTypeException("The provided EdDSA key uses curve [" + curveName
-          + "] which is not compatible with algorithm [" + algorithm.name() + "].");
+      throw new InvalidKeyTypeException("EdDSA key uses curve [" + curveName
+          + "] but requested algorithm [" + algorithm.name() + "]");
     }
   }
 }

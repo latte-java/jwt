@@ -61,7 +61,7 @@ public class EdDSASignerTest extends BaseJWTTest {
       fail("Expected an exception to be thrown.");
     } catch (Exception e) {
       assertTrue(e instanceof MissingVerifierException);
-      assertEquals(e.getMessage(), "No Verifier has been provided for verify a signature signed using [Ed25519]");
+      assertEquals(e.getMessage(), "No verifier provided to verify signature signed using [Ed25519]");
     }
   }
 

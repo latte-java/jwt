@@ -184,7 +184,7 @@ public class JWTDecoder {
     Verifier verifier = resolver.resolve(header);
     if (verifier == null || !verifier.canVerify(header.alg())) {
       throw new MissingVerifierException(
-          "No Verifier has been provided for verify a signature signed using ["
+          "No verifier provided to verify signature signed using ["
               + header.alg().name() + "]");
     }
 

@@ -46,7 +46,7 @@ final class HMACFamily {
       case "HS384" -> "HmacSHA384";
       case "HS512" -> "HmacSHA512";
       default ->
-          throw new IllegalArgumentException("Not an HMAC algorithm: [" + algorithm.name() + "]");
+          throw new IllegalArgumentException("Not an HMAC algorithm [" + algorithm.name() + "]");
     };
   }
 
@@ -62,9 +62,9 @@ final class HMACFamily {
       default -> 0;
     };
     if (secret.length < minimumLength) {
-      throw new InvalidKeyLengthException("Secret length of [" + secret.length
-          + "] bytes is less than the required length of [" + minimumLength
-          + "] bytes for algorithm [" + algorithm.name() + "].");
+      throw new InvalidKeyLengthException("Secret length [" + secret.length
+          + "] bytes is less than required [" + minimumLength
+          + "] bytes for algorithm [" + algorithm.name() + "]");
     }
   }
 }
