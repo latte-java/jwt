@@ -23,6 +23,8 @@
 
 package org.lattejava.jwt;
 
+import org.lattejava.jwt.internal.MessageSanitizer;
+
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
@@ -301,7 +303,7 @@ public class JWTDecoder {
     }
     String typ = header.typ();
     if (typ == null || !typ.equalsIgnoreCase(expectedType)) {
-      throw new InvalidJWTException("Header [typ] [" + typ
+      throw new InvalidJWTException("Header [typ] [" + MessageSanitizer.forMessage(typ)
           + "] does not match expectedType [" + expectedType + "]");
     }
   }
@@ -323,7 +325,7 @@ public class JWTDecoder {
       String entry = (String) name;
       if (!criticalHeaders.contains(entry)) {
         throw new InvalidJWTException(
-            "Header [crit] lists unrecognized critical parameter [" + entry + "]");
+            "Header [crit] lists unrecognized critical parameter [" + MessageSanitizer.forMessage(entry) + "]");
       }
     }
   }
