@@ -42,7 +42,6 @@ import java.security.spec.PSSParameterSpec;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Objects;
 
 /**
  * Facade for X.509 certificate construction.
@@ -76,13 +75,12 @@ public final class X509 {
   }
 
   /**
-   * Builder for a single X.509 certificate. Calling
-   * {@link #build(PrivateKey, Algorithm)} performs live cryptographic
-   * signing; each invocation signs fresh bytes and returns a new
-   * {@link X509Certificate}. The builder may be reused to produce
-   * additional certificates with the same TBS fields, but typical
-   * callers should construct a fresh builder per certificate since
-   * serial number and timestamps should differ.
+   * Builder for a single X.509 certificate. Calling {@link #build()} performs
+   * live cryptographic signing; each invocation signs fresh bytes and returns
+   * a new {@link X509Certificate}. The builder may be reused to produce
+   * additional certificates with the same TBS fields, but typical callers
+   * should construct a fresh builder per certificate since serial number and
+   * timestamps should differ.
    */
   public static final class Builder {
     private BigInteger serialNumber;
@@ -96,6 +94,10 @@ public final class X509 {
     private Instant notAfter;
 
     private PublicKey publicKey;
+
+    private PrivateKey signingKey;
+
+    private Algorithm signatureAlgorithm;
 
     private Builder() {}
 
@@ -126,17 +128,33 @@ public final class X509 {
     }
 
     /**
-     * Build the certificate, sign it with the supplied private key under the supplied
-     * signature algorithm, and return the parsed {@link X509Certificate}.
-     *
-     * @param signingKey the private key to sign with (self-signed: must match the
-     *     {@code publicKey} for the cert to verify against itself)
-     * @param signatureAlgorithm the JWA algorithm; must be one of the supported set
-     * @return the parsed X.509 certificate
+     * Set the private key used to sign the certificate. For a self-signed
+     * certificate this must correspond to {@link #publicKey(PublicKey)} so the
+     * cert verifies against itself.
      */
-    public X509Certificate build(PrivateKey signingKey, Algorithm signatureAlgorithm) {
-      Objects.requireNonNull(signingKey, "signingKey");
-      Objects.requireNonNull(signatureAlgorithm, "signatureAlgorithm");
+    public Builder signingKey(PrivateKey key) {
+      this.signingKey = key;
+      return this;
+    }
+
+    /**
+     * Set the JWA algorithm used to sign the certificate. Must be one of the
+     * supported set (RS256/384/512, PS256/384/512, ES256/384/512, Ed25519,
+     * Ed448).
+     */
+    public Builder signatureAlgorithm(Algorithm algorithm) {
+      this.signatureAlgorithm = algorithm;
+      return this;
+    }
+
+    /**
+     * Build the certificate, sign it with the configured signing key under the
+     * configured signature algorithm, and return the parsed {@link
+     * X509Certificate}.
+     */
+    public X509Certificate build() {
+      require(signingKey != null, "signingKey");
+      require(signatureAlgorithm != null, "signatureAlgorithm");
       require(serialNumber != null, "serialNumber");
       require(issuerDn != null, "issuer");
       require(subjectDn != null, "subject");

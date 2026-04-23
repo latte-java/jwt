@@ -122,82 +122,178 @@ public final class JSONWebKey {
 
   // ---------- Typed accessors ----------
 
+  /**
+   * The {@code alg} parameter (RFC 7517 §4.4) identifies the algorithm intended for use with
+   * this key.
+   */
   public Algorithm alg() {
     return alg;
   }
 
+  /**
+   * The Elliptic Curve name for EC and OKP keys. Common values:
+   * <ul>
+   *   <li>{@code P-256}, {@code P-384}, {@code P-521} — EC (RFC 7518 §6.2.1.1)</li>
+   *   <li>{@code Ed25519}, {@code Ed448} — OKP (RFC 8037 §2)</li>
+   * </ul>
+   */
   public String crv() {
     return crv;
   }
 
+  /**
+   * The {@code d} parameter. For RSA (RFC 7518 §6.3.2.1) this is the private exponent. For EC
+   * (RFC 7518 §6.2.2.1) and OKP (RFC 8037 §2) this is the private key value. Represented as a
+   * Base64urlUInt-encoded value for RSA/EC and a base64url-encoded octet string for OKP.
+   */
   public String d() {
     return d;
   }
 
+  /**
+   * The {@code dp} parameter (RFC 7518 §6.3.2.4): the first factor CRT (Chinese Remainder
+   * Theorem) exponent for the RSA private key. Represented as a Base64urlUInt-encoded value.
+   */
   public String dp() {
     return dp;
   }
 
+  /**
+   * The {@code dq} parameter (RFC 7518 §6.3.2.5): the second factor CRT (Chinese Remainder
+   * Theorem) exponent for the RSA private key. Represented as a Base64urlUInt-encoded value.
+   */
   public String dq() {
     return dq;
   }
 
+  /**
+   * The {@code e} parameter (RFC 7518 §6.3.1.2): the public exponent of the RSA public key.
+   * Represented as a Base64urlUInt-encoded value.
+   */
   public String e() {
     return e;
   }
 
+  /**
+   * The {@code kid} parameter (RFC 7517 §4.5): key identifier. Used to match a key to a JWS
+   * header's {@code kid} parameter during signature verification.
+   */
   public String kid() {
     return kid;
   }
 
+  /**
+   * The {@code kty} parameter (RFC 7517 §4.1) identifying the cryptographic family:
+   * <ul>
+   *   <li>{@code EC}  — Elliptic Curve (RFC 7518 §6.2)</li>
+   *   <li>{@code RSA} — RSA (RFC 7518 §6.3)</li>
+   *   <li>{@code OKP} — Octet Key Pair, used for Edwards curves (RFC 8037)</li>
+   *   <li>{@code oct} — Octet sequence, used for symmetric keys (RFC 7518 §6.4)</li>
+   * </ul>
+   */
   public KeyType kty() {
     return kty;
   }
 
+  /**
+   * The {@code key_ops} parameter (RFC 7517 §4.3) identifying the operations this key is
+   * intended for. Values include {@code sign}, {@code verify}, {@code encrypt}, {@code decrypt},
+   * {@code wrapKey}, {@code unwrapKey}, {@code deriveKey}, {@code deriveBits}.
+   */
   public List<String> key_ops() {
     return key_ops;
   }
 
+  /**
+   * The {@code n} parameter (RFC 7518 §6.3.1.1): the modulus of the RSA public key. Represented
+   * as a Base64urlUInt-encoded value.
+   */
   public String n() {
     return n;
   }
 
+  /**
+   * The {@code p} parameter (RFC 7518 §6.3.2.2): the first prime factor of the RSA private key.
+   * Represented as a Base64urlUInt-encoded value.
+   */
   public String p() {
     return p;
   }
 
+  /**
+   * The {@code q} parameter (RFC 7518 §6.3.2.3): the second prime factor of the RSA private
+   * key. Represented as a Base64urlUInt-encoded value.
+   */
   public String q() {
     return q;
   }
 
+  /**
+   * The {@code qi} parameter (RFC 7518 §6.3.2.6): the first CRT (Chinese Remainder Theorem)
+   * coefficient for the RSA private key. Represented as a Base64urlUInt-encoded value.
+   */
   public String qi() {
     return qi;
   }
 
+  /**
+   * The {@code use} parameter (RFC 7517 §4.2) identifying the intended use of the public key:
+   * <ul>
+   *   <li>{@code sig} — signature</li>
+   *   <li>{@code enc} — encryption</li>
+   * </ul>
+   */
   public String use() {
     return use;
   }
 
+  /**
+   * The {@code x} parameter. For EC (RFC 7518 §6.2.1.2) this is the x coordinate of the public
+   * point, Base64urlUInt-encoded. For OKP (RFC 8037 §2) this is the public key octet string,
+   * base64url-encoded.
+   */
   public String x() {
     return x;
   }
 
+  /**
+   * The {@code x5c} parameter (RFC 7517 §4.7): the X.509 certificate chain. Each entry is a
+   * base64-encoded (not base64url) DER-encoded X.509 certificate; the first entry holds the
+   * certificate matching this key.
+   */
   public List<String> x5c() {
     return x5c;
   }
 
+  /**
+   * The {@code x5t} parameter (RFC 7517 §4.8): the base64url-encoded SHA-1 thumbprint of the
+   * DER-encoded X.509 certificate matching this key. Prefer {@link #x5tS256()} for new use; see
+   * RFC 6194 on SHA-1 collision resistance.
+   */
   public String x5t() {
     return x5t;
   }
 
+  /**
+   * The {@code x5t#S256} parameter (RFC 7517 §4.9): the base64url-encoded SHA-256 thumbprint of
+   * the DER-encoded X.509 certificate matching this key.
+   */
   public String x5tS256() {
     return x5tS256;
   }
 
+  /**
+   * The {@code x5u} parameter (RFC 7517 §4.6): a URI that refers to a resource for the X.509
+   * public key certificate or certificate chain.
+   */
   public String x5u() {
     return x5u;
   }
 
+  /**
+   * The {@code y} parameter (RFC 7518 §6.2.1.3): the y coordinate of the EC public point.
+   * Represented as a Base64urlUInt-encoded value.
+   */
   public String y() {
     return y;
   }

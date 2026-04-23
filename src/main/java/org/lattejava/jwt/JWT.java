@@ -87,35 +87,84 @@ public final class JWT {
   }
 
   // ---------- Fluent getters ----------
+
+  /**
+   * Registered Claim {@code iss} as defined by RFC 7519 §4.1.1. Use of this claim is OPTIONAL.
+   * <p>
+   * The issuer claim identifies the principal that issued the JWT. If the value contains a
+   * {@code :} it must be a URI.
+   */
   public String issuer() {
     return issuer;
   }
 
+  /**
+   * Registered Claim {@code sub} as defined by RFC 7519 §4.1.2. Use of this claim is OPTIONAL.
+   * <p>
+   * The subject claim identifies the principal that is the subject of the JWT. If the value
+   * contains a {@code :} it must be a URI.
+   */
   public String subject() {
     return subject;
   }
 
+  /**
+   * Registered Claim {@code exp} as defined by RFC 7519 §4.1.4. Use of this claim is OPTIONAL.
+   * <p>
+   * The expiration time claim identifies the expiration time on or after which the JWT MUST NOT
+   * be accepted for processing. Serialized as NumericDate (seconds since Epoch).
+   */
   public Instant expiresAt() {
     return expiresAt;
   }
 
+  /**
+   * Registered Claim {@code nbf} as defined by RFC 7519 §4.1.5. Use of this claim is OPTIONAL.
+   * <p>
+   * This claim identifies the time before which the JWT MUST NOT be accepted for processing.
+   * Serialized as NumericDate (seconds since Epoch).
+   */
   public Instant notBefore() {
     return notBefore;
   }
 
+  /**
+   * Registered Claim {@code iat} as defined by RFC 7519 §4.1.6. Use of this claim is OPTIONAL.
+   * <p>
+   * The issued at claim identifies the time at which the JWT was issued. Serialized as
+   * NumericDate (seconds since Epoch).
+   */
   public Instant issuedAt() {
     return issuedAt;
   }
 
+  /**
+   * Registered Claim {@code jti} as defined by RFC 7519 §4.1.7. Use of this claim is OPTIONAL.
+   * <p>
+   * The JWT ID claim provides a unique identifier for the JWT.
+   */
   public String id() {
     return id;
   }
 
+  /**
+   * The decoded JWT header. This is not considered part of the JWT payload, but is attached
+   * here for caller convenience.
+   */
   public Header header() {
     return header;
   }
 
   // ---------- Audience ----------
+
+  /**
+   * Registered Claim {@code aud} as defined by RFC 7519 §4.1.3. Use of this claim is OPTIONAL.
+   * <p>
+   * The audience claim identifies the recipients that the JWT is intended for. On the wire this
+   * may be an array of strings or a single string; any string values containing a {@code :} must
+   * be URIs. This accessor always returns a list (empty if the claim is absent); the recorded
+   * wire form is preserved for serialization via {@link #audienceWireForm()}.
+   */
   public List<String> audience() {
     return audience;
   }
@@ -268,6 +317,12 @@ public final class JWT {
   }
 
   // ---------- Maps ----------
+
+  /**
+   * Returns all claims (registered + custom) as Java-typed values — timestamps are returned as
+   * {@link Instant}, not as epoch-seconds. Suitable for callers reading claim state; for JSON
+   * serialization use {@link #toSerializableMap()} which emits timestamps as NumericDate.
+   */
   public Map<String, Object> claims() {
     Map<String, Object> merged = new LinkedHashMap<>();
     if (issuer != null) merged.put("iss", issuer);
@@ -285,6 +340,11 @@ public final class JWT {
     return Collections.unmodifiableMap(merged);
   }
 
+  /**
+   * Returns a JSON-serializable view of the claims. Timestamps ({@code exp}, {@code nbf},
+   * {@code iat}) are emitted as NumericDate (epoch seconds) per RFC 7519 §2, and {@code aud} is
+   * emitted as either a single string or an array to match the recorded wire form.
+   */
   public Map<String, Object> toSerializableMap() {
     Map<String, Object> out = new LinkedHashMap<>();
     if (issuer != null) out.put("iss", issuer);

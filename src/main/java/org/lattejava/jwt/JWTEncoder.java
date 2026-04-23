@@ -83,19 +83,6 @@ public class JWTEncoder {
   }
 
   // ----------------------------------------------------------------------
-  // Backwards-compatible bridges (TODO Checkpoint 8: remove after legacy
-  // callers migrate to the new HeaderCustomizer-shaped API).
-  // ----------------------------------------------------------------------
-
-  // ----------------------------------------------------------------------
-  // No legacy bridges: existing call sites use the new
-  // Consumer<HeaderCustomizer> shape via lambdas like b -> b.kid("abc"),
-  // which compile-fits the new interface (typ/kid/parameter are all available
-  // on HeaderCustomizer). Pre-existing test callers continue to work without
-  // bridge methods.
-  // ----------------------------------------------------------------------
-
-  // ----------------------------------------------------------------------
 
   private String encodeInternal(JWT jwt, Signer signer, Consumer<HeaderCustomizer> customizer) {
     Objects.requireNonNull(jwt, "jwt");

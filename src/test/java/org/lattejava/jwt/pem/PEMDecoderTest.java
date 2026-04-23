@@ -54,7 +54,9 @@ public class PEMDecoderTest {
         .subject("CN=TBS Subject")
         .validity(notBefore, notAfter)
         .publicKey(kp.getPublic())
-        .build(kp.getPrivate(), Algorithm.RS256);
+        .signingKey(kp.getPrivate())
+        .signatureAlgorithm(Algorithm.RS256)
+        .build();
 
     PEMDecoder.TBSFields tbs = new PEMDecoder().decodeTBSCertificateFields(cert.getEncoded());
     assertEquals(tbs.serialNumber(), BigInteger.valueOf(424242));

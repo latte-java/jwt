@@ -81,7 +81,9 @@ public class X509BuilderTest extends BaseJWTTest {
         .subject("CN=Latte Test Subject")
         .validity(notBefore, notAfter)
         .publicKey(kp.getPublic())
-        .build(kp.getPrivate(), algorithm);
+        .signingKey(kp.getPrivate())
+        .signatureAlgorithm(algorithm)
+        .build();
 
     assertNotNull(cert);
 
@@ -110,8 +112,10 @@ public class X509BuilderTest extends BaseJWTTest {
         .issuer("CN=A")
         .subject("CN=A")
         .validity(t.plus(1, ChronoUnit.DAYS), t)
-        .publicKey(kp.getPublic());
-    assertThrows(IllegalStateException.class, () -> b.build(kp.getPrivate(), Algorithm.RS256));
+        .publicKey(kp.getPublic())
+        .signingKey(kp.getPrivate())
+        .signatureAlgorithm(Algorithm.RS256);
+    assertThrows(IllegalStateException.class, b::build);
   }
 
   @Test
@@ -123,8 +127,10 @@ public class X509BuilderTest extends BaseJWTTest {
         .serialNumber(BigInteger.ONE)
         .issuer("CN=A")
         .validity(now, now.plus(30, ChronoUnit.DAYS))
-        .publicKey(kp.getPublic());
-    assertThrows(IllegalStateException.class, () -> b.build(kp.getPrivate(), Algorithm.RS256));
+        .publicKey(kp.getPublic())
+        .signingKey(kp.getPrivate())
+        .signatureAlgorithm(Algorithm.RS256);
+    assertThrows(IllegalStateException.class, b::build);
   }
 
   @Test
@@ -136,8 +142,10 @@ public class X509BuilderTest extends BaseJWTTest {
         .serialNumber(BigInteger.ONE)
         .issuer("CN=A")
         .subject("CN=B")
-        .validity(now, now.plus(30, ChronoUnit.DAYS));
-    assertThrows(IllegalStateException.class, () -> b.build(kp.getPrivate(), Algorithm.RS256));
+        .validity(now, now.plus(30, ChronoUnit.DAYS))
+        .signingKey(kp.getPrivate())
+        .signatureAlgorithm(Algorithm.RS256);
+    assertThrows(IllegalStateException.class, b::build);
   }
 
   @Test
@@ -149,8 +157,10 @@ public class X509BuilderTest extends BaseJWTTest {
         .issuer("CN=A")
         .subject("CN=B")
         .validity(now, now.plus(30, ChronoUnit.DAYS))
-        .publicKey(kp.getPublic());
-    assertThrows(IllegalStateException.class, () -> b.build(kp.getPrivate(), Algorithm.RS256));
+        .publicKey(kp.getPublic())
+        .signingKey(kp.getPrivate())
+        .signatureAlgorithm(Algorithm.RS256);
+    assertThrows(IllegalStateException.class, b::build);
   }
 
   @Test
@@ -164,7 +174,9 @@ public class X509BuilderTest extends BaseJWTTest {
         .subject("CN=PEM Subject")
         .validity(now, now.plus(30, ChronoUnit.DAYS))
         .publicKey(kp.getPublic())
-        .build(kp.getPrivate(), Algorithm.ES256);
+        .signingKey(kp.getPrivate())
+        .signatureAlgorithm(Algorithm.ES256)
+        .build();
     String pem = new PEMEncoder().encode(cert);
 
     assertTrue(pem.contains("-----BEGIN CERTIFICATE-----"));
@@ -188,7 +200,9 @@ public class X509BuilderTest extends BaseJWTTest {
         .subject("CN=Boundary")
         .validity(notBefore, notAfter)
         .publicKey(kp.getPublic())
-        .build(kp.getPrivate(), Algorithm.ES256);
+        .signingKey(kp.getPrivate())
+        .signatureAlgorithm(Algorithm.ES256)
+        .build();
 
     assertEquals(cert.getNotBefore().toInstant(), notBefore);
     assertEquals(cert.getNotAfter().toInstant(), notAfter);

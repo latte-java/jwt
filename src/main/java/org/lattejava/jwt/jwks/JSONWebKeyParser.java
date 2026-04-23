@@ -17,6 +17,7 @@
 package org.lattejava.jwt.jwks;
 
 import org.lattejava.jwt.KeyType;
+import org.lattejava.jwt.internal.MessageSanitizer;
 import org.lattejava.jwt.pem.PEMEncoder;
 import org.lattejava.jwt.pem.PEM;
 
@@ -80,7 +81,7 @@ public class JSONWebKeyParser {
             parameters.init(new ECGenParameterSpec("secp521r1"));
             break;
           default:
-            throw new UnsupportedOperationException("Unsupported EC curve [" + key.crv() + "], expected [P-256], [P-384], or [P-521]");
+            throw new UnsupportedOperationException("Unsupported EC curve [" + MessageSanitizer.forMessage(key.crv()) + "], expected [P-256], [P-384], or [P-521]");
         }
 
         ECParameterSpec ecParameterSpec = parameters.getParameterSpec(ECParameterSpec.class);
@@ -97,7 +98,7 @@ public class JSONWebKeyParser {
         return publicKey;
       } else if (key.kty() == KeyType.OKP) {
         if (!"Ed25519".equals(key.crv()) && !"Ed448".equals(key.crv())) {
-          throw new UnsupportedOperationException("Unsupported OKP curve [" + key.crv() + "], expected [Ed25519] or [Ed448]");
+          throw new UnsupportedOperationException("Unsupported OKP curve [" + MessageSanitizer.forMessage(key.crv()) + "], expected [Ed25519] or [Ed448]");
         }
 
         byte[] bytes = Base64.getUrlDecoder().decode(key.x());
@@ -117,7 +118,7 @@ public class JSONWebKeyParser {
       throw new JSONWebKeyParserException("Failed to parse JWK", e);
     }
 
-    throw new UnsupportedOperationException("Unsupported JWK [kty] [" + key.kty() + "], expected [RSA], [EC], or [OKP]");
+    throw new UnsupportedOperationException("Unsupported JWK [kty] [" + MessageSanitizer.forMessage(String.valueOf(key.kty())) + "], expected [RSA], [EC], or [OKP]");
   }
 
   /**
@@ -160,7 +161,7 @@ public class JSONWebKeyParser {
       }
     }
 
-    throw new UnsupportedOperationException("Unsupported JWK [kty] [" + key.kty() + "], expected [RSA], [EC], or [OKP]");
+    throw new UnsupportedOperationException("Unsupported JWK [kty] [" + MessageSanitizer.forMessage(String.valueOf(key.kty())) + "], expected [RSA], [EC], or [OKP]");
   }
 
   private void verifyX5cEC(JSONWebKey key, BigInteger expectedXCoordinate, BigInteger expectedYCoordinate) {
