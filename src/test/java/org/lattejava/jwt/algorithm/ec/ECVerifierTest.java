@@ -25,7 +25,6 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import java.nio.charset.StandardCharsets;
-import java.security.InvalidParameterException;
 import java.security.interfaces.ECPublicKey;
 import java.util.Arrays;
 
@@ -81,11 +80,9 @@ public class ECVerifierTest extends BaseJWTTest {
   private void assertFailed(String fileName) {
     try {
       ECVerifier.newVerifier(readFile(fileName));
-      Assert.fail("Expected [InvalidParameterException] exception");
-    } catch (InvalidParameterException e) {
-      assertEquals(e.getMessage(), "Unexpected public key format", "[" + fileName + "]");
+      Assert.fail("Expected [MissingPublicKeyException] exception");
     } catch (MissingPublicKeyException e) {
-      assertEquals(e.getMessage(), "PEM did not contain a public key");
+      assertEquals(e.getMessage(), "PEM did not contain a public key", "[" + fileName + "]");
     } catch (Exception e) {
       Assert.fail("Unexpected exception when parsing file [" + fileName + "]", e);
     }
