@@ -123,8 +123,8 @@ public class JWTEncoder {
     // the encoded header MUST advertise the signer's algorithm.
     if (header.alg() == null || !header.alg().name().equals(signer.algorithm().name())) {
       throw new IllegalStateException(
-          "Encoder invariant violated: header.alg [" + (header.alg() == null ? "null" : header.alg().name())
-              + "] must equal signer.algorithm [" + signer.algorithm().name() + "]");
+          "Encoder invariant violated: expected header.alg [" + signer.algorithm().name()
+              + "] but found [" + (header.alg() == null ? "null" : header.alg().name()) + "]");
     }
 
     // Steps 2-3: serialize header and payload, base64url (no padding).

@@ -320,12 +320,12 @@ public class AuthorizationServerMetaData {
   @SuppressWarnings("unchecked")
   private static List<String> stringList(Object value, String name) {
     if (!(value instanceof List)) {
-      throw new IllegalArgumentException("Server metadata field [" + name + "] must be an array of strings.");
+      throw new IllegalArgumentException("Server metadata field [" + name + "] must be an array of strings");
     }
     List<String> result = new ArrayList<>();
     for (Object element : (List<Object>) value) {
       if (!(element instanceof String)) {
-        throw new IllegalArgumentException("Server metadata field [" + name + "] must be an array of strings.");
+        throw new IllegalArgumentException("Server metadata field [" + name + "] must be an array of strings");
       }
       result.add((String) element);
     }
@@ -448,7 +448,7 @@ public class AuthorizationServerMetaData {
     public Builder claim(String name, Object value) {
       Objects.requireNonNull(name, "name");
       if (REGISTERED.contains(name)) {
-        throw new IllegalArgumentException("Cannot add a registered server-metadata claim [" + name + "]; use the typed setter.");
+        throw new IllegalArgumentException("Cannot add a registered server-metadata claim [" + name + "]; use the typed setter");
       }
       otherClaims.put(name, value);
       return this;

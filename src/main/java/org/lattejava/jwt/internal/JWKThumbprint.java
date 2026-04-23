@@ -62,13 +62,13 @@ public final class JWKThumbprint {
    */
   public static String compute(String algorithm, JSONWebKey key) {
     if (algorithm == null) {
-      throw new IllegalArgumentException("algorithm is null");
+      throw new IllegalArgumentException("Algorithm is null");
     }
     if (key == null) {
-      throw new IllegalArgumentException("key is null");
+      throw new IllegalArgumentException("Key is null");
     }
     if (key.kty() == null) {
-      throw new IllegalArgumentException("key.kty is null");
+      throw new IllegalArgumentException("JWK [kty] is null");
     }
 
     Map<String, Object> members = canonicalMembers(key);

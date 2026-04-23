@@ -143,7 +143,7 @@ public final class X509 {
       require(notBefore != null && notAfter != null, "validity");
       require(publicKey != null, "publicKey");
       if (notBefore.isAfter(notAfter)) {
-        throw new IllegalStateException("notBefore (" + notBefore + ") must not be after notAfter (" + notAfter + ")");
+        throw new IllegalStateException("Expected notBefore [" + notBefore + "] not after notAfter [" + notAfter + "]");
       }
 
       try {
@@ -210,13 +210,13 @@ public final class X509 {
       for (String rdn : rdns) {
         int eq = rdn.indexOf('=');
         if (eq <= 0) {
-          throw new IllegalArgumentException("Malformed RDN segment: " + rdn);
+          throw new IllegalArgumentException("Malformed RDN segment [" + rdn + "]");
         }
         String type = rdn.substring(0, eq).trim();
         String value = rdn.substring(eq + 1).trim();
         String oid = attributeOids.get(type);
         if (oid == null) {
-          throw new IllegalArgumentException("Unsupported DN attribute: " + type);
+          throw new IllegalArgumentException("Unsupported DN attribute [" + type + "]");
         }
 
         // SET OF SEQUENCE { AttributeType OID, AttributeValue UTF8String }
@@ -269,7 +269,7 @@ public final class X509 {
         case "Ed448":
           return eddsaAlgId(ObjectIdentifier.EdDSA_448);
         default:
-          throw new IllegalArgumentException("Unsupported signature algorithm for X.509: " + name);
+          throw new IllegalArgumentException("Unsupported signature algorithm for X.509 [" + name + "]");
       }
     }
 
@@ -359,7 +359,7 @@ public final class X509 {
         case "Ed25519": signature = Signature.getInstance("Ed25519"); break;
         case "Ed448":   signature = Signature.getInstance("Ed448"); break;
         default:
-          throw new IllegalArgumentException("Unsupported signature algorithm for X.509: " + name);
+          throw new IllegalArgumentException("Unsupported signature algorithm for X.509 [" + name + "]");
       }
       signature.initSign(key);
       signature.update(tbs);
@@ -368,7 +368,7 @@ public final class X509 {
 
     private static void require(boolean cond, String field) {
       if (!cond) {
-        throw new IllegalStateException("X509.Builder requires " + field);
+        throw new IllegalStateException("X509.Builder requires [" + field + "]");
       }
     }
   }

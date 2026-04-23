@@ -88,8 +88,7 @@ public class OpenIDConnect {
         leftMostBytes = SHAKE256.digest(input, 57);
         break;
       default:
-        throw new IllegalArgumentException("You specified an unsupported algorithm. The algorithm [" + algorithm + "]"
-            + " is not supported. You must use Ed25519, Ed448, ES256, ES384, ES512, HS256, HS384, HS512, PS256, PS384, PS512, RS256, RS384 or RS512.");
+        throw new IllegalArgumentException("Unsupported algorithm [" + algorithm + "]");
     }
 
     return new String(Base64.getUrlEncoder().withoutPadding().encode(leftMostBytes));

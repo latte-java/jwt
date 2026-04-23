@@ -90,7 +90,7 @@ public final class Signers {
       case "HS384" -> HMACSigner.newSHA384Signer(secret, kid);
       case "HS512" -> HMACSigner.newSHA512Signer(secret, kid);
       default -> throw new IllegalArgumentException(
-          "forHMAC requires an HMAC algorithm (HS256/HS384/HS512); got " + algorithm.name());
+          "Expected HMAC algorithm but found [" + algorithm.name() + "]");
     };
   }
 
@@ -110,7 +110,7 @@ public final class Signers {
       case "HS384" -> HMACSigner.newSHA384Signer(secret, kid);
       case "HS512" -> HMACSigner.newSHA512Signer(secret, kid);
       default -> throw new IllegalArgumentException(
-          "forHMAC requires an HMAC algorithm (HS256/HS384/HS512); got " + algorithm.name());
+          "Expected HMAC algorithm but found [" + algorithm.name() + "]");
     };
   }
 
@@ -154,7 +154,7 @@ public final class Signers {
       case "ES256K" -> ECSigner.newSecp256k1Signer(pemPrivateKey, kid);
       case "Ed25519", "Ed448" -> EdDSASigner.newSigner(pemPrivateKey, kid);
       default -> throw new IllegalArgumentException(
-          "forAsymmetric requires an asymmetric algorithm (RS*/PS*/ES*/Ed*); got " + algorithm.name());
+          "Expected asymmetric algorithm but found [" + algorithm.name() + "]");
     };
   }
 
@@ -194,7 +194,7 @@ public final class Signers {
       case "ES256K" -> ECSigner.newSecp256k1Signer(privateKey, kid);
       case "Ed25519", "Ed448" -> EdDSASigner.newSigner(privateKey, kid);
       default -> throw new IllegalArgumentException(
-          "forAsymmetric requires an asymmetric algorithm (RS*/PS*/ES*/Ed*); got " + algorithm.name());
+          "Expected asymmetric algorithm but found [" + algorithm.name() + "]");
     };
   }
 }

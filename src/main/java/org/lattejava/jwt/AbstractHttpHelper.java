@@ -82,7 +82,7 @@ public abstract class AbstractHttpHelper {
       try {
         current.setRequestMethod("GET");
       } catch (Exception e) {
-        throw exception.apply("Failed to prepare the request to [" + endpoint + "].", e);
+        throw exception.apply("Failed to prepare the request to [" + endpoint + "]", e);
       }
       // Disable auto-redirect so we can apply the per-hop body cap.
       current.setInstanceFollowRedirects(false);
@@ -90,30 +90,30 @@ public abstract class AbstractHttpHelper {
       try {
         current.connect();
       } catch (Exception e) {
-        throw exception.apply("Failed to connect to [" + endpoint + "].", e);
+        throw exception.apply("Failed to connect to [" + endpoint + "]", e);
       }
 
       int status;
       try {
         status = current.getResponseCode();
       } catch (Exception e) {
-        throw exception.apply("Failed to make a request to [" + endpoint + "].", e);
+        throw exception.apply("Failed to make a request to [" + endpoint + "]", e);
       }
 
       // Redirect handling: 301, 302, 303, 307, 308
       if (status >= 300 && status <= 399 && status != 304 && status != 305 && status != 306) {
         if (redirectsFollowed >= maxRedirects) {
-          throw new TooManyRedirectsException("Failed to make a request to [" + originalEndpoint + "]: exceeded maximum redirect count of [" + maxRedirects + "].");
+          throw new TooManyRedirectsException("Failed to make a request to [" + originalEndpoint + "] after exceeding maximum redirect count [" + maxRedirects + "]");
         }
         String location = current.getHeaderField("Location");
         if (location == null || location.isEmpty()) {
-          throw exception.apply("Failed to make a request to [" + endpoint + "]: status [" + status + "] returned without a Location header.", null);
+          throw exception.apply("Failed to make a request to [" + endpoint + "]: status [" + status + "] returned without a Location header", null);
         }
         URL nextURL;
         try {
           nextURL = new URL(current.getURL(), location);
         } catch (IOException e) {
-          throw exception.apply("Failed to parse redirect Location header [" + location + "] from [" + endpoint + "].", e);
+          throw exception.apply("Failed to parse redirect Location header [" + location + "] from [" + endpoint + "]", e);
         }
         // Drain & close the body of the redirect hop so the connection can be reused.
         try {
@@ -132,7 +132,7 @@ public abstract class AbstractHttpHelper {
       }
 
       if (status < 200 || status > 299) {
-        throw exception.apply("Failed to make a request to [" + endpoint + "], a status code of [" + status + "] was returned.", null);
+        throw exception.apply("Failed to make a request to [" + endpoint + "]: status code [" + status + "] returned", null);
       }
 
       try (InputStream is = new LimitedInputStream(new BufferedInputStream(current.getInputStream()), maxResponseBytes)) {
@@ -140,7 +140,7 @@ public abstract class AbstractHttpHelper {
       } catch (RuntimeException e) {
         throw e;
       } catch (Exception e) {
-        throw exception.apply("Failed to parse the response as JSON from [" + endpoint + "].", e);
+        throw exception.apply("Failed to parse the response as JSON from [" + endpoint + "]", e);
       }
     }
   }
@@ -223,7 +223,7 @@ public abstract class AbstractHttpHelper {
       urlConnection.addRequestProperty("User-Agent", "latte-jwt (https://github.com/latte-java/jwt)");
       return urlConnection;
     } catch (IOException e) {
-      throw new JSONWebKeySetHelper.JSONWebKeySetException("Failed to build connection to [" + endpoint + "].", e);
+      throw new JSONWebKeySetHelper.JSONWebKeySetException("Failed to build connection to [" + endpoint + "]", e);
     }
   }
 }

@@ -102,7 +102,7 @@ public final class Verifiers {
       case "ES256", "ES256K", "ES384", "ES512" -> ECVerifier.newVerifier(pemPublicKey);
       case "Ed25519", "Ed448" -> EdDSAVerifier.newVerifier(pemPublicKey);
       default -> throw new IllegalArgumentException(
-          "forAsymmetric requires an asymmetric algorithm (RS*/PS*/ES*/Ed*); got " + algorithm.name());
+          "Expected asymmetric algorithm but found [" + algorithm.name() + "]");
     };
   }
 
@@ -122,7 +122,7 @@ public final class Verifiers {
       case "ES256", "ES256K", "ES384", "ES512" -> ECVerifier.newVerifier(publicKey);
       case "Ed25519", "Ed448" -> EdDSAVerifier.newVerifier(publicKey);
       default -> throw new IllegalArgumentException(
-          "forAsymmetric requires an asymmetric algorithm (RS*/PS*/ES*/Ed*); got " + algorithm.name());
+          "Expected asymmetric algorithm but found [" + algorithm.name() + "]");
     };
   }
 
@@ -175,7 +175,7 @@ public final class Verifiers {
           }
         }
         throw new MissingVerifierException(
-            "No Verifier in this anyOf composite accepts algorithm " + algorithm.name());
+            "No Verifier in anyOf composite accepts algorithm [" + algorithm.name() + "]");
       }
     };
   }
@@ -190,7 +190,7 @@ public final class Verifiers {
       case "HS256", "HS384", "HS512" -> {
       }
       default -> throw new IllegalArgumentException(
-          "forHMAC requires an HMAC algorithm (HS256/HS384/HS512); got " + algorithm.name());
+          "Expected HMAC algorithm but found [" + algorithm.name() + "]");
     }
   }
 }

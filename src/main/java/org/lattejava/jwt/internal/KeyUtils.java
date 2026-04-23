@@ -105,13 +105,12 @@ public class KeyUtils {
       case "Ed25519" -> 32;
       case "Ed448" -> 57;
       default ->
-          throw new IllegalArgumentException("You specified an unsupported algorithm. The algorithm [" + algorithm + "]"
-              + " is not supported. You must use Ed25519 or Ed448.");
+          throw new IllegalArgumentException("Unsupported algorithm [" + algorithm + "]");
     };
 
     // Ensure the caller provided a key of the correct length.
     if (privateKey.length != expectedByteLength) {
-      throw new IllegalArgumentException("The provided privateKey length is unexpected. Expected [" + expectedByteLength + "] but found [" + privateKey.length + "]");
+      throw new IllegalArgumentException("Expected private key length [" + expectedByteLength + "] but found [" + privateKey.length + "]");
     }
 
     keyPairGenerator.initialize(new NamedParameterSpec(curve), new SecureRandom() {
@@ -119,7 +118,7 @@ public class KeyUtils {
         // Note that because we pass the curve to the NamedParameterSpec constructor, it would be unexpected that the provided
         // byte array would not fit the expected key length. As a fail save, ensure it fits.
         if (bytes.length != privateKey.length) {
-          throw new IllegalStateException("Provided bytes array is not large enough for the key. Expected [" + privateKey.length + "] but found [" + bytes.length + "]");
+          throw new IllegalStateException("Expected byte array of length [" + privateKey.length + "] but found [" + bytes.length + "]");
         }
         System.arraycopy(privateKey, 0, bytes, 0, privateKey.length);
       }

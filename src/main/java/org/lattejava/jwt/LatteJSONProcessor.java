@@ -71,10 +71,10 @@ public class LatteJSONProcessor implements JSONProcessor {
    */
   public LatteJSONProcessor(int maxNestingDepth, int maxNumberLength, boolean allowDuplicateJSONKeys) {
     if (maxNestingDepth <= 0) {
-      throw new IllegalArgumentException("maxNestingDepth must be > 0, got " + maxNestingDepth);
+      throw new IllegalArgumentException("maxNestingDepth must be > 0 but found [" + maxNestingDepth + "]");
     }
     if (maxNumberLength <= 0) {
-      throw new IllegalArgumentException("maxNumberLength must be > 0, got " + maxNumberLength);
+      throw new IllegalArgumentException("maxNumberLength must be > 0 but found [" + maxNumberLength + "]");
     }
     this.maxNestingDepth = maxNestingDepth;
     this.maxNumberLength = maxNumberLength;
@@ -88,13 +88,13 @@ public class LatteJSONProcessor implements JSONProcessor {
   @Override
   public byte[] serialize(Map<String, Object> object) throws JSONProcessingException {
     if (object == null) {
-      throw new JSONProcessingException("input map is null");
+      throw new JSONProcessingException("Input map is null");
     }
     ByteArrayOutputStream out = new ByteArrayOutputStream(256);
     try {
       writeMap(object, out);
     } catch (IOException e) {
-      throw new JSONProcessingException("serialization I/O failure", e);
+      throw new JSONProcessingException("Serialization I/O failure", e);
     }
     return out.toByteArray();
   }
@@ -118,7 +118,7 @@ public class LatteJSONProcessor implements JSONProcessor {
     } else if (value instanceof Float || value instanceof Double) {
       double d = ((Number) value).doubleValue();
       if (Double.isNaN(d) || Double.isInfinite(d)) {
-        throw new JSONProcessingException("cannot serialize non-finite number: " + value);
+        throw new JSONProcessingException("Cannot serialize non-finite number [" + value + "]");
       }
       out.write(value.toString().getBytes(StandardCharsets.UTF_8));
     } else if (value instanceof Map) {
@@ -128,7 +128,7 @@ public class LatteJSONProcessor implements JSONProcessor {
     } else if (value instanceof List) {
       writeList((List<?>) value, out);
     } else {
-      throw new JSONProcessingException("unsupported value type: " + value.getClass().getName());
+      throw new JSONProcessingException("Unsupported value type [" + value.getClass().getName() + "]");
     }
   }
 
@@ -142,8 +142,8 @@ public class LatteJSONProcessor implements JSONProcessor {
       first = false;
       Object k = e.getKey();
       if (!(k instanceof String)) {
-        throw new JSONProcessingException("map keys must be String, got "
-            + (k == null ? "null" : k.getClass().getName()));
+        throw new JSONProcessingException("Expected String map key but found ["
+            + (k == null ? "null" : k.getClass().getName()) + "]");
       }
       writeString((String) k, out);
       out.write(':');
@@ -217,21 +217,21 @@ public class LatteJSONProcessor implements JSONProcessor {
   @Override
   public Map<String, Object> deserialize(byte[] json) throws JSONProcessingException {
     if (json == null) {
-      throw new JSONProcessingException("input bytes are null");
+      throw new JSONProcessingException("Input bytes are null");
     }
     String input = new String(json, StandardCharsets.UTF_8);
     Parser p = new Parser(input);
     p.skipWhitespace();
     if (p.pos >= p.len) {
-      throw new JSONProcessingException("empty input");
+      throw new JSONProcessingException("Empty input");
     }
     if (p.peek() != '{') {
-      throw new JSONProcessingException("top-level JSON value must be an object; got '" + p.peek() + "'");
+      throw new JSONProcessingException("Expected top-level JSON object but found [" + p.peek() + "]");
     }
     Object value = p.parseValue(0);
     p.skipWhitespace();
     if (p.pos != p.len) {
-      throw new JSONProcessingException("trailing content after JSON value at position " + p.pos);
+      throw new JSONProcessingException("Trailing content after JSON value at position [" + p.pos + "]");
     }
     @SuppressWarnings("unchecked")
     Map<String, Object> map = (Map<String, Object>) value;
@@ -266,11 +266,11 @@ public class LatteJSONProcessor implements JSONProcessor {
 
     void expect(char c) {
       if (pos >= len) {
-        throw new JSONProcessingException("expected '" + c + "' but reached end of input");
+        throw new JSONProcessingException("Expected [" + c + "] but reached end of input");
       }
       if (s.charAt(pos) != c) {
         throw new JSONProcessingException(
-            "expected '" + c + "' but got '" + s.charAt(pos) + "' at position " + pos);
+            "Expected [" + c + "] but found [" + s.charAt(pos) + "] at position [" + pos + "]");
       }
       pos++;
     }
@@ -278,7 +278,7 @@ public class LatteJSONProcessor implements JSONProcessor {
     Object parseValue(int depth) {
       skipWhitespace();
       if (pos >= len) {
-        throw new JSONProcessingException("unexpected end of input");
+        throw new JSONProcessingException("Unexpected end of input");
       }
       char c = s.charAt(pos);
       switch (c) {
@@ -291,14 +291,14 @@ public class LatteJSONProcessor implements JSONProcessor {
           if (c == '-' || (c >= '0' && c <= '9')) {
             return parseNumber();
           }
-          throw new JSONProcessingException("unexpected character '" + c + "' at position " + pos);
+          throw new JSONProcessingException("Unexpected character [" + c + "] at position [" + pos + "]");
       }
     }
 
     Map<String, Object> parseObject(int depth) {
       if (depth > maxNestingDepth) {
         throw new JSONProcessingException(
-            "maximum nesting depth " + maxNestingDepth + " exceeded at position " + pos);
+            "Maximum nesting depth [" + maxNestingDepth + "] exceeded at position [" + pos + "]");
       }
       expect('{');
       Map<String, Object> map = new LinkedHashMap<>();
@@ -311,19 +311,19 @@ public class LatteJSONProcessor implements JSONProcessor {
         skipWhitespace();
         if (pos >= len || s.charAt(pos) != '"') {
           throw new JSONProcessingException(
-              "expected string key at position " + pos);
+              "Expected string key at position [" + pos + "]");
         }
         String key = parseString();
         skipWhitespace();
         expect(':');
         Object value = parseValue(depth);
         if (!allowDuplicateJSONKeys && map.containsKey(key)) {
-          throw new JSONProcessingException("duplicate JSON key: \"" + key + "\"");
+          throw new JSONProcessingException("Duplicate JSON key [" + key + "]");
         }
         map.put(key, value);
         skipWhitespace();
         if (pos >= len) {
-          throw new JSONProcessingException("unterminated object at position " + pos);
+          throw new JSONProcessingException("Unterminated object at position [" + pos + "]");
         }
         char nc = s.charAt(pos);
         if (nc == ',') {
@@ -334,14 +334,14 @@ public class LatteJSONProcessor implements JSONProcessor {
           pos++;
           return map;
         }
-        throw new JSONProcessingException("expected ',' or '}' at position " + pos);
+        throw new JSONProcessingException("Expected [,] or [}] at position [" + pos + "]");
       }
     }
 
     List<Object> parseArray(int depth) {
       if (depth > maxNestingDepth) {
         throw new JSONProcessingException(
-            "maximum nesting depth " + maxNestingDepth + " exceeded at position " + pos);
+            "Maximum nesting depth [" + maxNestingDepth + "] exceeded at position [" + pos + "]");
       }
       expect('[');
       List<Object> list = new ArrayList<>();
@@ -355,7 +355,7 @@ public class LatteJSONProcessor implements JSONProcessor {
         list.add(value);
         skipWhitespace();
         if (pos >= len) {
-          throw new JSONProcessingException("unterminated array at position " + pos);
+          throw new JSONProcessingException("Unterminated array at position [" + pos + "]");
         }
         char nc = s.charAt(pos);
         if (nc == ',') {
@@ -366,7 +366,7 @@ public class LatteJSONProcessor implements JSONProcessor {
           pos++;
           return list;
         }
-        throw new JSONProcessingException("expected ',' or ']' at position " + pos);
+        throw new JSONProcessingException("Expected [,] or []] at position [" + pos + "]");
       }
     }
 
@@ -380,7 +380,7 @@ public class LatteJSONProcessor implements JSONProcessor {
         }
         if (c == '\\') {
           if (pos >= len) {
-            throw new JSONProcessingException("unterminated escape sequence");
+            throw new JSONProcessingException("Unterminated escape sequence");
           }
           char esc = s.charAt(pos++);
           switch (esc) {
@@ -397,40 +397,40 @@ public class LatteJSONProcessor implements JSONProcessor {
               if (Character.isHighSurrogate((char) code)) {
                 if (pos + 1 >= len || s.charAt(pos) != '\\' || s.charAt(pos + 1) != 'u') {
                   throw new JSONProcessingException(
-                      "lone high surrogate \\u" + Integer.toHexString(code));
+                      "Lone high surrogate [\\u" + Integer.toHexString(code) + "]");
                 }
                 pos += 2;
                 int low = parseHex4();
                 if (!Character.isLowSurrogate((char) low)) {
                   throw new JSONProcessingException(
-                      "high surrogate not followed by low surrogate");
+                      "High surrogate not followed by low surrogate");
                 }
                 sb.append((char) code);
                 sb.append((char) low);
               } else if (Character.isLowSurrogate((char) code)) {
                 throw new JSONProcessingException(
-                    "lone low surrogate \\u" + Integer.toHexString(code));
+                    "Lone low surrogate [\\u" + Integer.toHexString(code) + "]");
               } else {
                 sb.append((char) code);
               }
               break;
             }
             default:
-              throw new JSONProcessingException("invalid escape: \\" + esc);
+              throw new JSONProcessingException("Invalid escape [\\" + esc + "]");
           }
         } else if (c < 0x20) {
           throw new JSONProcessingException(
-              "unescaped control character U+" + String.format("%04X", (int) c) + " in string");
+              "Unescaped control character [U+" + String.format("%04X", (int) c) + "] in string");
         } else {
           sb.append(c);
         }
       }
-      throw new JSONProcessingException("unterminated string");
+      throw new JSONProcessingException("Unterminated string");
     }
 
     int parseHex4() {
       if (pos + 4 > len) {
-        throw new JSONProcessingException("truncated \\u escape");
+        throw new JSONProcessingException("Truncated \\u escape");
       }
       int code = 0;
       for (int i = 0; i < 4; i++) {
@@ -439,7 +439,7 @@ public class LatteJSONProcessor implements JSONProcessor {
         if (c >= '0' && c <= '9') d = c - '0';
         else if (c >= 'a' && c <= 'f') d = 10 + (c - 'a');
         else if (c >= 'A' && c <= 'F') d = 10 + (c - 'A');
-        else throw new JSONProcessingException("invalid hex digit '" + c + "' in \\u escape");
+        else throw new JSONProcessingException("Invalid hex digit [" + c + "] in \\u escape");
         code = (code << 4) | d;
       }
       return code;
@@ -454,7 +454,7 @@ public class LatteJSONProcessor implements JSONProcessor {
         pos += 5;
         return Boolean.FALSE;
       }
-      throw new JSONProcessingException("invalid literal at position " + pos);
+      throw new JSONProcessingException("Invalid literal at position [" + pos + "]");
     }
 
     Object parseNull() {
@@ -462,7 +462,7 @@ public class LatteJSONProcessor implements JSONProcessor {
         pos += 4;
         return null;
       }
-      throw new JSONProcessingException("invalid literal at position " + pos);
+      throw new JSONProcessingException("Invalid literal at position [" + pos + "]");
     }
 
     Object parseNumber() {
@@ -474,7 +474,7 @@ public class LatteJSONProcessor implements JSONProcessor {
       if (s.charAt(pos) == '-') {
         pos++;
         if (pos >= len) {
-          throw new JSONProcessingException("number ends after '-'");
+          throw new JSONProcessingException("Number ends after [-]");
         }
       }
 
@@ -489,11 +489,11 @@ public class LatteJSONProcessor implements JSONProcessor {
           digitCount++;
           if (digitCount > maxNumberLength) {
             throw new JSONProcessingException(
-                "number digit-run exceeds maxNumberLength " + maxNumberLength);
+                "Number digit-run exceeds maxNumberLength [" + maxNumberLength + "]");
           }
         }
       } else {
-        throw new JSONProcessingException("invalid number at position " + pos);
+        throw new JSONProcessingException("Invalid number at position [" + pos + "]");
       }
 
       // fraction
@@ -506,11 +506,11 @@ public class LatteJSONProcessor implements JSONProcessor {
           digitCount++;
           if (digitCount > maxNumberLength) {
             throw new JSONProcessingException(
-                "number digit-run exceeds maxNumberLength " + maxNumberLength);
+                "Number digit-run exceeds maxNumberLength [" + maxNumberLength + "]");
           }
         }
         if (pos == fracStart) {
-          throw new JSONProcessingException("number has '.' with no fractional digits");
+          throw new JSONProcessingException("Number has [.] with no fractional digits");
         }
       }
 
@@ -527,11 +527,11 @@ public class LatteJSONProcessor implements JSONProcessor {
           digitCount++;
           if (digitCount > maxNumberLength) {
             throw new JSONProcessingException(
-                "number digit-run exceeds maxNumberLength " + maxNumberLength);
+                "Number digit-run exceeds maxNumberLength [" + maxNumberLength + "]");
           }
         }
         if (pos == expStart) {
-          throw new JSONProcessingException("number has exponent marker with no exponent digits");
+          throw new JSONProcessingException("Number has exponent marker with no exponent digits");
         }
       }
 
@@ -542,7 +542,7 @@ public class LatteJSONProcessor implements JSONProcessor {
         }
         return new BigInteger(token);
       } catch (NumberFormatException e) {
-        throw new JSONProcessingException("invalid number '" + token + "'", e);
+        throw new JSONProcessingException("Invalid number [" + token + "]", e);
       }
     }
   }

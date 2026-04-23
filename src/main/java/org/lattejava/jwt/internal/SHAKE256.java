@@ -113,7 +113,7 @@ public final class SHAKE256 {
   public static byte[] digest(byte[] input, int outputBytes) {
     Objects.requireNonNull(input, "input");
     if (outputBytes <= 0) {
-      throw new IllegalArgumentException("outputBytes must be > 0");
+      throw new IllegalArgumentException("outputBytes must be > 0 but found [" + outputBytes + "]");
     }
 
     Provider p = resolveProvider();

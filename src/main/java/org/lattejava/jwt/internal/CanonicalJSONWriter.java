@@ -62,7 +62,7 @@ final class CanonicalJSONWriter {
    */
   static byte[] write(Map<String, Object> input) {
     if (input == null) {
-      throw new IllegalArgumentException("input map is null");
+      throw new IllegalArgumentException("Input map is null");
     }
     StringBuilder sb = new StringBuilder();
     sb.append('{');
@@ -102,12 +102,12 @@ final class CanonicalJSONWriter {
     } else if (v instanceof Float || v instanceof Double) {
       double d = ((Number) v).doubleValue();
       if (Double.isNaN(d) || Double.isInfinite(d)) {
-        throw new IllegalArgumentException("non-finite number: " + v);
+        throw new IllegalArgumentException("Non-finite number [" + v + "]");
       }
       sb.append(v.toString());
     } else {
       throw new IllegalArgumentException(
-          "unsupported value type for canonical JSON: " + v.getClass().getName());
+          "Unsupported value type for canonical JSON [" + v.getClass().getName() + "]");
     }
   }
 
