@@ -107,7 +107,7 @@ public class JSONWebKeySetHelper extends AbstractHttpHelper {
           }
           return retrieveKeysFromJWKS((String) jwksURI);
         },
-        JSONWebKeyBuilderException::new);
+        JSONWebKeyException::new);
   }
 
   /**
@@ -175,7 +175,7 @@ public class JSONWebKeySetHelper extends AbstractHttpHelper {
           }
           return result;
         },
-        JSONWebKeyBuilderException::new);
+        JSONWebKeyException::new);
   }
 
   /**

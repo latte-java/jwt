@@ -119,7 +119,7 @@ public class JSONWebKeySetHelperTest extends BaseTest {
     JSONWebKeySetHelper.setMaxResponseSize(cap);
     try {
       JSONWebKeySetHelper.retrieveKeysFromJWKS("http://localhost:" + PORT + "/jwks.json");
-      fail("Expected JSONWebKeyBuilderException with ResponseTooLargeException cause.");
+      fail("Expected JSONWebKeyException with ResponseTooLargeException cause.");
     } catch (RuntimeException e) {
       assertTrue(containsCause(e, ResponseTooLargeException.class), "expected ResponseTooLargeException in cause chain, got: " + e);
     }

@@ -140,7 +140,7 @@ public interface Algorithm {
   /**
    * Look up by name returning {@code null} for unrecognized names. Provided as
    * a temporary back-compat shim for 6.x callers (notably
-   * {@code JSONWebKeyBuilder} and the EdDSA signer/verifier constructors).
+   * {@code JSONWebKey.build(...)} and the EdDSA signer/verifier constructors).
    * Accepts both JWA names ({@code "RS256"}) and the JCA signature/curve names
    * ({@code "SHA256withRSA"}, {@code "Ed25519"}) the legacy enum recognised.
    * New code should use {@link #of(String)} or compare {@link #name()} directly.
@@ -175,7 +175,7 @@ public interface Algorithm {
       return direct;
     }
     // Legacy 6.x semantics: map JCA signature/curve strings (case-insensitive)
-    // back to a standard JWA constant. Required by JSONWebKeyBuilder which
+    // back to a standard JWA constant. Required by the JWK converter which
     // passes X509Certificate#getSigAlgName() through this method.
     return switch (name.toUpperCase(java.util.Locale.ROOT)) {
       case "HMACSHA256" -> HS256;

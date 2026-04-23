@@ -17,14 +17,17 @@
 package org.lattejava.jwt.jwks;
 
 /**
+ * Thrown when JWK construction or conversion fails (malformed input,
+ * unsupported key type, invalid encoding, etc.).
+ *
  * @author Daniel DeGroff
  */
-public class JSONWebKeyBuilderException extends RuntimeException {
-  public JSONWebKeyBuilderException(String message, Throwable cause) {
+public class JSONWebKeyException extends RuntimeException {
+  public JSONWebKeyException(String message, Throwable cause) {
     super(message, cause);
   }
 
-  public JSONWebKeyBuilderException(String message) {
+  public JSONWebKeyException(String message) {
     super(message);
   }
 }

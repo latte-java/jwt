@@ -54,13 +54,18 @@ import java.util.Objects;
 import static org.lattejava.jwt.jwks.JWKUtils.base64EncodeUint;
 
 /**
+ * Internal helper that converts Java key material (PEM, PrivateKey,
+ * PublicKey, Certificate) into {@link JSONWebKey} instances. Package-private
+ * by design — external callers should use the {@code JSONWebKey.build(...)}
+ * overloads instead.
+ *
  * @author Daniel DeGroff
  */
-public class JSONWebKeyBuilder {
+class JSONWebKeyConverter {
   /**
    * Build a JSON Web Key from the provided encoded PEM.
    */
-  public JSONWebKey build(String encodedPEM) {
+  JSONWebKey build(String encodedPEM) {
     Objects.requireNonNull(encodedPEM);
     PEM pem = PEM.decode(encodedPEM);
     if (pem.privateKey != null) {
@@ -71,13 +76,13 @@ public class JSONWebKeyBuilder {
       return build(pem.publicKey);
     }
 
-    throw new JSONWebKeyBuilderException("The provided PEM did not contain a public or private key.");
+    throw new JSONWebKeyException("The provided PEM did not contain a public or private key.");
   }
 
   /**
    * Build a JSON Web Key from the provided PrivateKey.
    */
-  public JSONWebKey build(PrivateKey privateKey) {
+  JSONWebKey build(PrivateKey privateKey) {
     Objects.requireNonNull(privateKey);
     JSONWebKey.Builder b = JSONWebKey.builder()
         .kty(getKeyType(privateKey))
@@ -123,13 +128,13 @@ public class JSONWebKeyBuilder {
       b.alg(Algorithm.fromName(crv));
 
       var privateKeyBytes = edPrivateKey.getBytes().orElseThrow(
-          () -> new JSONWebKeyBuilderException("Unable to obtain the private key bytes."));
+          () -> new JSONWebKeyException("Unable to obtain the private key bytes."));
       b.d(Base64.getUrlEncoder().withoutPadding().encodeToString(privateKeyBytes));
       try {
         byte[] publicKeyBytes = KeyUtils.deriveEdDSAPublicKeyFromPrivate(privateKeyBytes, crv);
         b.x(Base64.getUrlEncoder().withoutPadding().encodeToString(publicKeyBytes));
       } catch (Exception e) {
-        throw new JSONWebKeyBuilderException("Unable to build the public key for the EdDSA private key using curve [" + crv + "]", e);
+        throw new JSONWebKeyException("Unable to build the public key for the EdDSA private key using curve [" + crv + "]", e);
       }
     }
 
@@ -140,14 +145,14 @@ public class JSONWebKeyBuilder {
     try {
       return KeyUtils.getCurveName(key);
     } catch (Exception e) {
-      throw new JSONWebKeyBuilderException("Unable to read the Object Identifier of the public key.", e);
+      throw new JSONWebKeyException("Unable to read the Object Identifier of the public key.", e);
     }
   }
 
   /**
    * Build a JSON Web Key from the provided PublicKey.
    */
-  public JSONWebKey build(PublicKey publicKey) {
+  JSONWebKey build(PublicKey publicKey) {
     Objects.requireNonNull(publicKey);
     KeyType kty = getKeyType(publicKey);
     JSONWebKey.Builder b = JSONWebKey.builder()
@@ -184,7 +189,7 @@ public class JSONWebKeyBuilder {
         var sequence = new DerInputStream(publicKey.getEncoded()).getSequence();
         publicKeyBytes = sequence[1].toByteArray();
       } catch (DerDecodingException e) {
-        throw new JSONWebKeyBuilderException("Unable to read the public key from the DER encoded key.", e);
+        throw new JSONWebKeyException("Unable to read the public key from the DER encoded key.", e);
       }
 
       b.x(base64EncodeUint(new BigInteger(publicKeyBytes), keyLength));
@@ -196,7 +201,7 @@ public class JSONWebKeyBuilder {
   /**
    * Build a JSON Web Key from the provided X.509 Certificate.
    */
-  public JSONWebKey build(Certificate certificate) {
+  JSONWebKey build(Certificate certificate) {
     Objects.requireNonNull(certificate);
     JSONWebKey base = build(certificate.getPublicKey());
     if (!(certificate instanceof X509Certificate x509Certificate)) {
@@ -224,7 +229,7 @@ public class JSONWebKeyBuilder {
           .x5t_256(JWTUtils.generateJWS_x5t("SHA-256", encodedCertificate))
           .build();
     } catch (CertificateEncodingException e) {
-      throw new JSONWebKeyBuilderException("Failed to decode X.509 certificate.", e);
+      throw new JSONWebKeyException("Failed to decode X.509 certificate.", e);
     }
   }
 
@@ -254,7 +259,7 @@ public class JSONWebKeyBuilder {
           default -> null;
         };
       } catch (IOException e) {
-        throw new JSONWebKeyBuilderException("Failed to decode X.509 certificate signature algorithm parameters to determine the key type.", e);
+        throw new JSONWebKeyException("Failed to decode X.509 certificate signature algorithm parameters to determine the key type.", e);
       }
     }
 

@@ -352,8 +352,8 @@ public class JSONWebKeyTest {
   public void builder_parameter_rejects_registered_parameter_name(String name) {
     try {
       JSONWebKey.builder().parameter(name, "value");
-      fail("Expected JSONWebKeyBuilderException for registered name [" + name + "].");
-    } catch (JSONWebKeyBuilderException expected) {
+      fail("Expected JSONWebKeyException for registered name [" + name + "].");
+    } catch (JSONWebKeyException expected) {
       assertTrue(expected.getMessage().contains(name));
     }
   }

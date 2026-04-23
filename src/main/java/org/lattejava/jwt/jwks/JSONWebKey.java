@@ -392,19 +392,19 @@ public final class JSONWebKey {
   // ---------- Static convenience methods ----------
 
   public static JSONWebKey build(String encodedPEM) {
-    return new JSONWebKeyBuilder().build(encodedPEM);
+    return new JSONWebKeyConverter().build(encodedPEM);
   }
 
   public static JSONWebKey build(Certificate certificate) {
-    return new JSONWebKeyBuilder().build(certificate);
+    return new JSONWebKeyConverter().build(certificate);
   }
 
   public static JSONWebKey build(PrivateKey privateKey) {
-    return new JSONWebKeyBuilder().build(privateKey);
+    return new JSONWebKeyConverter().build(privateKey);
   }
 
   public static JSONWebKey build(PublicKey publicKey) {
-    return new JSONWebKeyBuilder().build(publicKey);
+    return new JSONWebKeyConverter().build(publicKey);
   }
 
   public static PublicKey parse(JSONWebKey key) {
@@ -526,12 +526,12 @@ public final class JSONWebKey {
     /**
      * Add a custom (non-registered) JWK parameter. Registered parameters MUST
      * be set via the typed setters; calling this for a registered name throws
-     * {@link JSONWebKeyBuilderException}.
+     * {@link JSONWebKeyException}.
      */
     public Builder parameter(String name, Object value) {
       Objects.requireNonNull(name, "name");
       if (REGISTERED_PARAMETER_NAMES.contains(name)) {
-        throw new JSONWebKeyBuilderException("Cannot add a registered JWK parameter [" + name + "]; set it via the typed builder method.");
+        throw new JSONWebKeyException("Cannot add a registered JWK parameter [" + name + "]; set it via the typed builder method.");
       }
       other.put(name, value);
       return this;
