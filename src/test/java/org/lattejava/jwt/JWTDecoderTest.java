@@ -449,6 +449,28 @@ public class JWTDecoderTest {
   // ---------------------------------------------------------------------
 
   @Test
+  public void expired_exception_exposes_diagnostic_context() {
+    Instant now = Instant.parse("2026-04-22T12:00:00Z");
+    Instant exp = now.minusSeconds(30);
+    // Use case: library consumers diagnosing clock-sync issues need to see the exp claim, the clock reading, and the applied skew.
+    JWT jwt = JWT.builder().subject("s").expiresAt(exp).build();
+    String encoded = new JWTEncoder().encode(jwt, signer());
+
+    JWTDecoder decoder = JWTDecoder.builder()
+        .clock(Clock.fixed(now, ZoneOffset.UTC))
+        .clockSkew(Duration.ZERO)
+        .build();
+    try {
+      decoder.decode(encoded, VerifierResolver.of(verifier()));
+      fail("Expected JWTExpiredException");
+    } catch (JWTExpiredException e) {
+      assertEquals(e.getExpiration(), exp);
+      assertEquals(e.getNow(), now);
+      assertEquals(e.getClockSkew(), Duration.ZERO);
+    }
+  }
+
+  @Test
   public void builder_reuse_producesIndependentDecoders() {
     // Use case: building twice from the same builder with a mutated clockSkew between calls must produce two independent decoders.
     Instant fakeNow = Instant.parse("2026-04-22T12:00:00Z");
