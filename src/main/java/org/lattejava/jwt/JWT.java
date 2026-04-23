@@ -267,7 +267,7 @@ public final class JWT {
     List<T> result = new ArrayList<>(raw.size());
     for (Object element : raw) {
       if (element != null && !elementType.isInstance(element)) {
-        throw new ClassCastException("Claim [" + name + "] element is not of type " + elementType.getName());
+        throw new ClassCastException("Claim [" + name + "] element is not of type [" + elementType.getName() + "]");
       }
       result.add(elementType.cast(element));
     }
@@ -674,7 +674,7 @@ public final class JWT {
       if (value instanceof Number) {
         return Instant.ofEpochSecond(((Number) value).longValue());
       }
-      throw new IllegalArgumentException("Claim [" + name + "] cannot be coerced to Instant from value of type " + value.getClass().getName());
+      throw new IllegalArgumentException("Claim [" + name + "] cannot be coerced to Instant from value of type [" + value.getClass().getName() + "]");
     }
   }
 }

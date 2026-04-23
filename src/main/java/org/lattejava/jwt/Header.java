@@ -125,10 +125,10 @@ public final class Header {
 
     Object algRaw = map.get("alg");
     if (algRaw == null) {
-      throw new InvalidJWTException("Header is missing the required [alg] parameter");
+      throw new InvalidJWTException("Header [alg] is missing");
     }
     if (!(algRaw instanceof String)) {
-      throw new InvalidJWTException("Header parameter [alg] must be a String");
+      throw new InvalidJWTException("Header [alg] must be a String");
     }
     b.alg = Algorithm.of((String) algRaw);
 
@@ -141,13 +141,13 @@ public final class Header {
       switch (name) {
         case "typ":
           if (!(value instanceof String)) {
-            throw new InvalidJWTException("Header parameter [typ] must be a String");
+            throw new InvalidJWTException("Header [typ] must be a String");
           }
           b.typ = (String) value;
           break;
         case "kid":
           if (!(value instanceof String)) {
-            throw new InvalidJWTException("Header parameter [kid] must be a String");
+            throw new InvalidJWTException("Header [kid] must be a String");
           }
           b.kid = (String) value;
           break;
@@ -156,17 +156,17 @@ public final class Header {
         case "x5t#S256":
         case "x5u":
           if (!(value instanceof String)) {
-            throw new InvalidJWTException("Header parameter [" + name + "] must be a String");
+            throw new InvalidJWTException("Header [" + name + "] must be a String");
           }
           b.customParameters.put(name, value);
           break;
         case "x5c":
           if (!(value instanceof List)) {
-            throw new InvalidJWTException("Header parameter [x5c] must be an array of strings");
+            throw new InvalidJWTException("Header [x5c] must be an array of strings");
           }
           for (Object element : (List<?>) value) {
             if (!(element instanceof String)) {
-              throw new InvalidJWTException("Header parameter [x5c] must be an array of strings");
+              throw new InvalidJWTException("Header [x5c] must be an array of strings");
             }
           }
           b.customParameters.put(name, value);
@@ -190,23 +190,23 @@ public final class Header {
    */
   private static void validateCrit(Object value) {
     if (!(value instanceof List)) {
-      throw new InvalidJWTException("Header parameter [crit] must be a JSON array of strings");
+      throw new InvalidJWTException("Header [crit] must be a JSON array of strings");
     }
     List<?> raw = (List<?>) value;
     Set<String> seen = new LinkedHashSet<>();
     for (Object element : raw) {
       if (!(element instanceof String)) {
-        throw new InvalidJWTException("Header parameter [crit] elements must be strings");
+        throw new InvalidJWTException("Header [crit] elements must be strings");
       }
       String s = (String) element;
       if (s.isEmpty()) {
-        throw new InvalidJWTException("Header parameter [crit] elements must be non-empty strings");
+        throw new InvalidJWTException("Header [crit] elements must be non-empty strings");
       }
       if (!seen.add(s)) {
-        throw new InvalidJWTException("Header parameter [crit] contains duplicate entry [" + s + "]");
+        throw new InvalidJWTException("Header [crit] contains duplicate entry [" + s + "]");
       }
       if (REGISTERED_PARAMETER_NAMES.contains(s)) {
-        throw new InvalidJWTException("Header parameter [crit] must not list the registered RFC 7515 parameter [" + s + "]");
+        throw new InvalidJWTException("Header [crit] must not list the registered RFC 7515 parameter [" + s + "]");
       }
     }
   }
@@ -293,7 +293,7 @@ public final class Header {
           return this;
         }
         if (!(value instanceof Algorithm)) {
-          throw new IllegalArgumentException("Header parameter [alg] must be an Algorithm instance");
+          throw new IllegalArgumentException("Header [alg] must be an Algorithm instance");
         }
         this.alg = (Algorithm) value;
         return this;
@@ -304,7 +304,7 @@ public final class Header {
           return this;
         }
         if (!(value instanceof String)) {
-          throw new IllegalArgumentException("Header parameter [typ] must be a String");
+          throw new IllegalArgumentException("Header [typ] must be a String");
         }
         this.typ = (String) value;
         return this;
@@ -315,7 +315,7 @@ public final class Header {
           return this;
         }
         if (!(value instanceof String)) {
-          throw new IllegalArgumentException("Header parameter [kid] must be a String");
+          throw new IllegalArgumentException("Header [kid] must be a String");
         }
         this.kid = (String) value;
         return this;

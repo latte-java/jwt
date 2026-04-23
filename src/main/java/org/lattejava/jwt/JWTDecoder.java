@@ -171,7 +171,7 @@ public class JWTDecoder {
     if (expectedAlgorithmNames != null
         && !expectedAlgorithmNames.contains(header.alg().name())) {
       throw new InvalidJWTException(
-          "Header [alg] (" + header.alg().name() + ") is not in the expectedAlgorithms whitelist");
+          "Header [alg] [" + header.alg().name() + "] is not in the expectedAlgorithms whitelist");
     }
 
     // Step 6: type check
@@ -235,7 +235,7 @@ public class JWTDecoder {
     // Step 1: input size check
     if (encodedJWT.getBytes(StandardCharsets.UTF_8).length > maxInputBytes) {
       throw new InvalidJWTException(
-          "Encoded JWT exceeds maxInputBytes (" + maxInputBytes + ")");
+          "Encoded JWT exceeds maxInputBytes [" + maxInputBytes + "]");
     }
 
     // Step 3: split on '.', count segments by separator position.
@@ -248,11 +248,11 @@ public class JWTDecoder {
     if (firstDot < 0 || secondDot < 0) {
       // Fewer than 2 separators -> 1 or 2 segments -> missing signature
       throw new MissingSignatureException(
-          "The encoded JWT is missing a signature; expected three dot-separated segments");
+          "Encoded JWT is missing a signature; expected three dot-separated segments");
     }
     if (thirdDot >= 0) {
       throw new InvalidJWTException(
-          "The encoded JWT has more than three segments; expected exactly two '.' separators");
+          "Encoded JWT has more than three segments; expected exactly two '.' separators");
     }
 
     String headerB64 = encodedJWT.substring(0, firstDot);
@@ -260,10 +260,10 @@ public class JWTDecoder {
     String signatureB64 = encodedJWT.substring(secondDot + 1);
 
     if (headerB64.isEmpty()) {
-      throw new InvalidJWTException("The encoded JWT header segment is empty");
+      throw new InvalidJWTException("Encoded JWT header segment is empty");
     }
     if (payloadB64.isEmpty()) {
-      throw new InvalidJWTException("The encoded JWT payload segment is empty");
+      throw new InvalidJWTException("Encoded JWT payload segment is empty");
     }
 
     // Step 2: base64url strictness on header and payload (signature handled
@@ -301,8 +301,8 @@ public class JWTDecoder {
     }
     String typ = header.typ();
     if (typ == null || !typ.equalsIgnoreCase(expectedType)) {
-      throw new InvalidJWTException("Header [typ] (" + typ
-          + ") does not match expectedType (" + expectedType + ")");
+      throw new InvalidJWTException("Header [typ] [" + typ
+          + "] does not match expectedType [" + expectedType + "]");
     }
   }
 
@@ -314,16 +314,16 @@ public class JWTDecoder {
     }
     if (!(critValue instanceof List)) {
       // Header.fromMap already structurally validated, but defense-in-depth.
-      throw new InvalidJWTException("Header parameter [crit] must be a JSON array of strings");
+      throw new InvalidJWTException("Header [crit] must be a JSON array of strings");
     }
     for (Object name : (List<Object>) critValue) {
       if (!(name instanceof String)) {
-        throw new InvalidJWTException("Header parameter [crit] elements must be strings");
+        throw new InvalidJWTException("Header [crit] elements must be strings");
       }
       String entry = (String) name;
       if (!criticalHeaders.contains(entry)) {
         throw new InvalidJWTException(
-            "Header parameter [crit] lists unrecognized critical parameter [" + entry + "]");
+            "Header [crit] lists unrecognized critical parameter [" + entry + "]");
       }
     }
   }
@@ -355,15 +355,15 @@ public class JWTDecoder {
           || c == '-' || c == '_';
       if (!ok) {
         throw new InvalidJWTException(
-            "JWT " + name + " segment contains invalid base64url character '"
-                + c + "' at position " + i);
+            "JWT [" + name + "] segment contains invalid base64url character ["
+                + c + "] at position [" + i + "]");
       }
     }
     try {
       return Base64.getUrlDecoder().decode(segment);
     } catch (IllegalArgumentException e) {
       throw new InvalidJWTException(
-          "JWT " + name + " segment is not valid base64url", e);
+          "JWT [" + name + "] segment is not valid base64url", e);
     }
   }
 
@@ -377,8 +377,8 @@ public class JWTDecoder {
           || c == '-' || c == '_';
       if (!ok) {
         throw new InvalidJWTException(
-            "JWT " + name + " segment contains invalid base64url character '"
-                + c + "' at position " + i);
+            "JWT [" + name + "] segment contains invalid base64url character ["
+                + c + "] at position [" + i + "]");
       }
     }
   }
