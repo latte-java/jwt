@@ -104,7 +104,7 @@ public class OpenIDConnect {
     try {
       return MessageDigest.getInstance(digest);
     } catch (NoSuchAlgorithmException e) {
-      throw new RuntimeException(e);
+      throw new JWTSigningException("Required message digest algorithm [" + digest + "] is not registered with this JVM", e);
     }
   }
 }

@@ -309,7 +309,7 @@ public class JWTUtils {
       String publicKey = PEM.encode(keyPair.getPublic());
       return new KeyPair(privateKey, publicKey);
     } catch (NoSuchAlgorithmException e) {
-      throw new RuntimeException(e);
+      throw new JWTSigningException("Required key pair algorithm [" + algorithm + "] is not registered with this JVM", e);
     }
   }
 }
