@@ -44,6 +44,7 @@ import java.security.cert.X509Certificate;
 import java.security.spec.MGF1ParameterSpec;
 import java.security.spec.PSSParameterSpec;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -112,6 +113,74 @@ public final class X509 {
     return HexUtils.fromBytes(digest("SHA-1", encoded(cert)));
   }
 
+  /**
+   * Returns the SHA-256 fingerprint of the supplied DER-encoded certificate
+   * bytes as an uppercase hex string with no separators.
+   *
+   * <p>Use this overload when you already have raw DER bytes (for example,
+   * the contents of a JWKS {@code x5c} element after base64 decoding) and
+   * do not want to materialise an {@link X509Certificate}.</p>
+   *
+   * @param der the DER-encoded certificate bytes; non-null
+   * @return uppercase hex of the SHA-256 digest of {@code der}
+   */
+  public static String fingerprintSHA256(byte[] der) {
+    return HexUtils.fromBytes(digest("SHA-256", der));
+  }
+
+  /**
+   * Returns the SHA-1 fingerprint of the supplied DER-encoded certificate
+   * bytes as an uppercase hex string with no separators.
+   *
+   * <p>SHA-1 is retained for compatibility with older display formats; for
+   * new use, prefer {@link #fingerprintSHA256(byte[])}.</p>
+   *
+   * @param der the DER-encoded certificate bytes; non-null
+   * @return uppercase hex of the SHA-1 digest of {@code der}
+   */
+  public static String fingerprintSHA1(byte[] der) {
+    return HexUtils.fromBytes(digest("SHA-1", der));
+  }
+
+  /**
+   * Returns the SHA-256 thumbprint of {@code cert} as a base64url-no-pad
+   * string. This is the encoding used in the JWS {@code x5t#S256} header
+   * (RFC 7515 &sect;4.1.8).
+   *
+   * <p>For the hex form of the same digest, see
+   * {@link #fingerprintSHA256(X509Certificate)}.</p>
+   *
+   * @param cert the X.509 certificate; non-null
+   * @return base64url-no-pad of the SHA-256 digest of {@code cert.getEncoded()}
+   * @throws IllegalArgumentException if the certificate cannot be encoded
+   */
+  public static String thumbprintSHA256(X509Certificate cert) {
+    return base64url(digest("SHA-256", encoded(cert)));
+  }
+
+  /** SHA-256 thumbprint of {@code der}; see {@link #thumbprintSHA256(X509Certificate)}. */
+  public static String thumbprintSHA256(byte[] der) {
+    return base64url(digest("SHA-256", der));
+  }
+
+  /**
+   * Returns the SHA-1 thumbprint of {@code cert} as a base64url-no-pad
+   * string. This is the encoding used in the legacy JWS {@code x5t}
+   * header (RFC 7515 &sect;4.1.7).
+   *
+   * @param cert the X.509 certificate; non-null
+   * @return base64url-no-pad of the SHA-1 digest of {@code cert.getEncoded()}
+   * @throws IllegalArgumentException if the certificate cannot be encoded
+   */
+  public static String thumbprintSHA1(X509Certificate cert) {
+    return base64url(digest("SHA-1", encoded(cert)));
+  }
+
+  /** SHA-1 thumbprint of {@code der}; see {@link #thumbprintSHA1(X509Certificate)}. */
+  public static String thumbprintSHA1(byte[] der) {
+    return base64url(digest("SHA-1", der));
+  }
+
   // ---- Internal digest helpers ----
 
   private static byte[] encoded(X509Certificate cert) {
@@ -130,6 +199,10 @@ public final class X509 {
       // unreachable under any conformant JCA provider.
       throw new IllegalStateException(e);
     }
+  }
+
+  private static String base64url(byte[] bytes) {
+    return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
   }
 
   /**

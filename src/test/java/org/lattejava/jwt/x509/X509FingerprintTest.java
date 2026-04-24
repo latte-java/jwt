@@ -60,6 +60,34 @@ public class X509FingerprintTest extends BaseJWTTest {
         "BC34F6D776BF005E5E45D12529995AF7EF5DA5CF");
   }
 
+  @Test
+  public void fingerprint_byteInput() {
+    byte[] der = Base64.getDecoder().decode(BASE64_DER.getBytes(StandardCharsets.UTF_8));
+
+    // Use case: caller has raw DER bytes (e.g., already decoded from a JWKS
+    // x5c element) and wants the fingerprint without re-parsing the cert.
+    assertEquals(X509.fingerprintSHA256(der),
+        "B4814D2DF3D8635E2C3340CB4E9E93F81677C8F68F50F29CF079E1E9EBD74DE3");
+    assertEquals(X509.fingerprintSHA1(der),
+        "BC34F6D776BF005E5E45D12529995AF7EF5DA5CF");
+  }
+
+  @Test
+  public void thumbprint_certAndByteInput() throws Exception {
+    X509Certificate cert = parseCert(BASE64_DER);
+    byte[] der = Base64.getDecoder().decode(BASE64_DER.getBytes(StandardCharsets.UTF_8));
+
+    // Use case: produce the JWS-header `x5t#S256` (SHA-256, base64url-no-pad).
+    String expectedS256 = "tIFNLfPYY14sM0DLTp6T-BZ3yPaPUPKc8Hnh6evXTeM";
+    assertEquals(X509.thumbprintSHA256(cert), expectedS256);
+    assertEquals(X509.thumbprintSHA256(der), expectedS256);
+
+    // Use case: produce the legacy JWS-header `x5t` (SHA-1, base64url-no-pad).
+    String expectedS1 = "vDT213a_AF5eRdElKZla9-9dpc8";
+    assertEquals(X509.thumbprintSHA1(cert), expectedS1);
+    assertEquals(X509.thumbprintSHA1(der), expectedS1);
+  }
+
   private static X509Certificate parseCert(String base64Der) throws Exception {
     byte[] der = Base64.getDecoder().decode(base64Der.getBytes(StandardCharsets.UTF_8));
     CertificateFactory cf = CertificateFactory.getInstance("X.509");
