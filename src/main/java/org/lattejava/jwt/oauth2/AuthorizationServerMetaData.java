@@ -265,7 +265,7 @@ public class AuthorizationServerMetaData {
         out.put(e.getKey(), e.getValue());
       }
     }
-    return out;
+    return Collections.unmodifiableMap(out);
   }
 
   private static void putIfPresent(Map<String, Object> out, String key, Object value) {

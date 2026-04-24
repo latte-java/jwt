@@ -520,6 +520,20 @@ public class JWTTest {
   }
 
   @Test
+  public void isExpired_true_when_exp_equals_now() {
+    // RFC 7519 §4.1.4: "on or after which the JWT MUST NOT be accepted" --
+    // the boundary is expired.
+    JWT jwt = JWT.builder().expiresAt(Instant.ofEpochSecond(1_000)).build();
+    assertTrue(jwt.isExpired(Instant.ofEpochSecond(1_000)));
+  }
+
+  @Test
+  public void isExpired_false_when_now_before_exp() {
+    JWT jwt = JWT.builder().expiresAt(Instant.ofEpochSecond(2_000)).build();
+    assertFalse(jwt.isExpired(Instant.ofEpochSecond(1_000)));
+  }
+
+  @Test
   public void isExpired_false_when_no_exp() {
     JWT jwt = JWT.builder().build();
     assertFalse(jwt.isExpired());

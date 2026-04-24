@@ -149,6 +149,15 @@ public final class Header {
    * an array of strings; {@code crit} must be a non-empty array of distinct
    * strings that do not name any RFC 7515 registered parameter.
    *
+   * <p><strong>Aliasing note.</strong> Collection values supplied via the
+   * input map (notably {@code x5c}, {@code crit}, and any custom-parameter
+   * {@code List} or {@code Map}) are stored by reference rather than
+   * deep-copied. Callers that retain a mutable alias to such a value can
+   * observe their later mutations through {@link #get(String)} on the
+   * returned {@link Header}. To preserve full immutability, callers must
+   * not mutate the input map's collection values after this method
+   * returns. The same caveat applies to {@code Builder.parameter}.</p>
+   *
    * @throws InvalidJWTException if a registered parameter has the wrong shape
    */
   public static Header fromMap(Map<String, Object> map) {

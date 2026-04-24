@@ -171,7 +171,9 @@ public class DerInputStream {
 
       remaining = length & 0x7F; // 0b1000001 or 127
       if (remaining == 0) {
-        return -1;
+        // 0x80 alone signals BER indefinite-length form. DER (X.690 §10.1)
+        // forbids it -- a definite length is required for every TLV.
+        throw new IOException("Indefinite-length encoding is not allowed in DER (X.690 §10.1)");
       }
 
       //noinspection ConstantConditions

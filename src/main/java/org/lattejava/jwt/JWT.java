@@ -412,7 +412,9 @@ public final class JWT {
   }
 
   public boolean isExpired(Instant now) {
-    return expiresAt != null && expiresAt.isBefore(now);
+    // RFC 7519 §4.1.4: "the expiration time on or after which the JWT MUST
+    // NOT be accepted". The boundary (now == exp) is expired.
+    return expiresAt != null && !expiresAt.isAfter(now);
   }
 
   public boolean isUnavailableForProcessing() {
@@ -424,6 +426,22 @@ public final class JWT {
   }
 
   // ---------- Factory ----------
+
+  /**
+   * Build a {@link JWT} from a parsed JSON object map and an already-parsed
+   * {@link Header}. Registered claims ({@code iss}, {@code sub}, {@code aud},
+   * {@code exp}, {@code nbf}, {@code iat}, {@code jti}) are validated for
+   * type; all other entries are stored as custom claims.
+   *
+   * <p><strong>Aliasing note.</strong> Custom-claim values that are
+   * {@code List} or {@code Map} instances are stored by reference rather
+   * than deep-copied. Callers that retain a mutable alias to such a value
+   * can observe their later mutations through {@link #getObject(String)},
+   * {@link #getMap(String)}, or {@link #getList(String)} on the returned
+   * {@link JWT}. To preserve full immutability, callers must not mutate
+   * the input map's collection values after this method returns. The same
+   * caveat applies to {@code Builder.claim}.</p>
+   */
   public static JWT fromMap(Map<String, Object> map, Header header) {
     Objects.requireNonNull(map, "map");
     Builder b = new Builder();

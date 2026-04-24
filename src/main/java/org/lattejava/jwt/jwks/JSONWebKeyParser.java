@@ -26,6 +26,7 @@ import java.security.AlgorithmParameters;
 import java.security.KeyFactory;
 import java.security.PublicKey;
 import java.security.interfaces.ECPublicKey;
+import java.security.interfaces.EdECPublicKey;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.ECGenParameterSpec;
 import java.security.spec.ECParameterSpec;
@@ -110,7 +111,14 @@ public class JSONWebKeyParser {
         BigInteger y = new BigInteger(1, bytes);
 
         KeySpec keySpec = new EdECPublicKeySpec(new NamedParameterSpec(key.crv()), new EdECPoint(xOdd, y));
-        return KeyFactory.getInstance(key.crv()).generatePublic(keySpec);
+        PublicKey publicKey = KeyFactory.getInstance(key.crv()).generatePublic(keySpec);
+
+        // If the x5c is non-null, verify the public key
+        if (key.x5c() != null && key.x5c().size() > 0) {
+          verifyX5cOKP(key, y, xOdd);
+        }
+
+        return publicKey;
       }
     } catch (JSONWebKeyParserException e) {
       throw e;
@@ -184,6 +192,31 @@ public class JSONWebKeyParser {
       arr[j] = tmp;
       i++;
       j--;
+    }
+  }
+
+  private void verifyX5cOKP(JSONWebKey key, BigInteger expectedY, boolean expectedXOdd) {
+    // The first key in this array MUST contain the public key.
+    // >  https://tools.ietf.org/html/rfc7517#section-4.7
+    String encodedCertificate = key.x5c().get(0);
+    String pem = new PEMEncoder().parseEncodedCertificate(encodedCertificate);
+    PublicKey actual = PEM.decode(pem).publicKey;
+    if (!(actual instanceof EdECPublicKey edECPublicKey)) {
+      throw new JSONWebKeyParserException("Public key in [x5c] does not match the key type declared in [kty]");
+    }
+
+    String certCurve = edECPublicKey.getParams().getName();
+    if (!certCurve.equals(key.crv())) {
+      throw new JSONWebKeyParserException("Certificate in [x5c] declares curve [" + certCurve + "] but JWK declares [crv] [" + key.crv() + "]");
+    }
+
+    EdECPoint point = edECPublicKey.getPoint();
+    if (!point.getY().equals(expectedY)) {
+      throw new JSONWebKeyParserException("Certificate in [x5c] does not match the [x] coordinate y-value: expected [" + expectedY + "] but found [" + point.getY() + "]");
+    }
+
+    if (point.isXOdd() != expectedXOdd) {
+      throw new JSONWebKeyParserException("Certificate in [x5c] does not match the [x] coordinate x-parity");
     }
   }
 
