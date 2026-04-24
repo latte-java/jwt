@@ -33,6 +33,7 @@ import org.lattejava.jwt.pem.PEMEncoderException;
 
 import java.io.ByteArrayInputStream;
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
@@ -179,6 +180,30 @@ public final class X509 {
   /** SHA-1 thumbprint of {@code der}; see {@link #thumbprintSHA1(X509Certificate)}. */
   public static String thumbprintSHA1(byte[] der) {
     return base64url(digest("SHA-1", der));
+  }
+
+  /**
+   * Converts an uppercase hex X.509 fingerprint to its base64url-no-pad
+   * thumbprint form. The input length determines the digest algorithm:
+   * 40 hex chars (SHA-1) becomes an {@code x5t} value, 64 hex chars
+   * (SHA-256) becomes an {@code x5t#S256} value.
+   *
+   * @param fingerprint the hex-encoded fingerprint; non-null
+   * @return the equivalent base64url-no-pad thumbprint
+   */
+  public static String fingerprintToThumbprint(String fingerprint) {
+    return base64url(HexUtils.toBytes(fingerprint));
+  }
+
+  /**
+   * Converts a base64url-no-pad X.509 thumbprint to its uppercase hex
+   * fingerprint form. Reverses {@link #fingerprintToThumbprint(String)}.
+   *
+   * @param thumbprint the base64url-no-pad thumbprint; non-null
+   * @return the equivalent uppercase hex fingerprint
+   */
+  public static String thumbprintToFingerprint(String thumbprint) {
+    return HexUtils.fromBytes(Base64.getUrlDecoder().decode(thumbprint.getBytes(StandardCharsets.UTF_8)));
   }
 
   // ---- Internal digest helpers ----

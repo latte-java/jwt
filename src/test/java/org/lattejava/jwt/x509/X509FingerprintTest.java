@@ -88,6 +88,23 @@ public class X509FingerprintTest extends BaseJWTTest {
     assertEquals(X509.thumbprintSHA1(der), expectedS1);
   }
 
+  @Test
+  public void encodingConversion() {
+    // Use case: a configuration file or log line carries a hex SHA-1
+    // fingerprint and you need the JOSE x5t form to put in a header.
+    assertEquals(X509.fingerprintToThumbprint("BC34F6D776BF005E5E45D12529995AF7EF5DA5CF"),
+        "vDT213a_AF5eRdElKZla9-9dpc8");
+    assertEquals(X509.fingerprintToThumbprint("B4814D2DF3D8635E2C3340CB4E9E93F81677C8F68F50F29CF079E1E9EBD74DE3"),
+        "tIFNLfPYY14sM0DLTp6T-BZ3yPaPUPKc8Hnh6evXTeM");
+
+    // Use case: reverse direction -- received an x5t value, want to display
+    // it as a hex fingerprint to a human.
+    assertEquals(X509.thumbprintToFingerprint("vDT213a_AF5eRdElKZla9-9dpc8"),
+        "BC34F6D776BF005E5E45D12529995AF7EF5DA5CF");
+    assertEquals(X509.thumbprintToFingerprint("tIFNLfPYY14sM0DLTp6T-BZ3yPaPUPKc8Hnh6evXTeM"),
+        "B4814D2DF3D8635E2C3340CB4E9E93F81677C8F68F50F29CF079E1E9EBD74DE3");
+  }
+
   private static X509Certificate parseCert(String base64Der) throws Exception {
     byte[] der = Base64.getDecoder().decode(base64Der.getBytes(StandardCharsets.UTF_8));
     CertificateFactory cf = CertificateFactory.getInstance("X.509");
