@@ -16,14 +16,11 @@
 
 package org.lattejava.jwt;
 
-import org.lattejava.jwt.internal.HexUtils;
 import org.lattejava.jwt.internal.JWKThumbprint;
 import org.lattejava.jwt.jwks.JSONWebKey;
 import org.lattejava.jwt.pem.PEM;
 
-import java.nio.charset.StandardCharsets;
 import java.security.KeyPairGenerator;
-import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Base64;
@@ -34,33 +31,6 @@ import java.util.Base64;
  * @author Daniel DeGroff
  */
 public class JWTUtils {
-  /**
-   * Convert a HEX <code>SHA-1</code> or <code>SHA-256</code> X.509 certificate fingerprint to an <code>x5t</code>
-   * or <code>x5t#S256</code> thumbprint respectively.
-   *
-   * @param fingerprint the SHA-1 or SHA-256 fingerprint
-   * @return a x5t hash.
-   */
-  public static String convertFingerprintToThumbprint(String fingerprint) {
-    byte[] bytes = HexUtils.toBytes(fingerprint);
-    return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-  }
-
-  /**
-   * Convert an X.509 certificate thumbprint to a HEX <code>SHA-1</code> or <code>SHA-256</code> fingerprint respectively.
-   * <p>
-   * If a <code>x5t</code> thumbprint is provided, a SHA-1 HEX encoded fingerprint will be returned.
-   * <p>
-   * If a <code>x5t#S256</code> thumbprint is provided, a SHA-256 HEX encoded fingerprint will be returned.
-   *
-   * @param x5tHash the x5t hash
-   * @return a SHA-1 or SHA-256 fingerprint
-   */
-  public static String convertThumbprintToFingerprint(String x5tHash) {
-    byte[] bytes = Base64.getUrlDecoder().decode(x5tHash.getBytes(StandardCharsets.UTF_8));
-    return HexUtils.fromBytes(bytes);
-  }
-
   /**
    * Generate a new public / private key pair using a 2048-bit RSA key. This is the minimum key length for use with an
    * RSA signing scheme for JWT.
@@ -197,49 +167,6 @@ public class JWTUtils {
   }
 
   /**
-   * Generate the <code>x5t</code> - the X.509 certificate thumbprint to be used in JWT header.
-   *
-   * @param encodedCertificate the Base64 encoded certificate
-   * @return an x5t hash.
-   */
-  public static String generateJWS_x5t(String encodedCertificate) {
-    return generateJWS_x5t("SHA-1", encodedCertificate);
-  }
-
-  /**
-   * Generate the <code>x5t</code> - the X.509 certificate thumbprint to be used in JWT header.
-   *
-   * @param algorithm          the algorithm used to calculate the hash, generally SHA-1 or SHA-256.
-   * @param encodedCertificate the Base64 encoded certificate
-   * @return an x5t hash.
-   */
-  public static String generateJWS_x5t(String algorithm, String encodedCertificate) {
-    byte[] bytes = Base64.getDecoder().decode(encodedCertificate.getBytes(StandardCharsets.UTF_8));
-    return generateJWS_x5t(algorithm, bytes);
-  }
-
-  /**
-   * Generate the <code>x5t</code> - the X.509 certificate thumbprint to be used in JWT header.
-   *
-   * @param derEncodedCertificate the DER encoded certificate
-   * @return an x5t hash.
-   */
-  public static String generateJWS_x5t(byte[] derEncodedCertificate) {
-    return generateJWS_x5t("SHA-1", derEncodedCertificate);
-  }
-
-  /**
-   * Generate the <code>x5t</code> - the X.509 certificate thumbprint to be used in JWT header.
-   *
-   * @param algorithm             the algorithm used to calculate the hash, generally SHA-1 or SHA-256.
-   * @param derEncodedCertificate the DER encoded certificate
-   * @return an x5t hash.
-   */
-  public static String generateJWS_x5t(String algorithm, byte[] derEncodedCertificate) {
-    return digest(algorithm, derEncodedCertificate);
-  }
-
-  /**
    * Generate a 32 byte (256 bit) HMAC secret for use with a SHA-256 hash.
    *
    * @return a secret for use with an HMAC signing and verification scheme.
@@ -276,18 +203,6 @@ public class JWTUtils {
     byte[] buffer = new byte[bytes];
     new SecureRandom().nextBytes(buffer);
     return Base64.getEncoder().encodeToString(buffer);
-  }
-
-  private static String digest(String algorithm, byte[] bytes) {
-    MessageDigest messageDigest;
-    try {
-      messageDigest = MessageDigest.getInstance(algorithm);
-    } catch (NoSuchAlgorithmException e) {
-      throw new IllegalArgumentException("No such algorithm [" + algorithm + "]", e);
-    }
-
-    byte[] digest = messageDigest.digest(bytes);
-    return new String(Base64.getUrlEncoder().withoutPadding().encode(digest));
   }
 
   /**
