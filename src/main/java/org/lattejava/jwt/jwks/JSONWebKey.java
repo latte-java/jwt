@@ -591,25 +591,140 @@ public final class JSONWebKey {
 
     private Builder() {}
 
+    /**
+     * The {@code alg} parameter (RFC 7517 §4.4) identifies the algorithm intended for use with
+     * this key.
+     */
     public Builder alg(Algorithm v)          { this.alg = v; return this; }
+
+    /**
+     * The Elliptic Curve name for EC and OKP keys. Common values:
+     * <ul>
+     *   <li>{@code P-256}, {@code P-384}, {@code P-521} — EC (RFC 7518 §6.2.1.1)</li>
+     *   <li>{@code Ed25519}, {@code Ed448} — OKP (RFC 8037 §2)</li>
+     * </ul>
+     */
     public Builder crv(String v)             { this.crv = v; return this; }
+
+    /**
+     * The {@code kid} parameter (RFC 7517 §4.5): key identifier. Used to match a key to a JWS
+     * header's {@code kid} parameter during signature verification.
+     */
     public Builder kid(String v)             { this.kid = v; return this; }
+
+    /**
+     * The {@code kty} parameter (RFC 7517 §4.1) identifying the cryptographic family:
+     * <ul>
+     *   <li>{@code EC}  — Elliptic Curve (RFC 7518 §6.2)</li>
+     *   <li>{@code RSA} — RSA (RFC 7518 §6.3)</li>
+     *   <li>{@code OKP} — Octet Key Pair, used for Edwards curves (RFC 8037)</li>
+     *   <li>{@code oct} — Octet sequence, used for symmetric keys (RFC 7518 §6.4)</li>
+     * </ul>
+     */
     public Builder kty(KeyType v)            { this.kty = v; return this; }
+
+    /**
+     * The {@code use} parameter (RFC 7517 §4.2) identifying the intended use of the public key:
+     * <ul>
+     *   <li>{@code sig} — signature</li>
+     *   <li>{@code enc} — encryption</li>
+     * </ul>
+     */
     public Builder use(String v)             { this.use = v; return this; }
+
+    /**
+     * The {@code key_ops} parameter (RFC 7517 §4.3) identifying the operations this key is
+     * intended for. Values include {@code sign}, {@code verify}, {@code encrypt}, {@code decrypt},
+     * {@code wrapKey}, {@code unwrapKey}, {@code deriveKey}, {@code deriveBits}.
+     */
     public Builder keyOps(List<String> v)    { this.key_ops = v; return this; }
+
+    /**
+     * The {@code x5u} parameter (RFC 7517 §4.6): a URI that refers to a resource for the X.509
+     * public key certificate or certificate chain.
+     */
     public Builder x5u(String v)             { this.x5u = v; return this; }
+
+    /**
+     * The {@code d} parameter. For RSA (RFC 7518 §6.3.2.1) this is the private exponent. For EC
+     * (RFC 7518 §6.2.2.1) and OKP (RFC 8037 §2) this is the private key value. Represented as a
+     * Base64urlUInt-encoded value for RSA/EC and a base64url-encoded octet string for OKP.
+     */
     public Builder d(String v)               { this.d = v; return this; }
+
+    /**
+     * The {@code dp} parameter (RFC 7518 §6.3.2.4): the first factor CRT (Chinese Remainder
+     * Theorem) exponent for the RSA private key. Represented as a Base64urlUInt-encoded value.
+     */
     public Builder dp(String v)              { this.dp = v; return this; }
+
+    /**
+     * The {@code dq} parameter (RFC 7518 §6.3.2.5): the second factor CRT (Chinese Remainder
+     * Theorem) exponent for the RSA private key. Represented as a Base64urlUInt-encoded value.
+     */
     public Builder dq(String v)              { this.dq = v; return this; }
+
+    /**
+     * The {@code e} parameter (RFC 7518 §6.3.1.2): the public exponent of the RSA public key.
+     * Represented as a Base64urlUInt-encoded value.
+     */
     public Builder e(String v)               { this.e = v; return this; }
+
+    /**
+     * The {@code n} parameter (RFC 7518 §6.3.1.1): the modulus of the RSA public key. Represented
+     * as a Base64urlUInt-encoded value.
+     */
     public Builder n(String v)               { this.n = v; return this; }
+
+    /**
+     * The {@code p} parameter (RFC 7518 §6.3.2.2): the first prime factor of the RSA private key.
+     * Represented as a Base64urlUInt-encoded value.
+     */
     public Builder p(String v)               { this.p = v; return this; }
+
+    /**
+     * The {@code q} parameter (RFC 7518 §6.3.2.3): the second prime factor of the RSA private
+     * key. Represented as a Base64urlUInt-encoded value.
+     */
     public Builder q(String v)               { this.q = v; return this; }
+
+    /**
+     * The {@code qi} parameter (RFC 7518 §6.3.2.6): the first CRT (Chinese Remainder Theorem)
+     * coefficient for the RSA private key. Represented as a Base64urlUInt-encoded value.
+     */
     public Builder qi(String v)              { this.qi = v; return this; }
+
+    /**
+     * The {@code x} parameter. For EC (RFC 7518 §6.2.1.2) this is the x coordinate of the public
+     * point, Base64urlUInt-encoded. For OKP (RFC 8037 §2) this is the public key octet string,
+     * base64url-encoded.
+     */
     public Builder x(String v)               { this.x = v; return this; }
+
+    /**
+     * The {@code y} parameter (RFC 7518 §6.2.1.3): the y coordinate of the EC public point.
+     * Represented as a Base64urlUInt-encoded value.
+     */
     public Builder y(String v)               { this.y = v; return this; }
+
+    /**
+     * The {@code x5c} parameter (RFC 7517 §4.7): the X.509 certificate chain. Each entry is a
+     * base64-encoded (not base64url) DER-encoded X.509 certificate; the first entry holds the
+     * certificate matching this key.
+     */
     public Builder x5c(List<String> v)       { this.x5c = v; return this; }
+
+    /**
+     * The {@code x5t} parameter (RFC 7517 §4.8): the base64url-encoded SHA-1 thumbprint of the
+     * DER-encoded X.509 certificate matching this key. Prefer {@link #x5tS256(String)} for new
+     * use; see RFC 6194 on SHA-1 collision resistance.
+     */
     public Builder x5t(String v)             { this.x5t = v; return this; }
+
+    /**
+     * The {@code x5t#S256} parameter (RFC 7517 §4.9): the base64url-encoded SHA-256 thumbprint of
+     * the DER-encoded X.509 certificate matching this key.
+     */
     public Builder x5tS256(String v)         { this.x5tS256 = v; return this; }
 
     /**

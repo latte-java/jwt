@@ -621,18 +621,36 @@ public final class JWT {
 
     private Builder() {}
 
+    /**
+     * Registered Claim {@code iss} as defined by RFC 7519 §4.1.1. Use of this claim is OPTIONAL.
+     * <p>
+     * The issuer claim identifies the principal that issued the JWT. If the value contains a
+     * {@code :} it must be a URI.
+     */
     public Builder issuer(String issuer) {
       this.issuer = issuer;
       return this;
     }
 
+    /**
+     * Registered Claim {@code sub} as defined by RFC 7519 §4.1.2. Use of this claim is OPTIONAL.
+     * <p>
+     * The subject claim identifies the principal that is the subject of the JWT. If the value
+     * contains a {@code :} it must be a URI.
+     */
     public Builder subject(String subject) {
       this.subject = subject;
       return this;
     }
 
     /**
-     * Set a single-element audience. Serialization defaults to
+     * Registered Claim {@code aud} as defined by RFC 7519 §4.1.3. Use of this claim is OPTIONAL.
+     * <p>
+     * The audience claim identifies the recipients that the JWT is intended for. On the wire this
+     * may be an array of strings or a single string; any string values containing a {@code :} must
+     * be URIs.
+     * <p>
+     * This overload sets a single-element audience. Serialization defaults to
      * {@link AudienceSerialization#ALWAYS_ARRAY}; call
      * {@link #audienceSerialization(AudienceSerialization)} to opt in to
      * {@link AudienceSerialization#STRING_WHEN_SINGLE}.
@@ -647,7 +665,13 @@ public final class JWT {
     }
 
     /**
-     * Set the audience from a list. Serialization defaults to
+     * Registered Claim {@code aud} as defined by RFC 7519 §4.1.3. Use of this claim is OPTIONAL.
+     * <p>
+     * The audience claim identifies the recipients that the JWT is intended for. On the wire this
+     * may be an array of strings or a single string; any string values containing a {@code :} must
+     * be URIs.
+     * <p>
+     * This overload sets the audience from a list. Serialization defaults to
      * {@link AudienceSerialization#ALWAYS_ARRAY}.
      */
     public Builder audience(List<String> audiences) {
@@ -670,36 +694,77 @@ public final class JWT {
       return this;
     }
 
+    /**
+     * Registered Claim {@code exp} as defined by RFC 7519 §4.1.4. Use of this claim is OPTIONAL.
+     * <p>
+     * The expiration time claim identifies the expiration time on or after which the JWT MUST NOT
+     * be accepted for processing. Serialized as NumericDate (seconds since Epoch).
+     */
     public Builder expiresAt(Instant expiration) {
       this.expiresAt = expiration;
       return this;
     }
 
+    /**
+     * Registered Claim {@code exp} as defined by RFC 7519 §4.1.4. Use of this claim is OPTIONAL.
+     * <p>
+     * The expiration time claim identifies the expiration time on or after which the JWT MUST NOT
+     * be accepted for processing. Serialized as NumericDate (seconds since Epoch).
+     */
     public Builder expiresAt(long epochSeconds) {
       this.expiresAt = Instant.ofEpochSecond(epochSeconds);
       return this;
     }
 
+    /**
+     * Registered Claim {@code nbf} as defined by RFC 7519 §4.1.5. Use of this claim is OPTIONAL.
+     * <p>
+     * This claim identifies the time before which the JWT MUST NOT be accepted for processing.
+     * Serialized as NumericDate (seconds since Epoch).
+     */
     public Builder notBefore(Instant notBefore) {
       this.notBefore = notBefore;
       return this;
     }
 
+    /**
+     * Registered Claim {@code nbf} as defined by RFC 7519 §4.1.5. Use of this claim is OPTIONAL.
+     * <p>
+     * This claim identifies the time before which the JWT MUST NOT be accepted for processing.
+     * Serialized as NumericDate (seconds since Epoch).
+     */
     public Builder notBefore(long epochSeconds) {
       this.notBefore = Instant.ofEpochSecond(epochSeconds);
       return this;
     }
 
+    /**
+     * Registered Claim {@code iat} as defined by RFC 7519 §4.1.6. Use of this claim is OPTIONAL.
+     * <p>
+     * The issued at claim identifies the time at which the JWT was issued. Serialized as
+     * NumericDate (seconds since Epoch).
+     */
     public Builder issuedAt(Instant issuedAt) {
       this.issuedAt = issuedAt;
       return this;
     }
 
+    /**
+     * Registered Claim {@code iat} as defined by RFC 7519 §4.1.6. Use of this claim is OPTIONAL.
+     * <p>
+     * The issued at claim identifies the time at which the JWT was issued. Serialized as
+     * NumericDate (seconds since Epoch).
+     */
     public Builder issuedAt(long epochSeconds) {
       this.issuedAt = Instant.ofEpochSecond(epochSeconds);
       return this;
     }
 
+    /**
+     * Registered Claim {@code jti} as defined by RFC 7519 §4.1.7. Use of this claim is OPTIONAL.
+     * <p>
+     * The JWT ID claim provides a unique identifier for the JWT.
+     */
     public Builder id(String jwtId) {
       this.id = jwtId;
       return this;

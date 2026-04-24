@@ -288,19 +288,29 @@ public final class Header {
 
     private Builder() {}
 
-    /** Set the {@code alg} header parameter (RFC 7515 §4.1.1). Required before {@link #build()} for signed JWTs. */
+    /**
+     * The signing algorithm declared in the {@code alg} header (RFC 7515 §4.1.1). Never null for
+     * a parsed header; required before {@link #build()} for signed JWTs.
+     */
     public Builder alg(Algorithm algorithm) {
       this.alg = algorithm;
       return this;
     }
 
-    /** Set the {@code typ} header parameter (RFC 7515 §4.1.9). Defaults to {@code "JWT"}; passing {@code null} clears it. */
+    /**
+     * The media type of the token declared in {@code typ} (RFC 7515 §4.1.9). Defaults to
+     * {@code "JWT"} on the builder side; may be null on a parsed header. Passing {@code null}
+     * clears it.
+     */
     public Builder typ(String type) {
       this.typ = type;
       return this;
     }
 
-    /** Set the {@code kid} key-identifier header parameter (RFC 7515 §4.1.4). {@code null} clears it. */
+    /**
+     * The key identifier declared in {@code kid} (RFC 7515 §4.1.4), or null when unset. Passing
+     * {@code null} clears it.
+     */
     public Builder kid(String keyId) {
       this.kid = keyId;
       return this;
