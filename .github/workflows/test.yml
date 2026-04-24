@@ -1,34 +1,35 @@
 name: test
 
+# Run the tests when code is pushed to `main`
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
 jobs:
-  build_and_test:
-
+  test:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - name: Install Latte Build
+        run: |
+          curl -fsSL https://lattejava.org/javaenv/install | bash
+          curl -fsSL https://lattejava.org/cli/install | bash
+          ~/.local/bin/javaenv install 21
+          ~/.local/bin/javaenv install 25
+        shell: bash
+      - name: Run the build
+        run: |
+          export PATH=~/.local/bin:$PATH
+          latte clean int
+        shell: bash
+      - name: Archive TestNG reports
+        if: failure()
+        uses: actions/upload-artifact@v4
         with:
-          distribution: 'temurin'
-          java-version: 17
-
-      - name: Cache Maven packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.m2
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-m2
-
-      - name: Build and test with Maven
-        run: mvn -B verify --file pom.xml
-
-
+          name: testng-reports
+          path: build/test-reports
+          retention-days: 1
