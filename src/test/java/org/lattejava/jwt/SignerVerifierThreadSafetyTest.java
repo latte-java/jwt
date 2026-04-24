@@ -75,25 +75,25 @@ public class SignerVerifierThreadSafetyTest extends BaseJWTTest {
     String ed448Priv = readFile("ed_dsa_ed448_private_key.pem");
     String ed448Pub = readFile("ed_dsa_ed448_public_key.pem");
     return new Object[][]{
-        {"HS256", HMACSigner.newSHA256Signer(hmacSecret), HMACVerifier.newVerifier(Algorithm.HS256, hmacSecret), Algorithm.HS256},
-        {"HS384", HMACSigner.newSHA384Signer(hmacSecret), HMACVerifier.newVerifier(Algorithm.HS384, hmacSecret), Algorithm.HS384},
-        {"HS512", HMACSigner.newSHA512Signer(hmacSecret), HMACVerifier.newVerifier(Algorithm.HS512, hmacSecret), Algorithm.HS512},
-        {"RS256", RSASigner.newSHA256Signer(rsaPriv), RSAVerifier.newVerifier(Algorithm.RS256, rsaPub), Algorithm.RS256},
-        {"RS384", RSASigner.newSHA384Signer(rsaPriv), RSAVerifier.newVerifier(Algorithm.RS384, rsaPub), Algorithm.RS384},
-        {"RS512", RSASigner.newSHA512Signer(rsaPriv), RSAVerifier.newVerifier(Algorithm.RS512, rsaPub), Algorithm.RS512},
-        {"PS256", RSAPSSSigner.newSHA256Signer(rsaPriv), RSAPSSVerifier.newVerifier(Algorithm.PS256, rsaPub), Algorithm.PS256},
-        {"PS384", RSAPSSSigner.newSHA384Signer(rsaPriv), RSAPSSVerifier.newVerifier(Algorithm.PS384, rsaPub), Algorithm.PS384},
-        {"PS512", RSAPSSSigner.newSHA512Signer(rsaPriv), RSAPSSVerifier.newVerifier(Algorithm.PS512, rsaPub), Algorithm.PS512},
-        {"ES256", ECSigner.newSHA256Signer(ecPriv256), ECVerifier.newVerifier(ecPub256), Algorithm.ES256},
-        {"ES384", ECSigner.newSHA384Signer(ecPriv384), ECVerifier.newVerifier(ecPub384), Algorithm.ES384},
-        {"ES512", ECSigner.newSHA512Signer(ecPriv521), ECVerifier.newVerifier(ecPub521), Algorithm.ES512},
-        {"Ed25519", EdDSASigner.newSigner(ed25519Priv), EdDSAVerifier.newVerifier(ed25519Pub), Algorithm.Ed25519},
-        {"Ed448", EdDSASigner.newSigner(ed448Priv), EdDSAVerifier.newVerifier(ed448Pub), Algorithm.Ed448},
+        {"HS256", HMACSigner.newSHA256Signer(hmacSecret), HMACVerifier.newVerifier(Algorithm.HS256, hmacSecret)},
+        {"HS384", HMACSigner.newSHA384Signer(hmacSecret), HMACVerifier.newVerifier(Algorithm.HS384, hmacSecret)},
+        {"HS512", HMACSigner.newSHA512Signer(hmacSecret), HMACVerifier.newVerifier(Algorithm.HS512, hmacSecret)},
+        {"RS256", RSASigner.newSHA256Signer(rsaPriv), RSAVerifier.newVerifier(Algorithm.RS256, rsaPub)},
+        {"RS384", RSASigner.newSHA384Signer(rsaPriv), RSAVerifier.newVerifier(Algorithm.RS384, rsaPub)},
+        {"RS512", RSASigner.newSHA512Signer(rsaPriv), RSAVerifier.newVerifier(Algorithm.RS512, rsaPub)},
+        {"PS256", RSAPSSSigner.newSHA256Signer(rsaPriv), RSAPSSVerifier.newVerifier(Algorithm.PS256, rsaPub)},
+        {"PS384", RSAPSSSigner.newSHA384Signer(rsaPriv), RSAPSSVerifier.newVerifier(Algorithm.PS384, rsaPub)},
+        {"PS512", RSAPSSSigner.newSHA512Signer(rsaPriv), RSAPSSVerifier.newVerifier(Algorithm.PS512, rsaPub)},
+        {"ES256", ECSigner.newSHA256Signer(ecPriv256), ECVerifier.newVerifier(ecPub256)},
+        {"ES384", ECSigner.newSHA384Signer(ecPriv384), ECVerifier.newVerifier(ecPub384)},
+        {"ES512", ECSigner.newSHA512Signer(ecPriv521), ECVerifier.newVerifier(ecPub521)},
+        {"Ed25519", EdDSASigner.newSigner(ed25519Priv), EdDSAVerifier.newVerifier(ed25519Pub)},
+        {"Ed448", EdDSASigner.newSigner(ed448Priv), EdDSAVerifier.newVerifier(ed448Pub)},
     };
   }
 
   @Test(dataProvider = "signerVerifierPairs")
-  public void sharedAcrossThreads(String label, Signer signer, Verifier verifier, Algorithm algorithm) throws Exception {
+  public void sharedAcrossThreads(String label, Signer signer, Verifier verifier) throws Exception {
     byte[] message = ("thread-safety test for " + label).getBytes();
     ExecutorService pool = Executors.newFixedThreadPool(THREAD_COUNT);
     CountDownLatch start = new CountDownLatch(1);
@@ -106,7 +106,7 @@ public class SignerVerifierThreadSafetyTest extends BaseJWTTest {
             start.await();
             for (int i = 0; i < ITERATIONS_PER_THREAD; i++) {
               byte[] signature = signer.sign(message);
-              verifier.verify(algorithm, message, signature);
+              verifier.verify(message, signature);
             }
           } catch (Throwable th) {
             failure.compareAndSet(null, th);

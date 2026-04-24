@@ -181,6 +181,6 @@ public class RFC7515VectorsTest extends BaseJWTTest {
     byte[] signature = b64u(parts[2]);
     // canVerify must accept ES512.
     assert v.canVerify(Algorithm.ES512);
-    v.verify(Algorithm.ES512, signingInput.getBytes(java.nio.charset.StandardCharsets.UTF_8), signature);
+    v.verify(signingInput.getBytes(java.nio.charset.StandardCharsets.UTF_8), signature);
   }
 }

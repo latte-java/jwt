@@ -23,6 +23,7 @@ import org.lattejava.jwt.Verifier;
 import org.lattejava.jwt.algorithm.KeyCoercion;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.InvalidKeyException;
@@ -38,12 +39,13 @@ import java.util.Objects;
  * algorithms (RFC 8037 §3.1, JOSE registry).
  *
  * <p>The bound JWA algorithm is derived from the key's curve at
- * construction. {@link #verify(Algorithm, byte[], byte[])} re-checks the
- * caller-supplied algorithm against the bound algorithm so a key cannot
- * be cross-used (Ed25519 key handed an Ed448-tagged signature).</p>
+ * construction. {@link #canVerify(Algorithm)} returns true only for that
+ * exact algorithm, so a key cannot be cross-used (Ed25519 key handed an
+ * Ed448-tagged signature) once the decoder gates the verify call on
+ * {@code canVerify}.</p>
  *
- * <p>Each call to {@link #verify(Algorithm, byte[], byte[])} obtains a
- * fresh {@link Signature} instance ({@link Signature} is not thread-safe).</p>
+ * <p>Each call to {@link #verify(byte[], byte[])} obtains a fresh
+ * {@link Signature} instance ({@link Signature} is not thread-safe).</p>
  *
  * @author Daniel DeGroff
  */
@@ -67,7 +69,7 @@ public class EdDSAVerifier implements Verifier {
   public static EdDSAVerifier newVerifier(Path path) {
     Objects.requireNonNull(path);
     try {
-      return new EdDSAVerifier(new String(Files.readAllBytes(path)));
+      return new EdDSAVerifier(new String(Files.readAllBytes(path), StandardCharsets.UTF_8));
     } catch (IOException e) {
       throw new JWTVerifierException("Unable to read file from path [" + path + "]", e);
     }
@@ -75,7 +77,7 @@ public class EdDSAVerifier implements Verifier {
 
   public static EdDSAVerifier newVerifier(byte[] bytes) {
     Objects.requireNonNull(bytes);
-    return new EdDSAVerifier(new String(bytes));
+    return new EdDSAVerifier(new String(bytes, StandardCharsets.UTF_8));
   }
 
   public static EdDSAVerifier newVerifier(PublicKey publicKey) {
@@ -92,29 +94,25 @@ public class EdDSAVerifier implements Verifier {
   }
 
   @Override
-  public void verify(Algorithm algorithm, byte[] message, byte[] signature) {
-    Objects.requireNonNull(algorithm);
+  public void verify(byte[] message, byte[] signature) {
     Objects.requireNonNull(message);
     Objects.requireNonNull(signature);
 
     int expectedLength;
     try {
-      expectedLength = EdDSAFamily.signatureLength(algorithm);
+      expectedLength = EdDSAFamily.signatureLength(this.algorithm);
     } catch (IllegalArgumentException e) {
-      // Reaching this branch means canVerify(algorithm) admitted an EdDSA algorithm that
-      // EdDSAFamily doesn't know about — an internal precondition violation, not a signature failure.
-      throw new IllegalStateException("EdDSAVerifier reached with unsupported algorithm ["
-          + algorithm.name() + "]; canVerify should have rejected this earlier", e);
+      // EdDSAFamily does not recognize the bound algorithm -- an internal precondition violation.
+      // This should never happen because the constructor derives the algorithm from a supported curve.
+      throw new IllegalStateException("EdDSAVerifier bound to unsupported algorithm ["
+          + this.algorithm.name() + "]", e);
     }
     if (signature.length != expectedLength) {
       throw new InvalidJWTSignatureException();
     }
-    if (!this.algorithm.name().equals(algorithm.name())) {
-      throw new InvalidJWTSignatureException();
-    }
 
     try {
-      Signature verifier = Signature.getInstance(EdDSAFamily.toJCA(algorithm));
+      Signature verifier = Signature.getInstance(EdDSAFamily.toJCA(this.algorithm));
       verifier.initVerify(publicKey);
       verifier.update(message);
       try {

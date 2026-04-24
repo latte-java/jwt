@@ -25,6 +25,7 @@ import org.lattejava.jwt.algorithm.KeyCoercion;
 import org.lattejava.jwt.internal.JOSEConverter;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.InvalidKeyException;
@@ -49,8 +50,8 @@ import java.util.Objects;
  * keys are already produced by the PEM decoder via the same provider path,
  * so they are accepted as-is.</p>
  *
- * <p>Each call to {@link #verify(Algorithm, byte[], byte[])} obtains a
- * fresh {@link Signature} instance ({@link Signature} is not thread-safe),
+ * <p>Each call to {@link #verify(byte[], byte[])} obtains a fresh
+ * {@link Signature} instance ({@link Signature} is not thread-safe),
  * validates that the JOSE signature length matches the curve, converts
  * JOSE {@code R || S} to DER via {@link JOSEConverter#joseToDer(byte[], int)},
  * and verifies.</p>
@@ -106,13 +107,13 @@ public class ECVerifier implements Verifier {
 
   public static ECVerifier newVerifier(byte[] bytes) {
     Objects.requireNonNull(bytes);
-    return new ECVerifier(new String(bytes));
+    return new ECVerifier(new String(bytes, StandardCharsets.UTF_8));
   }
 
   public static ECVerifier newVerifier(Path path) {
     Objects.requireNonNull(path);
     try {
-      return new ECVerifier(new String(Files.readAllBytes(path)));
+      return new ECVerifier(new String(Files.readAllBytes(path), StandardCharsets.UTF_8));
     } catch (IOException e) {
       throw new JWTVerifierException("Unable to read file from path [" + path + "]", e);
     }
@@ -124,21 +125,20 @@ public class ECVerifier implements Verifier {
   }
 
   @Override
-  public void verify(Algorithm algorithm, byte[] message, byte[] signature) {
-    Objects.requireNonNull(algorithm);
+  public void verify(byte[] message, byte[] signature) {
     Objects.requireNonNull(message);
     Objects.requireNonNull(signature);
 
     int expectedLength;
     int curveIntLength;
     try {
-      expectedLength = ECFamily.joseSignatureLength(algorithm);
-      curveIntLength = ECFamily.curveIntLength(algorithm);
+      expectedLength = ECFamily.joseSignatureLength(this.algorithm);
+      curveIntLength = ECFamily.curveIntLength(this.algorithm);
     } catch (IllegalArgumentException e) {
-      // Reaching this branch means canVerify(algorithm) admitted an EC algorithm that ECFamily
-      // doesn't know about — an internal precondition violation, not a signature failure.
-      throw new IllegalStateException("ECVerifier reached with unsupported algorithm ["
-          + algorithm.name() + "]; canVerify should have rejected this earlier", e);
+      // ECFamily does not recognize the bound algorithm -- an internal precondition violation.
+      // This should never happen because the constructor only accepts algorithms ECFamily knows.
+      throw new IllegalStateException("ECVerifier bound to unsupported algorithm ["
+          + this.algorithm.name() + "]", e);
     }
     if (signature.length != expectedLength) {
       throw new InvalidJWTSignatureException();
@@ -146,7 +146,7 @@ public class ECVerifier implements Verifier {
 
     byte[] der = JOSEConverter.joseToDer(signature, curveIntLength);
     try {
-      Signature verifier = Signature.getInstance(ECFamily.toJCA(algorithm));
+      Signature verifier = Signature.getInstance(ECFamily.toJCA(this.algorithm));
       verifier.initVerify(publicKey);
       verifier.update(message);
       try {

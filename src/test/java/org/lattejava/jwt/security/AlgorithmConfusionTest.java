@@ -33,7 +33,6 @@ import org.lattejava.jwt.JWTEncoder;
 import org.lattejava.jwt.MissingVerifierException;
 import org.lattejava.jwt.Verifier;
 import org.lattejava.jwt.VerifierResolver;
-import org.lattejava.jwt.Verifiers;
 import org.lattejava.jwt.algorithm.ec.ECSigner;
 import org.lattejava.jwt.algorithm.ec.ECVerifier;
 import org.lattejava.jwt.algorithm.hmac.HMACSigner;
@@ -110,24 +109,6 @@ public class AlgorithmConfusionTest extends BaseJWTTest {
     Verifier rsaVerifier = RSAVerifier.newVerifier(Algorithm.RS256, rsaPub);
     expectException(MissingVerifierException.class, () ->
         new JWTDecoder().decode(forged, VerifierResolver.of(rsaVerifier)));
-  }
-
-  @Test
-  public void hmacForgery_firstMatching_failsFastOnHmacVerifier() throws Exception {
-    // Use case: Algorithm confusion -- forged HMAC token passed to
-    // Verifiers.firstMatching(rsaVerifier, hmacVerifier). The HMAC verifier is selected
-    // via canVerify, signature verification fails, InvalidJWTSignatureException
-    // propagates immediately (fail-fast, no fall-through).
-    JWT jwt = JWT.builder().subject("123456789").build();
-    String rsaPub = new String(Files.readAllBytes(Paths.get("src/test/resources/rsa_public_key_2048.pem")));
-    String forged = new JWTEncoder().encode(jwt, HMACSigner.newSHA512Signer(rsaPub));
-
-    Verifier rsaVerifier = RSAVerifier.newVerifier(Algorithm.RS256, rsaPub);
-    Verifier hmacVerifier = HMACVerifier.newVerifier(Algorithm.HS512, HMAC_SECRET_64);
-
-    Verifier composite = Verifiers.firstMatching(rsaVerifier, hmacVerifier);
-    expectException(InvalidJWTSignatureException.class, () ->
-        new JWTDecoder().decode(forged, VerifierResolver.of(composite)));
   }
 
   @Test

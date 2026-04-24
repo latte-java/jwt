@@ -47,8 +47,8 @@ import java.util.Objects;
  * constant-time since JDK 7u40 (JDK-8006276) -- to avoid leaking the
  * valid MAC via comparison-timing side channels.</p>
  *
- * <p>Each call to {@link #verify(Algorithm, byte[], byte[])} obtains a
- * fresh {@link Mac} instance ({@link Mac} is not thread-safe).</p>
+ * <p>Each call to {@link #verify(byte[], byte[])} obtains a fresh
+ * {@link Mac} instance ({@link Mac} is not thread-safe).</p>
  *
  * @author Daniel DeGroff
  */
@@ -94,8 +94,7 @@ public class HMACVerifier implements Verifier {
   }
 
   @Override
-  public void verify(Algorithm algorithm, byte[] message, byte[] signature) {
-    Objects.requireNonNull(algorithm);
+  public void verify(byte[] message, byte[] signature) {
     Objects.requireNonNull(message);
     Objects.requireNonNull(signature);
 

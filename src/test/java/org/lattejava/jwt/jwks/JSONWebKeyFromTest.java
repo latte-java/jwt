@@ -175,7 +175,7 @@ public class JSONWebKeyFromTest extends BaseJWTTest {
         verifier.canVerify(Algorithm.PS256);
         verifier.canVerify(Algorithm.PS384);
         verifier.canVerify(Algorithm.PS512);
-        verifier.verify(Algorithm.PS256, messageBytes, signature);
+        verifier.verify(messageBytes, signature);
     }
 
     @Test

@@ -251,7 +251,7 @@ This call triggers the one-time probe on first invocation, so the result is stab
 
 When using `Ed25519` or `Ed448`, the `alg` JWT header and the JWK `alg` property will be equal to the algorithm name. The legacy `EdDSA` value has been deprecated in JOSE in favor of the fully-specified algorithm names `Ed25519` and `Ed448`, and this library will not accept a JWT with `alg: EdDSA` out of the box.
 
-If you need to interoperate with a producer that still emits `alg: EdDSA`, you can support it by implementing your own `Verifier`. The interface has just two methods — `canVerify(Algorithm)` and `verify(Algorithm, byte[], byte[])` — so a small delegating shim that accepts `EdDSA` and dispatches to the appropriate `Ed25519` or `Ed448` verifier is straightforward to write.
+If you need to interoperate with a producer that still emits `alg: EdDSA`, you can support it by implementing your own `Verifier`. The interface has just two methods — `canVerify(Algorithm)` and `verify(byte[], byte[])` — so a small delegating shim that accepts `EdDSA` and dispatches to the appropriate `Ed25519` or `Ed448` verifier is straightforward to write.
 
 ## JSON Web Keys
 

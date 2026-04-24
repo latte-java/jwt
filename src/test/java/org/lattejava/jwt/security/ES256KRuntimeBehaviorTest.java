@@ -100,7 +100,7 @@ public class ES256KRuntimeBehaviorTest extends BaseTest {
       throw e;
     }
     assertNotNull(sig);
-    verifier.verify(Algorithm.ES256K, message, sig);
+    verifier.verify(message, sig);
   }
 
   @Test

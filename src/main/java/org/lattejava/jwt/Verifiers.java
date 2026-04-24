@@ -30,7 +30,6 @@ import org.lattejava.jwt.algorithm.rsa.RSAPSSVerifier;
 import org.lattejava.jwt.algorithm.rsa.RSAVerifier;
 
 import java.security.PublicKey;
-import java.util.List;
 import java.util.Objects;
 
 /**
@@ -40,10 +39,10 @@ import java.util.Objects;
  * {@code forAsymmetric}) is rejected with {@link IllegalArgumentException} so a
  * misplaced key cannot be silently coerced into the wrong algorithm family.
  *
- * <p>{@link #firstMatching(Verifier...)} composes multiple verifiers; the first delegate
- * whose {@link Verifier#canVerify(Algorithm)} returns true handles the verify
- * call, and any exception it throws propagates immediately (fail-fast — no
- * fall-through to subsequent verifiers).</p>
+ * <p>Multi-verifier dispatch is not provided here. Callers that need to pick a
+ * {@link Verifier} per token should use {@link VerifierResolver#byKid} (kid-keyed
+ * map) or {@link VerifierResolver#from} (arbitrary function over the header),
+ * which make the resolution strategy explicit at the resolver layer.</p>
  *
  * @author Daniel DeGroff
  */
@@ -123,61 +122,6 @@ public final class Verifiers {
       case "Ed25519", "Ed448" -> EdDSAVerifier.newVerifier(publicKey);
       default -> throw new IllegalArgumentException(
           "Expected asymmetric algorithm but found [" + algorithm.name() + "]");
-    };
-  }
-
-  // ---------------------------------------------------------------------
-  // firstMatching -- composite verifier
-  // ---------------------------------------------------------------------
-
-  /**
-   * Compose multiple verifiers into a single fail-fast composite. The composite's
-   * {@link Verifier#canVerify(Algorithm)} returns {@code true} if any delegate
-   * accepts the algorithm. The composite's {@link Verifier#verify(Algorithm, byte[], byte[])}
-   * invokes the FIRST matching delegate (in declaration order) and propagates any
-   * exception that delegate throws immediately. The name reflects the dispatch
-   * semantics: it is not a "try-each-until-one-succeeds" verifier.
-   *
-   * <p>If no delegate matches, {@link Verifier#verify(Algorithm, byte[], byte[])}
-   * throws {@link MissingVerifierException}.</p>
-   *
-   * @param verifiers one or more delegates (must be non-null and non-empty)
-   * @return a composite {@code Verifier}
-   * @throws NullPointerException if {@code verifiers} or any element is null
-   * @throws IllegalArgumentException if {@code verifiers} is empty
-   */
-  public static Verifier firstMatching(Verifier... verifiers) {
-    Objects.requireNonNull(verifiers, "verifiers");
-    if (verifiers.length == 0) {
-      throw new IllegalArgumentException("firstMatching requires at least one Verifier");
-    }
-    Verifier[] copy = verifiers.clone();
-    for (int i = 0; i < copy.length; i++) {
-      Objects.requireNonNull(copy[i], "verifiers[" + i + "]");
-    }
-    List<Verifier> delegates = List.of(copy);
-    return new Verifier() {
-      @Override
-      public boolean canVerify(Algorithm algorithm) {
-        for (Verifier v : delegates) {
-          if (v.canVerify(algorithm)) {
-            return true;
-          }
-        }
-        return false;
-      }
-
-      @Override
-      public void verify(Algorithm algorithm, byte[] signingInput, byte[] signature) {
-        for (Verifier v : delegates) {
-          if (v.canVerify(algorithm)) {
-            v.verify(algorithm, signingInput, signature);
-            return;
-          }
-        }
-        throw new MissingVerifierException(
-            "No Verifier in firstMatching composite accepts algorithm [" + algorithm.name() + "]");
-      }
     };
   }
 

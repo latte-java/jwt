@@ -193,7 +193,7 @@ public class JWTDecoder {
     String signingInput = segments.headerB64 + "." + segments.payloadB64;
     byte[] message = signingInput.getBytes(StandardCharsets.UTF_8);
     byte[] signatureBytes = strictBase64UrlDecode(segments.signatureB64, "signature");
-    verifier.verify(header.alg(), message, signatureBytes);
+    verifier.verify(message, signatureBytes);
 
     JWT jwt = parsePayload(segments.payloadB64, header);
     enforceTimeClaims(jwt);
@@ -302,21 +302,19 @@ public class JWTDecoder {
     }
   }
 
-  @SuppressWarnings("unchecked")
   private void enforceCrit(Header header) {
     Object critValue = header.get("crit");
     if (critValue == null) {
       return;
     }
-    if (!(critValue instanceof List)) {
+    if (!(critValue instanceof List<?> critList)) {
       // Header.fromMap already structurally validated, but defense-in-depth.
       throw new InvalidJWTException("Header [crit] must be a JSON array of strings");
     }
-    for (Object name : (List<Object>) critValue) {
-      if (!(name instanceof String)) {
+    for (Object name : critList) {
+      if (!(name instanceof String entry)) {
         throw new InvalidJWTException("Header [crit] elements must be strings");
       }
-      String entry = (String) name;
       if (!criticalHeaders.contains(entry)) {
         throw new InvalidJWTException(
             "Header [crit] lists unrecognized critical parameter [" + MessageSanitizer.forMessage(entry) + "]");
@@ -472,6 +470,25 @@ public class JWTDecoder {
       return this;
     }
 
+    /**
+     * Whitelist of algorithms this decoder will accept. A header {@code alg}
+     * outside this set is rejected before verifier resolution, even if a
+     * matching verifier exists.
+     *
+     * <p>Every {@link Verifier} is already 1:1 bound to a single algorithm
+     * at construction time, so this whitelist is a policy layer on top of
+     * the structural protection -- not the primary defense against
+     * algorithm confusion. Typical uses: subsetting a shared verifier pool
+     * for one endpoint, deprecation windows where old-algorithm keys
+     * remain in the keystore but are no longer accepted, and
+     * defense-in-depth pinning.</p>
+     *
+     * <p>Null or empty disables the whitelist (all resolvable algorithms
+     * accepted).</p>
+     *
+     * @param expectedAlgorithms the whitelist, or null to disable
+     * @return this builder
+     */
     public Builder expectedAlgorithms(Set<Algorithm> expectedAlgorithms) {
       this.expectedAlgorithms = expectedAlgorithms == null
           ? null

@@ -122,7 +122,7 @@ public class VerifierResolverTest {
     }
 
     @Override
-    public void verify(Algorithm algorithm, byte[] message, byte[] signature) {
+    public void verify(byte[] message, byte[] signature) {
       // not exercised in this test
     }
   }

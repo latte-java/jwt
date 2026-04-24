@@ -172,7 +172,7 @@ public class SignersTest extends BaseTest {
 
     // round-trip verify with the matching family verifier
     Verifier verifier = HMACVerifier.newVerifier(algorithm, secret);
-    verifier.verify(algorithm, "message".getBytes(StandardCharsets.UTF_8), signature);
+    verifier.verify("message".getBytes(StandardCharsets.UTF_8), signature);
   }
 
   @Test(dataProvider = "hmacAlgorithms")
@@ -183,7 +183,7 @@ public class SignersTest extends BaseTest {
 
     byte[] signature = signer.sign("message".getBytes(StandardCharsets.UTF_8));
     Verifier verifier = HMACVerifier.newVerifier(algorithm, secretBytes);
-    verifier.verify(algorithm, "message".getBytes(StandardCharsets.UTF_8), signature);
+    verifier.verify("message".getBytes(StandardCharsets.UTF_8), signature);
   }
 
   @Test
@@ -267,7 +267,7 @@ public class SignersTest extends BaseTest {
     assertTrue(signature.length > 0);
 
     Verifier verifier = verifierFactory.get();
-    verifier.verify(algorithm, msg, signature);
+    verifier.verify(msg, signature);
   }
 
   @Test
@@ -280,7 +280,7 @@ public class SignersTest extends BaseTest {
     byte[] sig = signer.sign(msg);
 
     PublicKey pub = PEM.decode(readFile("ec_public_key_p_256.pem")).publicKey;
-    ECVerifier.newVerifier(pub).verify(Algorithm.ES256, msg, sig);
+    ECVerifier.newVerifier(pub).verify(msg, sig);
   }
 
   @Test
@@ -291,7 +291,7 @@ public class SignersTest extends BaseTest {
     byte[] msg = "message".getBytes(StandardCharsets.UTF_8);
     byte[] sig = signer.sign(msg);
     PublicKey pub = PEM.decode(readFile("rsa_public_key_2048.pem")).publicKey;
-    RSAVerifier.newVerifier(Algorithm.RS256, pub).verify(Algorithm.RS256, msg, sig);
+    RSAVerifier.newVerifier(Algorithm.RS256, pub).verify(msg, sig);
   }
 
   @Test
@@ -309,7 +309,7 @@ public class SignersTest extends BaseTest {
     byte[] msg = "message".getBytes(StandardCharsets.UTF_8);
     byte[] sig = signer.sign(msg);
     PublicKey pub = PEM.decode(readFile("rsa_pss_public_key_2048.pem")).publicKey;
-    RSAPSSVerifier.newVerifier(Algorithm.PS256, pub).verify(Algorithm.PS256, msg, sig);
+    RSAPSSVerifier.newVerifier(Algorithm.PS256, pub).verify(msg, sig);
   }
 
   @Test
@@ -347,7 +347,7 @@ public class SignersTest extends BaseTest {
     }
 
     Verifier verifier = ECVerifier.newVerifier(kp.getPublic());
-    verifier.verify(Algorithm.ES256K, msg, sig);
+    verifier.verify(msg, sig);
   }
 
   @Test
@@ -430,7 +430,7 @@ public class SignersTest extends BaseTest {
         : null;
     byte[] msg = "message".getBytes(StandardCharsets.UTF_8);
     byte[] sig = signer.sign(msg);
-    verifier.verify(algorithm, msg, sig);
+    verifier.verify(msg, sig);
   }
 
   @Test(dataProvider = "hmacAlgorithms")
@@ -441,7 +441,7 @@ public class SignersTest extends BaseTest {
     Signer signer = signerForHMAC(algorithm, secret);
     byte[] msg = "message".getBytes(StandardCharsets.UTF_8);
     byte[] sig = signer.sign(msg);
-    verifier.verify(algorithm, msg, sig);
+    verifier.verify(msg, sig);
   }
 
   @Test(dataProvider = "hmacAPIRejectsAsymmetric")
@@ -463,7 +463,7 @@ public class SignersTest extends BaseTest {
     assertTrue(verifier.canVerify(Algorithm.RS256));
     Signer signer = RSASigner.newSHA256Signer(readFile("rsa_private_key_2048.pem"));
     byte[] msg = "m".getBytes(StandardCharsets.UTF_8);
-    verifier.verify(Algorithm.RS256, msg, signer.sign(msg));
+    verifier.verify(msg, signer.sign(msg));
   }
 
   @Test
@@ -479,7 +479,7 @@ public class SignersTest extends BaseTest {
     assertTrue(verifier.canVerify(Algorithm.PS256));
     Signer signer = RSAPSSSigner.newSHA256Signer(readFile("rsa_pss_private_key_2048.pem"));
     byte[] msg = "m".getBytes(StandardCharsets.UTF_8);
-    verifier.verify(Algorithm.PS256, msg, signer.sign(msg));
+    verifier.verify(msg, signer.sign(msg));
   }
 
   @Test
@@ -488,7 +488,7 @@ public class SignersTest extends BaseTest {
     assertTrue(verifier.canVerify(Algorithm.ES256));
     Signer signer = ECSigner.newSHA256Signer(readFile("ec_private_key_p_256.pem"));
     byte[] msg = "m".getBytes(StandardCharsets.UTF_8);
-    verifier.verify(Algorithm.ES256, msg, signer.sign(msg));
+    verifier.verify(msg, signer.sign(msg));
   }
 
   @Test
@@ -497,7 +497,7 @@ public class SignersTest extends BaseTest {
     assertTrue(verifier.canVerify(Algorithm.Ed25519));
     Signer signer = EdDSASigner.newSigner(readFile("ed_dsa_ed25519_private_key.pem"));
     byte[] msg = "m".getBytes(StandardCharsets.UTF_8);
-    verifier.verify(Algorithm.Ed25519, msg, signer.sign(msg));
+    verifier.verify(msg, signer.sign(msg));
   }
 
   @Test(dataProvider = "asymmetricAPIRejectsHMAC")

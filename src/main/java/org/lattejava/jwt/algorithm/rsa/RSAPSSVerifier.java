@@ -23,6 +23,7 @@ import org.lattejava.jwt.Verifier;
 import org.lattejava.jwt.algorithm.KeyCoercion;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.InvalidAlgorithmParameterException;
@@ -44,8 +45,8 @@ import java.util.Objects;
  * tampered header {@code alg} could coax a family-accepting verifier into
  * using a weaker hash than the caller intended (RFC 8725 §3.1).</p>
  *
- * <p>Each call to {@link #verify(Algorithm, byte[], byte[])} obtains a
- * fresh {@link Signature} instance and configures it with an explicit
+ * <p>Each call to {@link #verify(byte[], byte[])} obtains a fresh
+ * {@link Signature} instance and configures it with an explicit
  * {@code PSSParameterSpec} so the parameters are not inherited from the
  * JCA provider's defaults.</p>
  *
@@ -86,13 +87,13 @@ public class RSAPSSVerifier implements Verifier {
 
   public static RSAPSSVerifier newVerifier(Algorithm algorithm, byte[] bytes) {
     Objects.requireNonNull(bytes, "bytes");
-    return new RSAPSSVerifier(algorithm, new String(bytes));
+    return new RSAPSSVerifier(algorithm, new String(bytes, StandardCharsets.UTF_8));
   }
 
   public static RSAPSSVerifier newVerifier(Algorithm algorithm, Path path) {
     Objects.requireNonNull(path, "path");
     try {
-      return new RSAPSSVerifier(algorithm, new String(Files.readAllBytes(path)));
+      return new RSAPSSVerifier(algorithm, new String(Files.readAllBytes(path), StandardCharsets.UTF_8));
     } catch (IOException e) {
       throw new JWTVerifierException("Unable to read file from path [" + path + "]", e);
     }
@@ -104,8 +105,7 @@ public class RSAPSSVerifier implements Verifier {
   }
 
   @Override
-  public void verify(Algorithm algorithm, byte[] message, byte[] signature) {
-    Objects.requireNonNull(algorithm);
+  public void verify(byte[] message, byte[] signature) {
     Objects.requireNonNull(message);
     Objects.requireNonNull(signature);
     try {

@@ -18,13 +18,16 @@ package org.lattejava.jwt;
 
 /**
  * A {@code Verifier} validates a signature against the JWT signing-input
- * bytes.
+ * bytes. Each instance is bound 1:1 to a single JWA algorithm at
+ * construction time; {@link #canVerify(Algorithm)} returns true only for
+ * that exact algorithm, which structurally prevents algorithm-confusion
+ * attacks where a tampered header {@code alg} could coax a
+ * family-accepting verifier into using a weaker primitive (RFC 8725 §3.1).
  *
  * <p>Implementations MUST be safe to share across threads. Each call to
- * {@link #verify(Algorithm, byte[], byte[])} MUST obtain a fresh JCA
- * primitive ({@code Mac}/{@code Signature}) and MUST NOT cache and reuse
- * it across threads -- the JDK explicitly documents these as not
- * thread-safe.</p>
+ * {@link #verify(byte[], byte[])} MUST obtain a fresh JCA primitive
+ * ({@code Mac}/{@code Signature}) and MUST NOT cache and reuse it across
+ * threads -- the JDK explicitly documents these as not thread-safe.</p>
  *
  * <p>Any {@code Verifier} performing HMAC (or any secret-dependent)
  * signature comparison MUST use a constant-time comparison
@@ -43,19 +46,18 @@ public interface Verifier {
   boolean canVerify(Algorithm algorithm);
 
   /**
-   * Verify the signature. Returns normally on success.
+   * Verify the signature against the message using this verifier's bound
+   * algorithm and key. Returns normally on success.
    *
-   * <p>The {@code algorithm} argument MUST be one for which
-   * {@link #canVerify(Algorithm)} returned true; callers (including
-   * {@code JWTDecoder}) guarantee this.</p>
+   * <p>Callers (including {@code JWTDecoder}) MUST first gate this call
+   * with {@link #canVerify(Algorithm)} using the token's declared
+   * {@code alg}; verification is performed with the algorithm bound at
+   * construction time regardless of any caller-supplied value.</p>
    *
-   * @param algorithm the algorithm used to sign the JWT
    * @param message   the JWT signing-input bytes (header.payload encoded as UTF-8)
    * @param signature the signature bytes
    * @throws InvalidJWTSignatureException if the signature does not match the message
-   * @throws InvalidKeyLengthException if the verifier's key is too short for the algorithm
-   * @throws InvalidKeyTypeException if the key type is not compatible with the algorithm
    * @throws JWTVerifierException if an underlying JCE operation fails
    */
-  void verify(Algorithm algorithm, byte[] message, byte[] signature);
+  void verify(byte[] message, byte[] signature);
 }

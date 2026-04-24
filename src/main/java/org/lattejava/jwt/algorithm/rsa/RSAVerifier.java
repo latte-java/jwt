@@ -23,6 +23,7 @@ import org.lattejava.jwt.Verifier;
 import org.lattejava.jwt.algorithm.KeyCoercion;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.InvalidKeyException;
@@ -43,8 +44,8 @@ import java.util.Objects;
  * tampered header {@code alg} could coax a family-accepting verifier into
  * using a weaker hash than the caller intended (RFC 8725 §3.1).</p>
  *
- * <p>Each call to {@link #verify(Algorithm, byte[], byte[])} obtains a
- * fresh {@link Signature} instance ({@link Signature} is not thread-safe).</p>
+ * <p>Each call to {@link #verify(byte[], byte[])} obtains a fresh
+ * {@link Signature} instance ({@link Signature} is not thread-safe).</p>
  *
  * @author Daniel DeGroff
  */
@@ -83,13 +84,13 @@ public class RSAVerifier implements Verifier {
 
   public static RSAVerifier newVerifier(Algorithm algorithm, byte[] bytes) {
     Objects.requireNonNull(bytes, "bytes");
-    return new RSAVerifier(algorithm, new String(bytes));
+    return new RSAVerifier(algorithm, new String(bytes, StandardCharsets.UTF_8));
   }
 
   public static RSAVerifier newVerifier(Algorithm algorithm, Path path) {
     Objects.requireNonNull(path, "path");
     try {
-      return new RSAVerifier(algorithm, new String(Files.readAllBytes(path)));
+      return new RSAVerifier(algorithm, new String(Files.readAllBytes(path), StandardCharsets.UTF_8));
     } catch (IOException e) {
       throw new JWTVerifierException("Unable to read file from path [" + path + "]", e);
     }
@@ -101,8 +102,7 @@ public class RSAVerifier implements Verifier {
   }
 
   @Override
-  public void verify(Algorithm algorithm, byte[] message, byte[] signature) {
-    Objects.requireNonNull(algorithm);
+  public void verify(byte[] message, byte[] signature) {
     Objects.requireNonNull(message);
     Objects.requireNonNull(signature);
     try {

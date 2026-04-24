@@ -23,7 +23,6 @@
 
 package org.lattejava.jwt.algorithm.ec;
 
-import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.BaseJWTTest;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -68,35 +67,35 @@ public class ECDSASignatureFuzzTest extends BaseJWTTest {
   public void fuzz_ES256_P256() throws Exception {
     ECSigner signer = ECSigner.newSHA256Signer(p256.getPrivate());
     ECVerifier verifier = ECVerifier.newVerifier(p256.getPublic());
-    signThenVerify(signer, verifier, Algorithm.ES256);
+    signThenVerify(signer, verifier);
   }
 
   @Test(invocationCount = 2_000)
   public void fuzz_ES384_P384() throws Exception {
     ECSigner signer = ECSigner.newSHA384Signer(p384.getPrivate());
     ECVerifier verifier = ECVerifier.newVerifier(p384.getPublic());
-    signThenVerify(signer, verifier, Algorithm.ES384);
+    signThenVerify(signer, verifier);
   }
 
   @Test(invocationCount = 2_000)
   public void fuzz_ES512_P521() throws Exception {
     ECSigner signer = ECSigner.newSHA512Signer(p521.getPrivate());
     ECVerifier verifier = ECVerifier.newVerifier(p521.getPublic());
-    signThenVerify(signer, verifier, Algorithm.ES512);
+    signThenVerify(signer, verifier);
   }
 
   @Test(invocationCount = 2_000)
   public void fuzz_ES512_OpensslKey() throws Exception {
     ECSigner signer = ECSigner.newSHA512Signer(openssl521Pem);
     ECVerifier verifier = ECVerifier.newVerifier(openssl521Pem);
-    signThenVerify(signer, verifier, Algorithm.ES512);
+    signThenVerify(signer, verifier);
   }
 
-  private void signThenVerify(ECSigner signer, ECVerifier verifier, Algorithm algorithm) {
+  private void signThenVerify(ECSigner signer, ECVerifier verifier) {
     byte[] message = new byte[64];
     RNG.nextBytes(message);
     byte[] signature = signer.sign(message);
-    verifier.verify(algorithm, message, signature);
+    verifier.verify(message, signature);
   }
 
   private static KeyPair generate(String curve) throws Exception {
