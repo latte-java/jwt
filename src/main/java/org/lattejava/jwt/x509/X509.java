@@ -24,6 +24,7 @@
 package org.lattejava.jwt.x509;
 
 import org.lattejava.jwt.Algorithm;
+import org.lattejava.jwt.internal.HexUtils;
 import org.lattejava.jwt.internal.der.DerOutputStream;
 import org.lattejava.jwt.internal.der.DerValue;
 import org.lattejava.jwt.internal.der.ObjectIdentifier;
@@ -32,9 +33,12 @@ import org.lattejava.jwt.pem.PEMEncoderException;
 
 import java.io.ByteArrayInputStream;
 import java.math.BigInteger;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Signature;
+import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.security.spec.MGF1ParameterSpec;
@@ -73,6 +77,59 @@ public final class X509 {
    */
   public static Builder builder() {
     return new Builder();
+  }
+
+  /**
+   * Returns the SHA-256 fingerprint of {@code cert} as an uppercase hex
+   * string with no separators.
+   *
+   * <p>The fingerprint is the SHA-256 digest over the certificate's DER
+   * encoding -- the same value shown by {@code openssl x509 -fingerprint
+   * -sha256} (with the colons removed). For the JOSE-spec encoding of the
+   * same digest, see {@link #thumbprintSHA256(X509Certificate)}.</p>
+   *
+   * @param cert the X.509 certificate; non-null
+   * @return uppercase hex of the SHA-256 digest of {@code cert.getEncoded()}
+   * @throws IllegalArgumentException if the certificate cannot be encoded
+   */
+  public static String fingerprintSHA256(X509Certificate cert) {
+    return HexUtils.fromBytes(digest("SHA-256", encoded(cert)));
+  }
+
+  /**
+   * Returns the SHA-1 fingerprint of {@code cert} as an uppercase hex
+   * string with no separators.
+   *
+   * <p>SHA-1 is retained for compatibility with older display formats
+   * (Windows cert dialog, legacy {@code openssl x509 -fingerprint}). For
+   * new use, prefer {@link #fingerprintSHA256(X509Certificate)}.</p>
+   *
+   * @param cert the X.509 certificate; non-null
+   * @return uppercase hex of the SHA-1 digest of {@code cert.getEncoded()}
+   * @throws IllegalArgumentException if the certificate cannot be encoded
+   */
+  public static String fingerprintSHA1(X509Certificate cert) {
+    return HexUtils.fromBytes(digest("SHA-1", encoded(cert)));
+  }
+
+  // ---- Internal digest helpers ----
+
+  private static byte[] encoded(X509Certificate cert) {
+    try {
+      return cert.getEncoded();
+    } catch (CertificateEncodingException e) {
+      throw new IllegalArgumentException(e);
+    }
+  }
+
+  private static byte[] digest(String algorithm, byte[] bytes) {
+    try {
+      return MessageDigest.getInstance(algorithm).digest(bytes);
+    } catch (NoSuchAlgorithmException e) {
+      // Algorithm name is hard-coded by callers ("SHA-1" / "SHA-256");
+      // unreachable under any conformant JCA provider.
+      throw new IllegalStateException(e);
+    }
   }
 
   /**
