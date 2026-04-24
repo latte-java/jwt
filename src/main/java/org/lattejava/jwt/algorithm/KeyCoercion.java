@@ -75,10 +75,12 @@ public final class KeyCoercion {
    */
   public static <T extends PrivateKey> T privateFromPem(String pemPrivateKey, Class<T> expected) {
     PEM pem = PEM.decode(pemPrivateKey);
-    if (pem.privateKey == null) {
-      throw new MissingPrivateKeyException("PEM did not contain a private key");
+    PrivateKey privateKey = pem.getPrivateKey();
+    if (privateKey == null) {
+      throw new MissingPrivateKeyException(
+          "PEM did not contain a private key; expected [" + expected.getSimpleName() + "]");
     }
-    return asPrivate(pem.privateKey, expected);
+    return asPrivate(privateKey, expected);
   }
 
   /**
@@ -87,9 +89,11 @@ public final class KeyCoercion {
    */
   public static <T extends PublicKey> T publicFromPem(String pemPublicKey, Class<T> expected) {
     PEM pem = PEM.decode(pemPublicKey);
-    if (pem.publicKey == null) {
-      throw new MissingPublicKeyException("PEM did not contain a public key");
+    PublicKey publicKey = pem.getPublicKey();
+    if (publicKey == null) {
+      throw new MissingPublicKeyException(
+          "PEM did not contain a public key; expected [" + expected.getSimpleName() + "]");
     }
-    return asPublic(pem.publicKey, expected);
+    return asPublic(publicKey, expected);
   }
 }

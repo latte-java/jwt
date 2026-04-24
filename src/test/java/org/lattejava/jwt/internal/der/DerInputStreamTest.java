@@ -14,9 +14,9 @@
  * language governing permissions and limitations under the License.
  */
 
-package org.lattejava.jwt.der;
+package org.lattejava.jwt.internal.der;
 
-import org.lattejava.jwt.der.*;
+import org.lattejava.jwt.internal.der.*;
 import org.lattejava.jwt.pem.PEM;
 import org.testng.annotations.Test;
 

@@ -47,6 +47,11 @@ public class JSONWebKeySetHelperTest extends BaseTest {
     // Restore defaults so tests stay isolated.
     JSONWebKeySetHelper.setMaxResponseSize(JSONWebKeySetHelper.DEFAULT_MAX_RESPONSE_BYTES);
     JSONWebKeySetHelper.setMaxRedirects(JSONWebKeySetHelper.DEFAULT_MAX_REDIRECTS);
+    JSONWebKeySetHelper.setMaxNestingDepth(JSONWebKeySetHelper.DEFAULT_MAX_NESTING_DEPTH);
+    JSONWebKeySetHelper.setMaxNumberLength(JSONWebKeySetHelper.DEFAULT_MAX_NUMBER_LENGTH);
+    JSONWebKeySetHelper.setMaxObjectMembers(JSONWebKeySetHelper.DEFAULT_MAX_OBJECT_MEMBERS);
+    JSONWebKeySetHelper.setMaxArrayElements(JSONWebKeySetHelper.DEFAULT_MAX_ARRAY_ELEMENTS);
+    JSONWebKeySetHelper.setAllowDuplicateJSONKeys(JSONWebKeySetHelper.DEFAULT_ALLOW_DUPLICATE_JSON_KEYS);
   }
 
   @Test
@@ -203,6 +208,251 @@ public class JSONWebKeySetHelperTest extends BaseTest {
     } catch (RuntimeException e) {
       assertTrue(containsCause(e, ResponseTooLargeException.class), "expected ResponseTooLargeException in cause chain, got: " + e);
     }
+  }
+
+  @Test
+  public void setMaxResponseSize_rejectsNonPositive() {
+    // Use case: the response cap cannot be disabled. Clients that attempt to pass -1 or 0
+    // (common "disable the limit" idiom) receive IllegalArgumentException rather than silently
+    // removing the DoS defense.
+    try {
+      JSONWebKeySetHelper.setMaxResponseSize(-1);
+      fail("Expected IllegalArgumentException for maxResponseSize=-1");
+    } catch (IllegalArgumentException expected) {
+    }
+    try {
+      JSONWebKeySetHelper.setMaxResponseSize(0);
+      fail("Expected IllegalArgumentException for maxResponseSize=0");
+    } catch (IllegalArgumentException expected) {
+    }
+  }
+
+  @Test
+  public void setMaxNestingDepth_rejectsNonPositive() {
+    // Use case: a zero/negative nesting cap would silently disable the depth defense.
+    try {
+      JSONWebKeySetHelper.setMaxNestingDepth(0);
+      fail("Expected IllegalArgumentException for maxNestingDepth=0");
+    } catch (IllegalArgumentException expected) {
+    }
+    try {
+      JSONWebKeySetHelper.setMaxNestingDepth(-1);
+      fail("Expected IllegalArgumentException for maxNestingDepth=-1");
+    } catch (IllegalArgumentException expected) {
+    }
+  }
+
+  @Test
+  public void setMaxNumberLength_rejectsNonPositive() {
+    // Use case: a zero/negative number-length cap would silently disable the parser's
+    // BigInteger/BigDecimal blow-up defense.
+    try {
+      JSONWebKeySetHelper.setMaxNumberLength(0);
+      fail("Expected IllegalArgumentException for maxNumberLength=0");
+    } catch (IllegalArgumentException expected) {
+    }
+    try {
+      JSONWebKeySetHelper.setMaxNumberLength(-1);
+      fail("Expected IllegalArgumentException for maxNumberLength=-1");
+    } catch (IllegalArgumentException expected) {
+    }
+  }
+
+  @Test
+  public void setMaxObjectMembers_rejectsNonPositive() {
+    // Use case: a zero/negative object-members cap would silently disable the parser's
+    // wide-object fan-out defense.
+    try {
+      JSONWebKeySetHelper.setMaxObjectMembers(0);
+      fail("Expected IllegalArgumentException for maxObjectMembers=0");
+    } catch (IllegalArgumentException expected) {
+    }
+    try {
+      JSONWebKeySetHelper.setMaxObjectMembers(-1);
+      fail("Expected IllegalArgumentException for maxObjectMembers=-1");
+    } catch (IllegalArgumentException expected) {
+    }
+  }
+
+  @Test
+  public void setMaxArrayElements_rejectsNonPositive() {
+    // Use case: a zero/negative array-elements cap would silently disable the parser's
+    // wide-array fan-out defense.
+    try {
+      JSONWebKeySetHelper.setMaxArrayElements(0);
+      fail("Expected IllegalArgumentException for maxArrayElements=0");
+    } catch (IllegalArgumentException expected) {
+    }
+    try {
+      JSONWebKeySetHelper.setMaxArrayElements(-1);
+      fail("Expected IllegalArgumentException for maxArrayElements=-1");
+    } catch (IllegalArgumentException expected) {
+    }
+  }
+
+  @Test
+  public void parse_rejectsExcessivelyWideObject() throws Exception {
+    // Use case: a JWKS response whose top-level object has more members than maxObjectMembers
+    // is rejected at parse time rather than being deserialized into a wide map.
+    StringBuilder sb = new StringBuilder("{\"keys\":[]");
+    for (int i = 0; i < 20; i++) {
+      sb.append(",\"k").append(i).append("\":1");
+    }
+    sb.append('}');
+    String body = sb.toString();
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = body)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+
+    JSONWebKeySetHelper.setMaxObjectMembers(5);
+    try {
+      JSONWebKeySetHelper.retrieveKeysFromJWKS("http://localhost:" + PORT + "/jwks.json");
+      fail("Expected JSONWebKeySetException due to maxObjectMembers cap");
+    } catch (RuntimeException e) {
+      assertTrue(e.getMessage() != null && (e.getMessage().contains("maxObjectMembers")
+          || (e.getCause() != null && String.valueOf(e.getCause().getMessage()).contains("maxObjectMembers"))),
+          "expected maxObjectMembers message, got: " + e);
+    }
+  }
+
+  @Test
+  public void parse_rejectsExcessivelyWideArray() throws Exception {
+    // Use case: a JWKS response whose [keys] array has more elements than maxArrayElements
+    // is rejected at parse time rather than being walked as a wide list.
+    StringBuilder sb = new StringBuilder("{\"keys\":[");
+    for (int i = 0; i < 20; i++) {
+      if (i > 0) sb.append(',');
+      sb.append("{\"kty\":\"oct\",\"kid\":\"").append(i).append("\"}");
+    }
+    sb.append("]}");
+    String body = sb.toString();
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = body)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+
+    JSONWebKeySetHelper.setMaxArrayElements(5);
+    try {
+      JSONWebKeySetHelper.retrieveKeysFromJWKS("http://localhost:" + PORT + "/jwks.json");
+      fail("Expected JSONWebKeySetException due to maxArrayElements cap");
+    } catch (RuntimeException e) {
+      assertTrue(e.getMessage() != null && (e.getMessage().contains("maxArrayElements")
+          || (e.getCause() != null && String.valueOf(e.getCause().getMessage()).contains("maxArrayElements"))),
+          "expected maxArrayElements message, got: " + e);
+    }
+  }
+
+  @Test
+  public void parse_rejectsExcessivelyDeepNesting() throws Exception {
+    // Use case: a JWKS response whose JSON nesting exceeds maxNestingDepth is rejected
+    // at parse time rather than being deserialized into a deeply-nested structure that
+    // could blow the stack downstream.
+    StringBuilder sb = new StringBuilder("{\"keys\":[");
+    int depth = 5;
+    for (int i = 0; i < depth; i++) {
+      sb.append('[');
+    }
+    for (int i = 0; i < depth; i++) {
+      sb.append(']');
+    }
+    sb.append("]}");
+    String body = sb.toString();
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = body)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+
+    JSONWebKeySetHelper.setMaxNestingDepth(3);
+    try {
+      JSONWebKeySetHelper.retrieveKeysFromJWKS("http://localhost:" + PORT + "/jwks.json");
+      fail("Expected JSONWebKeySetException due to nesting cap");
+    } catch (RuntimeException e) {
+      // The parser raises JSONProcessingException; the helper wraps it as a JWKS-set
+      // failure. Either appears in the cause chain.
+      assertTrue(e.getMessage() != null && (e.getMessage().contains("nesting")
+          || (e.getCause() != null && String.valueOf(e.getCause().getMessage()).contains("nesting"))),
+          "expected nesting-depth message, got: " + e);
+    }
+  }
+
+  @Test
+  public void parse_rejectsExcessivelyLongNumber() throws Exception {
+    // Use case: a JWKS response whose JSON contains a single number longer than
+    // maxNumberLength is rejected at parse time rather than being passed to
+    // BigInteger/BigDecimal where it could cost O(n^2) to construct.
+    StringBuilder digits = new StringBuilder();
+    for (int i = 0; i < 200; i++) {
+      digits.append('1');
+    }
+    String body = "{\"keys\":[],\"x\":" + digits + "}";
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = body)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+
+    JSONWebKeySetHelper.setMaxNumberLength(50);
+    try {
+      JSONWebKeySetHelper.retrieveKeysFromJWKS("http://localhost:" + PORT + "/jwks.json");
+      fail("Expected JSONWebKeySetException due to number-length cap");
+    } catch (RuntimeException e) {
+      assertTrue(e.getMessage() != null && (e.getMessage().contains("maxNumberLength")
+          || (e.getCause() != null && String.valueOf(e.getCause().getMessage()).contains("maxNumberLength"))),
+          "expected maxNumberLength message, got: " + e);
+    }
+  }
+
+  @Test
+  public void parse_rejectsDuplicateKeysByDefault() throws Exception {
+    // Use case: a JWKS response with a duplicate top-level member is rejected by default
+    // -- a caller cannot smuggle a second value past the parser by including the key twice.
+    String body = "{\"keys\":[],\"keys\":[{\"kty\":\"oct\"}]}";
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = body)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+
+    try {
+      JSONWebKeySetHelper.retrieveKeysFromJWKS("http://localhost:" + PORT + "/jwks.json");
+      fail("Expected JSONWebKeySetException due to duplicate key");
+    } catch (RuntimeException e) {
+      assertTrue(e.getMessage() != null && (e.getMessage().contains("Duplicate")
+          || (e.getCause() != null && String.valueOf(e.getCause().getMessage()).contains("Duplicate"))),
+          "expected Duplicate-key message, got: " + e);
+    }
+  }
+
+  @Test
+  public void parse_allowsDuplicateKeysWhenConfigured() throws Exception {
+    // Use case: when a caller explicitly opts into duplicate-key tolerance, the parser
+    // accepts the response (last value wins, per LinkedHashMap put semantics).
+    String body = "{\"keys\":[],\"keys\":[]}";
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = body)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+
+    JSONWebKeySetHelper.setAllowDuplicateJSONKeys(true);
+    List<JSONWebKey> keys = JSONWebKeySetHelper.retrieveKeysFromJWKS("http://localhost:" + PORT + "/jwks.json");
+    assertEquals(keys.size(), 0);
   }
 
   private static boolean containsCause(Throwable t, Class<? extends Throwable> needle) {

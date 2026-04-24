@@ -54,19 +54,32 @@ public final class Header {
   }
 
   // ---------- Fluent getters ----------
+
+  /** The signing algorithm declared in the {@code alg} header (RFC 7515 §4.1.1). Never null for a parsed header. */
   public Algorithm alg() {
     return alg;
   }
 
+  /** The media type of the token declared in {@code typ} (RFC 7515 §4.1.9). Defaults to {@code "JWT"} on the builder side; may be null on a parsed header. */
   public String typ() {
     return typ;
   }
 
+  /** The key identifier declared in {@code kid} (RFC 7515 §4.1.4), or null when unset. */
   public String kid() {
     return kid;
   }
 
   // ---------- Custom-parameter access ----------
+
+  /**
+   * Look up a header parameter by name. Standard parameters ({@code alg},
+   * {@code typ}, {@code kid}) return the typed field; any other name reads
+   * from the custom-parameters map.
+   *
+   * @param name the parameter name; {@code null} returns {@code null}
+   * @return the parameter value, or {@code null} if absent
+   */
   public Object get(String name) {
     if (name == null) {
       return null;
@@ -83,12 +96,22 @@ public final class Header {
     }
   }
 
+  /**
+   * Convenience accessor that returns {@link #get(String)} coerced via
+   * {@link Object#toString()}; returns {@code null} when the parameter is absent.
+   */
   public String getString(String name) {
     Object value = get(name);
     return value == null ? null : value.toString();
   }
 
   // ---------- Maps ----------
+
+  /**
+   * Return all header parameters as an unmodifiable map. Standard parameters
+   * appear with their typed values (e.g. {@code alg} is an {@link Algorithm});
+   * use {@link #toSerializableMap()} if you need JSON-ready values.
+   */
   public Map<String, Object> parameters() {
     Map<String, Object> merged = new LinkedHashMap<>();
     if (alg != null) merged.put("alg", alg);
@@ -98,6 +121,11 @@ public final class Header {
     return Collections.unmodifiableMap(merged);
   }
 
+  /**
+   * Return an unmodifiable map suitable for JSON serialization. {@code alg} is
+   * serialized by {@link Algorithm#name()}; {@code null}-valued custom
+   * parameters are omitted.
+   */
   public Map<String, Object> toSerializableMap() {
     Map<String, Object> out = new LinkedHashMap<>();
     if (alg != null) out.put("alg", alg.name());
@@ -112,6 +140,17 @@ public final class Header {
   }
 
   // ---------- Factory ----------
+
+  /**
+   * Build a {@link Header} from a parsed JSON object map. Enforces the RFC
+   * 7515 structural rules on registered parameters: {@code alg} is required
+   * and must be a string; {@code typ}, {@code kid}, {@code cty}, {@code x5t},
+   * {@code x5t#S256}, and {@code x5u} must be strings; {@code x5c} must be
+   * an array of strings; {@code crit} must be a non-empty array of distinct
+   * strings that do not name any RFC 7515 registered parameter.
+   *
+   * @throws InvalidJWTException if a registered parameter has the wrong shape
+   */
   public static Header fromMap(Map<String, Object> map) {
     Objects.requireNonNull(map, "map");
     Builder b = new Builder();
@@ -226,6 +265,7 @@ public final class Header {
     return new String(new LatteJSONProcessor().serialize(toSerializableMap()));
   }
 
+  /** Returns a new, empty {@link Builder}. */
   public static Builder builder() {
     return new Builder();
   }
@@ -248,16 +288,19 @@ public final class Header {
 
     private Builder() {}
 
+    /** Set the {@code alg} header parameter (RFC 7515 §4.1.1). Required before {@link #build()} for signed JWTs. */
     public Builder alg(Algorithm algorithm) {
       this.alg = algorithm;
       return this;
     }
 
+    /** Set the {@code typ} header parameter (RFC 7515 §4.1.9). Defaults to {@code "JWT"}; passing {@code null} clears it. */
     public Builder typ(String type) {
       this.typ = type;
       return this;
     }
 
+    /** Set the {@code kid} key-identifier header parameter (RFC 7515 §4.1.4). {@code null} clears it. */
     public Builder kid(String keyId) {
       this.kid = keyId;
       return this;
@@ -321,6 +364,7 @@ public final class Header {
       return this;
     }
 
+    /** Produce an immutable {@link Header} from the builder's current state. */
     public Header build() {
       return new Header(this);
     }

@@ -24,10 +24,10 @@
 package org.lattejava.jwt.x509;
 
 import org.lattejava.jwt.Algorithm;
-import org.lattejava.jwt.der.DerOutputStream;
-import org.lattejava.jwt.der.DerValue;
-import org.lattejava.jwt.der.ObjectIdentifier;
-import org.lattejava.jwt.der.Tag;
+import org.lattejava.jwt.internal.der.DerOutputStream;
+import org.lattejava.jwt.internal.der.DerValue;
+import org.lattejava.jwt.internal.der.ObjectIdentifier;
+import org.lattejava.jwt.internal.der.Tag;
 import org.lattejava.jwt.pem.PEMEncoderException;
 
 import java.io.ByteArrayInputStream;
@@ -42,6 +42,7 @@ import java.security.spec.PSSParameterSpec;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Facade for X.509 certificate construction.
@@ -101,27 +102,42 @@ public final class X509 {
 
     private Builder() {}
 
+    /** Set the certificate serial number (required, must be non-null). */
     public Builder serialNumber(BigInteger serial) {
       this.serialNumber = serial;
       return this;
     }
 
+    /**
+     * Set the issuer Distinguished Name as a comma-separated list of
+     * {@code "ATTR=value"} pairs (CN, C, L, ST, O, OU). For self-signed
+     * certificates, pass the same DN as {@link #subject(String)}.
+     */
     public Builder issuer(String dn) {
       this.issuerDn = dn;
       return this;
     }
 
+    /**
+     * Set the subject Distinguished Name as a comma-separated list of
+     * {@code "ATTR=value"} pairs (CN, C, L, ST, O, OU).
+     */
     public Builder subject(String dn) {
       this.subjectDn = dn;
       return this;
     }
 
+    /**
+     * Set the certificate validity window. {@code notBefore} must not be
+     * after {@code notAfter}; violated at {@link #build()} time.
+     */
     public Builder validity(Instant notBefore, Instant notAfter) {
       this.notBefore = notBefore;
       this.notAfter = notAfter;
       return this;
     }
 
+    /** Set the public key embedded in the certificate's SubjectPublicKeyInfo. */
     public Builder publicKey(PublicKey key) {
       this.publicKey = key;
       return this;
@@ -140,9 +156,23 @@ public final class X509 {
     /**
      * Set the JWA algorithm used to sign the certificate. Must be one of the
      * supported set (RS256/384/512, PS256/384/512, ES256/384/512, Ed25519,
-     * Ed448).
+     * Ed448). HMAC algorithms cannot sign certificates; ES256K is not supported
+     * for X.509.
+     *
+     * <p>Rejected at setter time with an {@link IllegalArgumentException} so the
+     * problem surfaces at the call site rather than during {@link #build()}.</p>
      */
     public Builder signatureAlgorithm(Algorithm algorithm) {
+      Objects.requireNonNull(algorithm, "algorithm");
+      switch (algorithm.name()) {
+        case "RS256": case "RS384": case "RS512":
+        case "PS256": case "PS384": case "PS512":
+        case "ES256": case "ES384": case "ES512":
+        case "Ed25519": case "Ed448":
+          break;
+        default:
+          throw new IllegalArgumentException("Unsupported signature algorithm for X.509 [" + algorithm.name() + "]");
+      }
       this.signatureAlgorithm = algorithm;
       return this;
     }

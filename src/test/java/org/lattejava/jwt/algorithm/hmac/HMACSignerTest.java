@@ -132,4 +132,22 @@ public class HMACSignerTest extends BaseJWTTest {
   public void test_nullMessage_throwsNpe() {
     HMACSigner.newSHA256Signer(SECRET_32).sign(null);
   }
+
+  @Test
+  public void test_secretIsDefensivelyCopied() {
+    // Use case: mutating the original secret array after constructing a signer must not
+    // affect the signer's behavior -- the signer retains its own copy of the secret.
+    byte[] original = SECRET_32.getBytes(StandardCharsets.UTF_8);
+    HMACSigner signer = HMACSigner.newSHA256Signer(original);
+    byte[] message = "m".getBytes(StandardCharsets.UTF_8);
+    byte[] before = signer.sign(message);
+
+    // Scribble over every byte of the original
+    for (int i = 0; i < original.length; i++) {
+      original[i] = 0;
+    }
+
+    byte[] after = signer.sign(message);
+    assertEquals(after, before);
+  }
 }

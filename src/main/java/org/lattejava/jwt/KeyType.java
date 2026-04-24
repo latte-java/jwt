@@ -18,11 +18,11 @@ package org.lattejava.jwt;
 
 import java.util.Objects;
 
-import static org.lattejava.jwt.der.ObjectIdentifier.EC_ENCRYPTION;
-import static org.lattejava.jwt.der.ObjectIdentifier.EdDSA_25519;
-import static org.lattejava.jwt.der.ObjectIdentifier.EdDSA_448;
-import static org.lattejava.jwt.der.ObjectIdentifier.RSASSA_PSS_ENCRYPTION;
-import static org.lattejava.jwt.der.ObjectIdentifier.RSA_ENCRYPTION;
+import static org.lattejava.jwt.internal.der.ObjectIdentifier.EC_ENCRYPTION;
+import static org.lattejava.jwt.internal.der.ObjectIdentifier.EdDSA_25519;
+import static org.lattejava.jwt.internal.der.ObjectIdentifier.EdDSA_448;
+import static org.lattejava.jwt.internal.der.ObjectIdentifier.RSASSA_PSS_ENCRYPTION;
+import static org.lattejava.jwt.internal.der.ObjectIdentifier.RSA_ENCRYPTION;
 
 /**
  * The JSON Web Key (JWK) {@code "kty"} parameter value as registered in the
@@ -31,6 +31,11 @@ import static org.lattejava.jwt.der.ObjectIdentifier.RSA_ENCRYPTION;
  * <p>Standard constants (e.g., {@link #RSA}, {@link #EC}, {@link #OKP},
  * {@link #OCT}) are interned: {@code KeyType.of("RSA") == KeyType.RSA}.
  * For custom key types, use {@link #of(String)} or implement this interface.</p>
+ *
+ * <p>{@code kty} values are <strong>case-sensitive</strong> per the IANA
+ * registry. {@code "RSA"}, {@code "EC"}, and {@code "OKP"} are uppercase;
+ * {@code "oct"} is lowercase. {@code KeyType.of("rsa")} is not equal to
+ * {@link #RSA} and will yield a distinct non-interned instance.</p>
  *
  * @author Daniel DeGroff
  */
@@ -58,7 +63,7 @@ public interface KeyType {
   KeyType OKP = new StandardKeyType("OKP");
 
   /**
-   * Symmetric ("octet sequence") keys (RFC 7517 §6.4). Used for HS256/384/512.
+   * Symmetric ("octet sequence") keys (RFC 7518 §6.4). Used for HS256/384/512.
    * Note the lowercase {@code "oct"} per the registry.
    */
   KeyType OCT = new StandardKeyType("oct");

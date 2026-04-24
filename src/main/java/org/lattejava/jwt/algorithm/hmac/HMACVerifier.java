@@ -36,6 +36,12 @@ import java.util.Objects;
  * HMAC-based {@link Verifier} for the {@code HS256} / {@code HS384} /
  * {@code HS512} JWA algorithms (RFC 7518 §3.2).
  *
+ * <p>Each instance is bound to a single JWA algorithm at construction time;
+ * {@link #canVerify(Algorithm)} returns true only for that exact algorithm.
+ * Binding at construction prevents algorithm-confusion attacks where a
+ * tampered header {@code alg} could coax a family-accepting verifier into
+ * using a weaker hash than the caller intended (RFC 8725 §3.1).</p>
+ *
  * <p>Signature comparison uses
  * {@link MessageDigest#isEqual(byte[], byte[])} -- documented as
  * constant-time since JDK 7u40 (JDK-8006276) -- to avoid leaking the
@@ -47,29 +53,36 @@ import java.util.Objects;
  * @author Daniel DeGroff
  */
 public class HMACVerifier implements Verifier {
+  private final Algorithm algorithm;
+
   private final byte[] secret;
 
-  private HMACVerifier(byte[] secret) {
-    Objects.requireNonNull(secret);
-    this.secret = secret;
+  private HMACVerifier(Algorithm algorithm, byte[] secret) {
+    Objects.requireNonNull(algorithm, "algorithm");
+    Objects.requireNonNull(secret, "secret");
+    requireHMAC(algorithm);
+    HMACFamily.assertMinimumSecretLength(algorithm, secret);
+    this.algorithm = algorithm;
+    // Defensive copy so callers cannot mutate the verifier's secret after construction.
+    this.secret = secret.clone();
   }
 
-  private HMACVerifier(String secret) {
-    this(secret == null ? null : secret.getBytes(StandardCharsets.UTF_8));
+  private HMACVerifier(Algorithm algorithm, String secret) {
+    this(algorithm, secret == null ? null : secret.getBytes(StandardCharsets.UTF_8));
   }
 
-  public static HMACVerifier newVerifier(String secret) {
-    return new HMACVerifier(secret);
+  public static HMACVerifier newVerifier(Algorithm algorithm, String secret) {
+    return new HMACVerifier(algorithm, secret);
   }
 
-  public static HMACVerifier newVerifier(byte[] bytes) {
-    return new HMACVerifier(bytes);
+  public static HMACVerifier newVerifier(Algorithm algorithm, byte[] bytes) {
+    return new HMACVerifier(algorithm, bytes);
   }
 
-  public static HMACVerifier newVerifier(Path path) {
-    Objects.requireNonNull(path);
+  public static HMACVerifier newVerifier(Algorithm algorithm, Path path) {
+    Objects.requireNonNull(path, "path");
     try {
-      return new HMACVerifier(Files.readAllBytes(path));
+      return new HMACVerifier(algorithm, Files.readAllBytes(path));
     } catch (IOException e) {
       throw new JWTVerifierException("Unable to read file from path [" + path + "]", e);
     }
@@ -77,10 +90,7 @@ public class HMACVerifier implements Verifier {
 
   @Override
   public boolean canVerify(Algorithm algorithm) {
-    return switch (algorithm.name()) {
-      case "HS256", "HS384", "HS512" -> true;
-      default -> false;
-    };
+    return algorithm != null && this.algorithm.name().equals(algorithm.name());
   }
 
   @Override
@@ -88,9 +98,8 @@ public class HMACVerifier implements Verifier {
     Objects.requireNonNull(algorithm);
     Objects.requireNonNull(message);
     Objects.requireNonNull(signature);
-    HMACFamily.assertMinimumSecretLength(algorithm, secret);
 
-    String jcaName = HMACFamily.toJCA(algorithm);
+    String jcaName = HMACFamily.toJCA(this.algorithm);
     try {
       Mac mac = Mac.getInstance(jcaName);
       mac.init(new SecretKeySpec(secret, jcaName));
@@ -100,6 +109,15 @@ public class HMACVerifier implements Verifier {
       }
     } catch (InvalidKeyException | NoSuchAlgorithmException e) {
       throw new JWTVerifierException("An unexpected exception occurred when attempting to verify the JWT", e);
+    }
+  }
+
+  private static void requireHMAC(Algorithm algorithm) {
+    switch (algorithm.name()) {
+      case "HS256", "HS384", "HS512" -> {
+      }
+      default -> throw new IllegalArgumentException(
+          "Expected HMAC algorithm but found [" + algorithm.name() + "]");
     }
   }
 }

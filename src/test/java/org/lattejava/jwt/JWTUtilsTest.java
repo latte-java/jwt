@@ -348,12 +348,12 @@ public class JWTUtilsTest extends BaseTest {
 
     // Convert HEX SHA-1 Fingerprint --> x5t
     assertEquals(JWTUtils.convertFingerprintToThumbprint("BC34F6D776BF005E5E45D12529995AF7EF5DA5CF"), "vDT213a_AF5eRdElKZla9-9dpc8");
-    // Convert SHA-256 Fingerprint to x5t#256
+    // Convert SHA-256 Fingerprint to x5t#S256
     assertEquals(JWTUtils.convertFingerprintToThumbprint("B4814D2DF3D8635E2C3340CB4E9E93F81677C8F68F50F29CF079E1E9EBD74DE3"), "tIFNLfPYY14sM0DLTp6T-BZ3yPaPUPKc8Hnh6evXTeM");
 
     // Convert x5t --> HEX SHA-1 Fingerprint
     assertEquals(JWTUtils.convertThumbprintToFingerprint("vDT213a_AF5eRdElKZla9-9dpc8"), "BC34F6D776BF005E5E45D12529995AF7EF5DA5CF");
-    // Convert x5t#256 --> HEX SHA-256 Fingerprint
+    // Convert x5t#S256 --> HEX SHA-256 Fingerprint
     assertEquals(JWTUtils.convertThumbprintToFingerprint("tIFNLfPYY14sM0DLTp6T-BZ3yPaPUPKc8Hnh6evXTeM"), "B4814D2DF3D8635E2C3340CB4E9E93F81677C8F68F50F29CF079E1E9EBD74DE3");
   }
 

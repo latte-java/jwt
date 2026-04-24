@@ -80,25 +80,25 @@ public class JWTEncoderTest {
     return new Object[][] {
         {Algorithm.HS256,
             (Supplier<Signer>) () -> HMACSigner.newSHA256Signer(HMAC_SECRET_32),
-            (Supplier<Verifier>) () -> HMACVerifier.newVerifier(HMAC_SECRET_32)},
+            (Supplier<Verifier>) () -> HMACVerifier.newVerifier(Algorithm.HS256, HMAC_SECRET_32)},
         {Algorithm.HS384,
             (Supplier<Signer>) () -> HMACSigner.newSHA384Signer(HMAC_SECRET_64),
-            (Supplier<Verifier>) () -> HMACVerifier.newVerifier(HMAC_SECRET_64)},
+            (Supplier<Verifier>) () -> HMACVerifier.newVerifier(Algorithm.HS384, HMAC_SECRET_64)},
         {Algorithm.HS512,
             (Supplier<Signer>) () -> HMACSigner.newSHA512Signer(HMAC_SECRET_64),
-            (Supplier<Verifier>) () -> HMACVerifier.newVerifier(HMAC_SECRET_64)},
+            (Supplier<Verifier>) () -> HMACVerifier.newVerifier(Algorithm.HS512, HMAC_SECRET_64)},
         {Algorithm.RS256,
             (Supplier<Signer>) () -> RSASigner.newSHA256Signer(readFile("rsa_private_key_2048.pem")),
-            (Supplier<Verifier>) () -> RSAVerifier.newVerifier(readFile("rsa_public_key_2048.pem"))},
+            (Supplier<Verifier>) () -> RSAVerifier.newVerifier(Algorithm.RS256, readFile("rsa_public_key_2048.pem"))},
         {Algorithm.RS384,
             (Supplier<Signer>) () -> RSASigner.newSHA384Signer(readFile("rsa_private_key_2048.pem")),
-            (Supplier<Verifier>) () -> RSAVerifier.newVerifier(readFile("rsa_public_key_2048.pem"))},
+            (Supplier<Verifier>) () -> RSAVerifier.newVerifier(Algorithm.RS384, readFile("rsa_public_key_2048.pem"))},
         {Algorithm.RS512,
             (Supplier<Signer>) () -> RSASigner.newSHA512Signer(readFile("rsa_private_key_2048.pem")),
-            (Supplier<Verifier>) () -> RSAVerifier.newVerifier(readFile("rsa_public_key_2048.pem"))},
+            (Supplier<Verifier>) () -> RSAVerifier.newVerifier(Algorithm.RS512, readFile("rsa_public_key_2048.pem"))},
         {Algorithm.PS256,
             (Supplier<Signer>) () -> RSAPSSSigner.newSHA256Signer(readFile("rsa_pss_private_key_2048.pem")),
-            (Supplier<Verifier>) () -> RSAPSSVerifier.newVerifier(readFile("rsa_pss_public_key_2048.pem"))},
+            (Supplier<Verifier>) () -> RSAPSSVerifier.newVerifier(Algorithm.PS256, readFile("rsa_pss_public_key_2048.pem"))},
         {Algorithm.ES256,
             (Supplier<Signer>) () -> ECSigner.newSHA256Signer(readFile("ec_private_key_p_256.pem")),
             (Supplier<Verifier>) () -> ECVerifier.newVerifier(readFile("ec_public_key_p_256.pem"))},
@@ -153,7 +153,7 @@ public class JWTEncoderTest {
       b.parameter("cty", "application/json");
     });
 
-    JWT decoded = new JWTDecoder().decode(encoded, VerifierResolver.of(HMACVerifier.newVerifier(HMAC_SECRET_32)));
+    JWT decoded = new JWTDecoder().decode(encoded, VerifierResolver.of(HMACVerifier.newVerifier(Algorithm.HS256, HMAC_SECRET_32)));
     Header h = decoded.header();
     assertEquals(h.typ(), "at+jwt");
     assertEquals(h.get("cty"), "application/json");
@@ -182,7 +182,7 @@ public class JWTEncoderTest {
     Signer signer = HMACSigner.newSHA256Signer(HMAC_SECRET_32.getBytes(), "key-1");
     String encoded = new JWTEncoder().encode(jwt, signer);
 
-    JWT decoded = new JWTDecoder().decode(encoded, VerifierResolver.of(HMACVerifier.newVerifier(HMAC_SECRET_32)));
+    JWT decoded = new JWTDecoder().decode(encoded, VerifierResolver.of(HMACVerifier.newVerifier(Algorithm.HS256, HMAC_SECRET_32)));
     assertEquals(decoded.header().kid(), "key-1");
   }
 
@@ -193,7 +193,7 @@ public class JWTEncoderTest {
     Signer signer = HMACSigner.newSHA256Signer(HMAC_SECRET_32.getBytes(), "key-1");
     String encoded = new JWTEncoder().encode(jwt, signer, b -> b.kid(null));
 
-    JWT decoded = new JWTDecoder().decode(encoded, VerifierResolver.of(HMACVerifier.newVerifier(HMAC_SECRET_32)));
+    JWT decoded = new JWTDecoder().decode(encoded, VerifierResolver.of(HMACVerifier.newVerifier(Algorithm.HS256, HMAC_SECRET_32)));
     assertEquals(decoded.header().kid(), null);
   }
 
@@ -204,7 +204,7 @@ public class JWTEncoderTest {
     Signer signer = HMACSigner.newSHA256Signer(HMAC_SECRET_32.getBytes(), "key-1");
     String encoded = new JWTEncoder().encode(jwt, signer, b -> b.kid("override"));
 
-    JWT decoded = new JWTDecoder().decode(encoded, VerifierResolver.of(HMACVerifier.newVerifier(HMAC_SECRET_32)));
+    JWT decoded = new JWTDecoder().decode(encoded, VerifierResolver.of(HMACVerifier.newVerifier(Algorithm.HS256, HMAC_SECRET_32)));
     assertEquals(decoded.header().kid(), "override");
   }
 

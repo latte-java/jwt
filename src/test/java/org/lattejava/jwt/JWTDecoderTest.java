@@ -59,7 +59,7 @@ public class JWTDecoderTest {
   }
 
   private static Verifier verifier() {
-    return HMACVerifier.newVerifier(SECRET);
+    return HMACVerifier.newVerifier(Algorithm.HS256, SECRET);
   }
 
   private static Signer signer() {

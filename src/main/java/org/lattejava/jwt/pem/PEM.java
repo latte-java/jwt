@@ -63,28 +63,32 @@ public class PEM {
   // PEM Encoded Public Key (X.509) End Tag
   public static final String X509_PUBLIC_KEY_SUFFIX = "-----END PUBLIC KEY-----";
 
-  public Certificate certificate;
+  public final Certificate certificate;
 
-  public PrivateKey privateKey;
+  public final PrivateKey privateKey;
 
-  public PublicKey publicKey;
+  public final PublicKey publicKey;
 
-  public PEM(PrivateKey privateKey, PublicKey publicKey) {
+  private PEM(Certificate certificate, PrivateKey privateKey, PublicKey publicKey) {
+    this.certificate = certificate;
     this.privateKey = privateKey;
     this.publicKey = publicKey;
+  }
+
+  public PEM(PrivateKey privateKey, PublicKey publicKey) {
+    this(null, privateKey, publicKey);
   }
 
   public PEM(PublicKey publicKey) {
-    this.publicKey = publicKey;
+    this(null, null, publicKey);
   }
 
   public PEM(Certificate certificate) {
-    this.certificate = certificate;
-    this.publicKey = certificate.getPublicKey();
+    this(certificate, null, certificate.getPublicKey());
   }
 
   public PEM(PrivateKey privateKey) {
-    this.privateKey = privateKey;
+    this(null, privateKey, null);
   }
 
   /**
@@ -160,7 +164,6 @@ public class PEM {
         Objects.equals(publicKey, pem.publicKey);
   }
 
-  @SuppressWarnings("unused")
   public Certificate getCertificate() {
     return certificate;
   }

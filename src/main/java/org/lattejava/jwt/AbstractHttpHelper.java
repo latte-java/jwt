@@ -61,13 +61,18 @@ public abstract class AbstractHttpHelper {
    *
    * @param urlConnection    the prepared {@link HttpURLConnection} (the helper sets
    *                         the request method and disables auto-redirect)
-   * @param maxResponseBytes per-hop body cap; {@code -1} disables the cap
+   * @param maxResponseBytes per-hop body cap; must be strictly positive (the
+   *                         cap cannot be disabled)
    * @param maxRedirects     maximum number of 3xx redirects to follow before
    *                         aborting; {@code 0} disables redirect following
    * @param consumer         response-body parser
    * @param exception        wrapper for any {@link IOException} surfaced
+   * @throws IllegalArgumentException if {@code maxResponseBytes &lt;= 0}
    */
   protected static <T> T get(HttpURLConnection urlConnection, int maxResponseBytes, int maxRedirects, Function<InputStream, T> consumer, BiFunction<String, Throwable, ? extends RuntimeException> exception) {
+    if (maxResponseBytes <= 0) {
+      throw new IllegalArgumentException("maxResponseBytes must be > 0; the response cap cannot be disabled");
+    }
     HttpURLConnection current = urlConnection;
     String originalEndpoint = current.getURL().toString();
     int redirectsFollowed = 0;
@@ -75,7 +80,7 @@ public abstract class AbstractHttpHelper {
       String endpoint = current.getURL().toString();
       try {
         current.setRequestMethod("GET");
-      } catch (Exception e) {
+      } catch (java.net.ProtocolException e) {
         throw exception.apply("Failed to prepare the request to [" + MessageSanitizer.forMessage(endpoint) + "]", e);
       }
       // Disable auto-redirect so we can apply the per-hop body cap.
@@ -83,14 +88,14 @@ public abstract class AbstractHttpHelper {
 
       try {
         current.connect();
-      } catch (Exception e) {
+      } catch (IOException e) {
         throw exception.apply("Failed to connect to [" + MessageSanitizer.forMessage(endpoint) + "]", e);
       }
 
       int status;
       try {
         status = current.getResponseCode();
-      } catch (Exception e) {
+      } catch (IOException e) {
         throw exception.apply("Failed to make a request to [" + MessageSanitizer.forMessage(endpoint) + "]", e);
       }
 
@@ -131,9 +136,9 @@ public abstract class AbstractHttpHelper {
 
       try (InputStream is = new LimitedInputStream(new BufferedInputStream(current.getInputStream()), maxResponseBytes)) {
         return consumer.apply(is);
-      } catch (RuntimeException e) {
-        throw e;
-      } catch (Exception e) {
+      } catch (IOException e) {
+        // ResponseTooLargeException (IOException) flows through here; callers
+        // inspect the cause chain to recover it.
         throw exception.apply("Failed to parse the response as JSON from [" + MessageSanitizer.forMessage(endpoint) + "]", e);
       }
     }
@@ -153,20 +158,23 @@ public abstract class AbstractHttpHelper {
     private int bytesRead;
 
     LimitedInputStream(InputStream delegate, int maximumBytes) {
+      if (maximumBytes <= 0) {
+        throw new IllegalArgumentException("maximumBytes must be > 0");
+      }
       this.delegate = delegate;
       this.maximumBytes = maximumBytes;
     }
 
     @Override
     public int read() throws IOException {
-      if (maximumBytes != -1 && bytesRead >= maximumBytes) {
+      if (bytesRead >= maximumBytes) {
         throw new ResponseTooLargeException(maximumBytes);
       }
 
       int b = delegate.read();
       if (b != -1) {
         bytesRead++;
-        if (maximumBytes != -1 && bytesRead > maximumBytes) {
+        if (bytesRead > maximumBytes) {
           throw new ResponseTooLargeException(maximumBytes);
         }
       }
@@ -176,26 +184,24 @@ public abstract class AbstractHttpHelper {
 
     @Override
     public int read(byte[] b, int off, int len) throws IOException {
-      if (maximumBytes != -1) {
-        int remaining = maximumBytes - bytesRead;
-        if (remaining <= 0) {
-          // Try to read one more byte to confirm the stream is over the cap.
-          int probe = delegate.read();
-          if (probe == -1) {
-            return -1;
-          }
-          throw new ResponseTooLargeException(maximumBytes);
+      int remaining = maximumBytes - bytesRead;
+      if (remaining <= 0) {
+        // Try to read one more byte to confirm the stream is over the cap.
+        int probe = delegate.read();
+        if (probe == -1) {
+          return -1;
         }
-        // Allow one byte beyond the cap so we can detect overflow on the next read.
-        len = Math.min(len, remaining + 1);
+        throw new ResponseTooLargeException(maximumBytes);
       }
+      // Allow one byte beyond the cap so we can detect overflow on the next read.
+      len = Math.min(len, remaining + 1);
 
       int read = delegate.read(b, off, len);
       if (read > 0) {
         bytesRead += read;
       }
 
-      if (maximumBytes != -1 && bytesRead > maximumBytes) {
+      if (bytesRead > maximumBytes) {
         throw new ResponseTooLargeException(maximumBytes);
       }
 

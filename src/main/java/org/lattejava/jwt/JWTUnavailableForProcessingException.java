@@ -36,10 +36,6 @@ public class JWTUnavailableForProcessingException extends JWTException {
 
   private final Duration clockSkew;
 
-  public JWTUnavailableForProcessingException() {
-    this(null, null, null);
-  }
-
   public JWTUnavailableForProcessingException(Instant notBefore, Instant now, Duration clockSkew) {
     this.notBefore = notBefore;
     this.now = now;

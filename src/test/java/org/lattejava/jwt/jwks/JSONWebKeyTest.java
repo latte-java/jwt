@@ -96,8 +96,9 @@ public class JSONWebKeyTest {
   }
 
   @Test
-  public void toString_redacts_even_when_private_fields_null() {
-    // Use case: toString redacts even when private fields are null (defense in depth)
+  public void toString_does_not_materialize_absent_private_fields() {
+    // Use case: toString only redacts private fields that are actually present;
+    // absent private fields stay absent rather than appearing as "***".
     JSONWebKey k = JSONWebKey.builder()
         .kty(KeyType.RSA)
         .n("AQAB")
@@ -106,14 +107,13 @@ public class JSONWebKeyTest {
     // d, dp, dq, p, q, qi all null
 
     String s = k.toString();
-    // Even with null sources, the redacted output MUST show "***" -- this is
-    // the contract: the field name always appears redacted.
-    assertTrue(s.contains("\"d\":\"***\""), s);
-    assertTrue(s.contains("\"dp\":\"***\""), s);
-    assertTrue(s.contains("\"dq\":\"***\""), s);
-    assertTrue(s.contains("\"p\":\"***\""), s);
-    assertTrue(s.contains("\"q\":\"***\""), s);
-    assertTrue(s.contains("\"qi\":\"***\""), s);
+    assertFalse(s.contains("\"d\""), s);
+    assertFalse(s.contains("\"dp\""), s);
+    assertFalse(s.contains("\"dq\""), s);
+    assertFalse(s.contains("\"p\""), s);
+    assertFalse(s.contains("\"q\""), s);
+    assertFalse(s.contains("\"qi\""), s);
+    assertFalse(s.contains("***"), s);
   }
 
   @Test

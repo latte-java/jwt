@@ -99,22 +99,22 @@ public class SignersTest extends BaseTest {
     return new Object[][] {
         {Algorithm.RS256,
             (Supplier<Signer>) () -> Signers.forAsymmetric(Algorithm.RS256, readFile("rsa_private_key_2048.pem")),
-            (Supplier<Verifier>) () -> RSAVerifier.newVerifier(readFile("rsa_public_key_2048.pem"))},
+            (Supplier<Verifier>) () -> RSAVerifier.newVerifier(Algorithm.RS256, readFile("rsa_public_key_2048.pem"))},
         {Algorithm.RS384,
             (Supplier<Signer>) () -> Signers.forAsymmetric(Algorithm.RS384, readFile("rsa_private_key_2048.pem")),
-            (Supplier<Verifier>) () -> RSAVerifier.newVerifier(readFile("rsa_public_key_2048.pem"))},
+            (Supplier<Verifier>) () -> RSAVerifier.newVerifier(Algorithm.RS384, readFile("rsa_public_key_2048.pem"))},
         {Algorithm.RS512,
             (Supplier<Signer>) () -> Signers.forAsymmetric(Algorithm.RS512, readFile("rsa_private_key_2048.pem")),
-            (Supplier<Verifier>) () -> RSAVerifier.newVerifier(readFile("rsa_public_key_2048.pem"))},
+            (Supplier<Verifier>) () -> RSAVerifier.newVerifier(Algorithm.RS512, readFile("rsa_public_key_2048.pem"))},
         {Algorithm.PS256,
             (Supplier<Signer>) () -> Signers.forAsymmetric(Algorithm.PS256, readFile("rsa_pss_private_key_2048.pem")),
-            (Supplier<Verifier>) () -> RSAPSSVerifier.newVerifier(readFile("rsa_pss_public_key_2048.pem"))},
+            (Supplier<Verifier>) () -> RSAPSSVerifier.newVerifier(Algorithm.PS256, readFile("rsa_pss_public_key_2048.pem"))},
         {Algorithm.PS384,
             (Supplier<Signer>) () -> Signers.forAsymmetric(Algorithm.PS384, readFile("rsa_pss_private_key_2048.pem")),
-            (Supplier<Verifier>) () -> RSAPSSVerifier.newVerifier(readFile("rsa_pss_public_key_2048.pem"))},
+            (Supplier<Verifier>) () -> RSAPSSVerifier.newVerifier(Algorithm.PS384, readFile("rsa_pss_public_key_2048.pem"))},
         {Algorithm.PS512,
             (Supplier<Signer>) () -> Signers.forAsymmetric(Algorithm.PS512, readFile("rsa_pss_private_key_2048.pem")),
-            (Supplier<Verifier>) () -> RSAPSSVerifier.newVerifier(readFile("rsa_pss_public_key_2048.pem"))},
+            (Supplier<Verifier>) () -> RSAPSSVerifier.newVerifier(Algorithm.PS512, readFile("rsa_pss_public_key_2048.pem"))},
         {Algorithm.ES256,
             (Supplier<Signer>) () -> Signers.forAsymmetric(Algorithm.ES256, readFile("ec_private_key_p_256.pem")),
             (Supplier<Verifier>) () -> ECVerifier.newVerifier(readFile("ec_public_key_p_256.pem"))},
@@ -171,7 +171,7 @@ public class SignersTest extends BaseTest {
     assertTrue(signature.length > 0);
 
     // round-trip verify with the matching family verifier
-    Verifier verifier = HMACVerifier.newVerifier(secret);
+    Verifier verifier = HMACVerifier.newVerifier(algorithm, secret);
     verifier.verify(algorithm, "message".getBytes(StandardCharsets.UTF_8), signature);
   }
 
@@ -182,7 +182,7 @@ public class SignersTest extends BaseTest {
     assertSame(signer.algorithm(), algorithm);
 
     byte[] signature = signer.sign("message".getBytes(StandardCharsets.UTF_8));
-    Verifier verifier = HMACVerifier.newVerifier(secretBytes);
+    Verifier verifier = HMACVerifier.newVerifier(algorithm, secretBytes);
     verifier.verify(algorithm, "message".getBytes(StandardCharsets.UTF_8), signature);
   }
 
@@ -291,7 +291,7 @@ public class SignersTest extends BaseTest {
     byte[] msg = "message".getBytes(StandardCharsets.UTF_8);
     byte[] sig = signer.sign(msg);
     PublicKey pub = PEM.decode(readFile("rsa_public_key_2048.pem")).publicKey;
-    RSAVerifier.newVerifier(pub).verify(Algorithm.RS256, msg, sig);
+    RSAVerifier.newVerifier(Algorithm.RS256, pub).verify(Algorithm.RS256, msg, sig);
   }
 
   @Test
@@ -309,7 +309,7 @@ public class SignersTest extends BaseTest {
     byte[] msg = "message".getBytes(StandardCharsets.UTF_8);
     byte[] sig = signer.sign(msg);
     PublicKey pub = PEM.decode(readFile("rsa_pss_public_key_2048.pem")).publicKey;
-    RSAPSSVerifier.newVerifier(pub).verify(Algorithm.PS256, msg, sig);
+    RSAPSSVerifier.newVerifier(Algorithm.PS256, pub).verify(Algorithm.PS256, msg, sig);
   }
 
   @Test

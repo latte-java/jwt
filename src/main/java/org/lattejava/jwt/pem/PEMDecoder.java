@@ -16,11 +16,11 @@
 
 package org.lattejava.jwt.pem;
 
-import org.lattejava.jwt.der.DerInputStream;
-import org.lattejava.jwt.der.DerOutputStream;
-import org.lattejava.jwt.der.DerValue;
-import org.lattejava.jwt.der.ObjectIdentifier;
-import org.lattejava.jwt.der.Tag;
+import org.lattejava.jwt.internal.der.DerInputStream;
+import org.lattejava.jwt.internal.der.DerOutputStream;
+import org.lattejava.jwt.internal.der.DerValue;
+import org.lattejava.jwt.internal.der.ObjectIdentifier;
+import org.lattejava.jwt.internal.der.Tag;
 import org.lattejava.jwt.KeyType;
 import org.lattejava.jwt.internal.KeyUtils;
 
@@ -510,7 +510,7 @@ public class PEMDecoder {
   private String jcaKeyFactoryName(String oid, KeyType type) {
     // PSS-specific OID maps to JCA "RSASSA-PSS" KeyFactory (provider-dependent).
     // All other RSA OIDs use the generic "RSA" KeyFactory.
-    if (org.lattejava.jwt.der.ObjectIdentifier.RSASSA_PSS_ENCRYPTION.equals(oid)) {
+    if (org.lattejava.jwt.internal.der.ObjectIdentifier.RSASSA_PSS_ENCRYPTION.equals(oid)) {
       return "RSASSA-PSS";
     }
     if (type == KeyType.OKP) {

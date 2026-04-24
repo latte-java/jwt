@@ -16,11 +16,11 @@
 
 package org.lattejava.jwt.pem;
 
-import org.lattejava.jwt.der.DerInputStream;
-import org.lattejava.jwt.der.DerOutputStream;
-import org.lattejava.jwt.der.DerValue;
-import org.lattejava.jwt.der.ObjectIdentifier;
-import org.lattejava.jwt.der.Tag;
+import org.lattejava.jwt.internal.der.DerInputStream;
+import org.lattejava.jwt.internal.der.DerOutputStream;
+import org.lattejava.jwt.internal.der.DerValue;
+import org.lattejava.jwt.internal.der.ObjectIdentifier;
+import org.lattejava.jwt.internal.der.Tag;
 
 import java.io.IOException;
 import java.math.BigInteger;

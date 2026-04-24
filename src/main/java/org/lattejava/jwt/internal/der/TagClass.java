@@ -14,7 +14,7 @@
  * language governing permissions and limitations under the License.
  */
 
-package org.lattejava.jwt.der;
+package org.lattejava.jwt.internal.der;
 
 /**
  * The 2 left most bits of the tag byte indicate the tag class.

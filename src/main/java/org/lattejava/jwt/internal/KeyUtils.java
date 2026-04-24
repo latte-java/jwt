@@ -16,9 +16,9 @@
 
 package org.lattejava.jwt.internal;
 
-import org.lattejava.jwt.der.DerInputStream;
-import org.lattejava.jwt.der.DerValue;
-import org.lattejava.jwt.der.ObjectIdentifier;
+import org.lattejava.jwt.internal.der.DerInputStream;
+import org.lattejava.jwt.internal.der.DerValue;
+import org.lattejava.jwt.internal.der.ObjectIdentifier;
 
 import java.io.IOException;
 import java.security.InvalidAlgorithmParameterException;
@@ -37,11 +37,11 @@ import java.security.interfaces.RSAKey;
 import java.security.spec.NamedParameterSpec;
 import java.util.Arrays;
 
-import static org.lattejava.jwt.der.ObjectIdentifier.ECDSA_P256;
-import static org.lattejava.jwt.der.ObjectIdentifier.ECDSA_P384;
-import static org.lattejava.jwt.der.ObjectIdentifier.ECDSA_P521;
-import static org.lattejava.jwt.der.ObjectIdentifier.EdDSA_25519;
-import static org.lattejava.jwt.der.ObjectIdentifier.EdDSA_448;
+import static org.lattejava.jwt.internal.der.ObjectIdentifier.ECDSA_P256;
+import static org.lattejava.jwt.internal.der.ObjectIdentifier.ECDSA_P384;
+import static org.lattejava.jwt.internal.der.ObjectIdentifier.ECDSA_P521;
+import static org.lattejava.jwt.internal.der.ObjectIdentifier.EdDSA_25519;
+import static org.lattejava.jwt.internal.der.ObjectIdentifier.EdDSA_448;
 
 /**
  * @author Daniel DeGroff

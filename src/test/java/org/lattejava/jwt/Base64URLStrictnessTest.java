@@ -80,7 +80,7 @@ public class Base64URLStrictnessTest {
     // Use case: any non-URL-safe character, padding, or whitespace in any segment rejects with InvalidJWTException.
     String token = corrupt(buildValidToken(), segmentIndex, badChar);
     JWTDecoder decoder = new JWTDecoder();
-    Verifier verifier = HMACVerifier.newVerifier(SECRET);
+    Verifier verifier = HMACVerifier.newVerifier(Algorithm.HS256, SECRET);
     try {
       decoder.decode(token, VerifierResolver.of(verifier));
       fail("Expected InvalidJWTException for [" + description + "]");

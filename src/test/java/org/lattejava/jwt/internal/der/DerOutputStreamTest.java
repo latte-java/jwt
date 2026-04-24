@@ -14,11 +14,11 @@
  * language governing permissions and limitations under the License.
  */
 
-package org.lattejava.jwt.der;
+package org.lattejava.jwt.internal.der;
 
-import org.lattejava.jwt.der.DerOutputStream;
-import org.lattejava.jwt.der.DerValue;
-import org.lattejava.jwt.der.Tag;
+import org.lattejava.jwt.internal.der.DerOutputStream;
+import org.lattejava.jwt.internal.der.DerValue;
+import org.lattejava.jwt.internal.der.Tag;
 import org.testng.annotations.Test;
 
 import java.nio.ByteBuffer;

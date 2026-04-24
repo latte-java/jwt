@@ -500,19 +500,19 @@ public final class JSONWebKey {
   // ---------- toString / equals / hashCode ----------
 
   /**
-   * Debug-friendly representation. Private key material fields (d, dp, dq, p,
-   * q, qi) are <strong>always</strong> replaced with {@code "***"} regardless
-   * of whether they are populated. Use {@link #toJSON()} for the full content.
+   * Debug-friendly representation. When populated, private key material fields
+   * (d, dp, dq, p, q, qi) are replaced with {@code "***"}; absent fields remain
+   * absent (never materialized as {@code "***"}). Use {@link #toJSON()} for the
+   * full content.
    */
   @Override
   public String toString() {
     Map<String, Object> redacted = new LinkedHashMap<>(toSerializableMap());
-    redacted.put("d", "***");
-    redacted.put("dp", "***");
-    redacted.put("dq", "***");
-    redacted.put("p", "***");
-    redacted.put("q", "***");
-    redacted.put("qi", "***");
+    for (String field : new String[]{"d", "dp", "dq", "p", "q", "qi"}) {
+      if (redacted.containsKey(field)) {
+        redacted.put(field, "***");
+      }
+    }
     return new String(new LatteJSONProcessor().serialize(redacted));
   }
 

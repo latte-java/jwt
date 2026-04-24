@@ -28,6 +28,7 @@ import org.lattejava.jwt.BaseJWTTest;
 import org.lattejava.jwt.InvalidJWTException;
 import org.lattejava.jwt.InvalidJWTSignatureException;
 import org.lattejava.jwt.InvalidKeyLengthException;
+import org.lattejava.jwt.InvalidKeyTypeException;
 import org.lattejava.jwt.JSONProcessingException;
 import org.lattejava.jwt.JWT;
 import org.lattejava.jwt.JWTDecoder;
@@ -45,9 +46,13 @@ import org.testng.annotations.Test;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.security.KeyFactory;
+import java.security.interfaces.RSAPublicKey;
+import java.security.spec.RSAPublicKeySpec;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.HashSet;
@@ -77,7 +82,7 @@ public class RFC8725ComplianceTest extends BaseJWTTest {
     String header = b64("{\"alg\":\"none\",\"typ\":\"JWT\"}");
     String payload = b64("{\"sub\":\"abc\"}");
     String token = header + "." + payload + ".";
-    Verifier hmac = HMACVerifier.newVerifier(HMAC_SECRET_32);
+    Verifier hmac = HMACVerifier.newVerifier(Algorithm.HS256, HMAC_SECRET_32);
     expectException(MissingVerifierException.class, () ->
         new JWTDecoder().decode(token, VerifierResolver.of(hmac)));
   }
@@ -89,7 +94,7 @@ public class RFC8725ComplianceTest extends BaseJWTTest {
     String rsaPub = new String(Files.readAllBytes(Paths.get("src/test/resources/rsa_public_key_2048.pem")));
     String forged = new JWTEncoder().encode(jwt, HMACSigner.newSHA512Signer(rsaPub));
 
-    Verifier rsaVerifier = RSAVerifier.newVerifier(rsaPub);
+    Verifier rsaVerifier = RSAVerifier.newVerifier(Algorithm.RS256, rsaPub);
     expectException(MissingVerifierException.class, () ->
         new JWTDecoder().decode(forged, VerifierResolver.of(rsaVerifier)));
   }
@@ -101,7 +106,7 @@ public class RFC8725ComplianceTest extends BaseJWTTest {
     String token = new JWTEncoder().encode(jwt, HMACSigner.newSHA256Signer(HMAC_SECRET_32));
     String stripped = token.substring(0, token.lastIndexOf('.'));
 
-    Verifier hmac = HMACVerifier.newVerifier(HMAC_SECRET_32);
+    Verifier hmac = HMACVerifier.newVerifier(Algorithm.HS256, HMAC_SECRET_32);
     expectException(MissingSignatureException.class, () ->
         new JWTDecoder().decode(stripped, VerifierResolver.of(hmac)));
   }
@@ -111,7 +116,7 @@ public class RFC8725ComplianceTest extends BaseJWTTest {
   public void rfc8725_section_3_1_algorithmVerificationViaCanVerify() throws Exception {
     JWT jwt = JWT.builder().subject("abc").build();
     String token = new JWTEncoder().encode(jwt, ECSigner.newSHA256Signer(readFile("ec_private_key_p_256.pem")));
-    Verifier rsaVerifier = RSAVerifier.newVerifier(
+    Verifier rsaVerifier = RSAVerifier.newVerifier(Algorithm.RS256,
         new String(Files.readAllBytes(Paths.get("src/test/resources/rsa_public_key_2048.pem"))));
     expectException(MissingVerifierException.class, () ->
         new JWTDecoder().decode(token, VerifierResolver.of(rsaVerifier)));
@@ -126,7 +131,7 @@ public class RFC8725ComplianceTest extends BaseJWTTest {
     JWTDecoder decoder = JWTDecoder.builder()
         .expectedAlgorithms(new HashSet<>(Collections.singletonList(Algorithm.RS256)))
         .build();
-    Verifier hmac = HMACVerifier.newVerifier(HMAC_SECRET_32);
+    Verifier hmac = HMACVerifier.newVerifier(Algorithm.HS256, HMAC_SECRET_32);
     expectException(InvalidJWTException.class, () ->
         decoder.decode(token, VerifierResolver.of(hmac)));
   }
@@ -134,21 +139,100 @@ public class RFC8725ComplianceTest extends BaseJWTTest {
   // RFC 8725 §2.2 - HS256 with 31-byte secret rejected (InvalidKeyLengthException) -- weak symmetric key
   @Test
   public void rfc8725_section_2_2_weakSymmetricKeyRejected() {
+    // Use case: with the algorithm-bound verifier API, a 31-byte secret for HS256 is rejected
+    // at construction time -- the verifier cannot be built with a sub-minimum key.
     byte[] tooShort = new byte[31];
-    Verifier verifier = HMACVerifier.newVerifier(tooShort);
-
-    JWT jwt = JWT.builder().subject("abc").build();
-    String token = new JWTEncoder().encode(jwt,
-        HMACSigner.newSHA256Signer(HMAC_SECRET_32));
     expectException(InvalidKeyLengthException.class, () ->
-        new JWTDecoder().decode(token, VerifierResolver.of(verifier)));
+        HMACVerifier.newVerifier(Algorithm.HS256, tooShort));
   }
 
   // RFC 8725 §3.5 - RSA 1024-bit key rejected (InvalidKeyLengthException) -- insufficient entropy
   @Test
   public void rfc8725_section_3_5_rsa1024BitKeyRejected() {
     String pem = readFile("rsa_public_key_1024.pem");
-    expectException(InvalidKeyLengthException.class, () -> RSAVerifier.newVerifier(pem));
+    expectException(InvalidKeyLengthException.class, () -> RSAVerifier.newVerifier(Algorithm.RS256, pem));
+  }
+
+  /**
+   * Synthesize an RSA public key with a modulus of exactly {@code bits} bits
+   * and the given exponent. The modulus is not cryptographically valid (not
+   * a product of two primes) but is accepted by {@link KeyFactory} and
+   * exercises the boundary-length checks in {@code RSAFamily}.
+   */
+  private static RSAPublicKey syntheticRsa(int bits, BigInteger exponent) throws Exception {
+    BigInteger modulus = BigInteger.ONE.shiftLeft(bits - 1).setBit(0);
+    return (RSAPublicKey) KeyFactory.getInstance("RSA").generatePublic(new RSAPublicKeySpec(modulus, exponent));
+  }
+
+  // RFC 8725 §3.5 - 2046-bit modulus is below the documented minimum (2047)
+  @Test
+  public void rfc8725_section_3_5_rsa2046BitModulusRejected() throws Exception {
+    // Use case: modulus one bit below the 2047-bit floor the library accepts
+    // for real-world key-generator jitter. This is the true reject boundary.
+    RSAPublicKey key = syntheticRsa(2046, BigInteger.valueOf(65537));
+    expectException(InvalidKeyLengthException.class, () -> RSAVerifier.newVerifier(Algorithm.RS256, key));
+  }
+
+  // RFC 8725 §3.5 - 2047-bit modulus is accepted (documented deviation; see SECURITY.md)
+  @Test
+  public void rfc8725_section_3_5_rsa2047BitModulusAccepted() throws Exception {
+    // Use case: RSA key generators occasionally emit a 2047-bit modulus (top
+    // bit clear). The library accepts this as a deliberate interop allowance.
+    RSAPublicKey key = syntheticRsa(2047, BigInteger.valueOf(65537));
+    RSAVerifier.newVerifier(Algorithm.RS256, key); // no exception
+  }
+
+  // RFC 8725 §3.5 - 2048-bit modulus is accepted (the nominal RFC 8725 floor)
+  @Test
+  public void rfc8725_section_3_5_rsa2048BitModulusAccepted() throws Exception {
+    // Use case: the nominal RFC 8725 §3.5 minimum modulus is accepted.
+    RSAPublicKey key = syntheticRsa(2048, BigInteger.valueOf(65537));
+    RSAVerifier.newVerifier(Algorithm.RS256, key); // no exception
+  }
+
+  // RFC 8017 §3 - RSA public exponent e must satisfy 2 < e < n and be odd
+  @Test
+  public void rfc8017_section_3_rsaPublicExponentZeroRejected() throws Exception {
+    // Use case: e = 0 is trivially broken (everything maps to 1). Rejected.
+    // A 0 exponent may be rejected earlier by KeyFactory itself on some
+    // providers; either InvalidKeyTypeException from our check or a JCA
+    // exception bubbling out is acceptable behaviour, but the rejection
+    // must happen.
+    try {
+      RSAPublicKey key = syntheticRsa(2048, BigInteger.ZERO);
+      expectException(InvalidKeyTypeException.class, () -> RSAVerifier.newVerifier(Algorithm.RS256, key));
+    } catch (java.security.spec.InvalidKeySpecException | IllegalArgumentException ignored) {
+      // The JCA provider rejected e=0 before we could even build the key
+      // (Sun raises InvalidKeySpecException, BC FIPS raises
+      // IllegalArgumentException). Both indicate the key was rejected at
+      // the provider boundary, which is the desired outcome.
+    }
+  }
+
+  @Test
+  public void rfc8017_section_3_rsaPublicExponentOneRejected() throws Exception {
+    // Use case: e = 1 makes RSA the identity function (ciphertext == message).
+    // Rejected -- either by JCA's KeyFactory (which enforces e >= 3 itself)
+    // or by our defence-in-depth check in RSAFamily for any caller-supplied
+    // RSAPublicKey that bypassed KeyFactory validation.
+    try {
+      RSAPublicKey key = syntheticRsa(2048, BigInteger.ONE);
+      expectException(InvalidKeyTypeException.class, () -> RSAVerifier.newVerifier(Algorithm.RS256, key));
+    } catch (java.security.spec.InvalidKeySpecException | IllegalArgumentException ignored) {
+      // KeyFactory rejected e=1 before we could even build the key; acceptable.
+    }
+  }
+
+  @Test
+  public void rfc8017_section_3_rsaPublicExponentTwoRejected() throws Exception {
+    // Use case: e = 2 is even and cryptographically invalid for RSA.
+    // Rejected -- either by JCA's KeyFactory or by our check in RSAFamily.
+    try {
+      RSAPublicKey key = syntheticRsa(2048, BigInteger.TWO);
+      expectException(InvalidKeyTypeException.class, () -> RSAVerifier.newVerifier(Algorithm.RS256, key));
+    } catch (java.security.spec.InvalidKeySpecException | IllegalArgumentException ignored) {
+      // KeyFactory rejected e=2 before we could even build the key; acceptable.
+    }
   }
 
   // RFC 8725 §3.11 - expectedType accepts matching typ
@@ -160,7 +244,7 @@ public class RFC8725ComplianceTest extends BaseJWTTest {
         b -> b.typ("at+jwt"));
 
     JWTDecoder decoder = JWTDecoder.builder().expectedType("at+jwt").build();
-    JWT decoded = decoder.decode(token, VerifierResolver.of(HMACVerifier.newVerifier(HMAC_SECRET_32)));
+    JWT decoded = decoder.decode(token, VerifierResolver.of(HMACVerifier.newVerifier(Algorithm.HS256, HMAC_SECRET_32)));
     assertEquals(decoded.subject(), "abc");
   }
 
@@ -174,7 +258,7 @@ public class RFC8725ComplianceTest extends BaseJWTTest {
 
     JWTDecoder decoder = JWTDecoder.builder().expectedType("at+jwt").build();
     expectException(InvalidJWTException.class, () ->
-        decoder.decode(token, VerifierResolver.of(HMACVerifier.newVerifier(HMAC_SECRET_32))));
+        decoder.decode(token, VerifierResolver.of(HMACVerifier.newVerifier(Algorithm.HS256, HMAC_SECRET_32))));
   }
 
   // RFC 8725 §3.12 - verifier per algorithm family (binding enforced via canVerify)
@@ -183,7 +267,7 @@ public class RFC8725ComplianceTest extends BaseJWTTest {
     JWT jwt = JWT.builder().subject("abc").build();
     String token = new JWTEncoder().encode(jwt, HMACSigner.newSHA256Signer(HMAC_SECRET_32));
 
-    Verifier rsaVerifier = RSAVerifier.newVerifier(
+    Verifier rsaVerifier = RSAVerifier.newVerifier(Algorithm.RS256,
         new String(Files.readAllBytes(Paths.get("src/test/resources/rsa_public_key_2048.pem"))));
     expectException(MissingVerifierException.class, () ->
         new JWTDecoder().decode(token, VerifierResolver.of(rsaVerifier)));
@@ -195,7 +279,7 @@ public class RFC8725ComplianceTest extends BaseJWTTest {
     // Header encoded with standard base64 ("+", "/", padding) is rejected.
     String token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9+." + b64("{\"sub\":\"abc\"}") + ".sig";
     expectException(InvalidJWTException.class, () ->
-        new JWTDecoder().decode(token, VerifierResolver.of(HMACVerifier.newVerifier(HMAC_SECRET_32))));
+        new JWTDecoder().decode(token, VerifierResolver.of(HMACVerifier.newVerifier(Algorithm.HS256, HMAC_SECRET_32))));
   }
 
   // RFC 8725 §2.6 - LatteJSONProcessor rejects duplicate JSON keys by default
@@ -220,7 +304,7 @@ public class RFC8725ComplianceTest extends BaseJWTTest {
         .expectedAlgorithms(new HashSet<>(Collections.singletonList(Algorithm.HS256)))
         .build();
     expectException(InvalidJWTException.class, () ->
-        idTokenDecoder.decode(token, VerifierResolver.of(HMACVerifier.newVerifier(HMAC_SECRET_32))));
+        idTokenDecoder.decode(token, VerifierResolver.of(HMACVerifier.newVerifier(Algorithm.HS256, HMAC_SECRET_32))));
   }
 
   // RFC 8725 §3.2 - Use appropriate algorithms (no Algorithm.NONE constant)
@@ -245,7 +329,7 @@ public class RFC8725ComplianceTest extends BaseJWTTest {
     String tampered = token.substring(0, token.length() - 1) + (last == 'A' ? 'B' : 'A');
 
     expectException(InvalidJWTSignatureException.class, () ->
-        new JWTDecoder().decode(tampered, VerifierResolver.of(HMACVerifier.newVerifier(HMAC_SECRET_32))));
+        new JWTDecoder().decode(tampered, VerifierResolver.of(HMACVerifier.newVerifier(Algorithm.HS256, HMAC_SECRET_32))));
   }
 
   // RFC 8725 §3.4 - Validate cryptographic inputs (maxInputBytes / maxNestingDepth)
@@ -256,7 +340,7 @@ public class RFC8725ComplianceTest extends BaseJWTTest {
     String payload = b64("{\"sub\":\"" + "a".repeat(200) + "\"}");
     String token = header + "." + payload + ".sig";
     expectException(InvalidJWTException.class, () ->
-        decoder.decode(token, VerifierResolver.of(HMACVerifier.newVerifier(HMAC_SECRET_32))));
+        decoder.decode(token, VerifierResolver.of(HMACVerifier.newVerifier(Algorithm.HS256, HMAC_SECRET_32))));
   }
 
   // RFC 8725 §3.7 - UTF-8 used for all JSON and base64url decoding (round-trip non-ASCII)
@@ -265,7 +349,7 @@ public class RFC8725ComplianceTest extends BaseJWTTest {
     JWT jwt = JWT.builder().subject("résumé—\u00e9").build();
     String token = new JWTEncoder().encode(jwt, HMACSigner.newSHA256Signer(HMAC_SECRET_32));
     JWT decoded = new JWTDecoder().decode(token,
-        VerifierResolver.of(HMACVerifier.newVerifier(HMAC_SECRET_32)));
+        VerifierResolver.of(HMACVerifier.newVerifier(Algorithm.HS256, HMAC_SECRET_32)));
     assertEquals(decoded.subject(), "résumé—\u00e9");
   }
 
@@ -284,7 +368,7 @@ public class RFC8725ComplianceTest extends BaseJWTTest {
     };
     expectException(InvalidJWTException.class, () ->
         new JWTDecoder().decode(token,
-            VerifierResolver.of(HMACVerifier.newVerifier(HMAC_SECRET_32)),
+            VerifierResolver.of(HMACVerifier.newVerifier(Algorithm.HS256, HMAC_SECRET_32)),
             issuerCheck));
   }
 
@@ -296,7 +380,7 @@ public class RFC8725ComplianceTest extends BaseJWTTest {
         .audience(java.util.Arrays.asList("svc-a", "svc-b")).build();
     String token = new JWTEncoder().encode(jwt, HMACSigner.newSHA256Signer(HMAC_SECRET_32));
     JWT decoded = new JWTDecoder().decode(token,
-        VerifierResolver.of(HMACVerifier.newVerifier(HMAC_SECRET_32)));
+        VerifierResolver.of(HMACVerifier.newVerifier(Algorithm.HS256, HMAC_SECRET_32)));
     assertNotNull(decoded.audience());
     assertTrue(decoded.hasAudience("svc-a"));
     assertTrue(decoded.hasAudience("svc-b"));
@@ -316,7 +400,7 @@ public class RFC8725ComplianceTest extends BaseJWTTest {
     // must fail before payload parsing is attempted.
     String tampered = parts[0] + "." + b64("\"not-an-object\"") + "." + parts[2];
     expectException(InvalidJWTSignatureException.class, () ->
-        new JWTDecoder().decode(tampered, VerifierResolver.of(HMACVerifier.newVerifier(HMAC_SECRET_32))));
+        new JWTDecoder().decode(tampered, VerifierResolver.of(HMACVerifier.newVerifier(Algorithm.HS256, HMAC_SECRET_32))));
   }
 
   // RFC 8725 §3.10 - Caller-supplied Consumer<JWT> validator runs AFTER signature/time validation.

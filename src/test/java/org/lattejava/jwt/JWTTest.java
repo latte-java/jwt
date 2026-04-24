@@ -113,30 +113,57 @@ public class JWTTest {
   }
 
   @Test
-  public void builder_audience_string_records_string_wire_form() {
+  public void builder_audience_string_defaults_to_always_array() {
+    // Use case: single-audience builder call defaults to ALWAYS_ARRAY so the serialized
+    // form does not vary with which audience overload the caller happens to use.
     JWT jwt = JWT.builder().audience("svc").build();
     assertEquals(jwt.audience(), Collections.singletonList("svc"));
-    assertEquals(jwt.audienceWireForm(), AudienceWireForm.STRING);
+    assertEquals(jwt.audienceSerialization(), AudienceSerialization.ALWAYS_ARRAY);
+    assertEquals(jwt.toSerializableMap().get("aud"), Collections.singletonList("svc"));
   }
 
   @Test
-  public void builder_audience_list_records_array_wire_form() {
+  public void builder_audience_list_defaults_to_always_array() {
     JWT jwt = JWT.builder().audience(Arrays.asList("a", "b")).build();
     assertEquals(jwt.audience(), Arrays.asList("a", "b"));
-    assertEquals(jwt.audienceWireForm(), AudienceWireForm.ARRAY);
+    assertEquals(jwt.audienceSerialization(), AudienceSerialization.ALWAYS_ARRAY);
   }
 
   @Test
-  public void builder_claim_aud_string_routes_to_string_wire_form() {
+  public void builder_claim_aud_string_defaults_to_always_array() {
     JWT jwt = JWT.builder().claim("aud", "svc").build();
     assertEquals(jwt.audience(), Collections.singletonList("svc"));
-    assertEquals(jwt.audienceWireForm(), AudienceWireForm.STRING);
+    assertEquals(jwt.audienceSerialization(), AudienceSerialization.ALWAYS_ARRAY);
+    assertEquals(jwt.toSerializableMap().get("aud"), Collections.singletonList("svc"));
   }
 
   @Test
-  public void builder_claim_aud_list_routes_to_array_wire_form() {
+  public void builder_claim_aud_list_defaults_to_always_array() {
     JWT jwt = JWT.builder().claim("aud", Arrays.asList("a", "b")).build();
-    assertEquals(jwt.audienceWireForm(), AudienceWireForm.ARRAY);
+    assertEquals(jwt.audienceSerialization(), AudienceSerialization.ALWAYS_ARRAY);
+  }
+
+  @Test
+  public void builder_audience_serialization_opt_in_string_when_single() {
+    // Use case: caller explicitly opts in to STRING_WHEN_SINGLE for a peer that expects
+    // the single-string form. With a 1-element audience, serialization emits a string.
+    JWT jwt = JWT.builder()
+        .audience("svc")
+        .audienceSerialization(AudienceSerialization.STRING_WHEN_SINGLE)
+        .build();
+    assertEquals(jwt.audienceSerialization(), AudienceSerialization.STRING_WHEN_SINGLE);
+    assertEquals(jwt.toSerializableMap().get("aud"), "svc");
+  }
+
+  @Test
+  public void builder_audience_serialization_string_when_single_falls_back_to_array_for_many() {
+    // Use case: STRING_WHEN_SINGLE with 2+ audiences still emits a JSON array -- the opt-in
+    // is "string when the list has one value", not a hard requirement.
+    JWT jwt = JWT.builder()
+        .audience(Arrays.asList("a", "b"))
+        .audienceSerialization(AudienceSerialization.STRING_WHEN_SINGLE)
+        .build();
+    assertEquals(jwt.toSerializableMap().get("aud"), Arrays.asList("a", "b"));
   }
 
   @Test
@@ -233,23 +260,24 @@ public class JWTTest {
 
   @Test
   public void fromMap_aud_string_preserves_wire_form() {
-    // Use case: fromMap with aud = "foo" -> audience() == ["foo"], wire form STRING
+    // Use case: fromMap with aud = "foo" -> audience() == ["foo"], serialization STRING_WHEN_SINGLE
+    // so a decode/encode round-trip emits the same single-string form it consumed.
     Map<String, Object> map = new LinkedHashMap<>();
     map.put("aud", "foo");
     JWT jwt = JWT.fromMap(map, null);
     assertEquals(jwt.audience(), Collections.singletonList("foo"));
-    assertEquals(jwt.audienceWireForm(), AudienceWireForm.STRING);
+    assertEquals(jwt.audienceSerialization(), AudienceSerialization.STRING_WHEN_SINGLE);
     // Round-trip: serializes back as string
     assertEquals(jwt.toSerializableMap().get("aud"), "foo");
   }
 
   @Test
-  public void fromMap_aud_array_records_array_wire_form() {
+  public void fromMap_aud_array_records_always_array() {
     Map<String, Object> map = new LinkedHashMap<>();
     map.put("aud", Arrays.asList("foo", "bar"));
     JWT jwt = JWT.fromMap(map, null);
     assertEquals(jwt.audience(), Arrays.asList("foo", "bar"));
-    assertEquals(jwt.audienceWireForm(), AudienceWireForm.ARRAY);
+    assertEquals(jwt.audienceSerialization(), AudienceSerialization.ALWAYS_ARRAY);
     Object out = jwt.toSerializableMap().get("aud");
     assertTrue(out instanceof List);
     assertEquals(out, Arrays.asList("foo", "bar"));
@@ -458,13 +486,16 @@ public class JWTTest {
   }
 
   @Test
-  public void claimsEquals_ignores_audience_wire_form() {
-    // Use case: claimsEquals with aud=["foo"] STRING vs aud=["foo"] ARRAY -> true.
-    // Audience wire form is intentionally ignored by claimsEquals.
-    JWT stringForm = JWT.builder().audience("foo").build();
-    JWT arrayForm = JWT.builder().audience(Collections.singletonList("foo")).build();
+  public void claimsEquals_ignores_audience_serialization() {
+    // Use case: claimsEquals with aud=["foo"] STRING_WHEN_SINGLE vs aud=["foo"] ALWAYS_ARRAY -> true.
+    // AudienceSerialization mode is intentionally ignored by claimsEquals.
+    JWT stringForm = JWT.builder()
+        .audience("foo")
+        .audienceSerialization(AudienceSerialization.STRING_WHEN_SINGLE)
+        .build();
+    JWT arrayForm = JWT.builder().audience("foo").build();
     assertTrue(stringForm.claimsEquals(arrayForm));
-    // Strict equals DOES still differ on wire form:
+    // Strict equals DOES still differ on serialization mode:
     assertNotEquals(stringForm, arrayForm);
   }
 

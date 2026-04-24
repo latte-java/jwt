@@ -24,18 +24,21 @@
 package org.lattejava.jwt;
 
 /**
- * The original wire form of the {@code aud} (audience) claim. RFC 7519 §4.1.3
- * permits the audience claim to be either a single JSON string or a JSON array
- * of strings. This enum records which shape was supplied so that
- * {@link JWT#toSerializableMap()} can preserve the original form on
- * re-serialization.
+ * Controls how the {@code aud} (audience) claim is serialized. Defaults to
+ * {@link #ALWAYS_ARRAY}; opt in to {@link #STRING_WHEN_SINGLE} to emit a
+ * single JSON string when the audience has exactly one value.
  *
  * @author Daniel DeGroff
  */
-enum AudienceWireForm {
-  /** {@code "aud": "single"} - serialized as a single JSON string. */
-  STRING,
+public enum AudienceSerialization {
+  /**
+   * Emit {@code aud} as a JSON array of strings regardless of audience size.
+   */
+  ALWAYS_ARRAY,
 
-  /** {@code "aud": ["a", "b"]} - serialized as a JSON array of strings. */
-  ARRAY
+  /**
+   * Emit {@code aud} as a single JSON string when the audience has exactly
+   * one value; emit a JSON array of strings otherwise.
+   */
+  STRING_WHEN_SINGLE
 }

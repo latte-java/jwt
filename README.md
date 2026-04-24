@@ -24,8 +24,8 @@ Java JWT is intended to be fast and easy to use. It has zero external runtime de
    - Generate RSA Key Pairs in `2048`, `3072` or `4096` bit sizes
    - Generate RSA PSS Key Pairs in `2048`, `3072` or `4096` bit sizes
    - Generate EC Key Pairs in `256`, `384` and `521` bit sizes
-   - Generate EdDSA Key Pairs for `Ed2559` and `Ed448` curves
-   - Generate `x5t` and `x5t#256` values from X.509 Certificates
+   - Generate EdDSA Key Pairs for `Ed25519` and `Ed448` curves
+   - Generate `x5t` and `x5t#S256` values from X.509 Certificates
    - Generate JWK thumbprint using `SHA-1` or `SHA-256` 
    - Generate ideal HMAC secret lengths for `SHA-256`, `SHA-384` and `SHA-512`
    - Generate the `at_hash` and `c_hash` claims for OpenID Connect
@@ -230,6 +230,22 @@ Once you have enabled an additional provider no change should be necessary to yo
 // Insert the provider ahead of the JCA.
 Security.insertProviderAt(new BouncyCastleFipsProvider(), 1);
 ```
+
+### FIPS observability for SHAKE256
+
+The Ed448 OpenID Connect `at_hash` / `c_hash` paths use FIPS 202 SHAKE256. On the first call, the library probes the JCE for a registered `SHAKE256` service and runs an internal known-answer test against it; on success the provider is cached and used for subsequent calls, otherwise the library falls back to a bundled FIPS 202 implementation. The bundled implementation is functionally correct but is not a FIPS-approved module.
+
+Operators running under a FIPS-approved JCE can confirm which path is in use:
+
+```java
+import org.lattejava.jwt.internal.SHAKE256;
+
+String name = SHAKE256.providerName();
+// non-null  → name of the JCE provider that satisfied the KAT (e.g. "BCFIPS")
+// null      → the bundled implementation is in use; not a FIPS-approved code path
+```
+
+This call triggers the one-time probe on first invocation, so the result is stable for the lifetime of the VM.
 
 ### Ed25519 and Ed448 interop notes
 

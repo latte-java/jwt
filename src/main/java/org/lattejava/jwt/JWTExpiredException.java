@@ -36,10 +36,6 @@ public class JWTExpiredException extends JWTException {
 
   private final Duration clockSkew;
 
-  public JWTExpiredException() {
-    this(null, null, null);
-  }
-
   public JWTExpiredException(Instant expiration, Instant now, Duration clockSkew) {
     this.expiration = expiration;
     this.now = now;

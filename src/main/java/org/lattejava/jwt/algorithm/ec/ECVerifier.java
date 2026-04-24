@@ -120,7 +120,7 @@ public class ECVerifier implements Verifier {
 
   @Override
   public boolean canVerify(Algorithm algorithm) {
-    return this.algorithm == algorithm;
+    return algorithm != null && this.algorithm.name().equals(algorithm.name());
   }
 
   @Override
@@ -135,7 +135,10 @@ public class ECVerifier implements Verifier {
       expectedLength = ECFamily.joseSignatureLength(algorithm);
       curveIntLength = ECFamily.curveIntLength(algorithm);
     } catch (IllegalArgumentException e) {
-      throw new InvalidJWTSignatureException(e);
+      // Reaching this branch means canVerify(algorithm) admitted an EC algorithm that ECFamily
+      // doesn't know about — an internal precondition violation, not a signature failure.
+      throw new IllegalStateException("ECVerifier reached with unsupported algorithm ["
+          + algorithm.name() + "]; canVerify should have rejected this earlier", e);
     }
     if (signature.length != expectedLength) {
       throw new InvalidJWTSignatureException();
@@ -151,7 +154,9 @@ public class ECVerifier implements Verifier {
           throw new InvalidJWTSignatureException();
         }
       } catch (SignatureException e) {
-        throw new InvalidJWTSignatureException(e);
+        // JCA signals malformed/truncated DER via SignatureException. The cause is intentionally
+        // dropped: the bare exception type is the signal.
+        throw new InvalidJWTSignatureException();
       }
     } catch (InvalidKeyException | NoSuchAlgorithmException | SignatureException | SecurityException e) {
       throw new JWTVerifierException("An unexpected exception occurred when attempting to verify the JWT", e);

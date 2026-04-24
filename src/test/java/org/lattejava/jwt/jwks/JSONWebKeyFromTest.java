@@ -171,7 +171,7 @@ public class JSONWebKeyFromTest extends BaseJWTTest {
         byte[] signature = signer.sign(messageBytes);
 
         RSAPublicKey publicKey = PEM.decode(Paths.get("src/test/resources/rsa_pss_public_key_2048.pem")).getPublicKey();
-        Verifier verifier = RSAPSSVerifier.newVerifier(publicKey);
+        Verifier verifier = RSAPSSVerifier.newVerifier(Algorithm.PS256, publicKey);
         verifier.canVerify(Algorithm.PS256);
         verifier.canVerify(Algorithm.PS384);
         verifier.canVerify(Algorithm.PS512);

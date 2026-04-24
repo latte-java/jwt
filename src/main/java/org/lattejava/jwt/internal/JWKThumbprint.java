@@ -61,6 +61,22 @@ public final class JWKThumbprint {
    *                                  unknown
    */
   public static String compute(String algorithm, JSONWebKey key) {
+    return Base64.getUrlEncoder().withoutPadding().encodeToString(computeBytes(algorithm, key));
+  }
+
+  /**
+   * Returns the raw JWK thumbprint digest bytes of {@code key} using the
+   * given JCA digest algorithm name. This is the byte-returning variant
+   * exposed to the public {@link org.lattejava.jwt.JWKThumbprint} facade.
+   *
+   * @param algorithm the JCA digest algorithm name; non-null
+   * @param key       the JWK; non-null and {@code key.kty} must be set
+   * @return the raw digest bytes
+   * @throws IllegalArgumentException if {@code key.kty} is null or
+   *                                  unsupported, or if {@code algorithm} is
+   *                                  unknown
+   */
+  public static byte[] computeBytes(String algorithm, JSONWebKey key) {
     if (algorithm == null) {
       throw new IllegalArgumentException("Algorithm is null");
     }
@@ -80,8 +96,7 @@ public final class JWKThumbprint {
     } catch (NoSuchAlgorithmException e) {
       throw new IllegalArgumentException("No such algorithm [" + algorithm + "]", e);
     }
-    byte[] hash = md.digest(canonical);
-    return Base64.getUrlEncoder().withoutPadding().encodeToString(hash);
+    return md.digest(canonical);
   }
 
   /**

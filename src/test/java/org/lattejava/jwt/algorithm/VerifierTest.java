@@ -16,6 +16,7 @@
 
 package org.lattejava.jwt.algorithm;
 
+import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.Signer;
 import org.lattejava.jwt.Verifier;
 import org.lattejava.jwt.VerifierResolver;
@@ -58,16 +59,16 @@ public class VerifierTest {
       JWTEncoder encoder = new JWTEncoder();
 
       String hmacToken = encoder.encode(jwt, HMACSigner.newSHA256Signer(hmacSecret));
-      algorithms.add(new Pair<>(new Pair<>(HMACSigner.newSHA256Signer(hmacSecret), HMACVerifier.newVerifier(hmacSecret)), hmacToken));
+      algorithms.add(new Pair<>(new Pair<>(HMACSigner.newSHA256Signer(hmacSecret), HMACVerifier.newVerifier(Algorithm.HS256, hmacSecret)), hmacToken));
 
       String rsaPrivateKey = new String(Files.readAllBytes(Paths.get("src/test/resources/rsa_private_key_4096.pem")));
       String rsaPublicKey = new String(Files.readAllBytes(Paths.get("src/test/resources/rsa_public_key_4096.pem")));
       String rsaToken = encoder.encode(jwt, RSASigner.newSHA256Signer(rsaPrivateKey));
-      algorithms.add(new Pair<>(new Pair<>(RSASigner.newSHA256Signer(rsaPrivateKey), RSAVerifier.newVerifier(rsaPublicKey)), rsaToken));
+      algorithms.add(new Pair<>(new Pair<>(RSASigner.newSHA256Signer(rsaPrivateKey), RSAVerifier.newVerifier(Algorithm.RS256, rsaPublicKey)), rsaToken));
 
       // RSA-PSS
       String rsaPssToken = encoder.encode(jwt, RSAPSSSigner.newSHA256Signer(rsaPrivateKey));
-      algorithms.add(new Pair<>(new Pair<>(RSAPSSSigner.newSHA256Signer(rsaPrivateKey), RSAPSSVerifier.newVerifier(rsaPublicKey)), rsaPssToken));
+      algorithms.add(new Pair<>(new Pair<>(RSAPSSSigner.newSHA256Signer(rsaPrivateKey), RSAPSSVerifier.newVerifier(Algorithm.PS256, rsaPublicKey)), rsaPssToken));
 
       // EC
       String ecPrivateKey = new String(Files.readAllBytes(Paths.get("src/test/resources/ec_private_key_p_256.pem")));

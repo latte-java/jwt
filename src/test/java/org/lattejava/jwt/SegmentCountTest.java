@@ -89,7 +89,7 @@ public class SegmentCountTest {
   public void segmentCounts(String input, Class<? extends Exception> expected, String description) {
     // Use case: segment-count matrix -- authenticated decode path.
     JWTDecoder decoder = new JWTDecoder();
-    Verifier verifier = HMACVerifier.newVerifier(SECRET);
+    Verifier verifier = HMACVerifier.newVerifier(Algorithm.HS256, SECRET);
     try {
       decoder.decode(input, VerifierResolver.of(verifier));
       fail("Expected [" + expected.getSimpleName() + "] for [" + description + "], no exception thrown");
@@ -106,7 +106,7 @@ public class SegmentCountTest {
     // Use case: "a.b.c" proceeds through the full sig flow on a real signed token.
     JWT jwt = JWT.builder().subject("abc").build();
     String encoded = new JWTEncoder().encode(jwt, HMACSigner.newSHA256Signer(SECRET));
-    JWT decoded = new JWTDecoder().decode(encoded, VerifierResolver.of(HMACVerifier.newVerifier(SECRET)));
+    JWT decoded = new JWTDecoder().decode(encoded, VerifierResolver.of(HMACVerifier.newVerifier(Algorithm.HS256, SECRET)));
     assertNotNull(decoded);
   }
 

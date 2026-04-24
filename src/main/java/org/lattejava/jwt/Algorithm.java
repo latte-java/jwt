@@ -126,18 +126,23 @@ public interface Algorithm {
     };
   }
 
-  // --- Legacy 6.x compatibility shims (temporary; removed in later checkpoints) ---
-
   /**
-   * Look up by name returning {@code null} for unrecognized names. Provided as
-   * a temporary back-compat shim for 6.x callers (notably
-   * {@code JSONWebKey.from(...)} and the EdDSA signer/verifier constructors).
-   * Accepts both JWA names ({@code "RS256"}) and the JCA signature/curve names
-   * ({@code "SHA256withRSA"}, {@code "Ed25519"}) the legacy enum recognised.
-   * New code should use {@link #of(String)} or compare {@link #name()} directly.
+   * Look up a standard {@link Algorithm} by either its JWA name ({@code "RS256"},
+   * {@code "Ed25519"}, …) or one of the JCA signature / curve name forms produced
+   * by the JDK — notably {@link java.security.cert.X509Certificate#getSigAlgName()}
+   * returns values like {@code "SHA256withRSA"} and {@code "SHA256withRSAandMGF1"}.
+   * Returns {@code null} for unrecognized input and silently accepts {@code null}.
    *
-   * @param name the JWA name or legacy JCA signature/curve name
-   * @return the standard constant or {@code null} if not a standard algorithm
+   * <p>This method exists specifically to bridge the JCA-shaped strings the JDK
+   * emits into the JWA-shaped {@code Algorithm} constants this library uses.
+   * Application code should prefer {@link #of(String)} when the input is a JWA
+   * name coming from a {@code "alg"} header.</p>
+   *
+   * <p>JWA names match exactly (per RFC 7515 §4.1.1); JCA names match
+   * case-insensitively because the JDK uses mixed case in its sig-alg strings.</p>
+   *
+   * @param name the JWA name or JCA signature/curve name; {@code null} is tolerated
+   * @return the standard constant or {@code null} if the name is not recognized
    */
   static Algorithm fromName(String name) {
     if (name == null) {
@@ -165,9 +170,8 @@ public interface Algorithm {
     if (direct != null) {
       return direct;
     }
-    // Legacy 6.x semantics: map JCA signature/curve strings (case-insensitive)
-    // back to a standard JWA constant. Required by the JWK converter which
-    // passes X509Certificate#getSigAlgName() through this method.
+    // JCA signature/curve strings (case-insensitive) → standard JWA constant.
+    // The JWK converter passes X509Certificate#getSigAlgName() through here.
     return switch (name.toUpperCase(java.util.Locale.ROOT)) {
       case "HMACSHA256" -> HS256;
       case "HMACSHA384" -> HS384;

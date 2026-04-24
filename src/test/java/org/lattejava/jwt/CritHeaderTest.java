@@ -58,7 +58,7 @@ public class CritHeaderTest {
     JWTDecoder decoder = JWTDecoder.builder()
         .criticalHeaders(new HashSet<>(Collections.singletonList("b64")))
         .build();
-    JWT jwt = decoder.decode(token, VerifierResolver.of(HMACVerifier.newVerifier(SECRET)));
+    JWT jwt = decoder.decode(token, VerifierResolver.of(HMACVerifier.newVerifier(Algorithm.HS256, SECRET)));
     assertNotNull(jwt);
   }
 
@@ -70,7 +70,7 @@ public class CritHeaderTest {
         .criticalHeaders(new HashSet<>(Collections.singletonList("b64")))
         .build();
     try {
-      decoder.decode(token, VerifierResolver.of(HMACVerifier.newVerifier(SECRET)));
+      decoder.decode(token, VerifierResolver.of(HMACVerifier.newVerifier(Algorithm.HS256, SECRET)));
       fail("Expected InvalidJWTException for unrecognized crit");
     } catch (InvalidJWTException expected) {
       // good
@@ -81,7 +81,7 @@ public class CritHeaderTest {
   public void crit_emptyArray_accepted() {
     // Use case: crit is an empty array -> accepted (no required critical parameters).
     String token = encodeWithCrit(Collections.emptyList());
-    JWT jwt = new JWTDecoder().decode(token, VerifierResolver.of(HMACVerifier.newVerifier(SECRET)));
+    JWT jwt = new JWTDecoder().decode(token, VerifierResolver.of(HMACVerifier.newVerifier(Algorithm.HS256, SECRET)));
     assertNotNull(jwt);
   }
 
@@ -93,7 +93,7 @@ public class CritHeaderTest {
         .criticalHeaders(new HashSet<>(Collections.singletonList("b64")))
         .build();
     try {
-      decoder.decode(token, VerifierResolver.of(HMACVerifier.newVerifier(SECRET)));
+      decoder.decode(token, VerifierResolver.of(HMACVerifier.newVerifier(Algorithm.HS256, SECRET)));
       fail("Expected InvalidJWTException when any crit entry is unrecognized");
     } catch (InvalidJWTException expected) {
       // good

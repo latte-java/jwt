@@ -37,6 +37,7 @@ import java.util.Map;
  * Built-in zero-dependency {@link JSONProcessor} implementation.
  *
  * <p>Defaults: {@code maxNestingDepth=16}, {@code maxNumberLength=1000},
+ * {@code maxObjectMembers=1000}, {@code maxArrayElements=10000},
  * {@code allowDuplicateJSONKeys=false}.
  *
  * <p>Stateless and thread-safe.
@@ -44,20 +45,30 @@ import java.util.Map;
  * @author Daniel DeGroff
  */
 public class LatteJSONProcessor implements JSONProcessor {
+  /** Default object/array fan-out caps applied during parse. */
+  public static final int DEFAULT_MAX_OBJECT_MEMBERS = 1000;
+
+  public static final int DEFAULT_MAX_ARRAY_ELEMENTS = 10000;
+
   private final int maxNestingDepth;
   private final int maxNumberLength;
+  private final int maxObjectMembers;
+  private final int maxArrayElements;
   private final boolean allowDuplicateJSONKeys;
 
   /**
    * Constructs a {@code LatteJSONProcessor} with defaults
-   * (maxNestingDepth=16, maxNumberLength=1000, allowDuplicateJSONKeys=false).
+   * (maxNestingDepth=16, maxNumberLength=1000, maxObjectMembers=1000,
+   * maxArrayElements=10000, allowDuplicateJSONKeys=false).
    */
   public LatteJSONProcessor() {
-    this(16, 1000, false);
+    this(16, 1000, DEFAULT_MAX_OBJECT_MEMBERS, DEFAULT_MAX_ARRAY_ELEMENTS, false);
   }
 
   /**
-   * Constructs a {@code LatteJSONProcessor} with explicit defenses.
+   * Constructs a {@code LatteJSONProcessor} with explicit depth, number, and
+   * duplicate-key defenses; object/array fan-out caps default to
+   * {@value #DEFAULT_MAX_OBJECT_MEMBERS} and {@value #DEFAULT_MAX_ARRAY_ELEMENTS}.
    *
    * @param maxNestingDepth        maximum JSON object/array nesting depth
    *                               (must be &gt; 0)
@@ -70,14 +81,50 @@ public class LatteJSONProcessor implements JSONProcessor {
    *                               {@link JSONProcessingException}.
    */
   public LatteJSONProcessor(int maxNestingDepth, int maxNumberLength, boolean allowDuplicateJSONKeys) {
+    this(maxNestingDepth, maxNumberLength, DEFAULT_MAX_OBJECT_MEMBERS, DEFAULT_MAX_ARRAY_ELEMENTS, allowDuplicateJSONKeys);
+  }
+
+  /**
+   * Constructs a {@code LatteJSONProcessor} with explicit defenses.
+   *
+   * @param maxNestingDepth        maximum JSON object/array nesting depth
+   *                               (must be &gt; 0)
+   * @param maxNumberLength        maximum digit-run length of a single JSON
+   *                               number (integer + decimal + exponent
+   *                               digits; sign chars excluded). Must be
+   *                               &gt; 0.
+   * @param maxObjectMembers       maximum number of members in a single
+   *                               JSON object (must be &gt; 0). Bounds the
+   *                               cost of building wide objects at parse
+   *                               time and downstream consumers that walk
+   *                               them.
+   * @param maxArrayElements       maximum number of elements in a single
+   *                               JSON array (must be &gt; 0). Bounds the
+   *                               cost of building wide arrays at parse
+   *                               time and downstream consumers that walk
+   *                               them.
+   * @param allowDuplicateJSONKeys when {@code false} (default), duplicate
+   *                               JSON object member names cause
+   *                               {@link JSONProcessingException}.
+   */
+  public LatteJSONProcessor(int maxNestingDepth, int maxNumberLength, int maxObjectMembers,
+                            int maxArrayElements, boolean allowDuplicateJSONKeys) {
     if (maxNestingDepth <= 0) {
       throw new IllegalArgumentException("maxNestingDepth must be > 0 but found [" + maxNestingDepth + "]");
     }
     if (maxNumberLength <= 0) {
       throw new IllegalArgumentException("maxNumberLength must be > 0 but found [" + maxNumberLength + "]");
     }
+    if (maxObjectMembers <= 0) {
+      throw new IllegalArgumentException("maxObjectMembers must be > 0 but found [" + maxObjectMembers + "]");
+    }
+    if (maxArrayElements <= 0) {
+      throw new IllegalArgumentException("maxArrayElements must be > 0 but found [" + maxArrayElements + "]");
+    }
     this.maxNestingDepth = maxNestingDepth;
     this.maxNumberLength = maxNumberLength;
+    this.maxObjectMembers = maxObjectMembers;
+    this.maxArrayElements = maxArrayElements;
     this.allowDuplicateJSONKeys = allowDuplicateJSONKeys;
   }
 
@@ -320,6 +367,10 @@ public class LatteJSONProcessor implements JSONProcessor {
         if (!allowDuplicateJSONKeys && map.containsKey(key)) {
           throw new JSONProcessingException("Duplicate JSON key [" + key + "]");
         }
+        if (map.size() >= maxObjectMembers && !map.containsKey(key)) {
+          throw new JSONProcessingException(
+              "Object exceeds maxObjectMembers [" + maxObjectMembers + "] at position [" + pos + "]");
+        }
         map.put(key, value);
         skipWhitespace();
         if (pos >= len) {
@@ -352,6 +403,10 @@ public class LatteJSONProcessor implements JSONProcessor {
       }
       while (true) {
         Object value = parseValue(depth);
+        if (list.size() >= maxArrayElements) {
+          throw new JSONProcessingException(
+              "Array exceeds maxArrayElements [" + maxArrayElements + "] at position [" + pos + "]");
+        }
         list.add(value);
         skipWhitespace();
         if (pos >= len) {

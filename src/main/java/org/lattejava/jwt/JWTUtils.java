@@ -36,7 +36,7 @@ import java.util.Base64;
 public class JWTUtils {
   /**
    * Convert a HEX <code>SHA-1</code> or <code>SHA-256</code> X.509 certificate fingerprint to an <code>x5t</code>
-   * or <code>x5t#256</code> thumbprint respectively.
+   * or <code>x5t#S256</code> thumbprint respectively.
    *
    * @param fingerprint the SHA-1 or SHA-256 fingerprint
    * @return a x5t hash.
@@ -51,7 +51,7 @@ public class JWTUtils {
    * <p>
    * If a <code>x5t</code> thumbprint is provided, a SHA-1 HEX encoded fingerprint will be returned.
    * <p>
-   * If a <code>x5t#256</code> thumbprint is provided, a SHA-256 HEX encoded fingerprint will be returned.
+   * If a <code>x5t#S256</code> thumbprint is provided, a SHA-256 HEX encoded fingerprint will be returned.
    *
    * @param x5tHash the x5t hash
    * @return a SHA-1 or SHA-256 fingerprint

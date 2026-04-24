@@ -82,7 +82,8 @@ public class ECVerifierTest extends BaseJWTTest {
       ECVerifier.newVerifier(readFile(fileName));
       Assert.fail("Expected [MissingPublicKeyException] exception");
     } catch (MissingPublicKeyException e) {
-      assertEquals(e.getMessage(), "PEM did not contain a public key", "[" + fileName + "]");
+      assertTrue(e.getMessage() != null && e.getMessage().startsWith("PEM did not contain a public key"),
+          "[" + fileName + "] got: " + e.getMessage());
     } catch (Exception e) {
       Assert.fail("Unexpected exception when parsing file [" + fileName + "]", e);
     }

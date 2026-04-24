@@ -125,6 +125,11 @@ public final class SHAKE256 {
       // Cached provider could not satisfy this length (e.g. BC-FIPS exposes
       // a fixed 64-byte output and outputBytes > 64): fall through to bundled.
     }
+    // Reaching this path means either no JCE provider exposes SHAKE256, or the discovered
+    // provider failed the KAT self-test, or it could not satisfy the requested output length.
+    // The bundled FIPS 202 implementation is functionally correct but is NOT a FIPS-approved
+    // module. Operators running under a FIPS-approved JCE can detect this state by calling
+    // SHAKE256.providerName(): a null return means this fallback is in use.
     return bundledShake256(input, outputBytes);
   }
 
@@ -197,6 +202,28 @@ public final class SHAKE256 {
       probed = true;
       return candidate;
     }
+  }
+
+  /**
+   * Returns the JCA provider name SHAKE256 will use, or {@code null} if the
+   * bundled FIPS 202 implementation is in effect. Useful for FIPS
+   * observability: callers running under a FIPS-approved JCE can confirm
+   * that the provider's SHAKE256 service was discovered and passed the
+   * internal KAT self-test (returns the provider name) versus silently
+   * falling back to the bundled implementation (returns {@code null},
+   * which is NOT a FIPS-approved code path).
+   *
+   * <p>This call triggers the one-time probe on first invocation (the same
+   * probe used by {@link #digest(byte[], int)}), so subsequent calls and
+   * subsequent {@code digest(...)} invocations observe a stable result for
+   * the lifetime of the VM.
+   *
+   * @return the resolved JCA provider name, or {@code null} if the bundled
+   *         implementation is in use
+   */
+  public static String providerName() {
+    Provider p = resolveProvider();
+    return p == null ? null : p.getName();
   }
 
   /**

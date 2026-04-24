@@ -40,7 +40,7 @@ import java.util.Objects;
  * {@code forAsymmetric}) is rejected with {@link IllegalArgumentException} so a
  * misplaced key cannot be silently coerced into the wrong algorithm family.
  *
- * <p>{@link #anyOf(Verifier...)} composes multiple verifiers; the first delegate
+ * <p>{@link #firstMatching(Verifier...)} composes multiple verifiers; the first delegate
  * whose {@link Verifier#canVerify(Algorithm)} returns true handles the verify
  * call, and any exception it throws propagates immediately (fail-fast — no
  * fall-through to subsequent verifiers).</p>
@@ -66,7 +66,7 @@ public final class Verifiers {
    */
   public static Verifier forHMAC(Algorithm algorithm, byte[] secret) {
     requireHMAC(algorithm);
-    return HMACVerifier.newVerifier(secret);
+    return HMACVerifier.newVerifier(algorithm, secret);
   }
 
   /**
@@ -79,7 +79,7 @@ public final class Verifiers {
    */
   public static Verifier forHMAC(Algorithm algorithm, String secret) {
     requireHMAC(algorithm);
-    return HMACVerifier.newVerifier(secret);
+    return HMACVerifier.newVerifier(algorithm, secret);
   }
 
   // ---------------------------------------------------------------------
@@ -97,8 +97,8 @@ public final class Verifiers {
   public static Verifier forAsymmetric(Algorithm algorithm, String pemPublicKey) {
     Objects.requireNonNull(algorithm, "algorithm");
     return switch (algorithm.name()) {
-      case "RS256", "RS384", "RS512" -> RSAVerifier.newVerifier(pemPublicKey);
-      case "PS256", "PS384", "PS512" -> RSAPSSVerifier.newVerifier(pemPublicKey);
+      case "RS256", "RS384", "RS512" -> RSAVerifier.newVerifier(algorithm, pemPublicKey);
+      case "PS256", "PS384", "PS512" -> RSAPSSVerifier.newVerifier(algorithm, pemPublicKey);
       case "ES256", "ES256K", "ES384", "ES512" -> ECVerifier.newVerifier(pemPublicKey);
       case "Ed25519", "Ed448" -> EdDSAVerifier.newVerifier(pemPublicKey);
       default -> throw new IllegalArgumentException(
@@ -117,8 +117,8 @@ public final class Verifiers {
   public static Verifier forAsymmetric(Algorithm algorithm, PublicKey publicKey) {
     Objects.requireNonNull(algorithm, "algorithm");
     return switch (algorithm.name()) {
-      case "RS256", "RS384", "RS512" -> RSAVerifier.newVerifier(publicKey);
-      case "PS256", "PS384", "PS512" -> RSAPSSVerifier.newVerifier(publicKey);
+      case "RS256", "RS384", "RS512" -> RSAVerifier.newVerifier(algorithm, publicKey);
+      case "PS256", "PS384", "PS512" -> RSAPSSVerifier.newVerifier(algorithm, publicKey);
       case "ES256", "ES256K", "ES384", "ES512" -> ECVerifier.newVerifier(publicKey);
       case "Ed25519", "Ed448" -> EdDSAVerifier.newVerifier(publicKey);
       default -> throw new IllegalArgumentException(
@@ -127,15 +127,16 @@ public final class Verifiers {
   }
 
   // ---------------------------------------------------------------------
-  // anyOf -- composite verifier
+  // firstMatching -- composite verifier
   // ---------------------------------------------------------------------
 
   /**
    * Compose multiple verifiers into a single fail-fast composite. The composite's
    * {@link Verifier#canVerify(Algorithm)} returns {@code true} if any delegate
    * accepts the algorithm. The composite's {@link Verifier#verify(Algorithm, byte[], byte[])}
-   * invokes the FIRST matching delegate; any exception that delegate throws
-   * propagates immediately.
+   * invokes the FIRST matching delegate (in declaration order) and propagates any
+   * exception that delegate throws immediately. The name reflects the dispatch
+   * semantics: it is not a "try-each-until-one-succeeds" verifier.
    *
    * <p>If no delegate matches, {@link Verifier#verify(Algorithm, byte[], byte[])}
    * throws {@link MissingVerifierException}.</p>
@@ -145,10 +146,10 @@ public final class Verifiers {
    * @throws NullPointerException if {@code verifiers} or any element is null
    * @throws IllegalArgumentException if {@code verifiers} is empty
    */
-  public static Verifier anyOf(Verifier... verifiers) {
+  public static Verifier firstMatching(Verifier... verifiers) {
     Objects.requireNonNull(verifiers, "verifiers");
     if (verifiers.length == 0) {
-      throw new IllegalArgumentException("anyOf requires at least one Verifier");
+      throw new IllegalArgumentException("firstMatching requires at least one Verifier");
     }
     Verifier[] copy = verifiers.clone();
     for (int i = 0; i < copy.length; i++) {
@@ -175,7 +176,7 @@ public final class Verifiers {
           }
         }
         throw new MissingVerifierException(
-            "No Verifier in anyOf composite accepts algorithm [" + algorithm.name() + "]");
+            "No Verifier in firstMatching composite accepts algorithm [" + algorithm.name() + "]");
       }
     };
   }

@@ -140,7 +140,7 @@ public class RFC7515VectorsTest extends BaseJWTTest {
   @Test
   public void rfc7515_appendixA1_hs256_verifies() {
     // Use case: RFC 7515 Appendix A.1 -- HS256 published vector verifies.
-    Verifier v = HMACVerifier.newVerifier(HS256_KEY);
+    Verifier v = HMACVerifier.newVerifier(Algorithm.HS256, HS256_KEY);
     JWT jwt = vectorClockDecoder().decode(HS256_JWS, VerifierResolver.of(v));
     assertNotNull(jwt);
     assertEquals(jwt.issuer(), "joe");
@@ -152,7 +152,7 @@ public class RFC7515VectorsTest extends BaseJWTTest {
   public void rfc7515_appendixA2_rs256_verifies() {
     // Use case: RFC 7515 Appendix A.2 -- RS256 published vector verifies with the
     // published RSA public key.
-    Verifier v = RSAVerifier.newVerifier(rsaPublic(RS256_N, RS256_E));
+    Verifier v = RSAVerifier.newVerifier(Algorithm.RS256, rsaPublic(RS256_N, RS256_E));
     JWT jwt = vectorClockDecoder().decode(RS256_JWS, VerifierResolver.of(v));
     assertNotNull(jwt);
     assertEquals(jwt.issuer(), "joe");

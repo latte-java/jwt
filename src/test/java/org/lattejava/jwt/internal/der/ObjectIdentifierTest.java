@@ -14,11 +14,11 @@
  * language governing permissions and limitations under the License.
  */
 
-package org.lattejava.jwt.der;
+package org.lattejava.jwt.internal.der;
 
 import org.lattejava.jwt.BaseJWTTest;
-import org.lattejava.jwt.der.DerDecodingException;
-import org.lattejava.jwt.der.ObjectIdentifier;
+import org.lattejava.jwt.internal.der.DerDecodingException;
+import org.lattejava.jwt.internal.der.ObjectIdentifier;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 

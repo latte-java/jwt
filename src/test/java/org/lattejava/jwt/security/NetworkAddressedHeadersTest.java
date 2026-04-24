@@ -23,6 +23,7 @@
 
 package org.lattejava.jwt.security;
 
+import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.BaseJWTTest;
 import org.lattejava.jwt.Header;
 import org.lattejava.jwt.JWT;
@@ -117,7 +118,7 @@ public class NetworkAddressedHeadersTest extends BaseJWTTest {
         HMACSigner.newSHA256Signer(SECRET),
         b -> b.parameter("jku", jkuUrl));
 
-    Verifier hmac = HMACVerifier.newVerifier(SECRET);
+    Verifier hmac = HMACVerifier.newVerifier(Algorithm.HS256, SECRET);
     JWT decoded = new JWTDecoder().decode(token, VerifierResolver.of(hmac));
     assertNotNull(decoded);
     assertEquals(connectionCount.get(), 0,
@@ -135,7 +136,7 @@ public class NetworkAddressedHeadersTest extends BaseJWTTest {
         HMACSigner.newSHA256Signer(SECRET),
         b -> b.parameter("x5u", x5uUrl));
 
-    Verifier hmac = HMACVerifier.newVerifier(SECRET);
+    Verifier hmac = HMACVerifier.newVerifier(Algorithm.HS256, SECRET);
     JWT decoded = new JWTDecoder().decode(token, VerifierResolver.of(hmac));
     assertNotNull(decoded);
     assertEquals(connectionCount.get(), 0,
@@ -156,7 +157,7 @@ public class NetworkAddressedHeadersTest extends BaseJWTTest {
         HMACSigner.newSHA256Signer(SECRET),
         b -> b.parameter("jwk", jwk));
 
-    Verifier hmac = HMACVerifier.newVerifier(SECRET);
+    Verifier hmac = HMACVerifier.newVerifier(Algorithm.HS256, SECRET);
     JWT decoded = new JWTDecoder().decode(token, VerifierResolver.of(hmac));
     assertNotNull(decoded);
     Header header = decoded.header();
@@ -193,7 +194,7 @@ public class NetworkAddressedHeadersTest extends BaseJWTTest {
       }
       // For the test we ignore the inline content and use the known shared
       // secret; the point is that the resolver is the explicit bridge.
-      return HMACVerifier.newVerifier(SECRET);
+      return HMACVerifier.newVerifier(Algorithm.HS256, SECRET);
     });
     JWT decoded = new JWTDecoder().decode(token, resolver);
     assertNotNull(decoded);

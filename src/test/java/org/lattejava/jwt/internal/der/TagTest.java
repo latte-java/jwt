@@ -14,10 +14,10 @@
  * language governing permissions and limitations under the License.
  */
 
-package org.lattejava.jwt.der;
+package org.lattejava.jwt.internal.der;
 
-import org.lattejava.jwt.der.Tag;
-import org.lattejava.jwt.der.TagClass;
+import org.lattejava.jwt.internal.der.Tag;
+import org.lattejava.jwt.internal.der.TagClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;

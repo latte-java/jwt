@@ -14,25 +14,24 @@
  * language governing permissions and limitations under the License.
  */
 
-package org.lattejava.jwt.der;
+package org.lattejava.jwt.internal.der;
 
 import java.io.IOException;
 
 /**
  * @author Daniel DeGroff
  */
-public class DerEncodingException extends IOException {
+public class DerDecodingException extends IOException {
   @SuppressWarnings("unused")
-  public DerEncodingException(String message, Throwable cause) {
+  public DerDecodingException(String message, Throwable cause) {
     super(message, cause);
   }
 
-  public DerEncodingException(Throwable cause) {
-    super(cause);
+  public DerDecodingException(String message) {
+    super(message);
   }
 
-  @SuppressWarnings("unused")
-  public DerEncodingException(String message) {
-    super(message);
+  public DerDecodingException(Throwable cause) {
+    super(cause);
   }
 }

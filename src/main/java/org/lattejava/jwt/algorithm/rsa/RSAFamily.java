@@ -25,7 +25,9 @@ package org.lattejava.jwt.algorithm.rsa;
 
 import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.InvalidKeyLengthException;
+import org.lattejava.jwt.InvalidKeyTypeException;
 
+import java.math.BigInteger;
 import java.security.spec.MGF1ParameterSpec;
 import java.security.spec.PSSParameterSpec;
 
@@ -77,6 +79,24 @@ final class RSAFamily {
     if (bitLength < 2047) {
       throw new InvalidKeyLengthException("Key length [" + bitLength
           + "] bits is less than required 2048 bits");
+    }
+  }
+
+  /**
+   * RFC 8017 §3: the RSA public exponent {@code e} must satisfy
+   * {@code 2 < e < n} and, per PKCS#1 practice, be odd. Tiny exponents
+   * (0, 1, 2) and even exponents are cryptographically broken and are
+   * rejected at construction time.
+   */
+  static void assertAcceptablePublicExponent(BigInteger e) {
+    if (e == null) {
+      throw new InvalidKeyTypeException("RSA public exponent is null");
+    }
+    if (e.compareTo(BigInteger.valueOf(3)) < 0) {
+      throw new InvalidKeyTypeException("RSA public exponent [" + e + "] is less than the minimum acceptable value [3]");
+    }
+    if (!e.testBit(0)) {
+      throw new InvalidKeyTypeException("RSA public exponent [" + e + "] is even; must be odd per PKCS#1");
     }
   }
 }

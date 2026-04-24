@@ -19,9 +19,9 @@ package org.lattejava.jwt.jwks;
 import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.JWTUtils;
 import org.lattejava.jwt.KeyType;
-import org.lattejava.jwt.der.DerDecodingException;
-import org.lattejava.jwt.der.DerInputStream;
-import org.lattejava.jwt.der.ObjectIdentifier;
+import org.lattejava.jwt.internal.der.DerDecodingException;
+import org.lattejava.jwt.internal.der.DerInputStream;
+import org.lattejava.jwt.internal.der.ObjectIdentifier;
 import org.lattejava.jwt.internal.KeyUtils;
 import org.lattejava.jwt.pem.PEM;
 
@@ -126,7 +126,7 @@ class JSONWebKeyConverter {
       try {
         byte[] publicKeyBytes = KeyUtils.deriveEdDSAPublicKeyFromPrivate(privateKeyBytes, crv);
         b.x(Base64.getUrlEncoder().withoutPadding().encodeToString(publicKeyBytes));
-      } catch (Exception e) {
+      } catch (java.security.NoSuchAlgorithmException | java.security.InvalidAlgorithmParameterException e) {
         throw new JSONWebKeyException("Failed to derive EdDSA public key for curve [" + crv + "]", e);
       }
     }
@@ -137,7 +137,7 @@ class JSONWebKeyConverter {
   private String getCurveOID(Key key) {
     try {
       return KeyUtils.getCurveName(key);
-    } catch (Exception e) {
+    } catch (IOException e) {
       throw new JSONWebKeyException("Failed to read OID from the public key", e);
     }
   }

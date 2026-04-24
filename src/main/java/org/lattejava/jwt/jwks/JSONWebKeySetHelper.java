@@ -41,18 +41,62 @@ import java.util.function.Consumer;
  *   <li>No URL scheme restriction.</li>
  * </ul>
  *
+ * <p>JSON parse hardening (mirrors {@link org.lattejava.jwt.JWTDecoder} defaults):</p>
+ * <ul>
+ *   <li>{@code maxNestingDepth} -- 16 by default; bounds JSON object/array
+ *       nesting depth to defend against stack-blowup parses.</li>
+ *   <li>{@code maxNumberLength} -- 1000 digits by default; bounds the digit
+ *       run of a single JSON number so {@code BigInteger}/{@code BigDecimal}
+ *       construction cannot be coerced into pathological cost.</li>
+ *   <li>{@code maxObjectMembers} -- 1000 by default; bounds the number of
+ *       members in any single JSON object.</li>
+ *   <li>{@code maxArrayElements} -- 10000 by default; bounds the number of
+ *       elements in any single JSON array (e.g. {@code keys}).</li>
+ *   <li>{@code allowDuplicateJSONKeys} -- {@code false} by default; duplicate
+ *       member names raise {@link org.lattejava.jwt.JSONProcessingException}
+ *       at parse time, so a malicious JWKS cannot smuggle a second
+ *       {@code keys}/{@code kid} past the parser.</li>
+ * </ul>
+ *
  * @author Daniel DeGroff
  */
 public class JSONWebKeySetHelper extends AbstractHttpHelper {
+  /** Default JSON parse limits mirror {@link org.lattejava.jwt.JWTDecoder}. */
+  public static final int DEFAULT_MAX_NESTING_DEPTH = 16;
+
+  public static final int DEFAULT_MAX_NUMBER_LENGTH = 1000;
+
+  public static final int DEFAULT_MAX_OBJECT_MEMBERS = LatteJSONProcessor.DEFAULT_MAX_OBJECT_MEMBERS;
+
+  public static final int DEFAULT_MAX_ARRAY_ELEMENTS = LatteJSONProcessor.DEFAULT_MAX_ARRAY_ELEMENTS;
+
+  public static final boolean DEFAULT_ALLOW_DUPLICATE_JSON_KEYS = false;
+
   private static volatile int maxResponseSize = DEFAULT_MAX_RESPONSE_BYTES;
 
   private static volatile int maxRedirects = DEFAULT_MAX_REDIRECTS;
 
+  private static volatile int maxNestingDepth = DEFAULT_MAX_NESTING_DEPTH;
+
+  private static volatile int maxNumberLength = DEFAULT_MAX_NUMBER_LENGTH;
+
+  private static volatile int maxObjectMembers = DEFAULT_MAX_OBJECT_MEMBERS;
+
+  private static volatile int maxArrayElements = DEFAULT_MAX_ARRAY_ELEMENTS;
+
+  private static volatile boolean allowDuplicateJSONKeys = DEFAULT_ALLOW_DUPLICATE_JSON_KEYS;
+
   /**
    * Set the maximum response size in bytes that will be read from an HTTP
-   * endpoint. A value of {@code -1} disables the cap. Default: 1 MiB.
+   * endpoint. Must be strictly positive; the response cap cannot be
+   * disabled. Default: 1 MiB.
+   *
+   * @throws IllegalArgumentException if {@code maxBytes &lt;= 0}
    */
   public static void setMaxResponseSize(int maxBytes) {
+    if (maxBytes <= 0) {
+      throw new IllegalArgumentException("maxResponseSize must be > 0; the response cap cannot be disabled");
+    }
     JSONWebKeySetHelper.maxResponseSize = maxBytes;
   }
 
@@ -62,6 +106,70 @@ public class JSONWebKeySetHelper extends AbstractHttpHelper {
    */
   public static void setMaxRedirects(int max) {
     JSONWebKeySetHelper.maxRedirects = max;
+  }
+
+  /**
+   * Set the maximum JSON object/array nesting depth accepted by the
+   * built-in JSON parser when reading JWKS / OIDC discovery responses.
+   * Must be strictly positive. Default: 16.
+   *
+   * @throws IllegalArgumentException if {@code maxDepth &lt;= 0}
+   */
+  public static void setMaxNestingDepth(int maxDepth) {
+    if (maxDepth <= 0) {
+      throw new IllegalArgumentException("maxNestingDepth must be > 0 but found [" + maxDepth + "]");
+    }
+    JSONWebKeySetHelper.maxNestingDepth = maxDepth;
+  }
+
+  /**
+   * Set the maximum digit-run length of a single JSON number accepted by
+   * the built-in JSON parser. Must be strictly positive. Default: 1000.
+   *
+   * @throws IllegalArgumentException if {@code maxLength &lt;= 0}
+   */
+  public static void setMaxNumberLength(int maxLength) {
+    if (maxLength <= 0) {
+      throw new IllegalArgumentException("maxNumberLength must be > 0 but found [" + maxLength + "]");
+    }
+    JSONWebKeySetHelper.maxNumberLength = maxLength;
+  }
+
+  /**
+   * Set the maximum number of members accepted in any single JSON object by
+   * the built-in JSON parser when reading JWKS / OIDC discovery responses.
+   * Must be strictly positive. Default: {@value #DEFAULT_MAX_OBJECT_MEMBERS}.
+   *
+   * @throws IllegalArgumentException if {@code maxMembers &lt;= 0}
+   */
+  public static void setMaxObjectMembers(int maxMembers) {
+    if (maxMembers <= 0) {
+      throw new IllegalArgumentException("maxObjectMembers must be > 0 but found [" + maxMembers + "]");
+    }
+    JSONWebKeySetHelper.maxObjectMembers = maxMembers;
+  }
+
+  /**
+   * Set the maximum number of elements accepted in any single JSON array by
+   * the built-in JSON parser when reading JWKS / OIDC discovery responses.
+   * Must be strictly positive. Default: {@value #DEFAULT_MAX_ARRAY_ELEMENTS}.
+   *
+   * @throws IllegalArgumentException if {@code maxElements &lt;= 0}
+   */
+  public static void setMaxArrayElements(int maxElements) {
+    if (maxElements <= 0) {
+      throw new IllegalArgumentException("maxArrayElements must be > 0 but found [" + maxElements + "]");
+    }
+    JSONWebKeySetHelper.maxArrayElements = maxElements;
+  }
+
+  /**
+   * Permit (or forbid) duplicate JSON object member names in JWKS / OIDC
+   * discovery responses. Default: {@code false} (duplicates raise
+   * {@link org.lattejava.jwt.JSONProcessingException} at parse time).
+   */
+  public static void setAllowDuplicateJSONKeys(boolean allow) {
+    JSONWebKeySetHelper.allowDuplicateJSONKeys = allow;
   }
 
   /**
@@ -177,7 +285,8 @@ public class JSONWebKeySetHelper extends AbstractHttpHelper {
    * JSON object.
    */
   public static Map<String, Object> parseJSON(InputStream is) {
-    JSONProcessor processor = new LatteJSONProcessor();
+    JSONProcessor processor = new LatteJSONProcessor(maxNestingDepth, maxNumberLength,
+        maxObjectMembers, maxArrayElements, allowDuplicateJSONKeys);
     try {
       ByteArrayOutputStream out = new ByteArrayOutputStream();
       byte[] buffer = new byte[8192];

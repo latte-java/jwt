@@ -21,7 +21,7 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.lattejava.jwt.der;
+package org.lattejava.jwt.internal.der;
 
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;

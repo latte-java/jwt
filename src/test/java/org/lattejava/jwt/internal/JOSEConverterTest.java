@@ -183,6 +183,63 @@ public class JOSEConverterTest {
   }
 
   @Test
+  public void derToJose_nonCanonicalLongFormSequenceLength_throws() {
+    // Use case: DER malleability -- SEQUENCE length 6 encoded with the long
+    // form byte (0x30 0x81 0x06 ...) when short form (0x30 0x06 ...) is
+    // canonical. The parser rejects non-canonical long-form.
+    byte[] der = new byte[]{0x30, (byte) 0x81, 0x06, 0x02, 0x01, 0x01, 0x02, 0x01, 0x02};
+    try {
+      JOSEConverter.derToJose(der, 32);
+      fail("Expected IllegalStateException for non-canonical long-form SEQUENCE length");
+    } catch (IllegalStateException expected) {
+      assertTrue(expected.getMessage().contains("non-canonical") || expected.getMessage().contains("SEQUENCE length"));
+    }
+  }
+
+  @Test
+  public void derToJose_negativeInteger_throws() {
+    // Use case: DER malleability -- INTEGER r with high bit set and no 0x00
+    // pad (content byte 0x80 interpreted in two's complement is negative).
+    // ECDSA r and s are unsigned by definition; the parser rejects.
+    byte[] der = new byte[]{0x30, 0x06, 0x02, 0x01, (byte) 0x80, 0x02, 0x01, 0x01};
+    try {
+      JOSEConverter.derToJose(der, 32);
+      fail("Expected IllegalStateException for negative INTEGER");
+    } catch (IllegalStateException expected) {
+      assertTrue(expected.getMessage().contains("negative"));
+    }
+  }
+
+  @Test
+  public void derToJose_redundantLeadingZero_throws() {
+    // Use case: DER malleability -- INTEGER r encoded as 0x00 0x01 (two
+    // bytes) instead of the canonical 0x01 (one byte). The leading 0x00 is
+    // only legal when the next byte has its high bit set; here it does not,
+    // so the encoding is non-minimal and rejected.
+    byte[] der = new byte[]{0x30, 0x07, 0x02, 0x02, 0x00, 0x01, 0x02, 0x01, 0x01};
+    try {
+      JOSEConverter.derToJose(der, 32);
+      fail("Expected IllegalStateException for non-minimal INTEGER encoding");
+    } catch (IllegalStateException expected) {
+      assertTrue(expected.getMessage().contains("non-minimal"));
+    }
+  }
+
+  @Test
+  public void derToJose_trailingBytesAfterSignature_throws() {
+    // Use case: DER malleability -- SEQUENCE body ends before the declared
+    // length, with extra bytes tacked on. Parser computes seqLen vs buffer
+    // length and rejects.
+    byte[] der = new byte[]{0x30, 0x06, 0x02, 0x01, 0x01, 0x02, 0x01, 0x02, 0x00};
+    try {
+      JOSEConverter.derToJose(der, 32);
+      fail("Expected IllegalStateException for trailing bytes");
+    } catch (IllegalStateException expected) {
+      assertTrue(expected.getMessage().contains("SEQUENCE length"));
+    }
+  }
+
+  @Test
   public void derToJose_integerExceedsCurveLength_throws() {
     // r is 33 bytes (0x00 pad + 32 bytes with high bit set) -> content after
     // leading-zero strip is 32 bytes = OK. Build an r of actual 33 unsigned

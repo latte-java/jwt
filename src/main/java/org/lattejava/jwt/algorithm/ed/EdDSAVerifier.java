@@ -88,7 +88,7 @@ public class EdDSAVerifier implements Verifier {
 
   @Override
   public boolean canVerify(Algorithm algorithm) {
-    return this.algorithm == algorithm;
+    return algorithm != null && this.algorithm.name().equals(algorithm.name());
   }
 
   @Override
@@ -101,12 +101,15 @@ public class EdDSAVerifier implements Verifier {
     try {
       expectedLength = EdDSAFamily.signatureLength(algorithm);
     } catch (IllegalArgumentException e) {
-      throw new InvalidJWTSignatureException(e);
+      // Reaching this branch means canVerify(algorithm) admitted an EdDSA algorithm that
+      // EdDSAFamily doesn't know about — an internal precondition violation, not a signature failure.
+      throw new IllegalStateException("EdDSAVerifier reached with unsupported algorithm ["
+          + algorithm.name() + "]; canVerify should have rejected this earlier", e);
     }
     if (signature.length != expectedLength) {
       throw new InvalidJWTSignatureException();
     }
-    if (this.algorithm != algorithm) {
+    if (!this.algorithm.name().equals(algorithm.name())) {
       throw new InvalidJWTSignatureException();
     }
 
@@ -119,7 +122,9 @@ public class EdDSAVerifier implements Verifier {
           throw new InvalidJWTSignatureException();
         }
       } catch (SignatureException e) {
-        throw new InvalidJWTSignatureException(e);
+        // JCA signals malformed/truncated signature bytes via SignatureException. The cause
+        // is intentionally dropped: the bare exception type is the signal.
+        throw new InvalidJWTSignatureException();
       }
     } catch (InvalidKeyException | NoSuchAlgorithmException | SignatureException e) {
       throw new JWTVerifierException("An unexpected exception occurred when attempting to verify the JWT", e);

@@ -23,7 +23,9 @@
 
 package org.lattejava.jwt.security;
 
+import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.BaseJWTTest;
+import org.lattejava.jwt.InvalidJWTException;
 import org.lattejava.jwt.InvalidJWTSignatureException;
 import org.lattejava.jwt.JWT;
 import org.lattejava.jwt.JWTDecoder;
@@ -87,7 +89,7 @@ public class AlgorithmConfusionTest extends BaseJWTTest {
     String signature = b64("anything");
     String token = header + "." + payload + "." + signature;
 
-    Verifier hmac = HMACVerifier.newVerifier(HMAC_SECRET_32);
+    Verifier hmac = HMACVerifier.newVerifier(Algorithm.HS256, HMAC_SECRET_32);
     expectException(MissingVerifierException.class, () ->
         new JWTDecoder().decode(token, VerifierResolver.of(hmac)));
   }
@@ -105,25 +107,25 @@ public class AlgorithmConfusionTest extends BaseJWTTest {
     // Forge an HMAC-signed token using the RSA public key bytes as the "shared secret".
     String forged = new JWTEncoder().encode(jwt, HMACSigner.newSHA512Signer(rsaPub), b -> b.kid("abc"));
 
-    Verifier rsaVerifier = RSAVerifier.newVerifier(rsaPub);
+    Verifier rsaVerifier = RSAVerifier.newVerifier(Algorithm.RS256, rsaPub);
     expectException(MissingVerifierException.class, () ->
         new JWTDecoder().decode(forged, VerifierResolver.of(rsaVerifier)));
   }
 
   @Test
-  public void hmacForgery_anyOf_failsFastOnHmacVerifier() throws Exception {
+  public void hmacForgery_firstMatching_failsFastOnHmacVerifier() throws Exception {
     // Use case: Algorithm confusion -- forged HMAC token passed to
-    // Verifiers.anyOf(rsaVerifier, hmacVerifier). The HMAC verifier is selected
+    // Verifiers.firstMatching(rsaVerifier, hmacVerifier). The HMAC verifier is selected
     // via canVerify, signature verification fails, InvalidJWTSignatureException
     // propagates immediately (fail-fast, no fall-through).
     JWT jwt = JWT.builder().subject("123456789").build();
     String rsaPub = new String(Files.readAllBytes(Paths.get("src/test/resources/rsa_public_key_2048.pem")));
     String forged = new JWTEncoder().encode(jwt, HMACSigner.newSHA512Signer(rsaPub));
 
-    Verifier rsaVerifier = RSAVerifier.newVerifier(rsaPub);
-    Verifier hmacVerifier = HMACVerifier.newVerifier(HMAC_SECRET_64);
+    Verifier rsaVerifier = RSAVerifier.newVerifier(Algorithm.RS256, rsaPub);
+    Verifier hmacVerifier = HMACVerifier.newVerifier(Algorithm.HS512, HMAC_SECRET_64);
 
-    Verifier composite = Verifiers.anyOf(rsaVerifier, hmacVerifier);
+    Verifier composite = Verifiers.firstMatching(rsaVerifier, hmacVerifier);
     expectException(InvalidJWTSignatureException.class, () ->
         new JWTDecoder().decode(forged, VerifierResolver.of(composite)));
   }
@@ -139,7 +141,7 @@ public class AlgorithmConfusionTest extends BaseJWTTest {
     String forged = new JWTEncoder().encode(jwt, HMACSigner.newSHA512Signer(rsaPub), b -> b.kid("hmac"));
 
     Map<String, Verifier> verifiers = new HashMap<>();
-    verifiers.put("hmac", HMACVerifier.newVerifier(HMAC_SECRET_64));
+    verifiers.put("hmac", HMACVerifier.newVerifier(Algorithm.HS512, HMAC_SECRET_64));
 
     expectException(InvalidJWTSignatureException.class, () ->
         new JWTDecoder().decode(forged, VerifierResolver.byKid(verifiers)));
@@ -156,7 +158,7 @@ public class AlgorithmConfusionTest extends BaseJWTTest {
     JWT jwt = JWT.builder().subject("123").build();
     String encoded = new JWTEncoder().encode(jwt, ECSigner.newSHA256Signer(readFile("ec_private_key_p_256.pem")));
 
-    Verifier rsaVerifier = RSAVerifier.newVerifier(
+    Verifier rsaVerifier = RSAVerifier.newVerifier(Algorithm.RS256,
         new String(Files.readAllBytes(Paths.get("src/test/resources/rsa_public_key_2048.pem"))));
     expectException(MissingVerifierException.class, () ->
         new JWTDecoder().decode(encoded, VerifierResolver.of(rsaVerifier)));
@@ -172,5 +174,77 @@ public class AlgorithmConfusionTest extends BaseJWTTest {
     Verifier ecVerifier = ECVerifier.newVerifier(readFile("ec_public_key_p_256.pem"));
     expectException(MissingVerifierException.class, () ->
         new JWTDecoder().decode(encoded, VerifierResolver.of(ecVerifier)));
+  }
+
+  // ---------------------------------------------------------------------
+  // Algorithm-name tampering (header [alg] value mutated from the standard)
+  // ---------------------------------------------------------------------
+
+  @DataProvider(name = "tamperedAlgNames")
+  public Object[][] tamperedAlgNames() {
+    // Each variant mutates the JWA name so the decoder must NOT resolve it
+    // to the HS256 constant (exact string match per RFC 7515 §4.1.1).
+    return new Object[][] {
+        {""},                 // empty string
+        {" HS256"},           // leading whitespace
+        {"HS256 "},           // trailing whitespace
+        {"HS257"},            // typo - not a real JWA name
+        {"hs256"},            // wrong case (JWA names are case-sensitive)
+        {"HS256\u200B"},      // trailing zero-width space
+    };
+  }
+
+  @Test(dataProvider = "tamperedAlgNames")
+  public void tamperedAlgName_rejected(String alg) {
+    // Use case: Header [alg] name is mutated from the exact JWA string
+    // "HS256"; the decoder must treat the tampered value as a non-standard
+    // algorithm that no verifier can handle, producing
+    // MissingVerifierException rather than silently accepting an HS256
+    // verifier for a mismatched header.
+    String header = b64("{\"alg\":\"" + alg + "\",\"typ\":\"JWT\"}");
+    String payload = b64("{\"sub\":\"abc\"}");
+    String signature = b64("anything");
+    String token = header + "." + payload + "." + signature;
+
+    Verifier hmac = HMACVerifier.newVerifier(Algorithm.HS256, HMAC_SECRET_32);
+    expectException(MissingVerifierException.class, () ->
+        new JWTDecoder().decode(token, VerifierResolver.of(hmac)));
+  }
+
+  @Test
+  public void missingAlgHeader_rejected() {
+    // Use case: Header with no [alg] member is rejected at parse time -- the
+    // decoder never reaches verifier selection for an unsigned header.
+    String header = b64("{\"typ\":\"JWT\"}");
+    String payload = b64("{\"sub\":\"abc\"}");
+    String signature = b64("anything");
+    String token = header + "." + payload + "." + signature;
+
+    Verifier hmac = HMACVerifier.newVerifier(Algorithm.HS256, HMAC_SECRET_32);
+    expectException(InvalidJWTException.class, () ->
+        new JWTDecoder().decode(token, VerifierResolver.of(hmac)));
+  }
+
+  @Test
+  public void headerAlgMismatch_hs512HeaderOverHs256Signature_rejected() {
+    // Use case: Header claims [alg=HS512] but the signature bytes were
+    // produced by HS256. The HS512 verifier runs HS512-MAC over the signing
+    // input and compares against the attacker-supplied signature -- the
+    // comparison must fail with InvalidJWTSignatureException, never succeed
+    // by accidentally accepting the shorter HS256 MAC.
+    JWT jwt = JWT.builder().subject("123").build();
+    // Sign with HS256 -> 32-byte MAC.
+    String hs256Encoded = new JWTEncoder().encode(jwt, HMACSigner.newSHA256Signer(HMAC_SECRET_64));
+    // Strip the HS256 header and prepend a fake HS512 header over the same
+    // payload+signature. The HS256 signature bytes are now presented under
+    // alg=HS512.
+    String payload = hs256Encoded.split("\\.")[1];
+    String sig256 = hs256Encoded.split("\\.")[2];
+    String fakeHeader = b64("{\"alg\":\"HS512\",\"typ\":\"JWT\"}");
+    String forged = fakeHeader + "." + payload + "." + sig256;
+
+    Verifier hs512 = HMACVerifier.newVerifier(Algorithm.HS512, HMAC_SECRET_64);
+    expectException(InvalidJWTSignatureException.class, () ->
+        new JWTDecoder().decode(forged, VerifierResolver.of(hs512)));
   }
 }

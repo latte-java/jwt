@@ -37,7 +37,8 @@ import java.util.function.Consumer;
  *
  * <p>Defaults: {@code clockSkew=Duration.ZERO},
  * {@code maxInputBytes=262144}, {@code maxNestingDepth=16},
- * {@code maxNumberLength=1000}, {@code allowDuplicateJSONKeys=false}.</p>
+ * {@code maxNumberLength=1000}, {@code maxObjectMembers=1000},
+ * {@code maxArrayElements=10000}, {@code allowDuplicateJSONKeys=false}.</p>
  *
  * <p>All fields are final; instances are immutable and safe to share. Use
  * {@link Builder} for advanced configuration (custom {@link Clock},
@@ -68,7 +69,7 @@ public class JWTDecoder {
 
   /** Constructs a decoder with all defaults. */
   public JWTDecoder() {
-    this(builderDefaults().materialize());
+    this(builderDefaults());
   }
 
   /**
@@ -78,7 +79,7 @@ public class JWTDecoder {
    * @param jsonProcessor the JSON processor; must be non-null
    */
   public JWTDecoder(JSONProcessor jsonProcessor) {
-    this(builderDefaults().jsonProcessor(jsonProcessor).materialize());
+    this(builderDefaults().jsonProcessor(jsonProcessor));
   }
 
   /**
@@ -89,7 +90,7 @@ public class JWTDecoder {
    *                  must be non-null and non-negative
    */
   public JWTDecoder(Duration clockSkew) {
-    this(builderDefaults().clockSkew(clockSkew).materialize());
+    this(builderDefaults().clockSkew(clockSkew));
   }
 
   /**
@@ -101,10 +102,18 @@ public class JWTDecoder {
    *                      must be non-null and non-negative
    */
   public JWTDecoder(JSONProcessor jsonProcessor, Duration clockSkew) {
-    this(builderDefaults().jsonProcessor(jsonProcessor).clockSkew(clockSkew).materialize());
+    this(builderDefaults().jsonProcessor(jsonProcessor).clockSkew(clockSkew));
   }
 
   private JWTDecoder(Builder b) {
+    // Resolve the default JSON processor lazily (so the parse-DoS limits captured
+    // on the builder flow into the LatteJSONProcessor when no caller-supplied
+    // processor was provided).
+    if (!b.jsonProcessorExplicit) {
+      b.jsonProcessor = new LatteJSONProcessor(
+          b.maxNestingDepth, b.maxNumberLength, b.maxObjectMembers, b.maxArrayElements,
+          b.allowDuplicateJSONKeys);
+    }
     this.jsonProcessor = b.jsonProcessor;
     this.clock = b.clock;
     this.clockSkew = b.clockSkew;
@@ -162,20 +171,16 @@ public class JWTDecoder {
     Segments segments = parseSegments(encodedJWT, /* requireSignature */ true);
     Header header = parseHeader(segments.headerB64);
 
-    // Step 5: algorithm whitelist
+    // Algorithm whitelist.
     if (expectedAlgorithmNames != null
         && !expectedAlgorithmNames.contains(header.alg().name())) {
       throw new InvalidJWTException(
           "Header [alg] [" + header.alg().name() + "] is not in the expectedAlgorithms whitelist");
     }
 
-    // Step 6: type check
     enforceExpectedType(header);
-
-    // Step 7: crit understood-parameters check
     enforceCrit(header);
 
-    // Step 8: resolve verifier
     Verifier verifier = resolver.resolve(header);
     if (verifier == null || !verifier.canVerify(header.alg())) {
       throw new MissingVerifierException(
@@ -183,19 +188,16 @@ public class JWTDecoder {
               + header.alg().name() + "]");
     }
 
-    // Step 9: verify signature BEFORE parsing payload
+    // Verify the signature BEFORE parsing the payload so that untrusted
+    // payload bytes never reach the JSON parser unless authenticated.
     String signingInput = segments.headerB64 + "." + segments.payloadB64;
     byte[] message = signingInput.getBytes(StandardCharsets.UTF_8);
     byte[] signatureBytes = strictBase64UrlDecode(segments.signatureB64, "signature");
     verifier.verify(header.alg(), message, signatureBytes);
 
-    // Step 10: parse payload
     JWT jwt = parsePayload(segments.payloadB64, header);
-
-    // Step 11: time validation with clock skew
     enforceTimeClaims(jwt);
 
-    // Step 12: custom validator
     if (validator != null) {
       validator.accept(jwt);
     }
@@ -227,15 +229,14 @@ public class JWTDecoder {
 
   /** Parse the input into segments after enforcing size and structural defenses. */
   private Segments parseSegments(String encodedJWT, boolean requireSignature) {
-    // Step 1: input size check
     if (encodedJWT.getBytes(StandardCharsets.UTF_8).length > maxInputBytes) {
       throw new InvalidJWTException(
           "Encoded JWT exceeds maxInputBytes [" + maxInputBytes + "]");
     }
 
-    // Step 3: split on '.', count segments by separator position.
-    // We do NOT use String.split (which trims trailing empties); count dots
-    // explicitly so that "a.b." (3 segments, empty signature) is recognized.
+    // Count separator positions directly -- String.split would trim a trailing
+    // empty signature segment and we need to distinguish "a.b." (3 segments,
+    // empty signature) from "a.b" (2 segments, no separator).
     int firstDot = encodedJWT.indexOf('.');
     int secondDot = firstDot < 0 ? -1 : encodedJWT.indexOf('.', firstDot + 1);
     int thirdDot = secondDot < 0 ? -1 : encodedJWT.indexOf('.', secondDot + 1);
@@ -261,8 +262,8 @@ public class JWTDecoder {
       throw new InvalidJWTException("Encoded JWT payload segment is empty");
     }
 
-    // Step 2: base64url strictness on header and payload (signature handled
-    // when we decode it).
+    // Base64url strictness on header and payload; signature strictness runs
+    // when we decode the signature bytes below.
     enforceStrictBase64Url(headerB64, "header");
     enforceStrictBase64Url(payloadB64, "payload");
     if (!signatureB64.isEmpty()) {
@@ -419,6 +420,8 @@ public class JWTDecoder {
     private int maxInputBytes = DEFAULT_MAX_INPUT_BYTES;
     private int maxNestingDepth = DEFAULT_MAX_NESTING_DEPTH;
     private int maxNumberLength = DEFAULT_MAX_NUMBER_LENGTH;
+    private int maxObjectMembers = LatteJSONProcessor.DEFAULT_MAX_OBJECT_MEMBERS;
+    private int maxArrayElements = LatteJSONProcessor.DEFAULT_MAX_ARRAY_ELEMENTS;
     private boolean allowDuplicateJSONKeys = false;
     private boolean jsonProcessorExplicit = false;
 
@@ -500,30 +503,29 @@ public class JWTDecoder {
       return this;
     }
 
+    public Builder maxObjectMembers(int maxObjectMembers) {
+      if (maxObjectMembers <= 0) {
+        throw new IllegalArgumentException("maxObjectMembers must be > 0");
+      }
+      this.maxObjectMembers = maxObjectMembers;
+      return this;
+    }
+
+    public Builder maxArrayElements(int maxArrayElements) {
+      if (maxArrayElements <= 0) {
+        throw new IllegalArgumentException("maxArrayElements must be > 0");
+      }
+      this.maxArrayElements = maxArrayElements;
+      return this;
+    }
+
     public Builder allowDuplicateJSONKeys(boolean allow) {
       this.allowDuplicateJSONKeys = allow;
       return this;
     }
 
     public JWTDecoder build() {
-      return new JWTDecoder(materialize());
-    }
-
-    /**
-     * Materializes the builder into a frozen state ready for the
-     * {@link JWTDecoder} constructor. Resolves the default
-     * {@link LatteJSONProcessor} (configured with the parse-DoS limits from
-     * this builder) when no processor was explicitly supplied.
-     */
-    Builder materialize() {
-      if (!jsonProcessorExplicit) {
-        // Default LatteJSONProcessor honors the parse-DoS limits configured
-        // on this builder. Caller-supplied processors are expected to enforce
-        // their own limits.
-        this.jsonProcessor = new LatteJSONProcessor(
-            maxNestingDepth, maxNumberLength, allowDuplicateJSONKeys);
-      }
-      return this;
+      return new JWTDecoder(this);
     }
   }
 }

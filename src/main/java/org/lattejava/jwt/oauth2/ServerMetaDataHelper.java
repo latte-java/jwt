@@ -35,10 +35,15 @@ public class ServerMetaDataHelper extends AbstractHttpHelper {
   private static volatile int maxRedirects = DEFAULT_MAX_REDIRECTS;
 
   /**
-   * Set the maximum response size in bytes that will be read. {@code -1}
-   * disables the cap. Default: 1 MiB.
+   * Set the maximum response size in bytes that will be read. Must be
+   * strictly positive; the response cap cannot be disabled. Default: 1 MiB.
+   *
+   * @throws IllegalArgumentException if {@code maxBytes &lt;= 0}
    */
   public static void setMaxResponseSize(int maxBytes) {
+    if (maxBytes <= 0) {
+      throw new IllegalArgumentException("maxResponseSize must be > 0; the response cap cannot be disabled");
+    }
     ServerMetaDataHelper.maxResponseSize = maxBytes;
   }
 

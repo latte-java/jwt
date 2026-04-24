@@ -41,7 +41,7 @@ import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 /**
- * Coverage of {@code Verifiers.anyOf}:
+ * Coverage of {@code Verifiers.firstMatching}:
  * <ul>
  *   <li>{@code canVerify} returns true if ANY delegate's {@code canVerify} is true.</li>
  *   <li>{@code verify} invokes the FIRST matching delegate; the exception from that
@@ -55,7 +55,7 @@ import static org.testng.Assert.assertTrue;
  *
  * @author Daniel DeGroff
  */
-public class VerifiersAnyOfTest {
+public class VerifiersFirstMatchingTest {
   private static final String HMAC_SECRET_32 = "super-secret-key-that-is-at-least-32-bytes-long!!";
 
   private static String readFile(String name) {
@@ -67,12 +67,12 @@ public class VerifiersAnyOfTest {
   }
 
   @Test
-  public void anyOf_picksMatchingDelegate() {
+  public void firstMatching_picksMatchingDelegate() {
     // Use case: First matching verifier is used (ordered delegation). Two verifiers,
-    // each accepting a distinct algorithm; signatures from each round-trip through anyOf.
-    Verifier hmac = HMACVerifier.newVerifier(HMAC_SECRET_32);
-    Verifier rsa = RSAVerifier.newVerifier(readFile("rsa_public_key_2048.pem"));
-    Verifier composite = Verifiers.anyOf(hmac, rsa);
+    // each accepting a distinct algorithm; signatures from each round-trip through firstMatching.
+    Verifier hmac = HMACVerifier.newVerifier(Algorithm.HS256, HMAC_SECRET_32);
+    Verifier rsa = RSAVerifier.newVerifier(Algorithm.RS256, readFile("rsa_public_key_2048.pem"));
+    Verifier composite = Verifiers.firstMatching(hmac, rsa);
 
     assertTrue(composite.canVerify(Algorithm.HS256));
     assertTrue(composite.canVerify(Algorithm.RS256));
@@ -87,10 +87,10 @@ public class VerifiersAnyOfTest {
   }
 
   @Test
-  public void anyOf_noMatchThrowsMissingVerifier() {
+  public void firstMatching_noMatchThrowsMissingVerifier() {
     // Use case: No matching verifier throws MissingVerifierException.
-    Verifier hmac = HMACVerifier.newVerifier(HMAC_SECRET_32);
-    Verifier composite = Verifiers.anyOf(hmac);
+    Verifier hmac = HMACVerifier.newVerifier(Algorithm.HS256, HMAC_SECRET_32);
+    Verifier composite = Verifiers.firstMatching(hmac);
 
     assertFalse(composite.canVerify(Algorithm.RS256));
     assertThrows(MissingVerifierException.class,
@@ -100,10 +100,10 @@ public class VerifiersAnyOfTest {
   }
 
   @Test
-  public void anyOf_singleVerifierBehavesAsPassThrough() {
+  public void firstMatching_singleVerifierBehavesAsPassThrough() {
     // Use case: Single verifier behaves identically to direct use.
-    Verifier hmac = HMACVerifier.newVerifier(HMAC_SECRET_32);
-    Verifier composite = Verifiers.anyOf(hmac);
+    Verifier hmac = HMACVerifier.newVerifier(Algorithm.HS256, HMAC_SECRET_32);
+    Verifier composite = Verifiers.firstMatching(hmac);
     assertTrue(composite.canVerify(Algorithm.HS256));
 
     Signer signer = HMACSigner.newSHA256Signer(HMAC_SECRET_32);
@@ -112,11 +112,11 @@ public class VerifiersAnyOfTest {
   }
 
   @Test
-  public void anyOf_failFastOnFirstMatchInvalidSignature() {
+  public void firstMatching_failFastOnFirstMatchInvalidSignature() {
     // Use case: Fail-fast -- first canVerify match that fails verify propagates the
     // exception immediately. The second verifier (which would have matched and might
     // even succeed) is NOT consulted.
-    Verifier first = HMACVerifier.newVerifier(HMAC_SECRET_32);
+    Verifier first = HMACVerifier.newVerifier(Algorithm.HS256, HMAC_SECRET_32);
     AtomicInteger secondCalls = new AtomicInteger();
     Verifier second = new Verifier() {
       @Override public boolean canVerify(Algorithm a) {
@@ -126,7 +126,7 @@ public class VerifiersAnyOfTest {
         secondCalls.incrementAndGet();
       }
     };
-    Verifier composite = Verifiers.anyOf(first, second);
+    Verifier composite = Verifiers.firstMatching(first, second);
 
     // bogus signature -- HMACVerifier (first match) will throw; second is never called
     assertThrows(InvalidJWTSignatureException.class,
@@ -138,31 +138,31 @@ public class VerifiersAnyOfTest {
   }
 
   @Test
-  public void anyOf_emptyVarargsThrowsAtConstruction() {
+  public void firstMatching_emptyVarargsThrowsAtConstruction() {
     // Use case: Empty list rejected at construction so the caller sees the misuse immediately
     // rather than later discovering that every verify() call throws MissingVerifierException.
-    assertThrows(IllegalArgumentException.class, () -> Verifiers.anyOf());
+    assertThrows(IllegalArgumentException.class, () -> Verifiers.firstMatching());
   }
 
   @Test
-  public void anyOf_emptyArrayThrowsAtConstruction() {
+  public void firstMatching_emptyArrayThrowsAtConstruction() {
     Verifier[] empty = new Verifier[0];
-    assertThrows(IllegalArgumentException.class, () -> Verifiers.anyOf(empty));
+    assertThrows(IllegalArgumentException.class, () -> Verifiers.firstMatching(empty));
   }
 
   @Test
-  public void anyOf_nullArrayThrows() {
-    assertThrows(NullPointerException.class, () -> Verifiers.anyOf((Verifier[]) null));
+  public void firstMatching_nullArrayThrows() {
+    assertThrows(NullPointerException.class, () -> Verifiers.firstMatching((Verifier[]) null));
   }
 
   @Test
-  public void anyOf_nullElementThrows() {
-    Verifier hmac = HMACVerifier.newVerifier(HMAC_SECRET_32);
-    assertThrows(NullPointerException.class, () -> Verifiers.anyOf(hmac, null));
+  public void firstMatching_nullElementThrows() {
+    Verifier hmac = HMACVerifier.newVerifier(Algorithm.HS256, HMAC_SECRET_32);
+    assertThrows(NullPointerException.class, () -> Verifiers.firstMatching(hmac, null));
   }
 
   @Test
-  public void anyOf_customAlgorithmWithBrokenEqualsRoutedByName() {
+  public void firstMatching_customAlgorithmWithBrokenEqualsRoutedByName() {
     // Use case: Custom Algorithm impl with broken equals still works because the dispatch
     // is keyed on Algorithm.name().
     // Custom algorithm whose name is "HS256" but whose equals() always returns false.
@@ -171,20 +171,20 @@ public class VerifiersAnyOfTest {
       @Override public boolean equals(Object o) { return false; }
       @Override public int hashCode() { return 0; }
     };
-    Verifier hmac = HMACVerifier.newVerifier(HMAC_SECRET_32);
-    Verifier composite = Verifiers.anyOf(hmac);
+    Verifier hmac = HMACVerifier.newVerifier(Algorithm.HS256, HMAC_SECRET_32);
+    Verifier composite = Verifiers.firstMatching(hmac);
     assertTrue(composite.canVerify(broken),
-        "anyOf must consult delegate.canVerify(broken) which keys off name(), not equals()");
+        "firstMatching must consult delegate.canVerify(broken) which keys off name(), not equals()");
 
     Signer signer = HMACSigner.newSHA256Signer(HMAC_SECRET_32);
     byte[] msg = "m".getBytes(StandardCharsets.UTF_8);
     composite.verify(broken, msg, signer.sign(msg));
   }
 
-  // Sanity: composite returned from anyOf must not be null.
+  // Sanity: composite returned from firstMatching must not be null.
   @Test
-  public void anyOf_returnsNonNull() {
-    Verifier hmac = HMACVerifier.newVerifier(HMAC_SECRET_32);
-    assertNotNull(Verifiers.anyOf(hmac));
+  public void firstMatching_returnsNonNull() {
+    Verifier hmac = HMACVerifier.newVerifier(Algorithm.HS256, HMAC_SECRET_32);
+    assertNotNull(Verifiers.firstMatching(hmac));
   }
 }

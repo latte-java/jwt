@@ -51,7 +51,8 @@ public class HMACSigner implements Signer {
 
     this.algorithm = algorithm;
     this.kid = kid;
-    this.secret = secret;
+    // Defensive copy so callers cannot mutate the signer's secret after construction.
+    this.secret = secret.clone();
   }
 
   private HMACSigner(Algorithm algorithm, String secret, String kid) {

@@ -73,11 +73,17 @@ public final class JOSEConverter {
     if ((b & 0x80) == 0) {
       seqLen = b;
     } else {
+      // Long-form DER length: only one following byte is expected for ECDSA
+      // signatures (total length < 256). Enforce canonical (minimum) DER: a
+      // value < 128 must use short form; a value in [128,255] uses 0x81 LL.
       int n = b & 0x7F;
       if (n != 1 || idx >= der.length) {
         throw new IllegalStateException("Malformed ECDSA DER signature: invalid SEQUENCE length");
       }
       seqLen = der[idx++] & 0xFF;
+      if (seqLen < 0x80) {
+        throw new IllegalStateException("Malformed ECDSA DER signature: non-canonical long-form SEQUENCE length");
+      }
     }
     if (idx + seqLen != der.length) {
       throw new IllegalStateException("Malformed ECDSA DER signature: SEQUENCE length mismatch");
@@ -143,8 +149,19 @@ public final class JOSEConverter {
   /**
    * Read a DER {@code INTEGER} from {@code der} starting at
    * {@code cursor[0]}, advance the cursor past the value, return the raw
-   * content bytes (which may include a DER leading-zero pad byte for the
-   * sign bit).
+   * content bytes (which may include a single DER leading-zero pad byte
+   * for the sign bit).
+   *
+   * <p>Enforces canonical DER for ECDSA signature integers:
+   * <ul>
+   *   <li>INTEGER length must be short-form (0 <= len <= 127).</li>
+   *   <li>INTEGER must be non-negative -- if the high bit of the first
+   *       content byte is set, the value must be preceded by a 0x00 pad
+   *       byte (two's complement sign bit).</li>
+   *   <li>No redundant leading zeros -- 0x00 0x00 ... is non-canonical.</li>
+   * </ul>
+   * Rejecting these forms removes ECDSA signature malleability at the
+   * parse boundary.
    */
   private static byte[] readDerInteger(byte[] der, int[] cursor) {
     int idx = cursor[0];
@@ -154,6 +171,21 @@ public final class JOSEConverter {
     int len = der[idx + 1] & 0xFF;
     if ((len & 0x80) != 0 || idx + 2 + len > der.length || len == 0) {
       throw new IllegalStateException("Malformed ECDSA DER signature: invalid INTEGER length");
+    }
+    int first = der[idx + 2] & 0xFF;
+    // Negative INTEGER: high bit of first content byte set means a negative
+    // two's complement value. ECDSA r and s are non-negative by definition.
+    if ((first & 0x80) != 0) {
+      throw new IllegalStateException("Malformed ECDSA DER signature: negative INTEGER");
+    }
+    // Non-canonical leading zero: a 0x00 pad byte is only permitted when the
+    // next byte has its high bit set (required to keep the value non-negative).
+    // Any other 0x00 prefix is redundant and rejected.
+    if (len > 1 && first == 0x00) {
+      int second = der[idx + 3] & 0xFF;
+      if ((second & 0x80) == 0) {
+        throw new IllegalStateException("Malformed ECDSA DER signature: non-minimal INTEGER encoding");
+      }
     }
     byte[] value = new byte[len];
     System.arraycopy(der, idx + 2, value, 0, len);

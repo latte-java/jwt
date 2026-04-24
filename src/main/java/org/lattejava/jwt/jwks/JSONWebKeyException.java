@@ -20,6 +20,12 @@ package org.lattejava.jwt.jwks;
  * Thrown when JWK construction or conversion fails (malformed input,
  * unsupported key type, invalid encoding, etc.).
  *
+ * <p>Intentionally <em>not</em> a {@code JWTException}: a JSON Web Key is a
+ * standalone key artifact (RFC 7517) that may be produced, consumed, or
+ * round-tripped entirely outside of any JWT flow. Modelling JWK errors as JWT
+ * errors would mislead callers writing generic JWT error handlers into
+ * catching conditions that have nothing to do with token processing.</p>
+ *
  * @author Daniel DeGroff
  */
 public class JSONWebKeyException extends RuntimeException {

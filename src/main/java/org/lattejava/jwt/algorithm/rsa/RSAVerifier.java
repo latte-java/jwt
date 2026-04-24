@@ -37,43 +37,59 @@ import java.util.Objects;
  * RSASSA-PKCS1-v1_5 {@link Verifier} for the {@code RS256} / {@code RS384}
  * / {@code RS512} JWA algorithms (RFC 7518 §3.3).
  *
+ * <p>Each instance is bound to a single JWA algorithm at construction time;
+ * {@link #canVerify(Algorithm)} returns true only for that exact algorithm.
+ * Binding at construction prevents algorithm-confusion attacks where a
+ * tampered header {@code alg} could coax a family-accepting verifier into
+ * using a weaker hash than the caller intended (RFC 8725 §3.1).</p>
+ *
  * <p>Each call to {@link #verify(Algorithm, byte[], byte[])} obtains a
  * fresh {@link Signature} instance ({@link Signature} is not thread-safe).</p>
  *
  * @author Daniel DeGroff
  */
 public class RSAVerifier implements Verifier {
+  private final Algorithm algorithm;
+
   private final RSAPublicKey publicKey;
 
-  private RSAVerifier(PublicKey publicKey) {
-    Objects.requireNonNull(publicKey);
+  private RSAVerifier(Algorithm algorithm, PublicKey publicKey) {
+    Objects.requireNonNull(algorithm, "algorithm");
+    Objects.requireNonNull(publicKey, "publicKey");
+    requireRSA(algorithm);
+    this.algorithm = algorithm;
     this.publicKey = KeyCoercion.asPublic(publicKey, RSAPublicKey.class);
     RSAFamily.assertMinimumModulus(this.publicKey.getModulus().bitLength());
+    RSAFamily.assertAcceptablePublicExponent(this.publicKey.getPublicExponent());
   }
 
-  private RSAVerifier(String pemPublicKey) {
-    Objects.requireNonNull(pemPublicKey);
+  private RSAVerifier(Algorithm algorithm, String pemPublicKey) {
+    Objects.requireNonNull(algorithm, "algorithm");
+    Objects.requireNonNull(pemPublicKey, "pemPublicKey");
+    requireRSA(algorithm);
+    this.algorithm = algorithm;
     this.publicKey = KeyCoercion.publicFromPem(pemPublicKey, RSAPublicKey.class);
     RSAFamily.assertMinimumModulus(this.publicKey.getModulus().bitLength());
+    RSAFamily.assertAcceptablePublicExponent(this.publicKey.getPublicExponent());
   }
 
-  public static RSAVerifier newVerifier(PublicKey publicKey) {
-    return new RSAVerifier(publicKey);
+  public static RSAVerifier newVerifier(Algorithm algorithm, PublicKey publicKey) {
+    return new RSAVerifier(algorithm, publicKey);
   }
 
-  public static RSAVerifier newVerifier(String pemPublicKey) {
-    return new RSAVerifier(pemPublicKey);
+  public static RSAVerifier newVerifier(Algorithm algorithm, String pemPublicKey) {
+    return new RSAVerifier(algorithm, pemPublicKey);
   }
 
-  public static RSAVerifier newVerifier(byte[] bytes) {
-    Objects.requireNonNull(bytes);
-    return new RSAVerifier(new String(bytes));
+  public static RSAVerifier newVerifier(Algorithm algorithm, byte[] bytes) {
+    Objects.requireNonNull(bytes, "bytes");
+    return new RSAVerifier(algorithm, new String(bytes));
   }
 
-  public static RSAVerifier newVerifier(Path path) {
-    Objects.requireNonNull(path);
+  public static RSAVerifier newVerifier(Algorithm algorithm, Path path) {
+    Objects.requireNonNull(path, "path");
     try {
-      return new RSAVerifier(new String(Files.readAllBytes(path)));
+      return new RSAVerifier(algorithm, new String(Files.readAllBytes(path)));
     } catch (IOException e) {
       throw new JWTVerifierException("Unable to read file from path [" + path + "]", e);
     }
@@ -81,10 +97,7 @@ public class RSAVerifier implements Verifier {
 
   @Override
   public boolean canVerify(Algorithm algorithm) {
-    return switch (algorithm.name()) {
-      case "RS256", "RS384", "RS512" -> true;
-      default -> false;
-    };
+    return algorithm != null && this.algorithm.name().equals(algorithm.name());
   }
 
   @Override
@@ -93,7 +106,7 @@ public class RSAVerifier implements Verifier {
     Objects.requireNonNull(message);
     Objects.requireNonNull(signature);
     try {
-      Signature verifier = Signature.getInstance(RSAFamily.toJCA(algorithm));
+      Signature verifier = Signature.getInstance(RSAFamily.toJCA(this.algorithm));
       verifier.initVerify(publicKey);
       verifier.update(message);
       try {
@@ -101,10 +114,22 @@ public class RSAVerifier implements Verifier {
           throw new InvalidJWTSignatureException();
         }
       } catch (SignatureException e) {
-        throw new InvalidJWTSignatureException(e);
+        // JCA signals malformed/truncated signature bytes via SignatureException. The cause
+        // is intentionally dropped: the bare exception type is the signal.
+        throw new InvalidJWTSignatureException();
       }
     } catch (InvalidKeyException | NoSuchAlgorithmException | SignatureException | SecurityException e) {
       throw new JWTVerifierException("An unexpected exception occurred when attempting to verify the JWT", e);
+    }
+  }
+
+  private static void requireRSA(Algorithm algorithm) {
+    switch (algorithm.name()) {
+      case "RS256", "RS384", "RS512" -> {
+      }
+
+      default -> throw new IllegalArgumentException(
+          "Expected RSASSA-PKCS1-v1_5 algorithm but found [" + algorithm.name() + "]");
     }
   }
 }

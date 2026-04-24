@@ -54,7 +54,7 @@ public final class JWT {
 
   private final List<String> audience;
 
-  private final AudienceWireForm audienceWireForm;
+  private final AudienceSerialization audienceSerialization;
 
   private final Instant expiresAt;
 
@@ -73,10 +73,12 @@ public final class JWT {
     this.subject = b.subject;
     if (b.audience == null) {
       this.audience = Collections.emptyList();
-      this.audienceWireForm = null;
+      this.audienceSerialization = null;
     } else {
       this.audience = Collections.unmodifiableList(new ArrayList<>(b.audience));
-      this.audienceWireForm = b.audienceWireForm;
+      this.audienceSerialization = b.audienceSerialization == null
+          ? AudienceSerialization.ALWAYS_ARRAY
+          : b.audienceSerialization;
     }
     this.expiresAt = b.expiresAt;
     this.notBefore = b.notBefore;
@@ -162,22 +164,26 @@ public final class JWT {
    * <p>
    * The audience claim identifies the recipients that the JWT is intended for. On the wire this
    * may be an array of strings or a single string; any string values containing a {@code :} must
-   * be URIs. This accessor always returns a list (empty if the claim is absent); the recorded
-   * wire form is preserved for serialization via {@link #audienceWireForm()}.
+   * be URIs. This accessor always returns a list (empty if the claim is absent); the
+   * {@link AudienceSerialization} mode selects the serialized form and is available via
+   * {@link #audienceSerialization()}.
    */
   public List<String> audience() {
     return audience;
   }
 
   /**
-   * Package-private accessor for the recorded wire form. Used by
-   * {@link #toSerializableMap()} to choose the serialization shape and by
-   * tests; not part of the public API.
+   * The {@link AudienceSerialization} mode for this JWT, or {@code null} when
+   * {@code aud} is absent.
    */
-  AudienceWireForm audienceWireForm() {
-    return audienceWireForm;
+  public AudienceSerialization audienceSerialization() {
+    return audienceSerialization;
   }
 
+  /**
+   * Returns {@code true} if {@code value} appears in the {@code aud} claim.
+   * {@code null} input returns {@code false}.
+   */
   public boolean hasAudience(String value) {
     if (value == null) {
       return false;
@@ -186,6 +192,15 @@ public final class JWT {
   }
 
   // ---------- Custom-claim accessors ----------
+
+  /*
+   * The get* family looks up a claim by name (registered or custom) and
+   * coerces to the requested Java type. Absent claims return null; present
+   * claims of the wrong JSON type throw InvalidJWTException (or
+   * ClassCastException for typed list elements).
+   */
+
+  /** Look up a claim as a {@link String}. Returns {@code null} if absent; throws if the claim is not a JSON string. */
   public String getString(String name) {
     Object value = lookup(name);
     if (value == null) {
@@ -197,26 +212,31 @@ public final class JWT {
     throw new InvalidJWTException("Claim [" + name + "] is not a String");
   }
 
+  /** Look up a numeric claim and narrow to {@code int} via {@link Number#intValue()}; returns {@code null} if absent. */
   public Integer getInteger(String name) {
     Number n = (Number) lookup(name);
     return n == null ? null : n.intValue();
   }
 
+  /** Look up a numeric claim and narrow to {@code long} via {@link Number#longValue()}; returns {@code null} if absent. */
   public Long getLong(String name) {
     Number n = (Number) lookup(name);
     return n == null ? null : n.longValue();
   }
 
+  /** Look up a numeric claim and narrow to {@code float} via {@link Number#floatValue()}; returns {@code null} if absent. */
   public Float getFloat(String name) {
     Number n = (Number) lookup(name);
     return n == null ? null : n.floatValue();
   }
 
+  /** Look up a numeric claim and narrow to {@code double} via {@link Number#doubleValue()}; returns {@code null} if absent. */
   public Double getDouble(String name) {
     Number n = (Number) lookup(name);
     return n == null ? null : n.doubleValue();
   }
 
+  /** Look up a boolean claim. Returns {@code null} if absent; throws if the claim is not a JSON boolean. */
   public Boolean getBoolean(String name) {
     Object value = lookup(name);
     if (value == null) {
@@ -228,6 +248,11 @@ public final class JWT {
     throw new InvalidJWTException("Claim [" + name + "] is not a Boolean");
   }
 
+  /**
+   * Look up a numeric claim as a {@link BigDecimal}. Accepts values already
+   * of type {@code BigDecimal}, {@code BigInteger}, or any {@link Number}
+   * (narrowed via {@code doubleValue()}). Returns {@code null} if absent.
+   */
   public BigDecimal getBigDecimal(String name) {
     Object value = lookup(name);
     if (value == null) {
@@ -245,6 +270,12 @@ public final class JWT {
     throw new InvalidJWTException("Claim [" + name + "] is not a numeric value");
   }
 
+  /**
+   * Look up a numeric claim as a {@link BigInteger}. Accepts values already
+   * of type {@code BigInteger}, {@code BigDecimal} (truncated), or any
+   * {@link Number} (narrowed via {@code longValue()}). Returns {@code null}
+   * if absent.
+   */
   public BigInteger getBigInteger(String name) {
     Object value = lookup(name);
     if (value == null) {
@@ -262,6 +293,7 @@ public final class JWT {
     throw new InvalidJWTException("Claim [" + name + "] is not a numeric value");
   }
 
+  /** Look up a numeric claim as a raw {@link Number}. Returns {@code null} if absent; throws if the claim is not a JSON number. */
   public Number getNumber(String name) {
     Object value = lookup(name);
     if (value == null) {
@@ -273,10 +305,12 @@ public final class JWT {
     throw new InvalidJWTException("Claim [" + name + "] is not a Number");
   }
 
+  /** Look up a claim as its raw Java value (no type check). Returns {@code null} if absent. */
   public Object getObject(String name) {
     return lookup(name);
   }
 
+  /** Look up a claim as a {@link Map}. Returns {@code null} if absent; throws if the claim is not a JSON object. */
   @SuppressWarnings("unchecked")
   public Map<String, Object> getMap(String name) {
     Object value = lookup(name);
@@ -289,6 +323,7 @@ public final class JWT {
     throw new InvalidJWTException("Claim [" + name + "] is not a Map");
   }
 
+  /** Look up a claim as a raw {@link List}. Returns {@code null} if absent; throws if the claim is not a JSON array. */
   @SuppressWarnings("unchecked")
   public List<Object> getList(String name) {
     Object value = lookup(name);
@@ -301,6 +336,11 @@ public final class JWT {
     throw new InvalidJWTException("Claim [" + name + "] is not a List");
   }
 
+  /**
+   * Look up a claim as a list of a specific element type. Returns {@code null}
+   * if absent; throws {@link ClassCastException} on the first element that is
+   * not an instance of {@code elementType}. Null elements are permitted.
+   */
   public <T> List<T> getList(String name, Class<T> elementType) {
     List<Object> raw = getList(name);
     if (raw == null) {
@@ -343,14 +383,15 @@ public final class JWT {
   /**
    * Returns a JSON-serializable view of the claims. Timestamps ({@code exp}, {@code nbf},
    * {@code iat}) are emitted as NumericDate (epoch seconds) per RFC 7519 §2, and {@code aud} is
-   * emitted as either a single string or an array to match the recorded wire form.
+   * emitted as either a single string or an array to match the recorded
+   * {@link AudienceSerialization} mode.
    */
   public Map<String, Object> toSerializableMap() {
     Map<String, Object> out = new LinkedHashMap<>();
     if (issuer != null) out.put("iss", issuer);
     if (subject != null) out.put("sub", subject);
     if (!audience.isEmpty()) {
-      if (audienceWireForm == AudienceWireForm.STRING) {
+      if (audienceSerialization == AudienceSerialization.STRING_WHEN_SINGLE && audience.size() == 1) {
         out.put("aud", audience.get(0));
       } else {
         out.put("aud", new ArrayList<>(audience));
@@ -419,7 +460,7 @@ public final class JWT {
         case "aud":
           if (value instanceof String) {
             b.audience = new ArrayList<>(Collections.singletonList((String) value));
-            b.audienceWireForm = AudienceWireForm.STRING;
+            b.audienceSerialization = AudienceSerialization.STRING_WHEN_SINGLE;
           } else if (value instanceof List) {
             List<?> raw = (List<?>) value;
             List<String> strs = new ArrayList<>(raw.size());
@@ -430,7 +471,7 @@ public final class JWT {
               strs.add((String) element);
             }
             b.audience = strs;
-            b.audienceWireForm = AudienceWireForm.ARRAY;
+            b.audienceSerialization = AudienceSerialization.ALWAYS_ARRAY;
           } else {
             throw new InvalidJWTException("Claim [aud] must be a string or an array of strings");
           }
@@ -453,7 +494,7 @@ public final class JWT {
     return Objects.equals(issuer, other.issuer)
         && Objects.equals(subject, other.subject)
         && Objects.equals(audience, other.audience)
-        && audienceWireForm == other.audienceWireForm
+        && audienceSerialization == other.audienceSerialization
         && Objects.equals(expiresAt, other.expiresAt)
         && Objects.equals(notBefore, other.notBefore)
         && Objects.equals(issuedAt, other.issuedAt)
@@ -464,15 +505,15 @@ public final class JWT {
 
   @Override
   public int hashCode() {
-    return Objects.hash(issuer, subject, audience, audienceWireForm, expiresAt,
+    return Objects.hash(issuer, subject, audience, audienceSerialization, expiresAt,
         notBefore, issuedAt, id, customClaims, header);
   }
 
   /**
    * Returns true if the claim fields of this JWT equal the claim fields of the
    * other JWT. The {@link Header} is intentionally not consulted, and the
-   * {@code audienceWireForm} (STRING vs ARRAY framing) is intentionally
-   * ignored - audience is compared by list contents.
+   * {@link AudienceSerialization} mode is intentionally ignored - audience is
+   * compared by list contents.
    */
   public boolean claimsEquals(JWT other) {
     if (this == other) return true;
@@ -564,7 +605,7 @@ public final class JWT {
 
     private List<String> audience;
 
-    private AudienceWireForm audienceWireForm;
+    private AudienceSerialization audienceSerialization;
 
     private Instant expiresAt;
 
@@ -590,25 +631,42 @@ public final class JWT {
       return this;
     }
 
+    /**
+     * Set a single-element audience. Serialization defaults to
+     * {@link AudienceSerialization#ALWAYS_ARRAY}; call
+     * {@link #audienceSerialization(AudienceSerialization)} to opt in to
+     * {@link AudienceSerialization#STRING_WHEN_SINGLE}.
+     */
     public Builder audience(String audience) {
       if (audience == null) {
         this.audience = null;
-        this.audienceWireForm = null;
       } else {
         this.audience = new ArrayList<>(Collections.singletonList(audience));
-        this.audienceWireForm = AudienceWireForm.STRING;
       }
       return this;
     }
 
+    /**
+     * Set the audience from a list. Serialization defaults to
+     * {@link AudienceSerialization#ALWAYS_ARRAY}.
+     */
     public Builder audience(List<String> audiences) {
       if (audiences == null) {
         this.audience = null;
-        this.audienceWireForm = null;
       } else {
         this.audience = new ArrayList<>(audiences);
-        this.audienceWireForm = AudienceWireForm.ARRAY;
       }
+      return this;
+    }
+
+    /**
+     * Override the serialization form of the {@code aud} claim. Passing
+     * {@code null} restores the builder default
+     * ({@link AudienceSerialization#ALWAYS_ARRAY}). Has no effect when the
+     * audience is absent.
+     */
+    public Builder audienceSerialization(AudienceSerialization mode) {
+      this.audienceSerialization = mode;
       return this;
     }
 

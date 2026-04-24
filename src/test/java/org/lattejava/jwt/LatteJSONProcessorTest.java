@@ -332,6 +332,77 @@ public class LatteJSONProcessorTest {
         () -> jp.deserialize(sb.toString().getBytes(StandardCharsets.UTF_8)));
   }
 
+  @Test
+  public void constructorRejectsNonPositiveObjectMembers() {
+    // Use case: zero/negative caps would silently disable the wide-object defense
+    expectThrows(IllegalArgumentException.class, () -> new LatteJSONProcessor(16, 1000, 0, 10000, false));
+    expectThrows(IllegalArgumentException.class, () -> new LatteJSONProcessor(16, 1000, -1, 10000, false));
+  }
+
+  @Test
+  public void constructorRejectsNonPositiveArrayElements() {
+    // Use case: zero/negative caps would silently disable the wide-array defense
+    expectThrows(IllegalArgumentException.class, () -> new LatteJSONProcessor(16, 1000, 1000, 0, false));
+    expectThrows(IllegalArgumentException.class, () -> new LatteJSONProcessor(16, 1000, 1000, -1, false));
+  }
+
+  @Test
+  public void objectMembersBoundaryRespected() {
+    // Use case: an object with exactly maxObjectMembers entries is accepted; one more is rejected.
+    JSONProcessor accept = new LatteJSONProcessor(16, 1000, 5, 10000, false);
+    StringBuilder sb = new StringBuilder("{");
+    for (int i = 0; i < 5; i++) {
+      if (i > 0) sb.append(',');
+      sb.append("\"k").append(i).append("\":").append(i);
+    }
+    sb.append('}');
+    try {
+      accept.deserialize(sb.toString().getBytes(StandardCharsets.UTF_8));
+    } catch (JSONProcessingException e) {
+      fail("Expected 5 members to be accepted; threw: " + e.getMessage());
+    }
+
+    StringBuilder over = new StringBuilder("{");
+    for (int i = 0; i < 6; i++) {
+      if (i > 0) over.append(',');
+      over.append("\"k").append(i).append("\":").append(i);
+    }
+    over.append('}');
+    expectThrows(JSONProcessingException.class,
+        () -> accept.deserialize(over.toString().getBytes(StandardCharsets.UTF_8)));
+  }
+
+  @Test
+  public void arrayElementsBoundaryRespected() {
+    // Use case: an array with exactly maxArrayElements entries is accepted; one more is rejected.
+    JSONProcessor accept = new LatteJSONProcessor(16, 1000, 1000, 5, false);
+    String ok = "{\"a\":[1,2,3,4,5]}";
+    try {
+      accept.deserialize(ok.getBytes(StandardCharsets.UTF_8));
+    } catch (JSONProcessingException e) {
+      fail("Expected 5 elements to be accepted; threw: " + e.getMessage());
+    }
+    String over = "{\"a\":[1,2,3,4,5,6]}";
+    expectThrows(JSONProcessingException.class,
+        () -> accept.deserialize(over.getBytes(StandardCharsets.UTF_8)));
+  }
+
+  @Test
+  public void duplicateKeyDoesNotConsumeObjectMembersBudget() {
+    // Use case: when allowDuplicateJSONKeys=true, repeating an existing key updates the existing
+    // entry rather than counting against maxObjectMembers (LinkedHashMap.put semantics).
+    JSONProcessor jp = new LatteJSONProcessor(16, 1000, 2, 10000, true);
+    String json = "{\"a\":1,\"a\":2,\"b\":3}";
+    try {
+      Map<String, Object> r = jp.deserialize(json.getBytes(StandardCharsets.UTF_8));
+      assertEquals(r.size(), 2);
+      assertEquals(r.get("a"), BigInteger.valueOf(2));
+      assertEquals(r.get("b"), BigInteger.valueOf(3));
+    } catch (JSONProcessingException e) {
+      fail("Expected duplicate-key updates to not count against the cap; threw: " + e.getMessage());
+    }
+  }
+
   @DataProvider(name = "numberLengthBoundary")
   public Object[][] numberLengthBoundary() {
     // Use case: number digit-run boundary: 1000 accepted / 1001 rejected

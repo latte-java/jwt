@@ -14,7 +14,7 @@
  * language governing permissions and limitations under the License.
  */
 
-package org.lattejava.jwt.der;
+package org.lattejava.jwt.internal.der;
 
 import java.io.IOException;
 import java.math.BigInteger;

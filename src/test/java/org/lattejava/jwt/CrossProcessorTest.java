@@ -73,7 +73,7 @@ public class CrossProcessorTest extends BaseJWTTest {
         .build();
     String token = new JWTEncoder(encodeProc).encode(jwt, HMACSigner.newSHA256Signer(SECRET));
     JWT decoded = new JWTDecoder(decodeProc).decode(token,
-        VerifierResolver.of(HMACVerifier.newVerifier(SECRET)));
+        VerifierResolver.of(HMACVerifier.newVerifier(Algorithm.HS256, SECRET)));
     assertEquals(decoded.subject(), "abc", label);
     assertEquals(decoded.issuer(), "https://issuer.example", label);
     assertEquals(decoded.audience(), Arrays.asList("svc-a", "svc-b"), label);
@@ -91,7 +91,7 @@ public class CrossProcessorTest extends BaseJWTTest {
     JWT jwt = JWT.builder().subject("abc").claim("huge", huge).build();
     String token = new JWTEncoder(encodeProc).encode(jwt, HMACSigner.newSHA256Signer(SECRET));
     JWT decoded = new JWTDecoder(decodeProc).decode(token,
-        VerifierResolver.of(HMACVerifier.newVerifier(SECRET)));
+        VerifierResolver.of(HMACVerifier.newVerifier(Algorithm.HS256, SECRET)));
     Number n = (Number) decoded.getObject("huge");
     BigInteger asBigInt = (n instanceof BigInteger)
         ? (BigInteger) n
@@ -106,7 +106,7 @@ public class CrossProcessorTest extends BaseJWTTest {
     JWT jwt = JWT.builder().subject("abc").claim("pi", precise).build();
     String token = new JWTEncoder(encodeProc).encode(jwt, HMACSigner.newSHA256Signer(SECRET));
     JWT decoded = new JWTDecoder(decodeProc).decode(token,
-        VerifierResolver.of(HMACVerifier.newVerifier(SECRET)));
+        VerifierResolver.of(HMACVerifier.newVerifier(Algorithm.HS256, SECRET)));
     Number n = (Number) decoded.getObject("pi");
     BigDecimal asBigDec = (n instanceof BigDecimal)
         ? (BigDecimal) n
