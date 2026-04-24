@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2025, FusionAuth, All Rights Reserved
+ * Copyright (c) 2016-2026, FusionAuth, All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,11 +16,10 @@
 
 package org.lattejava.jwt.algorithm.hmac;
 
+import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.InvalidJWTSignatureException;
-import org.lattejava.jwt.InvalidKeyLengthException;
 import org.lattejava.jwt.JWTVerifierException;
 import org.lattejava.jwt.Verifier;
-import org.lattejava.jwt.Algorithm;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -34,100 +33,90 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Objects;
 
 /**
- * This class is used to verify a JWT signed with an HMAC algorithm.
+ * HMAC-based {@link Verifier} for the {@code HS256} / {@code HS384} /
+ * {@code HS512} JWA algorithms (RFC 7518 §3.2).
+ *
+ * <p>Each instance is bound to a single JWA algorithm at construction time;
+ * {@link #canVerify(Algorithm)} returns true only for that exact algorithm.
+ * Binding at construction prevents algorithm-confusion attacks where a
+ * tampered header {@code alg} could coax a family-accepting verifier into
+ * using a weaker hash than the caller intended (RFC 8725 §3.1).</p>
+ *
+ * <p>Signature comparison uses
+ * {@link MessageDigest#isEqual(byte[], byte[])} -- documented as
+ * constant-time since JDK 7u40 (JDK-8006276) -- to avoid leaking the
+ * valid MAC via comparison-timing side channels.</p>
+ *
+ * <p>Each call to {@link #verify(byte[], byte[])} obtains a fresh
+ * {@link Mac} instance ({@link Mac} is not thread-safe).</p>
  *
  * @author Daniel DeGroff
  */
 public class HMACVerifier implements Verifier {
+  private final Algorithm algorithm;
+
   private final byte[] secret;
 
-  private HMACVerifier(String secret) {
-    Objects.requireNonNull(secret);
-    this.secret = secret.getBytes(StandardCharsets.UTF_8);
+  private HMACVerifier(Algorithm algorithm, byte[] secret) {
+    Objects.requireNonNull(algorithm, "algorithm");
+    Objects.requireNonNull(secret, "secret");
+    requireHMAC(algorithm);
+    HMACFamily.assertMinimumSecretLength(algorithm, secret);
+    this.algorithm = algorithm;
+    // Defensive copy so callers cannot mutate the verifier's secret after construction.
+    this.secret = secret.clone();
   }
 
-  private HMACVerifier(byte[] secret) {
-    Objects.requireNonNull(secret);
-    this.secret = secret;
+  private HMACVerifier(Algorithm algorithm, String secret) {
+    this(algorithm, secret == null ? null : secret.getBytes(StandardCharsets.UTF_8));
   }
 
-  /**
-   * Return a new instance of the HMAC Verifier with the provided secret.
-   *
-   * @param secret The secret.
-   * @return a new instance of the HMAC verifier.
-   */
-  public static HMACVerifier newVerifier(String secret) {
-    Objects.requireNonNull(secret);
-    return new HMACVerifier(secret);
+  public static HMACVerifier newVerifier(Algorithm algorithm, String secret) {
+    return new HMACVerifier(algorithm, secret);
   }
 
-  /**
-   * Return a new instance of the HMAC Verifier with the provided secret.
-   *
-   * @param path The path to the secret.
-   * @return a new instance of the HMAC verifier.
-   */
-  public static HMACVerifier newVerifier(Path path) {
-    Objects.requireNonNull(path);
+  public static HMACVerifier newVerifier(Algorithm algorithm, byte[] bytes) {
+    return new HMACVerifier(algorithm, bytes);
+  }
 
+  public static HMACVerifier newVerifier(Algorithm algorithm, Path path) {
+    Objects.requireNonNull(path, "path");
     try {
-      return new HMACVerifier(Files.readAllBytes(path));
+      return new HMACVerifier(algorithm, Files.readAllBytes(path));
     } catch (IOException e) {
-      throw new JWTVerifierException("Unable to read the file from path [" + path.toAbsolutePath() + "]", e);
-    }
-  }
-
-  /**
-   * Return a new instance of the HMAC Verifier with the provided secret.
-   *
-   * @param bytes The bytes of the secret.
-   * @return a new instance of the HMAC verifier.
-   */
-  public static HMACVerifier newVerifier(byte[] bytes) {
-    Objects.requireNonNull(bytes);
-    return new HMACVerifier(bytes);
-  }
-
-  // RFC 7518 Section 3.2: "A key of the same size as the hash output or larger MUST be used with this algorithm."
-  private static void assertMinimumSecretLength(Algorithm algorithm, byte[] secret) {
-    int minimumLength = switch (algorithm) {
-      case HS256 -> 32;
-      case HS384 -> 48;
-      case HS512 -> 64;
-      default -> 0;
-    };
-    if (secret.length < minimumLength) {
-      throw new InvalidKeyLengthException("Secret length of [" + secret.length + "] bytes is less than the required length of [" + minimumLength + "] bytes for algorithm [" + algorithm.name() + "].");
+      throw new JWTVerifierException("Unable to read file from path [" + path + "]", e);
     }
   }
 
   @Override
-  @SuppressWarnings("Duplicates")
   public boolean canVerify(Algorithm algorithm) {
-    return switch (algorithm) {
-      case HS256, HS384, HS512 -> true;
-      default -> false;
-    };
+    return algorithm != null && this.algorithm.name().equals(algorithm.name());
   }
 
   @Override
-  public void verify(Algorithm algorithm, byte[] message, byte[] signature) {
-    Objects.requireNonNull(algorithm);
+  public void verify(byte[] message, byte[] signature) {
     Objects.requireNonNull(message);
     Objects.requireNonNull(signature);
-    assertMinimumSecretLength(algorithm, secret);
 
+    String jcaName = HMACFamily.toJCA(this.algorithm);
     try {
-      Mac mac = Mac.getInstance(algorithm.getName());
-      mac.init(new SecretKeySpec(secret, algorithm.getName()));
-      byte[] actualSignature = mac.doFinal(message);
-
-      if (!MessageDigest.isEqual(signature, actualSignature)) {
+      Mac mac = Mac.getInstance(jcaName);
+      mac.init(new SecretKeySpec(secret, jcaName));
+      byte[] expected = mac.doFinal(message);
+      if (!MessageDigest.isEqual(signature, expected)) {
         throw new InvalidJWTSignatureException();
       }
     } catch (InvalidKeyException | NoSuchAlgorithmException e) {
       throw new JWTVerifierException("An unexpected exception occurred when attempting to verify the JWT", e);
+    }
+  }
+
+  private static void requireHMAC(Algorithm algorithm) {
+    switch (algorithm.name()) {
+      case "HS256", "HS384", "HS512" -> {
+      }
+      default -> throw new IllegalArgumentException(
+          "Expected HMAC algorithm but found [" + algorithm.name() + "]");
     }
   }
 }

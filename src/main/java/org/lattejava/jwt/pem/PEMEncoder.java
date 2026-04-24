@@ -16,11 +16,11 @@
 
 package org.lattejava.jwt.pem;
 
-import org.lattejava.jwt.der.DerInputStream;
-import org.lattejava.jwt.der.DerOutputStream;
-import org.lattejava.jwt.der.DerValue;
-import org.lattejava.jwt.der.ObjectIdentifier;
-import org.lattejava.jwt.der.Tag;
+import org.lattejava.jwt.internal.der.DerInputStream;
+import org.lattejava.jwt.internal.der.DerOutputStream;
+import org.lattejava.jwt.internal.der.DerValue;
+import org.lattejava.jwt.internal.der.ObjectIdentifier;
+import org.lattejava.jwt.internal.der.Tag;
 
 import java.io.IOException;
 import java.math.BigInteger;
@@ -94,7 +94,7 @@ public class PEMEncoder {
    */
   public String encode(PrivateKey privateKey, PublicKey publicKey) {
     if (privateKey == null && publicKey == null) {
-      throw new PEMEncoderException(new InvalidParameterException("At least one key must be provided, they may not both be null"));
+      throw new PEMEncoderException(new InvalidParameterException("At least one key must be provided"));
     }
 
     Key key = Objects.requireNonNullElse(privateKey, publicKey);
@@ -179,13 +179,13 @@ public class PEMEncoder {
    * @return a PEM encoded key
    */
   public String encode(Key key) {
-    if (key instanceof PrivateKey) {
-      return encode((PrivateKey) key, null);
-    } else if (key instanceof PublicKey) {
-      return encode(null, (PublicKey) key);
+    if (key instanceof PrivateKey privateKey) {
+      return encode(privateKey, null);
+    } else if (key instanceof PublicKey publicKey) {
+      return encode(null, publicKey);
     }
 
-    throw new PEMEncoderException(new InvalidParameterException("Unexpected key type. Expecting instance of [PrivateKey | PublicKey], found [" + key.getClass().getCanonicalName() + "]"));
+    throw new PEMEncoderException(new InvalidParameterException("Expected key type [PrivateKey | PublicKey] but found [" + key.getClass().getCanonicalName() + "]"));
   }
 
   /**
@@ -224,14 +224,14 @@ public class PEMEncoder {
         sb.append(PEM.PKCS_8_PRIVATE_KEY_PREFIX).append("\n");
       } else {
         throw new PEMEncoderException(
-            new InvalidParameterException("Unexpected Private Key format, expecting PKCS#1 or PKCS#8 but found " + format + "."));
+            new InvalidParameterException("Expected private key format [PKCS#1] or [PKCS#8] but found [" + format + "]"));
       }
     } else {
       if (format.equals("X.509")) {
         sb.append(PEM.X509_PUBLIC_KEY_PREFIX).append("\n");
       } else {
         throw new PEMEncoderException(
-            new InvalidParameterException("Unexpected Public Key format, expecting X.509 but found " + format + "."));
+            new InvalidParameterException("Expected public key format [X.509] but found [" + format + "]"));
       }
     }
   }

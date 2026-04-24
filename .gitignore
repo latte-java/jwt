@@ -1,6 +1,5 @@
 build
-*.iws
-.idea
 target
 .DS_Store
 .savant/cache
+.worktrees

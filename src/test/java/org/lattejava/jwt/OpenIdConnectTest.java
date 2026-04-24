@@ -21,7 +21,6 @@ import org.testng.annotations.Test;
 import static org.lattejava.jwt.OpenIDConnect.at_hash;
 import static org.lattejava.jwt.OpenIDConnect.c_hash;
 import static org.testng.Assert.assertEquals;
-import static org.testng.AssertJUnit.fail;
 
 /**
  * @author Daniel DeGroff
@@ -42,30 +41,14 @@ public class OpenIdConnectTest extends BaseTest {
     assertEquals(at_hash("dNZX1hEZ9wBCzNL40Upu646bdzQA", Algorithm.RS512), "8xltSlOGYrWy8W9yNvRlEth1i_bXW-JROWPLvCv5zog");
 
     assertEquals(at_hash("dNZX1hEZ9wBCzNL40Upu646bdzQA", Algorithm.Ed25519), "8xltSlOGYrWy8W9yNvRlEth1i_bXW-JROWPLvCv5zog");
-    requiresShake256(() ->
-        assertEquals(at_hash("dNZX1hEZ9wBCzNL40Upu646bdzQA", Algorithm.Ed448), "ACuRpk9jl5IEa3yqpBCNNOCpBEI7qjud6mc80cs6vWX2fcqpsk8RozYBKTUuSS6SqJhw302xFZeM"));
+    // SHAKE256 is bundled, so Ed448 at_hash works on stock JDK without BC registered.
+    assertEquals(at_hash("dNZX1hEZ9wBCzNL40Upu646bdzQA", Algorithm.Ed448), "ACuRpk9jl5IEa3yqpBCNNOCpBEI7qjud6mc80cs6vWX2fcqpsk8RozYBKTUuSS6SqJhw302xFZeM");
 
     // Controls
     assertEquals(at_hash("1940a308-d492-3660-a9f8-46723cc582e9", Algorithm.RS256), "JrZY9MtYVEIIJUx-DDBmww");
     assertEquals(at_hash("jHkWEdUXMU1BwAsC4vtUsZwnNvTIxEl0z9K3vx5KF0Y", Algorithm.RS256), "77QmUPtjPfzWtF2AnpK9RQ");
     // https://bitbucket.org/openid/connect/issues/1125
-    requiresShake256(() ->
-        assertEquals(at_hash("YmJiZTAwYmYtMzgyOC00NzhkLTkyOTItNjJjNDM3MGYzOWIy9sFhvH8K_x8UIHj1osisS57f5DduL", Algorithm.Ed448), "sB_U72jyb0WgtX8TsVoqJnm6CD295W9gfSDRxkilB3LAL7REi9JYutRW_s1yE4lD8cOfMZf83gi4"));
-  }
-
-  private void requiresShake256(Runnable runnable) {
-    // The JCA does not ship with SHAKE256 which will be used to calculate the hash for Ed448.
-    // - Expect failure unless FIPS has been enabled.
-    try {
-      runnable.run();
-      if (!FipsEnabled) {
-        fail("Expected this to fail unless FIPS was enabled.");
-      }
-    } catch (Exception e) {
-      if (FipsEnabled) {
-        throw e;
-      }
-    }
+    assertEquals(at_hash("YmJiZTAwYmYtMzgyOC00NzhkLTkyOTItNjJjNDM3MGYzOWIy9sFhvH8K_x8UIHj1osisS57f5DduL", Algorithm.Ed448), "sB_U72jyb0WgtX8TsVoqJnm6CD295W9gfSDRxkilB3LAL7REi9JYutRW_s1yE4lD8cOfMZf83gi4");
   }
 
   @Test
@@ -84,10 +67,8 @@ public class OpenIdConnectTest extends BaseTest {
 
     assertEquals(c_hash("dNZX1hEZ9wBCzNL40Upu646bdzQA", Algorithm.Ed25519), "8xltSlOGYrWy8W9yNvRlEth1i_bXW-JROWPLvCv5zog");
 
-    // The JCA does not ship with SHAKE256 which will be used to calculate the hash for Ed448.
-    // - Expect this to fail unless FIPS has been enabled.
-    requiresShake256(() ->
-        assertEquals(c_hash("dNZX1hEZ9wBCzNL40Upu646bdzQA", Algorithm.Ed448), "ACuRpk9jl5IEa3yqpBCNNOCpBEI7qjud6mc80cs6vWX2fcqpsk8RozYBKTUuSS6SqJhw302xFZeM"));
+    // SHAKE256 is bundled, so Ed448 c_hash works on stock JDK without BC registered.
+    assertEquals(c_hash("dNZX1hEZ9wBCzNL40Upu646bdzQA", Algorithm.Ed448), "ACuRpk9jl5IEa3yqpBCNNOCpBEI7qjud6mc80cs6vWX2fcqpsk8RozYBKTUuSS6SqJhw302xFZeM");
 
     // Controls
     assertEquals(c_hash("16fd899f-5f0c-3114-875e-2547b629cd05", Algorithm.HS256), "S5UOXRNNyYsI6Z0G3xxdpw");

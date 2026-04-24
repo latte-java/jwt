@@ -16,9 +16,9 @@
 
 package org.lattejava.jwt.internal;
 
-import org.lattejava.jwt.der.DerInputStream;
-import org.lattejava.jwt.der.DerValue;
-import org.lattejava.jwt.der.ObjectIdentifier;
+import org.lattejava.jwt.internal.der.DerInputStream;
+import org.lattejava.jwt.internal.der.DerValue;
+import org.lattejava.jwt.internal.der.ObjectIdentifier;
 
 import java.io.IOException;
 import java.security.InvalidAlgorithmParameterException;
@@ -37,11 +37,11 @@ import java.security.interfaces.RSAKey;
 import java.security.spec.NamedParameterSpec;
 import java.util.Arrays;
 
-import static org.lattejava.jwt.der.ObjectIdentifier.ECDSA_P256;
-import static org.lattejava.jwt.der.ObjectIdentifier.ECDSA_P384;
-import static org.lattejava.jwt.der.ObjectIdentifier.ECDSA_P521;
-import static org.lattejava.jwt.der.ObjectIdentifier.EdDSA_25519;
-import static org.lattejava.jwt.der.ObjectIdentifier.EdDSA_448;
+import static org.lattejava.jwt.internal.der.ObjectIdentifier.ECDSA_P256;
+import static org.lattejava.jwt.internal.der.ObjectIdentifier.ECDSA_P384;
+import static org.lattejava.jwt.internal.der.ObjectIdentifier.ECDSA_P521;
+import static org.lattejava.jwt.internal.der.ObjectIdentifier.EdDSA_25519;
+import static org.lattejava.jwt.internal.der.ObjectIdentifier.EdDSA_448;
 
 /**
  * @author Daniel DeGroff
@@ -105,13 +105,12 @@ public class KeyUtils {
       case "Ed25519" -> 32;
       case "Ed448" -> 57;
       default ->
-          throw new IllegalArgumentException("You specified an unsupported algorithm. The algorithm [" + algorithm + "]"
-              + " is not supported. You must use Ed25519 or Ed448.");
+          throw new IllegalArgumentException("Unsupported algorithm [" + algorithm + "]");
     };
 
     // Ensure the caller provided a key of the correct length.
     if (privateKey.length != expectedByteLength) {
-      throw new IllegalArgumentException("The provided privateKey length is unexpected. Expected [" + expectedByteLength + "] but found [" + privateKey.length + "]");
+      throw new IllegalArgumentException("Expected private key length [" + expectedByteLength + "] but found [" + privateKey.length + "]");
     }
 
     keyPairGenerator.initialize(new NamedParameterSpec(curve), new SecureRandom() {
@@ -119,7 +118,7 @@ public class KeyUtils {
         // Note that because we pass the curve to the NamedParameterSpec constructor, it would be unexpected that the provided
         // byte array would not fit the expected key length. As a fail save, ensure it fits.
         if (bytes.length != privateKey.length) {
-          throw new IllegalStateException("Provided bytes array is not large enough for the key. Expected [" + privateKey.length + "] but found [" + bytes.length + "]");
+          throw new IllegalStateException("Expected byte array of length [" + privateKey.length + "] but found [" + bytes.length + "]");
         }
         System.arraycopy(privateKey, 0, bytes, 0, privateKey.length);
       }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2025, FusionAuth, All Rights Reserved
+ * Copyright (c) 2018-2026, FusionAuth, All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,26 +16,46 @@
 
 package org.lattejava.jwt.algorithm.ec;
 
+import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.InvalidJWTSignatureException;
 import org.lattejava.jwt.InvalidKeyTypeException;
 import org.lattejava.jwt.JWTVerifierException;
-import org.lattejava.jwt.MissingPublicKeyException;
 import org.lattejava.jwt.Verifier;
-import org.lattejava.jwt.Algorithm;
-import org.lattejava.jwt.pem.PEM;
+import org.lattejava.jwt.algorithm.KeyCoercion;
+import org.lattejava.jwt.internal.JOSEConverter;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.InvalidKeyException;
+import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
 import java.security.Signature;
 import java.security.SignatureException;
 import java.security.interfaces.ECPublicKey;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.X509EncodedKeySpec;
 import java.util.Objects;
 
 /**
+ * ECDSA {@link Verifier} for the {@code ES256} / {@code ES384} / {@code ES512}
+ * / {@code ES256K} JWA algorithms (RFC 7518 §3.4 and RFC 8812 §3.2).
+ *
+ * <p>When constructed with a caller-supplied {@link ECPublicKey}, the key
+ * is round-tripped through {@code KeyFactory.generatePublic(new
+ * X509EncodedKeySpec(key.getEncoded()))} so the JCE provider rejects
+ * off-curve points before verification (CVE-2022-21449 defense). PEM-loaded
+ * keys are already produced by the PEM decoder via the same provider path,
+ * so they are accepted as-is.</p>
+ *
+ * <p>Each call to {@link #verify(byte[], byte[])} obtains a fresh
+ * {@link Signature} instance ({@link Signature} is not thread-safe),
+ * validates that the JOSE signature length matches the curve, converts
+ * JOSE {@code R || S} to DER via {@link JOSEConverter#joseToDer(byte[], int)},
+ * and verifies.</p>
+ *
  * @author Daniel DeGroff
  */
 public class ECVerifier implements Verifier {
@@ -45,119 +65,98 @@ public class ECVerifier implements Verifier {
 
   private ECVerifier(PublicKey publicKey) {
     Objects.requireNonNull(publicKey);
-
-    if (!(publicKey instanceof ECPublicKey)) {
-      throw new InvalidKeyTypeException("Expecting a public key of type [ECPublicKey], but found [" + publicKey.getClass().getSimpleName() + "].");
-    }
-    this.publicKey = (ECPublicKey) publicKey;
-    this.algorithm = algorithmForKey(this.publicKey);
+    this.publicKey = revalidate(KeyCoercion.asPublic(publicKey, ECPublicKey.class));
+    this.algorithm = ECFamily.algorithmForCurve(this.publicKey.getParams());
   }
 
-  private ECVerifier(String publicKey) {
-    Objects.requireNonNull(publicKey);
-
-    PEM pem = PEM.decode(publicKey);
-    if (pem.publicKey == null) {
-      throw new MissingPublicKeyException("The provided PEM encoded string did not contain a public key.");
-    }
-
-    if (!(pem.publicKey instanceof ECPublicKey)) {
-      throw new InvalidKeyTypeException("Expecting a public key of type [ECPublicKey], but found [" + pem.publicKey.getClass().getSimpleName() + "].");
-    }
-
-    this.publicKey = pem.getPublicKey();
-    this.algorithm = algorithmForKey(this.publicKey);
-  }
-
-  private static Algorithm algorithmForKey(ECPublicKey key) {
-    int fieldSize = key.getParams().getCurve().getField().getFieldSize();
-    return switch (fieldSize) {
-      case 256 -> Algorithm.ES256;
-      case 384 -> Algorithm.ES384;
-      case 521 -> Algorithm.ES512;
-      default -> throw new InvalidKeyTypeException("Unsupported EC curve with field size [" + fieldSize + "]. Expected 256, 384, or 521.");
-    };
+  private ECVerifier(String pemPublicKey) {
+    Objects.requireNonNull(pemPublicKey);
+    this.publicKey = KeyCoercion.publicFromPem(pemPublicKey, ECPublicKey.class);
+    this.algorithm = ECFamily.algorithmForCurve(this.publicKey.getParams());
   }
 
   /**
-   * Return a new instance of the EC Verifier with the provided public key.
-   *
-   * @param publicKey The EC public key PEM.
-   * @return a new instance of the EC verifier.
+   * Re-derive the EC public key via {@code KeyFactory.generatePublic} so
+   * the JCE provider runs its on-curve / point-validation checks. Defends
+   * against caller-supplied {@code ECPublicKey} instances that bypass the
+   * provider's validation (the CVE-2022-21449 surface).
    */
-  public static ECVerifier newVerifier(String publicKey) {
-    return new ECVerifier(publicKey);
+  private static ECPublicKey revalidate(ECPublicKey key) {
+    byte[] encoded = key.getEncoded();
+    if (encoded == null) {
+      throw new InvalidKeyTypeException("EC public key did not provide X.509 encoding for revalidation");
+    }
+    try {
+      PublicKey derived = KeyFactory.getInstance("EC").generatePublic(new X509EncodedKeySpec(encoded));
+      if (!(derived instanceof ECPublicKey ec)) {
+        throw new InvalidKeyTypeException("Re-derived key is not an ECPublicKey [" + derived.getClass().getSimpleName() + "]");
+      }
+      return ec;
+    } catch (NoSuchAlgorithmException | InvalidKeySpecException e) {
+      throw new InvalidKeyTypeException("EC public key failed re-validation", e);
+    }
   }
 
-  /**
-   * Return a new instance of the EC Verifier with the provided public key.
-   *
-   * @param publicKey The EC public key object.
-   * @return a new instance of the EC verifier.
-   */
+  public static ECVerifier newVerifier(String pemPublicKey) {
+    return new ECVerifier(pemPublicKey);
+  }
+
   public static ECVerifier newVerifier(PublicKey publicKey) {
     return new ECVerifier(publicKey);
   }
 
-  /**
-   * Return a new instance of the EC Verifier with the provided public key.
-   *
-   * @param path The path to the EC public key PEM.
-   * @return a new instance of the EC verifier.
-   */
-  public static ECVerifier newVerifier(Path path) {
-    Objects.requireNonNull(path);
-
-    try {
-      return new ECVerifier(new String(Files.readAllBytes(path)));
-    } catch (IOException e) {
-      throw new JWTVerifierException("Unable to read the file from path [" + path.toAbsolutePath() + "]", e);
-    }
-  }
-
-  /**
-   * Return a new instance of the EC Verifier with the provided public key.
-   *
-   * @param bytes The bytes of the EC public key PEM.
-   * @return a new instance of the EC verifier.
-   */
   public static ECVerifier newVerifier(byte[] bytes) {
     Objects.requireNonNull(bytes);
-    return new ECVerifier(new String(bytes));
+    return new ECVerifier(new String(bytes, StandardCharsets.UTF_8));
+  }
+
+  public static ECVerifier newVerifier(Path path) {
+    Objects.requireNonNull(path);
+    try {
+      return new ECVerifier(new String(Files.readAllBytes(path), StandardCharsets.UTF_8));
+    } catch (IOException e) {
+      throw new JWTVerifierException("Unable to read file from path [" + path + "]", e);
+    }
   }
 
   @Override
   public boolean canVerify(Algorithm algorithm) {
-    return this.algorithm == algorithm;
+    return algorithm != null && this.algorithm.name().equals(algorithm.name());
   }
 
   @Override
-  public void verify(Algorithm algorithm, byte[] message, byte[] signature) {
-    Objects.requireNonNull(algorithm);
+  public void verify(byte[] message, byte[] signature) {
     Objects.requireNonNull(message);
     Objects.requireNonNull(signature);
-    int expectedLength = switch (algorithm) {
-      case ES256 -> 64;
-      case ES384 -> 96;
-      case ES512 -> 132;
-      default -> throw new InvalidJWTSignatureException();
-    };
+
+    int expectedLength;
+    int curveIntLength;
+    try {
+      expectedLength = ECFamily.joseSignatureLength(this.algorithm);
+      curveIntLength = ECFamily.curveIntLength(this.algorithm);
+    } catch (IllegalArgumentException e) {
+      // ECFamily does not recognize the bound algorithm -- an internal precondition violation.
+      // This should never happen because the constructor only accepts algorithms ECFamily knows.
+      throw new IllegalStateException("ECVerifier bound to unsupported algorithm ["
+          + this.algorithm.name() + "]", e);
+    }
     if (signature.length != expectedLength) {
       throw new InvalidJWTSignatureException();
     }
+
+    byte[] der = JOSEConverter.joseToDer(signature, curveIntLength);
     try {
-      Signature verifier = Signature.getInstance(algorithm.getName() + "inP1363Format");
+      Signature verifier = Signature.getInstance(ECFamily.toJCA(this.algorithm));
       verifier.initVerify(publicKey);
       verifier.update(message);
-
-      // Depending upon the JCE provider, an invalid signature may cause verify() to return false
-      // or throw a SignatureException. For example, the signature length may not match the key size.
       try {
-        if (!verifier.verify(signature)) {
+        if (!verifier.verify(der)) {
           throw new InvalidJWTSignatureException();
         }
       } catch (SignatureException e) {
-        throw new InvalidJWTSignatureException(e);
+        // JCA signals malformed/truncated DER via SignatureException. The cause is intentionally
+        // dropped: the bare exception type is the signal.
+        throw new InvalidJWTSignatureException();
       }
     } catch (InvalidKeyException | NoSuchAlgorithmException | SignatureException | SecurityException e) {
       throw new JWTVerifierException("An unexpected exception occurred when attempting to verify the JWT", e);

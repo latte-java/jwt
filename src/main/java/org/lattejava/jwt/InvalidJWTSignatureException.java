@@ -18,14 +18,14 @@ package org.lattejava.jwt;
 
 /**
  * The JWT was properly constructed but the signature is invalid. This token should not be trusted.
+ * <p>
+ * This exception carries no message and no cause by design: its <em>presence</em> is the signal. Propagating a
+ * JCA-level detail such as "Signature length not correct" would turn verification failures into an oracle that leaks
+ * information about the shape of the rejected ciphertext to an attacker probing variations of a forged signature.
  *
  * @author Daniel DeGroff
  */
 public class InvalidJWTSignatureException extends JWTException {
   public InvalidJWTSignatureException() {
-  }
-
-  public InvalidJWTSignatureException(Throwable cause) {
-    super(cause.getMessage(), cause);
   }
 }

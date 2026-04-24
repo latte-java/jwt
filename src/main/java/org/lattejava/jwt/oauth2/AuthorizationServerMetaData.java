@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, FusionAuth, All Rights Reserved
+ * Copyright (c) 2026, FusionAuth, All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,88 +16,438 @@
 
 package org.lattejava.jwt.oauth2;
 
-import com.fasterxml.jackson.annotation.JsonAnyGetter;
-import com.fasterxml.jackson.annotation.JsonAnySetter;
-import org.lattejava.jwt.json.Mapper;
+import org.lattejava.jwt.LatteJSONProcessor;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
- * Server Metadata as defined by <a href="https://tools.ietf.org/html/rfc8414">RFC 8414</a>
+ * Server Metadata as defined by <a href="https://tools.ietf.org/html/rfc8414">RFC 8414</a>.
+ *
+ * <p>Immutable. Construct via {@link #builder()} or {@link #fromMap(Map)} and
+ * serialize via {@link #toSerializableMap()} through a
+ * {@link org.lattejava.jwt.JSONProcessor}.</p>
  *
  * @author Daniel DeGroff
  */
 public class AuthorizationServerMetaData {
-  public String authorization_endpoint;
+  private static final Set<String> REGISTERED = new HashSet<>(Arrays.asList(
+      "authorization_endpoint",
+      "code_challenge_methods_supported",
+      "grant_types_supported",
+      "introspection_endpoint",
+      "introspection_endpoint_auth_methods_supported",
+      "introspection_endpoint_auth_signing_alg_values_supported",
+      "issuer",
+      "jwks_uri",
+      "op_policy_uri",
+      "op_tos_uri",
+      "registration_endpoint",
+      "response_modes_supported",
+      "response_types_supported",
+      "revocation_endpoint",
+      "revocation_endpoint_auth_methods_supported",
+      "revocation_endpoint_auth_signing_alg_values_supported",
+      "scopes_supported",
+      "service_documentation",
+      "token_endpoint",
+      "token_endpoint_auth_methods_supported",
+      "token_endpoint_auth_signing_alg_values_supported",
+      "ui_locales_supported"
+  ));
 
-  public List<String> code_challenge_methods_supported;
+  private final String authorizationEndpoint;
 
-  public List<String> grant_types_supported;
+  private final List<String> codeChallengeMethodsSupported;
 
-  public String introspection_endpoint;
+  private final List<String> grantTypesSupported;
 
-  public List<String> introspection_endpoint_auth_methods_supported;
+  private final String introspectionEndpoint;
 
-  public List<String> introspection_endpoint_auth_signing_alg_values_supported;
+  private final List<String> introspectionEndpointAuthMethodsSupported;
 
-  public String issuer;
+  private final List<String> introspectionEndpointAuthSigningAlgValuesSupported;
 
-  public String jwks_uri;
+  private final String issuer;
 
-  public String op_policy_uri;
+  private final String jwksUri;
 
-  public String op_tos_uri;
+  private final String opPolicyUri;
 
-  @JsonAnySetter
-  public Map<String, Object> otherClaims = new LinkedHashMap<>();
+  private final String opTosUri;
 
-  public String registration_endpoint;
+  private final Map<String, Object> otherClaims;
 
-  public List<String> response_modes_supported;
+  private final String registrationEndpoint;
 
-  public List<String> response_types_supported;
+  private final List<String> responseModesSupported;
 
-  public String revocation_endpoint;
+  private final List<String> responseTypesSupported;
 
-  public List<String> revocation_endpoint_auth_methods_supported;
+  private final String revocationEndpoint;
 
-  public List<String> revocation_endpoint_auth_signing_alg_values_supported;
+  private final List<String> revocationEndpointAuthMethodsSupported;
 
-  public List<String> scopes_supported;
+  private final List<String> revocationEndpointAuthSigningAlgValuesSupported;
 
-  public String service_documentation;
+  private final List<String> scopesSupported;
 
-  public String token_endpoint;
+  private final String serviceDocumentation;
 
-  public List<String> token_endpoint_auth_methods_supported;
+  private final String tokenEndpoint;
 
-  public List<String> token_endpoint_auth_signing_alg_values_supported;
+  private final List<String> tokenEndpointAuthMethodsSupported;
 
-  public List<String> ui_locales_supported;
+  private final List<String> tokenEndpointAuthSigningAlgValuesSupported;
 
-  @JsonAnyGetter
-  public Map<String, Object> getOtherClaims() {
+  private final List<String> uiLocalesSupported;
+
+  private AuthorizationServerMetaData(Builder b) {
+    this.authorizationEndpoint = b.authorizationEndpoint;
+    this.codeChallengeMethodsSupported = immutableCopy(b.codeChallengeMethodsSupported);
+    this.grantTypesSupported = immutableCopy(b.grantTypesSupported);
+    this.introspectionEndpoint = b.introspectionEndpoint;
+    this.introspectionEndpointAuthMethodsSupported = immutableCopy(b.introspectionEndpointAuthMethodsSupported);
+    this.introspectionEndpointAuthSigningAlgValuesSupported = immutableCopy(b.introspectionEndpointAuthSigningAlgValuesSupported);
+    this.issuer = b.issuer;
+    this.jwksUri = b.jwksUri;
+    this.opPolicyUri = b.opPolicyUri;
+    this.opTosUri = b.opTosUri;
+    this.registrationEndpoint = b.registrationEndpoint;
+    this.responseModesSupported = immutableCopy(b.responseModesSupported);
+    this.responseTypesSupported = immutableCopy(b.responseTypesSupported);
+    this.revocationEndpoint = b.revocationEndpoint;
+    this.revocationEndpointAuthMethodsSupported = immutableCopy(b.revocationEndpointAuthMethodsSupported);
+    this.revocationEndpointAuthSigningAlgValuesSupported = immutableCopy(b.revocationEndpointAuthSigningAlgValuesSupported);
+    this.scopesSupported = immutableCopy(b.scopesSupported);
+    this.serviceDocumentation = b.serviceDocumentation;
+    this.tokenEndpoint = b.tokenEndpoint;
+    this.tokenEndpointAuthMethodsSupported = immutableCopy(b.tokenEndpointAuthMethodsSupported);
+    this.tokenEndpointAuthSigningAlgValuesSupported = immutableCopy(b.tokenEndpointAuthSigningAlgValuesSupported);
+    this.uiLocalesSupported = immutableCopy(b.uiLocalesSupported);
+    this.otherClaims = Collections.unmodifiableMap(new LinkedHashMap<>(b.otherClaims));
+  }
+
+  private static List<String> immutableCopy(List<String> list) {
+    return list == null ? null : List.copyOf(list);
+  }
+
+  public String authorizationEndpoint() {
+    return authorizationEndpoint;
+  }
+
+  public List<String> codeChallengeMethodsSupported() {
+    return codeChallengeMethodsSupported;
+  }
+
+  public List<String> grantTypesSupported() {
+    return grantTypesSupported;
+  }
+
+  public String introspectionEndpoint() {
+    return introspectionEndpoint;
+  }
+
+  public List<String> introspectionEndpointAuthMethodsSupported() {
+    return introspectionEndpointAuthMethodsSupported;
+  }
+
+  public List<String> introspectionEndpointAuthSigningAlgValuesSupported() {
+    return introspectionEndpointAuthSigningAlgValuesSupported;
+  }
+
+  public String issuer() {
+    return issuer;
+  }
+
+  public String jwksUri() {
+    return jwksUri;
+  }
+
+  public String opPolicyUri() {
+    return opPolicyUri;
+  }
+
+  public String opTosUri() {
+    return opTosUri;
+  }
+
+  public Map<String, Object> otherClaims() {
     return otherClaims;
+  }
+
+  public String registrationEndpoint() {
+    return registrationEndpoint;
+  }
+
+  public List<String> responseModesSupported() {
+    return responseModesSupported;
+  }
+
+  public List<String> responseTypesSupported() {
+    return responseTypesSupported;
+  }
+
+  public String revocationEndpoint() {
+    return revocationEndpoint;
+  }
+
+  public List<String> revocationEndpointAuthMethodsSupported() {
+    return revocationEndpointAuthMethodsSupported;
+  }
+
+  public List<String> revocationEndpointAuthSigningAlgValuesSupported() {
+    return revocationEndpointAuthSigningAlgValuesSupported;
+  }
+
+  public List<String> scopesSupported() {
+    return scopesSupported;
+  }
+
+  public String serviceDocumentation() {
+    return serviceDocumentation;
+  }
+
+  public String tokenEndpoint() {
+    return tokenEndpoint;
+  }
+
+  public List<String> tokenEndpointAuthMethodsSupported() {
+    return tokenEndpointAuthMethodsSupported;
+  }
+
+  public List<String> tokenEndpointAuthSigningAlgValuesSupported() {
+    return tokenEndpointAuthSigningAlgValuesSupported;
+  }
+
+  public List<String> uiLocalesSupported() {
+    return uiLocalesSupported;
+  }
+
+  /**
+   * Map suitable for JSON serialization. Registered RFC 8414 fields appear
+   * under their specified names; non-registered claims are emitted from
+   * {@link #otherClaims()}.
+   */
+  public Map<String, Object> toSerializableMap() {
+    Map<String, Object> out = new LinkedHashMap<>();
+    putIfPresent(out, "authorization_endpoint", authorizationEndpoint);
+    putIfPresent(out, "code_challenge_methods_supported", codeChallengeMethodsSupported);
+    putIfPresent(out, "grant_types_supported", grantTypesSupported);
+    putIfPresent(out, "introspection_endpoint", introspectionEndpoint);
+    putIfPresent(out, "introspection_endpoint_auth_methods_supported", introspectionEndpointAuthMethodsSupported);
+    putIfPresent(out, "introspection_endpoint_auth_signing_alg_values_supported", introspectionEndpointAuthSigningAlgValuesSupported);
+    putIfPresent(out, "issuer", issuer);
+    putIfPresent(out, "jwks_uri", jwksUri);
+    putIfPresent(out, "op_policy_uri", opPolicyUri);
+    putIfPresent(out, "op_tos_uri", opTosUri);
+    putIfPresent(out, "registration_endpoint", registrationEndpoint);
+    putIfPresent(out, "response_modes_supported", responseModesSupported);
+    putIfPresent(out, "response_types_supported", responseTypesSupported);
+    putIfPresent(out, "revocation_endpoint", revocationEndpoint);
+    putIfPresent(out, "revocation_endpoint_auth_methods_supported", revocationEndpointAuthMethodsSupported);
+    putIfPresent(out, "revocation_endpoint_auth_signing_alg_values_supported", revocationEndpointAuthSigningAlgValuesSupported);
+    putIfPresent(out, "scopes_supported", scopesSupported);
+    putIfPresent(out, "service_documentation", serviceDocumentation);
+    putIfPresent(out, "token_endpoint", tokenEndpoint);
+    putIfPresent(out, "token_endpoint_auth_methods_supported", tokenEndpointAuthMethodsSupported);
+    putIfPresent(out, "token_endpoint_auth_signing_alg_values_supported", tokenEndpointAuthSigningAlgValuesSupported);
+    putIfPresent(out, "ui_locales_supported", uiLocalesSupported);
+    for (Map.Entry<String, Object> e : otherClaims.entrySet()) {
+      if (e.getValue() != null && !REGISTERED.contains(e.getKey())) {
+        out.put(e.getKey(), e.getValue());
+      }
+    }
+    return Collections.unmodifiableMap(out);
+  }
+
+  private static void putIfPresent(Map<String, Object> out, String key, Object value) {
+    if (value != null) {
+      out.put(key, value);
+    }
+  }
+
+  public static AuthorizationServerMetaData fromMap(Map<String, Object> map) {
+    Objects.requireNonNull(map, "map");
+    Builder b = new Builder();
+    for (Map.Entry<String, Object> entry : map.entrySet()) {
+      String name = entry.getKey();
+      Object value = entry.getValue();
+      if (value == null) continue;
+      switch (name) {
+        case "authorization_endpoint": b.authorizationEndpoint = value.toString(); break;
+        case "code_challenge_methods_supported": b.codeChallengeMethodsSupported = stringList(value, name); break;
+        case "grant_types_supported": b.grantTypesSupported = stringList(value, name); break;
+        case "introspection_endpoint": b.introspectionEndpoint = value.toString(); break;
+        case "introspection_endpoint_auth_methods_supported": b.introspectionEndpointAuthMethodsSupported = stringList(value, name); break;
+        case "introspection_endpoint_auth_signing_alg_values_supported": b.introspectionEndpointAuthSigningAlgValuesSupported = stringList(value, name); break;
+        case "issuer": b.issuer = value.toString(); break;
+        case "jwks_uri": b.jwksUri = value.toString(); break;
+        case "op_policy_uri": b.opPolicyUri = value.toString(); break;
+        case "op_tos_uri": b.opTosUri = value.toString(); break;
+        case "registration_endpoint": b.registrationEndpoint = value.toString(); break;
+        case "response_modes_supported": b.responseModesSupported = stringList(value, name); break;
+        case "response_types_supported": b.responseTypesSupported = stringList(value, name); break;
+        case "revocation_endpoint": b.revocationEndpoint = value.toString(); break;
+        case "revocation_endpoint_auth_methods_supported": b.revocationEndpointAuthMethodsSupported = stringList(value, name); break;
+        case "revocation_endpoint_auth_signing_alg_values_supported": b.revocationEndpointAuthSigningAlgValuesSupported = stringList(value, name); break;
+        case "scopes_supported": b.scopesSupported = stringList(value, name); break;
+        case "service_documentation": b.serviceDocumentation = value.toString(); break;
+        case "token_endpoint": b.tokenEndpoint = value.toString(); break;
+        case "token_endpoint_auth_methods_supported": b.tokenEndpointAuthMethodsSupported = stringList(value, name); break;
+        case "token_endpoint_auth_signing_alg_values_supported": b.tokenEndpointAuthSigningAlgValuesSupported = stringList(value, name); break;
+        case "ui_locales_supported": b.uiLocalesSupported = stringList(value, name); break;
+        default: b.otherClaims.put(name, value); break;
+      }
+    }
+    return b.build();
+  }
+
+  private static List<String> stringList(Object value, String name) {
+    if (!(value instanceof List<?> list)) {
+      throw new IllegalArgumentException("Server metadata field [" + name + "] must be an array of strings");
+    }
+    List<String> result = new ArrayList<>();
+    for (Object element : list) {
+      if (!(element instanceof String s)) {
+        throw new IllegalArgumentException("Server metadata field [" + name + "] must be an array of strings");
+      }
+      result.add(s);
+    }
+    return result;
+  }
+
+  public String toJSON() {
+    return new String(new LatteJSONProcessor().serialize(toSerializableMap()));
   }
 
   @Override
   public String toString() {
-    return new String(Mapper.prettyPrint(this));
+    return toJSON();
   }
 
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
     if (o == null || getClass() != o.getClass()) return false;
-    AuthorizationServerMetaData metaData = (AuthorizationServerMetaData) o;
-    return Objects.equals(authorization_endpoint, metaData.authorization_endpoint) && Objects.equals(code_challenge_methods_supported, metaData.code_challenge_methods_supported) && Objects.equals(grant_types_supported, metaData.grant_types_supported) && Objects.equals(introspection_endpoint, metaData.introspection_endpoint) && Objects.equals(introspection_endpoint_auth_methods_supported, metaData.introspection_endpoint_auth_methods_supported) && Objects.equals(introspection_endpoint_auth_signing_alg_values_supported, metaData.introspection_endpoint_auth_signing_alg_values_supported) && Objects.equals(issuer, metaData.issuer) && Objects.equals(jwks_uri, metaData.jwks_uri) && Objects.equals(op_policy_uri, metaData.op_policy_uri) && Objects.equals(op_tos_uri, metaData.op_tos_uri) && Objects.equals(otherClaims, metaData.otherClaims) && Objects.equals(registration_endpoint, metaData.registration_endpoint) && Objects.equals(response_modes_supported, metaData.response_modes_supported) && Objects.equals(response_types_supported, metaData.response_types_supported) && Objects.equals(revocation_endpoint, metaData.revocation_endpoint) && Objects.equals(revocation_endpoint_auth_methods_supported, metaData.revocation_endpoint_auth_methods_supported) && Objects.equals(revocation_endpoint_auth_signing_alg_values_supported, metaData.revocation_endpoint_auth_signing_alg_values_supported) && Objects.equals(scopes_supported, metaData.scopes_supported) && Objects.equals(service_documentation, metaData.service_documentation) && Objects.equals(token_endpoint, metaData.token_endpoint) && Objects.equals(token_endpoint_auth_methods_supported, metaData.token_endpoint_auth_methods_supported) && Objects.equals(token_endpoint_auth_signing_alg_values_supported, metaData.token_endpoint_auth_signing_alg_values_supported) && Objects.equals(ui_locales_supported, metaData.ui_locales_supported);
+    AuthorizationServerMetaData that = (AuthorizationServerMetaData) o;
+    return Objects.equals(authorizationEndpoint, that.authorizationEndpoint)
+        && Objects.equals(codeChallengeMethodsSupported, that.codeChallengeMethodsSupported)
+        && Objects.equals(grantTypesSupported, that.grantTypesSupported)
+        && Objects.equals(introspectionEndpoint, that.introspectionEndpoint)
+        && Objects.equals(introspectionEndpointAuthMethodsSupported, that.introspectionEndpointAuthMethodsSupported)
+        && Objects.equals(introspectionEndpointAuthSigningAlgValuesSupported, that.introspectionEndpointAuthSigningAlgValuesSupported)
+        && Objects.equals(issuer, that.issuer)
+        && Objects.equals(jwksUri, that.jwksUri)
+        && Objects.equals(opPolicyUri, that.opPolicyUri)
+        && Objects.equals(opTosUri, that.opTosUri)
+        && Objects.equals(otherClaims, that.otherClaims)
+        && Objects.equals(registrationEndpoint, that.registrationEndpoint)
+        && Objects.equals(responseModesSupported, that.responseModesSupported)
+        && Objects.equals(responseTypesSupported, that.responseTypesSupported)
+        && Objects.equals(revocationEndpoint, that.revocationEndpoint)
+        && Objects.equals(revocationEndpointAuthMethodsSupported, that.revocationEndpointAuthMethodsSupported)
+        && Objects.equals(revocationEndpointAuthSigningAlgValuesSupported, that.revocationEndpointAuthSigningAlgValuesSupported)
+        && Objects.equals(scopesSupported, that.scopesSupported)
+        && Objects.equals(serviceDocumentation, that.serviceDocumentation)
+        && Objects.equals(tokenEndpoint, that.tokenEndpoint)
+        && Objects.equals(tokenEndpointAuthMethodsSupported, that.tokenEndpointAuthMethodsSupported)
+        && Objects.equals(tokenEndpointAuthSigningAlgValuesSupported, that.tokenEndpointAuthSigningAlgValuesSupported)
+        && Objects.equals(uiLocalesSupported, that.uiLocalesSupported);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(authorization_endpoint, code_challenge_methods_supported, grant_types_supported, introspection_endpoint, introspection_endpoint_auth_methods_supported, introspection_endpoint_auth_signing_alg_values_supported, issuer, jwks_uri, op_policy_uri, op_tos_uri, otherClaims, registration_endpoint, response_modes_supported, response_types_supported, revocation_endpoint, revocation_endpoint_auth_methods_supported, revocation_endpoint_auth_signing_alg_values_supported, scopes_supported, service_documentation, token_endpoint, token_endpoint_auth_methods_supported, token_endpoint_auth_signing_alg_values_supported, ui_locales_supported);
+    return Objects.hash(authorizationEndpoint, codeChallengeMethodsSupported, grantTypesSupported,
+        introspectionEndpoint, introspectionEndpointAuthMethodsSupported,
+        introspectionEndpointAuthSigningAlgValuesSupported, issuer, jwksUri, opPolicyUri, opTosUri,
+        otherClaims, registrationEndpoint, responseModesSupported, responseTypesSupported,
+        revocationEndpoint, revocationEndpointAuthMethodsSupported,
+        revocationEndpointAuthSigningAlgValuesSupported, scopesSupported, serviceDocumentation,
+        tokenEndpoint, tokenEndpointAuthMethodsSupported,
+        tokenEndpointAuthSigningAlgValuesSupported, uiLocalesSupported);
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  /**
+   * Mutable, reusable builder for {@link AuthorizationServerMetaData}. After
+   * {@link #build()} is called, the builder retains its state and may be
+   * further modified to produce additional independent
+   * {@link AuthorizationServerMetaData} instances; each {@code build()} call
+   * produces a fresh immutable instance with an independent copy of any
+   * collection fields.
+   */
+  public static final class Builder {
+    private String authorizationEndpoint;
+    private List<String> codeChallengeMethodsSupported;
+    private List<String> grantTypesSupported;
+    private String introspectionEndpoint;
+    private List<String> introspectionEndpointAuthMethodsSupported;
+    private List<String> introspectionEndpointAuthSigningAlgValuesSupported;
+    private String issuer;
+    private String jwksUri;
+    private String opPolicyUri;
+    private String opTosUri;
+    private final Map<String, Object> otherClaims = new LinkedHashMap<>();
+    private String registrationEndpoint;
+    private List<String> responseModesSupported;
+    private List<String> responseTypesSupported;
+    private String revocationEndpoint;
+    private List<String> revocationEndpointAuthMethodsSupported;
+    private List<String> revocationEndpointAuthSigningAlgValuesSupported;
+    private List<String> scopesSupported;
+    private String serviceDocumentation;
+    private String tokenEndpoint;
+    private List<String> tokenEndpointAuthMethodsSupported;
+    private List<String> tokenEndpointAuthSigningAlgValuesSupported;
+    private List<String> uiLocalesSupported;
+
+    private Builder() {}
+
+    public Builder authorizationEndpoint(String v)                                       { this.authorizationEndpoint = v; return this; }
+    public Builder codeChallengeMethodsSupported(List<String> v)                         { this.codeChallengeMethodsSupported = v; return this; }
+    public Builder grantTypesSupported(List<String> v)                                   { this.grantTypesSupported = v; return this; }
+    public Builder introspectionEndpoint(String v)                                       { this.introspectionEndpoint = v; return this; }
+    public Builder introspectionEndpointAuthMethodsSupported(List<String> v)             { this.introspectionEndpointAuthMethodsSupported = v; return this; }
+    public Builder introspectionEndpointAuthSigningAlgValuesSupported(List<String> v)    { this.introspectionEndpointAuthSigningAlgValuesSupported = v; return this; }
+    public Builder issuer(String v)                                                      { this.issuer = v; return this; }
+    public Builder jwksUri(String v)                                                     { this.jwksUri = v; return this; }
+    public Builder opPolicyUri(String v)                                                 { this.opPolicyUri = v; return this; }
+    public Builder opTosUri(String v)                                                    { this.opTosUri = v; return this; }
+    public Builder registrationEndpoint(String v)                                        { this.registrationEndpoint = v; return this; }
+    public Builder responseModesSupported(List<String> v)                                { this.responseModesSupported = v; return this; }
+    public Builder responseTypesSupported(List<String> v)                                { this.responseTypesSupported = v; return this; }
+    public Builder revocationEndpoint(String v)                                          { this.revocationEndpoint = v; return this; }
+    public Builder revocationEndpointAuthMethodsSupported(List<String> v)                { this.revocationEndpointAuthMethodsSupported = v; return this; }
+    public Builder revocationEndpointAuthSigningAlgValuesSupported(List<String> v)       { this.revocationEndpointAuthSigningAlgValuesSupported = v; return this; }
+    public Builder scopesSupported(List<String> v)                                       { this.scopesSupported = v; return this; }
+    public Builder serviceDocumentation(String v)                                        { this.serviceDocumentation = v; return this; }
+    public Builder tokenEndpoint(String v)                                               { this.tokenEndpoint = v; return this; }
+    public Builder tokenEndpointAuthMethodsSupported(List<String> v)                     { this.tokenEndpointAuthMethodsSupported = v; return this; }
+    public Builder tokenEndpointAuthSigningAlgValuesSupported(List<String> v)            { this.tokenEndpointAuthSigningAlgValuesSupported = v; return this; }
+    public Builder uiLocalesSupported(List<String> v)                                    { this.uiLocalesSupported = v; return this; }
+
+    public Builder claim(String name, Object value) {
+      Objects.requireNonNull(name, "name");
+      if (REGISTERED.contains(name)) {
+        throw new IllegalArgumentException("Cannot add a registered server-metadata claim [" + name + "]; use the typed setter");
+      }
+      otherClaims.put(name, value);
+      return this;
+    }
+
+    public AuthorizationServerMetaData build() {
+      return new AuthorizationServerMetaData(this);
+    }
   }
 }

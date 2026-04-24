@@ -59,17 +59,41 @@ public class BuilderHTTPHandler implements HttpHandler {
       return;
     }
 
-    // Else return the expected result
+    // Set headers BEFORE sendResponseHeaders (HttpExchange flushes once headers are committed).
+    if (expectedResult.contentType != null) {
+      httpExchange.getResponseHeaders().add("Content-Type", expectedResult.contentType);
+    }
+    if (expectedResult.redirectLocation != null) {
+      httpExchange.getResponseHeaders().add("Location", expectedResult.redirectLocation);
+    }
+
+    if (expectedResult.responseSize > 0) {
+      // Stream a synthesized body of exactly responseSize bytes. Content is a
+      // wide-padded JSON object so that a JSON parser still parses any prefix
+      // up to the cap; the test cares about the size enforcement, not the
+      // content semantics.
+      int total = expectedResult.responseSize;
+      httpExchange.sendResponseHeaders(expectedResult.status, total);
+      try (java.io.OutputStream out = httpExchange.getResponseBody()) {
+        byte[] chunk = new byte[Math.min(8192, total)];
+        java.util.Arrays.fill(chunk, (byte) ' ');
+        int written = 0;
+        while (written < total) {
+          int len = Math.min(chunk.length, total - written);
+          out.write(chunk, 0, len);
+          written += len;
+        }
+      }
+      return;
+    }
+
+    // Else return the expected result body verbatim.
     byte[] bytes = expectedResult.response == null ? new byte[]{} : expectedResult.response.getBytes(StandardCharsets.UTF_8);
     httpExchange.sendResponseHeaders(expectedResult.status, bytes.length);
 
     if (bytes.length != 0) {
       httpExchange.getResponseBody().write(bytes);
       httpExchange.getResponseBody().flush();
-    }
-
-    if (expectedResult.contentType != null) {
-      httpExchange.getResponseHeaders().add("Content-Type", expectedResult.contentType);
     }
 
     httpExchange.getResponseBody().close();

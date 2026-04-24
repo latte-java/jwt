@@ -16,11 +16,19 @@
 
 package org.lattejava.jwt.pem;
 
+import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.pem.PEM;
+import org.lattejava.jwt.x509.X509;
+import org.lattejava.jwt.x509.X509BuilderTest;
 import org.testng.annotations.Test;
 
+import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.security.KeyPair;
+import java.security.cert.X509Certificate;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.List;
 
@@ -33,6 +41,34 @@ import static org.testng.Assert.assertTrue;
  * @author Daniel DeGroff
  */
 public class PEMDecoderTest {
+  @Test
+  public void decodeTBSCertificateFields_roundTrip() throws Exception {
+    // Use case: decodeTBSCertificateFields parses serial / validity / issuer / subject from a
+    // DER-encoded cert without going through CertificateFactory.
+    KeyPair kp = X509BuilderTest.generateKeyPair(Algorithm.RS256);
+    Instant notBefore = Instant.parse("2024-06-01T12:00:00Z");
+    Instant notAfter = notBefore.plus(180, ChronoUnit.DAYS);
+    X509Certificate cert = X509.builder()
+        .serialNumber(BigInteger.valueOf(424242))
+        .issuer("CN=TBS Issuer")
+        .subject("CN=TBS Subject")
+        .validity(notBefore, notAfter)
+        .publicKey(kp.getPublic())
+        .signingKey(kp.getPrivate())
+        .signatureAlgorithm(Algorithm.RS256)
+        .build();
+
+    PEMDecoder.TBSFields tbs = new PEMDecoder().decodeTBSCertificateFields(cert.getEncoded());
+    assertEquals(tbs.serialNumber(), BigInteger.valueOf(424242));
+    assertEquals(tbs.notBefore(), notBefore);
+    assertEquals(tbs.notAfter(), notAfter);
+    assertNotNull(tbs.issuerDer());
+    assertNotNull(tbs.subjectDer());
+    // Issuer and subject DERs differ because the CN strings differ.
+    assertTrue(tbs.issuerDer().length > 0);
+    assertTrue(tbs.subjectDer().length > 0);
+  }
+
   @Test
   public void inputs() throws Exception {
     // Ensure there are no explosions, loading the PEM from a Path, bytes and a String

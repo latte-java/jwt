@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2025, FusionAuth, All Rights Reserved
+ * Copyright (c) 2016-2026, FusionAuth, All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,1083 +16,565 @@
 
 package org.lattejava.jwt;
 
-import org.lattejava.jwt.algorithm.ec.ECSigner;
-import org.lattejava.jwt.algorithm.ec.ECVerifier;
-import org.lattejava.jwt.algorithm.ed.EdDSASigner;
-import org.lattejava.jwt.algorithm.ed.EdDSAVerifier;
-import org.lattejava.jwt.algorithm.hmac.HMACSigner;
-import org.lattejava.jwt.algorithm.hmac.HMACVerifier;
-import org.lattejava.jwt.algorithm.rsa.RSAPSSSigner;
-import org.lattejava.jwt.algorithm.rsa.RSAPSSVerifier;
-import org.lattejava.jwt.algorithm.rsa.RSASigner;
-import org.lattejava.jwt.algorithm.rsa.RSAVerifier;
-import org.lattejava.jwt.pem.PEM;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.math.RoundingMode;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.security.interfaces.ECPublicKey;
-import java.security.interfaces.RSAPublicKey;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
-import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
+import static org.testng.Assert.fail;
 
 /**
- * Note that the higher invocationCount parameters are helpful to indentify incorrect assumptions in key parsing.
- * <p>
- * Key lengths can differ, and when encoding larger integers in DER encode sequences, or parsing them in and out of
- * JWK formats, we want to be certain we are not making incorrect assumptions. During development, you may wish to
- * run some of these with 5-10k invocation counts to ensure these types of anomalies are un-covered and addressed.
- * <p>
- * It may be reasonable to reduce the invocation counts if tests take too long to run - once we know that the tests
- * will pass with a high number of invocations. However, the time is not yet that significant, and there is value to
- * ensuring that the same result can be expected regardless of the number of times we run the same test.
+ * Tests for {@link JWT}.
  *
  * @author Daniel DeGroff
  */
-public class JWTTest extends BaseJWTTest {
-  private final String rsaPrivateKey4096Pem;
+public class JWTTest {
+  // -------------------- Builder --------------------
 
-  private final Path ecPublicKey256Path;
-
-  private final Path rsaPublicKey4096Path;
-
-  private final Path rsaPublicKey2048Path;
-
-  private final Path secretPath;
-
-  public JWTTest() throws Exception {
-    rsaPrivateKey4096Pem = new String(Files.readAllBytes(Paths.get("src/test/resources/rsa_private_key_4096.pem")));
-    ecPublicKey256Path = Paths.get("src/test/resources/ec_public_key_p_256.pem");
-    rsaPublicKey4096Path = Paths.get("src/test/resources/rsa_public_key_4096.pem");
-    rsaPublicKey2048Path = Paths.get("src/test/resources/rsa_public_key_2048.pem");
-    secretPath = Paths.get("src/test/resources/secret.txt");
+  @Test
+  public void builder_reusable_produces_independent_instances() {
+    // Use case: Builder reusability -- build(), modify, build() again produces independent instances.
+    JWT.Builder b = JWT.builder();
+    JWT a = b.subject("a").build();
+    JWT bee = b.subject("b").build();
+    assertEquals(a.subject(), "a");
+    assertEquals(bee.subject(), "b");
+    assertNotEquals(a, bee);
   }
 
-  @Test(enabled = false)
-  public void buildSignerPerformance() throws Exception {
-    long iterationCount = 500_000;
-    String privateKey = new String(Files.readAllBytes(Paths.get("src/test/resources/rsa_private_key_2048.pem")));
-
-    Instant start = Instant.now();
-    for (int i = 0; i < iterationCount; i++) {
-      RSASigner.newSHA256Signer(privateKey);
-    }
-
-    Duration duration = Duration.between(start, Instant.now());
-    BigDecimal durationInMillis = BigDecimal.valueOf(duration.toMillis());
-    BigDecimal average = durationInMillis.divide(BigDecimal.valueOf(iterationCount), RoundingMode.HALF_DOWN);
-    long perSecond = iterationCount / (duration.toMillis() / 1000);
-
-    System.out.println("[Build Signer] " + duration.toMillis() + " milliseconds total. [" + iterationCount + "] iterations. [" + average + "] milliseconds per iteration. Approx. [" + perSecond + "] per second.");
-
-    // 500,000 Iterations
-    // - Reading file and building signer
-    //   --> Results [Build Signer] 28274 milliseconds total. [500000] iterations. [0] milliseconds per iteration. Approx. [17,857] per second.
-    ///
-    // - Build Signer Only
-    //   --> Results [Build Signer] 15443 milliseconds total. [500000] iterations. [0] milliseconds per iteration. Approx. [33,333] per second.
+  @Test
+  public void builder_claim_routes_exp_long_to_instant() {
+    // Use case: claim("exp", 1700000000L) -> Instant.ofEpochSecond(1700000000)
+    JWT jwt = JWT.builder().claim("exp", 1_700_000_000L).build();
+    assertEquals(jwt.expiresAt(), Instant.ofEpochSecond(1_700_000_000L));
   }
 
-  @Test(enabled = false)
-  public void buildVerifierPerformance() throws Exception {
-    long iterationCount = 500_000;
-    String publicKey = new String(Files.readAllBytes(rsaPublicKey2048Path));
-
-    Instant start = Instant.now();
-    for (int i = 0; i < iterationCount; i++) {
-      RSAVerifier.newVerifier(publicKey);
-    }
-
-    Duration duration = Duration.between(start, Instant.now());
-    BigDecimal durationInMillis = BigDecimal.valueOf(duration.toMillis());
-    BigDecimal average = durationInMillis.divide(BigDecimal.valueOf(iterationCount), RoundingMode.HALF_DOWN);
-    long perSecond = iterationCount / (duration.toMillis() / 1000);
-
-    System.out.println("[Build Verifier] " + duration.toMillis() + " milliseconds total. [" + iterationCount + "] iterations. [" + average + "] milliseconds per iteration. Approx. [" + perSecond + "] per second.");
-
-    // 500,000 Iterations
-    // - Reading file and building verifier
-    //   --> Results [Build Verifier] 14778 milliseconds total. [500000] iterations. [0] milliseconds per iteration. Approx. [35,714] per second.
-    ///
-    // - Build Verifier Only
-    //   --> Results [Build Verifier] 4969 milliseconds total. [500000] iterations. [0] milliseconds per iteration. Approx. [125,000] per second.
+  @Test
+  public void builder_claim_routes_exp_instant_directly() {
+    Instant inst = Instant.ofEpochSecond(1_700_000_000L);
+    JWT jwt = JWT.builder().claim("exp", inst).build();
+    assertEquals(jwt.expiresAt(), inst);
   }
+
+  @Test
+  public void builder_claim_routes_exp_zoned_date_time() {
+    ZonedDateTime z = ZonedDateTime.of(2030, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC);
+    JWT jwt = JWT.builder().claim("exp", z).build();
+    assertEquals(jwt.expiresAt(), z.toInstant());
+  }
+
+  @Test
+  public void builder_claim_exp_string_throws_iae() {
+    // Use case: claim("exp", "not-a-number") -> IllegalArgumentException
+    expectThrows(IllegalArgumentException.class, () -> JWT.builder().claim("exp", "not-a-number"));
+  }
+
+  @Test
+  public void builder_claim_iss_routes_to_iss_field() {
+    JWT jwt = JWT.builder().claim("iss", "alice").build();
+    assertEquals(jwt.issuer(), "alice");
+  }
+
+  @Test
+  public void builder_claim_iss_non_string_throws_iae() {
+    expectThrows(IllegalArgumentException.class, () -> JWT.builder().claim("iss", 42));
+  }
+
+  @Test
+  public void builder_claim_custom_stored_in_custom_claims() {
+    // Use case: claim("custom", v) -> stored in customClaims, retrievable via getObject
+    JWT jwt = JWT.builder().claim("foo", "bar").build();
+    assertEquals(jwt.getObject("foo"), "bar");
+  }
+
+  @Test
+  public void builder_null_claim_value_omitted() {
+    // Use case: Null claim values are omitted from build result
+    JWT jwt = JWT.builder().claim("foo", null).build();
+    assertNull(jwt.getObject("foo"));
+    assertFalse(jwt.claims().containsKey("foo"));
+  }
+
+  @Test
+  public void builder_audience_string_defaults_to_always_array() {
+    // Use case: single-audience builder call defaults to ALWAYS_ARRAY so the serialized
+    // form does not vary with which audience overload the caller happens to use.
+    JWT jwt = JWT.builder().audience("svc").build();
+    assertEquals(jwt.audience(), Collections.singletonList("svc"));
+    assertEquals(jwt.audienceSerialization(), AudienceSerialization.ALWAYS_ARRAY);
+    assertEquals(jwt.toSerializableMap().get("aud"), Collections.singletonList("svc"));
+  }
+
+  @Test
+  public void builder_audience_list_defaults_to_always_array() {
+    JWT jwt = JWT.builder().audience(Arrays.asList("a", "b")).build();
+    assertEquals(jwt.audience(), Arrays.asList("a", "b"));
+    assertEquals(jwt.audienceSerialization(), AudienceSerialization.ALWAYS_ARRAY);
+  }
+
+  @Test
+  public void builder_claim_aud_string_defaults_to_always_array() {
+    JWT jwt = JWT.builder().claim("aud", "svc").build();
+    assertEquals(jwt.audience(), Collections.singletonList("svc"));
+    assertEquals(jwt.audienceSerialization(), AudienceSerialization.ALWAYS_ARRAY);
+    assertEquals(jwt.toSerializableMap().get("aud"), Collections.singletonList("svc"));
+  }
+
+  @Test
+  public void builder_claim_aud_list_defaults_to_always_array() {
+    JWT jwt = JWT.builder().claim("aud", Arrays.asList("a", "b")).build();
+    assertEquals(jwt.audienceSerialization(), AudienceSerialization.ALWAYS_ARRAY);
+  }
+
+  @Test
+  public void builder_audience_serialization_opt_in_string_when_single() {
+    // Use case: caller explicitly opts in to STRING_WHEN_SINGLE for a peer that expects
+    // the single-string form. With a 1-element audience, serialization emits a string.
+    JWT jwt = JWT.builder()
+        .audience("svc")
+        .audienceSerialization(AudienceSerialization.STRING_WHEN_SINGLE)
+        .build();
+    assertEquals(jwt.audienceSerialization(), AudienceSerialization.STRING_WHEN_SINGLE);
+    assertEquals(jwt.toSerializableMap().get("aud"), "svc");
+  }
+
+  @Test
+  public void builder_audience_serialization_string_when_single_falls_back_to_array_for_many() {
+    // Use case: STRING_WHEN_SINGLE with 2+ audiences still emits a JSON array -- the opt-in
+    // is "string when the list has one value", not a hard requirement.
+    JWT jwt = JWT.builder()
+        .audience(Arrays.asList("a", "b"))
+        .audienceSerialization(AudienceSerialization.STRING_WHEN_SINGLE)
+        .build();
+    assertEquals(jwt.toSerializableMap().get("aud"), Arrays.asList("a", "b"));
+  }
+
+  @Test
+  public void builder_claim_aud_invalid_type_throws_iae() {
+    expectThrows(IllegalArgumentException.class, () -> JWT.builder().claim("aud", 42));
+  }
+
+  @Test
+  public void builder_claim_aud_list_with_non_string_element_throws_iae() {
+    expectThrows(IllegalArgumentException.class, () -> JWT.builder().claim("aud", Arrays.asList("a", 42)));
+  }
+
+  // -------------------- fromMap shape validation --------------------
+
+  @DataProvider(name = "fromMapMalformed")
+  public Object[][] fromMapMalformed() {
+    return new Object[][] {
+        // Time claim with non-numeric value
+        {"exp", "1700000000"},
+        {"nbf", "1700000000"},
+        {"iat", "abc"},
+        // String claims with non-string value
+        {"iss", 42},
+        {"sub", true},
+        {"jti", Arrays.asList("x")},
+        // Aud with object
+        {"aud", new LinkedHashMap<String, Object>() {{ put("foo", 1); }}},
+        // Aud with mixed-type array
+        {"aud", Arrays.asList("a", 42)},
+        // Aud with number
+        {"aud", 42},
+    };
+  }
+
+  @Test(dataProvider = "fromMapMalformed")
+  public void fromMap_malformed_shape_throws(String claim, Object value) {
+    Map<String, Object> map = new LinkedHashMap<>();
+    map.put(claim, value);
+    expectThrows(InvalidJWTException.class, () -> JWT.fromMap(map, null));
+  }
+
+  @DataProvider(name = "timeClaimBoundsRejected")
+  public Object[][] timeClaimBoundsRejected() {
+    BigInteger overMax = BigInteger.valueOf(Instant.MAX.getEpochSecond()).add(BigInteger.ONE);
+    BigInteger underMin = BigInteger.valueOf(Instant.MIN.getEpochSecond()).subtract(BigInteger.ONE);
+    BigDecimal huge = new BigDecimal("1e30");
+    return new Object[][] {
+        {overMax},
+        {underMin},
+        {huge},
+        {new BigDecimal("-1e30")},
+    };
+  }
+
+  @Test(dataProvider = "timeClaimBoundsRejected")
+  public void fromMap_time_claim_outside_instant_bounds_rejected(Number value) {
+    Map<String, Object> map = new LinkedHashMap<>();
+    map.put("exp", value);
+    expectThrows(InvalidJWTException.class, () -> JWT.fromMap(map, null));
+  }
+
+  @Test
+  public void fromMap_time_claim_at_instant_max_boundary_accepted() {
+    // Use case: fromMap with exp = Instant.MAX.getEpochSecond() -> accepted (boundary)
+    Map<String, Object> map = new LinkedHashMap<>();
+    map.put("exp", BigInteger.valueOf(Instant.MAX.getEpochSecond()));
+    JWT jwt = JWT.fromMap(map, null);
+    assertEquals(jwt.expiresAt().getEpochSecond(), Instant.MAX.getEpochSecond());
+  }
+
+  @Test
+  public void fromMap_time_claim_long_accepted() {
+    Map<String, Object> map = new LinkedHashMap<>();
+    map.put("exp", 1_700_000_000L);
+    JWT jwt = JWT.fromMap(map, null);
+    assertEquals(jwt.expiresAt(), Instant.ofEpochSecond(1_700_000_000L));
+  }
+
+  @Test
+  public void fromMap_time_claim_integer_accepted() {
+    Map<String, Object> map = new LinkedHashMap<>();
+    map.put("exp", 1_700_000_000);
+    JWT jwt = JWT.fromMap(map, null);
+    assertEquals(jwt.expiresAt(), Instant.ofEpochSecond(1_700_000_000L));
+  }
+
+  @Test
+  public void fromMap_time_claim_bigdecimal_truncates_fractional() {
+    Map<String, Object> map = new LinkedHashMap<>();
+    map.put("exp", new BigDecimal("1700000000.5"));
+    JWT jwt = JWT.fromMap(map, null);
+    assertEquals(jwt.expiresAt(), Instant.ofEpochSecond(1_700_000_000L));
+  }
+
+  @Test
+  public void fromMap_aud_string_preserves_wire_form() {
+    // Use case: fromMap with aud = "foo" -> audience() == ["foo"], serialization STRING_WHEN_SINGLE
+    // so a decode/encode round-trip emits the same single-string form it consumed.
+    Map<String, Object> map = new LinkedHashMap<>();
+    map.put("aud", "foo");
+    JWT jwt = JWT.fromMap(map, null);
+    assertEquals(jwt.audience(), Collections.singletonList("foo"));
+    assertEquals(jwt.audienceSerialization(), AudienceSerialization.STRING_WHEN_SINGLE);
+    // Round-trip: serializes back as string
+    assertEquals(jwt.toSerializableMap().get("aud"), "foo");
+  }
+
+  @Test
+  public void fromMap_aud_array_records_always_array() {
+    Map<String, Object> map = new LinkedHashMap<>();
+    map.put("aud", Arrays.asList("foo", "bar"));
+    JWT jwt = JWT.fromMap(map, null);
+    assertEquals(jwt.audience(), Arrays.asList("foo", "bar"));
+    assertEquals(jwt.audienceSerialization(), AudienceSerialization.ALWAYS_ARRAY);
+    Object out = jwt.toSerializableMap().get("aud");
+    assertTrue(out instanceof List);
+    assertEquals(out, Arrays.asList("foo", "bar"));
+  }
+
+  @Test
+  public void fromMap_unknown_claims_pass_through() {
+    Map<String, Object> map = new LinkedHashMap<>();
+    map.put("nonce", "xyz");
+    JWT jwt = JWT.fromMap(map, null);
+    assertEquals(jwt.getString("nonce"), "xyz");
+  }
+
+  @Test
+  public void fromMap_associates_header() {
+    Header header = Header.builder().alg(Algorithm.HS256).build();
+    JWT jwt = JWT.fromMap(new LinkedHashMap<>(), header);
+    assertSame(jwt.header(), header);
+  }
+
+  // -------------------- toSerializableMap --------------------
+
+  @Test
+  public void toSerializableMap_writes_instants_as_epoch_seconds() {
+    JWT jwt = JWT.builder().expiresAt(Instant.ofEpochSecond(1_700_000_000L)).build();
+    Object exp = jwt.toSerializableMap().get("exp");
+    assertEquals(exp, 1_700_000_000L);
+  }
+
+  @Test
+  public void toSerializableMap_drops_null_claims() {
+    JWT jwt = JWT.builder().subject("sub-only").build();
+    Map<String, Object> out = jwt.toSerializableMap();
+    assertEquals(out.size(), 1);
+    assertEquals(out.get("sub"), "sub-only");
+  }
+
+  @Test
+  public void toSerializableMap_emits_registered_then_custom() {
+    JWT jwt = JWT.builder()
+        .issuer("iss-x")
+        .claim("custom", "v")
+        .subject("sub-x")
+        .build();
+    List<String> keys = new java.util.ArrayList<>(jwt.toSerializableMap().keySet());
+    assertEquals(keys.get(0), "iss");
+    assertEquals(keys.get(1), "sub");
+    assertEquals(keys.get(2), "custom");
+  }
+
+  @Test
+  public void toSerializableMap_unmodifiable() {
+    JWT jwt = JWT.builder().subject("a").build();
+    Map<String, Object> out = jwt.toSerializableMap();
+    expectThrows(UnsupportedOperationException.class, () -> out.put("x", "y"));
+  }
+
+  // -------------------- accessors --------------------
+
+  @Test
+  public void getInteger_from_biginteger_narrows() {
+    JWT jwt = JWT.builder().claim("n", BigInteger.valueOf(42)).build();
+    assertEquals(jwt.getInteger("n"), Integer.valueOf(42));
+  }
+
+  @Test
+  public void getFloat_from_bigdecimal_narrows() {
+    JWT jwt = JWT.builder().claim("n", new BigDecimal("1.5")).build();
+    assertEquals(jwt.getFloat("n"), Float.valueOf(1.5f));
+  }
+
+  @Test
+  public void getNumber_returns_underlying_biginteger() {
+    BigInteger big = BigInteger.valueOf(42);
+    JWT jwt = JWT.builder().claim("n", big).build();
+    assertSame(jwt.getNumber("n"), big);
+  }
+
+  @Test
+  public void getObject_returns_raw_value() {
+    Object payload = new java.util.ArrayList<>();
+    JWT jwt = JWT.builder().claim("data", payload).build();
+    assertSame(jwt.getObject("data"), payload);
+  }
+
+  @Test
+  public void getList_typed_returns_typed_list_when_homogeneous() {
+    JWT jwt = JWT.builder().claim("items", Arrays.asList("a", "b")).build();
+    List<String> typed = jwt.getList("items", String.class);
+    assertEquals(typed, Arrays.asList("a", "b"));
+  }
+
+  @Test
+  public void getList_typed_throws_on_mixed_types() {
+    JWT jwt = JWT.builder().claim("items", Arrays.asList("a", 42)).build();
+    expectThrows(ClassCastException.class, () -> jwt.getList("items", String.class));
+  }
+
+  @Test
+  public void getList_untyped_returns_list_object() {
+    JWT jwt = JWT.builder().claim("items", Arrays.asList("a", 42)).build();
+    List<Object> raw = jwt.getList("items");
+    assertEquals(raw.size(), 2);
+  }
+
+  @Test
+  public void accessor_for_missing_claim_returns_null() {
+    JWT jwt = JWT.builder().build();
+    assertNull(jwt.getString("nope"));
+    assertNull(jwt.getInteger("nope"));
+    assertNull(jwt.getList("nope"));
+    assertNull(jwt.getList("nope", String.class));
+    assertNull(jwt.getObject("nope"));
+  }
+
+  // -------------------- audience helpers --------------------
+
+  @Test
+  public void hasAudience_true_when_present() {
+    JWT jwt = JWT.builder().audience(Arrays.asList("a", "b")).build();
+    assertTrue(jwt.hasAudience("a"));
+  }
+
+  @Test
+  public void hasAudience_false_when_absent() {
+    JWT jwt = JWT.builder().audience(Arrays.asList("a", "b")).build();
+    assertFalse(jwt.hasAudience("c"));
+  }
+
+  @Test
+  public void hasAudience_false_when_audience_empty() {
+    JWT jwt = JWT.builder().build();
+    assertFalse(jwt.hasAudience("a"));
+  }
+
+  @Test
+  public void hasAudience_null_input_returns_false() {
+    JWT jwt = JWT.builder().audience("a").build();
+    assertFalse(jwt.hasAudience(null));
+  }
+
+  @Test
+  public void audience_returns_unmodifiable_list() {
+    JWT jwt = JWT.builder().audience(Arrays.asList("a", "b")).build();
+    expectThrows(UnsupportedOperationException.class, () -> jwt.audience().add("x"));
+  }
+
+  // -------------------- claims map --------------------
+
+  @Test
+  public void claims_returns_unmodifiable_map() {
+    JWT jwt = JWT.builder().subject("s").build();
+    expectThrows(UnsupportedOperationException.class, () -> jwt.claims().put("x", "y"));
+  }
+
+  @Test
+  public void claims_carries_audience_as_list_regardless_of_wire_form() {
+    JWT jwt = JWT.builder().audience("svc").build();
+    Object aud = jwt.claims().get("aud");
+    assertTrue(aud instanceof List);
+    assertEquals(aud, Collections.singletonList("svc"));
+  }
+
+  // -------------------- equals / claimsEquals --------------------
+
+  @Test
+  public void equals_same_claims_same_header_equal() {
+    Header h = Header.builder().alg(Algorithm.HS256).kid("k").build();
+    JWT a = new JWTBuilderHack().subject("s").header(h).build();
+    JWT b = new JWTBuilderHack().subject("s").header(h).build();
+    assertEquals(a, b);
+    assertEquals(a.hashCode(), b.hashCode());
+  }
+
+  @Test
+  public void equals_same_claims_different_header_NOT_equal() {
+    Header h1 = Header.builder().alg(Algorithm.HS256).build();
+    Header h2 = Header.builder().alg(Algorithm.RS256).build();
+    JWT a = new JWTBuilderHack().subject("s").header(h1).build();
+    JWT b = new JWTBuilderHack().subject("s").header(h2).build();
+    assertNotEquals(a, b);
+  }
+
+  @Test
+  public void equals_builder_no_header_vs_decoded_with_header_NOT_equal() {
+    Header h = Header.builder().alg(Algorithm.HS256).build();
+    JWT a = JWT.builder().subject("s").build();
+    JWT b = new JWTBuilderHack().subject("s").header(h).build();
+    assertNotEquals(a, b);
+  }
+
+  @Test
+  public void claimsEquals_ignores_header() {
+    // Use case: claimsEquals returns true when claim fields match, regardless of Header
+    Header h = Header.builder().alg(Algorithm.HS256).build();
+    JWT a = JWT.builder().subject("s").build();
+    JWT b = new JWTBuilderHack().subject("s").header(h).build();
+    assertTrue(a.claimsEquals(b));
+  }
+
+  @Test
+  public void claimsEquals_false_when_claim_differs() {
+    JWT a = JWT.builder().subject("a").build();
+    JWT b = JWT.builder().subject("b").build();
+    assertFalse(a.claimsEquals(b));
+  }
+
+  @Test
+  public void claimsEquals_ignores_audience_serialization() {
+    // Use case: claimsEquals with aud=["foo"] STRING_WHEN_SINGLE vs aud=["foo"] ALWAYS_ARRAY -> true.
+    // AudienceSerialization mode is intentionally ignored by claimsEquals.
+    JWT stringForm = JWT.builder()
+        .audience("foo")
+        .audienceSerialization(AudienceSerialization.STRING_WHEN_SINGLE)
+        .build();
+    JWT arrayForm = JWT.builder().audience("foo").build();
+    assertTrue(stringForm.claimsEquals(arrayForm));
+    // Strict equals DOES still differ on serialization mode:
+    assertNotEquals(stringForm, arrayForm);
+  }
+
+  // -------------------- toString --------------------
+
+  @Test
+  public void toString_produces_json_via_latte_processor() {
+    JWT jwt = JWT.builder().subject("alice").issuer("iss-x").build();
+    String out = jwt.toString();
+    assertNotNull(out);
+    assertTrue(out.contains("\"sub\""));
+    assertTrue(out.contains("alice"));
+    assertTrue(out.contains("\"iss\""));
+  }
+
+  // -------------------- isExpired / isUnavailableForProcessing --------------------
+
+  @Test
+  public void isExpired_true_when_exp_before_now() {
+    JWT jwt = JWT.builder().expiresAt(Instant.ofEpochSecond(1_000)).build();
+    assertTrue(jwt.isExpired(Instant.ofEpochSecond(2_000)));
+  }
+
+  @Test
+  public void isExpired_true_when_exp_equals_now() {
+    // RFC 7519 §4.1.4: "on or after which the JWT MUST NOT be accepted" --
+    // the boundary is expired.
+    JWT jwt = JWT.builder().expiresAt(Instant.ofEpochSecond(1_000)).build();
+    assertTrue(jwt.isExpired(Instant.ofEpochSecond(1_000)));
+  }
+
+  @Test
+  public void isExpired_false_when_now_before_exp() {
+    JWT jwt = JWT.builder().expiresAt(Instant.ofEpochSecond(2_000)).build();
+    assertFalse(jwt.isExpired(Instant.ofEpochSecond(1_000)));
+  }
+
+  @Test
+  public void isExpired_false_when_no_exp() {
+    JWT jwt = JWT.builder().build();
+    assertFalse(jwt.isExpired());
+  }
+
+  @Test
+  public void isUnavailableForProcessing_true_when_nbf_after_now() {
+    JWT jwt = JWT.builder().notBefore(Instant.ofEpochSecond(2_000)).build();
+    assertTrue(jwt.isUnavailableForProcessing(Instant.ofEpochSecond(1_000)));
+  }
+
+  // -------------------- helper for header injection in tests --------------------
 
   /**
-   * Performance
-   * <pre>
-   *   Performance Summary:
-   *   - HMAC is dramatically faster
-   *   - SHA length does not dramatically affect the results
-   *   - Size of JWT will negatively affect the performance of encoding and decoding
-   *   - Verifying an RSA signature is much faster than generating the signature
-   *
-   *   Performance Recommendations:
-   *   - Keep the JWT as small as possible
-   *   - Use HMAC when you can safely share the HMAC secret or performance is paramount
-   * </pre>
+   * The public Builder does not expose a header() setter (header is populated
+   * by the decoder). For equality tests we go through {@link JWT#fromMap} to
+   * obtain a JWT with a populated header.
    */
-  @Test(enabled = false)
-  public void decoding_performance() throws Exception {
-    String secret = JWTUtils.generateSHA256_HMACSecret();
-    Signer hmacSigner = HMACSigner.newSHA256Signer(secret);
-    Signer rsaSigner = RSASigner.newSHA256Signer(new String(Files.readAllBytes(Paths.get("src/test/resources/rsa_private_key_2048.pem"))));
+  private static final class JWTBuilderHack {
+    private final Map<String, Object> claims = new LinkedHashMap<>();
 
-    Verifier hmacVerifier = HMACVerifier.newVerifier(secret);
-    Verifier rsaVerifier = RSAVerifier.newVerifier(new String(Files.readAllBytes(rsaPublicKey2048Path)));
+    private Header header;
 
-    JWT jwt = new JWT().setSubject(UUID.randomUUID().toString())
-        .addClaim("exp", ZonedDateTime.now(ZoneOffset.UTC).plusMinutes(5).toInstant().toEpochMilli())
-        .setAudience(UUID.randomUUID().toString())
-        .addClaim("roles", new ArrayList<>(Arrays.asList("admin", "user")))
-        .addClaim("iat", ZonedDateTime.now(ZoneOffset.UTC).toInstant().toEpochMilli())
-        .setIssuer("inversoft.com");
+    JWTBuilderHack subject(String s) {
+      claims.put("sub", s);
+      return this;
+    }
 
-    long iterationCount = 250_000;
-    for (Verifier verifier : Arrays.asList(hmacVerifier, rsaVerifier)) {
-      Instant start = Instant.now();
-      Signer signer = verifier instanceof HMACVerifier ? hmacSigner : rsaSigner;
-      String encodedJWT = JWT.getEncoder().encode(jwt, signer);
+    JWTBuilderHack header(Header h) {
+      this.header = h;
+      return this;
+    }
 
-      for (int i = 0; i < iterationCount; i++) {
-        JWT.getDecoder().decode(encodedJWT, verifier);
-      }
-
-      Duration duration = Duration.between(start, Instant.now());
-      BigDecimal durationInMillis = BigDecimal.valueOf(duration.toMillis());
-      BigDecimal average = durationInMillis.divide(BigDecimal.valueOf(iterationCount), RoundingMode.HALF_DOWN);
-      long perSecond = iterationCount / (duration.toMillis() / 1000);
-
-      System.out.println("[" + signer.getAlgorithm().name() + "] " + duration.toMillis() + " milliseconds total. [" + iterationCount + "] iterations. [" + average + "] milliseconds per iteration. Approx. [" + perSecond + "] per second.");
-
+    JWT build() {
+      return JWT.fromMap(claims, header);
     }
   }
 
-  @Test(enabled = false)
-  public void encoding_performance() throws Exception {
-    Signer hmacSigner = HMACSigner.newSHA256Signer(JWTUtils.generateSHA256_HMACSecret());
-    Signer rsaSigner = RSASigner.newSHA256Signer(new String(Files.readAllBytes(Paths.get("src/test/resources/rsa_private_key_2048.pem"))));
-
-    JWT jwt = new JWT().setSubject(UUID.randomUUID().toString())
-        .addClaim("exp", ZonedDateTime.now(ZoneOffset.UTC).plusMinutes(5).toInstant().toEpochMilli())
-        .setAudience(UUID.randomUUID().toString())
-        .addClaim("roles", new ArrayList<>(Arrays.asList("admin", "user")))
-        .addClaim("iat", ZonedDateTime.now(ZoneOffset.UTC).toInstant().toEpochMilli())
-        .setIssuer("inversoft.com");
-
-    long iterationCount = 10_000;
-    for (Signer signer : Arrays.asList(hmacSigner, rsaSigner)) {
-      Instant start = Instant.now();
-      for (int i = 0; i < iterationCount; i++) {
-        JWT.getEncoder().encode(jwt, signer);
-      }
-      Duration duration = Duration.between(start, Instant.now());
-      BigDecimal durationInMillis = BigDecimal.valueOf(duration.toMillis());
-      BigDecimal average = durationInMillis.divide(BigDecimal.valueOf(iterationCount), RoundingMode.HALF_DOWN);
-      long perSecond = iterationCount / (duration.toMillis() / 1000);
-
-      System.out.println("[" + signer.getAlgorithm().getName() + "] " + duration.toMillis() + " milliseconds total. [" + iterationCount + "] iterations. [" + average + "] milliseconds per iteration. Approx. [" + perSecond + "] per second.");
-    }
-  }
-
-  @Test
-  public void expired() {
-    // no expiration
-    assertFalse(new JWT()
-        .setSubject("123456789").isExpired());
-
-    assertFalse(new JWT()
-        .setExpiration(ZonedDateTime.now(ZoneOffset.UTC).plusMinutes(1))
-        .setSubject("123456789").isExpired());
-
-    assertTrue(new JWT()
-        .setExpiration(ZonedDateTime.now(ZoneOffset.UTC).minusMinutes(1))
-        .setSubject("123456789").isExpired());
-
-    // Account for 59 seconds of skew, expired.
-    assertTrue(new JWT()
-        .setExpiration(ZonedDateTime.now(ZoneOffset.UTC).minusMinutes(1))
-        .setSubject("123456789").isExpired(ZonedDateTime.now(ZoneOffset.UTC).minusSeconds(59)));
-
-    // Account for 61 seconds of skew, not expired.
-    assertFalse(new JWT()
-        .setExpiration(ZonedDateTime.now(ZoneOffset.UTC).minusMinutes(1))
-        .setSubject("123456789").isExpired(ZonedDateTime.now(ZoneOffset.UTC).minusSeconds(61)));
-  }
-
-  @Test
-  public void test_EC_privateKey_needsConversionTo_pkcs_8() {
-    JWT jwt = new JWT()
-        .setSubject("1234567890")
-        .addClaim("name", "John Doe")
-        .addClaim("admin", true)
-        .addClaim("iat", 1516239022);
-
-    // EC Private key, needs to be encapulated to a PKCS#8 to be parsed by Java
-    Signer signer = ECSigner.newSHA512Signer(
-        "-----BEGIN EC PRIVATE KEY-----\n" +
-            "MIHcAgEBBEIBiyAa7aRHFDCh2qga9sTUGINE5jHAFnmM8xWeT/uni5I4tNqhV5Xx\n" +
-            "0pDrmCV9mbroFtfEa0XVfKuMAxxfZ6LM/yKgBwYFK4EEACOhgYkDgYYABAGBzgdn\n" +
-            "P798FsLuWYTDDQA7c0r3BVk8NnRUSexpQUsRilPNv3SchO0lRw9Ru86x1khnVDx+\n" +
-            "duq4BiDFcvlSAcyjLACJvjvoyTLJiA+TQFdmrearjMiZNE25pT2yWP1NUndJxPcv\n" +
-            "VtfBW48kPOmvkY4WlqP5bAwCXwbsKrCgk6xbsp12ew==\n" +
-            "-----END EC PRIVATE KEY-----");
-    String encodedJWT = JWT.getEncoder().encode(jwt, signer, header
-        -> header.set("kid", "xZDfZpry4P9vZPZyG2fNBRj-7Lz5omVdm7tHoCgSNfY"));
-
-    Verifier verifier = ECVerifier.newVerifier(
-        "-----BEGIN PUBLIC KEY-----\n" +
-            "MIGbMBAGByqGSM49AgEGBSuBBAAjA4GGAAQBgc4HZz+/fBbC7lmEww0AO3NK9wVZ\n" +
-            "PDZ0VEnsaUFLEYpTzb90nITtJUcPUbvOsdZIZ1Q8fnbquAYgxXL5UgHMoywAib47\n" +
-            "6MkyyYgPk0BXZq3mq4zImTRNuaU9slj9TVJ3ScT3L1bXwVuPJDzpr5GOFpaj+WwM\n" +
-            "Al8G7CqwoJOsW7Kddns=\n" +
-            "-----END PUBLIC KEY-----");
-    JWT actual = JWT.getDecoder().decode(encodedJWT, verifier);
-
-    assertEquals(actual.subject, jwt.subject);
-  }
-
-  @Test
-  public void test_ES() throws IOException {
-    Signer signer = ECSigner.newSHA256Signer(new String(Files.readAllBytes(Paths.get("src/test/resources/ec_private_key_control.pem"))));
-    Verifier verifier = ECVerifier.newVerifier(new String(Files.readAllBytes(Paths.get("src/test/resources/ec_public_key_p_256_control.pem"))));
-
-    JWT jwt = new JWT().setSubject("123456789");
-    String encodedJWT = JWT.getEncoder().encode(jwt, signer);
-    JWT decoded = JWT.getDecoder().decode(encodedJWT, verifier);
-    assertNotNull(decoded);
-    assertEquals(decoded.subject, "123456789");
-  }
-
-  @Test
-  public void test_ES256() {
-    String encodedJWT = "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkifQ.vPn7xrCNOLWbBRaWdVn53ddj2hW0E87FYl4gPnWy5d1Qj3WgyF8FS6I_hj_3kIJ77tbvy0GXdr7fO91NeWMD1A";
-    Verifier verifier = ECVerifier.newVerifier(ecPublicKey256Path);
-    JWT jwt = JWT.getDecoder().decode(encodedJWT, verifier);
-    assertEquals(jwt.subject, "123456789");
-    assertEquals(jwt.header.algorithm, Algorithm.ES256);
-    assertEquals(jwt.header.type, "JWT");
-
-    // Re-test using a pre-built EC Public Key
-    assertEquals(JWT.getDecoder().decode(encodedJWT, ECVerifier.newVerifier((ECPublicKey) PEM.decode(ecPublicKey256Path).getPublicKey())).subject, "123456789");
-  }
-
-  @Test
-  public void test_ES256_control() {
-    // Control test, known encoded ES256 JWT
-    String encodedJWT = "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.tyh-VfuzIxCyGYDlkBA7DfyjrqmSHu6pQ2hoZuFqUSLPNY2N0mpHb3nk5K17HWP_3cYHBw7AhHale5wky6-sVA";
-
-    JWT jwt = JWT.getDecoder().decode(encodedJWT, ECVerifier.newVerifier(
-        "-----BEGIN PUBLIC KEY-----\n" +
-            "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEEVs/o5+uQbTjL3chynL4wXgUg2R9\n" +
-            "q9UU8I5mEovUf86QZ7kOBIjJwqnzD1omageEHWwHdBO6B+dFabmdT9POxg==\n" +
-            "-----END PUBLIC KEY-----"));
-    assertNotNull(jwt);
-    assertEquals(jwt.subject, "1234567890");
-    assertEquals(jwt.getString("name"), "John Doe");
-    assertEquals(jwt.getBoolean("admin"), Boolean.TRUE);
-    assertEquals(jwt.getRawClaims().get("iat"), 1516239022L);
-    assertEquals(jwt.issuedAt, ZonedDateTime.ofInstant(Instant.ofEpochSecond(1516239022L), ZoneOffset.UTC));
-  }
-
-  @Test
-  public void test_ES384() throws Exception {
-    String encodedJWT = "eyJhbGciOiJFUzM4NCIsInR5cCI6IkpXVCIsImtpZCI6ImlUcVhYSTB6YkFuSkNLRGFvYmZoa00xZi02ck1TcFRmeVpNUnBfMnRLSTgifQ.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.cJOP_w-hBqnyTsBm3T6lOE5WpcHaAkLuQGAs1QO-lg2eWs8yyGW8p9WagGjxgvx7h9X72H7pXmXqej3GdlVbFmhuzj45A9SXDOAHZ7bJXwM1VidcPi7ZcrsMSCtP1hiN";
-    Verifier verifier = ECVerifier.newVerifier(new String(Files.readAllBytes(Paths.get("src/test/resources/ec_public_key_p_384_2.pem"))));
-    JWT jwt = JWT.getDecoder().decode(encodedJWT, verifier);
-    assertEquals(jwt.subject, "1234567890");
-    assertEquals(jwt.getString("name"), "John Doe");
-    assertEquals(jwt.getBoolean("admin"), Boolean.TRUE);
-    assertEquals(jwt.getRawClaims().get("iat"), 1516239022L);
-  }
-
-  @Test
-  public void test_ES384_control() {
-    // Control test, known encoded ES384 JWT
-    String encodedJWT = "eyJhbGciOiJFUzM4NCIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.okIXzSvlJ0gFtnrrcdlzcnYBiJsk-S5m4Qj-qpUSgnT6uMrYIYL06Z7_Nx6buKFyY4DgeS8RU-9tZOy1VmayTbvm0hQyjuiDY8tsoVHi7FhhF4GyTDAAgDH_4jK_h4_R";
-    JWT jwt = JWT.getDecoder().decode(encodedJWT, ECVerifier.newVerifier(
-        "-----BEGIN PUBLIC KEY-----\n" +
-            "MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAEC1uWSXj2czCDwMTLWV5BFmwxdM6PX9p+\n" +
-            "Pk9Yf9rIf374m5XP1U8q79dBhLSIuaojsvOT39UUcPJROSD1FqYLued0rXiooIii\n" +
-            "1D3jaW6pmGVJFhodzC31cy5sfOYotrzF\n" +
-            "-----END PUBLIC KEY-----"));
-    assertNotNull(jwt);
-    assertEquals(jwt.subject, "1234567890");
-    assertEquals(jwt.getString("name"), "John Doe");
-    assertEquals(jwt.getBoolean("admin"), Boolean.TRUE);
-    assertEquals(jwt.getRawClaims().get("iat"), 1516239022L);
-    assertEquals(jwt.issuedAt, ZonedDateTime.ofInstant(Instant.ofEpochSecond(1516239022L), ZoneOffset.UTC));
-  }
-
-  @Test
-  public void test_ES512() throws Exception {
-    String encodedJWT = "eyJhbGciOiJFUzUxMiIsInR5cCI6IkpXVCIsImtpZCI6InhaRGZacHJ5NFA5dlpQWnlHMmZOQlJqLTdMejVvbVZkbTd0SG9DZ1NOZlkifQ.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.AP_CIMClixc5-BFflmjyh_bRrkloEvwzn8IaWJFfMz13X76PGWF0XFuhjJUjp7EYnSAgtjJ-7iJG4IP7w3zGTBk_AUdmvRCiWp5YAe8S_Hcs8e3gkeYoOxiXFZlSSAx0GfwW1cZ0r67mwGtso1I3VXGkSjH5J0Rk6809bn25GoGRjOPu";
-    Verifier verifier = ECVerifier.newVerifier(new String(Files.readAllBytes(Paths.get("src/test/resources/ec_public_key_p_521_2.pem"))));
-    JWT jwt = JWT.getDecoder().decode(encodedJWT, verifier);
-    assertEquals(jwt.subject, "1234567890");
-    assertEquals(jwt.getString("name"), "John Doe");
-    assertEquals(jwt.getBoolean("admin"), Boolean.TRUE);
-    assertEquals(jwt.getRawClaims().get("iat"), 1516239022L);
-  }
-
-  @Test
-  public void test_ES512_control() {
-    // Control test, known encoded ES512 JWT
-    String encodedJWT = "eyJhbGciOiJFUzUxMiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.AU5vXkGbPjUABWey3dk4_UldeQMXMwjHY6LG6ff5J-YzH925b4ItQzkJ0kuOuwammUTXRZ7_4W76qa-ooR0umLl1AU0YjFVqxBFXeletCYCznFnIlZYJS-iKqvuwpwPFT0b4OHQxmrIV0ETw4Ei2p1dDMtX4oAbBi-DRybc70CA5f3XT";
-    JWT jwt = JWT.getDecoder().decode(encodedJWT, ECVerifier.newVerifier(
-        "-----BEGIN PUBLIC KEY-----\n" +
-            "MIGbMBAGByqGSM49AgEGBSuBBAAjA4GGAAQBgc4HZz+/fBbC7lmEww0AO3NK9wVZ\n" +
-            "PDZ0VEnsaUFLEYpTzb90nITtJUcPUbvOsdZIZ1Q8fnbquAYgxXL5UgHMoywAib47\n" +
-            "6MkyyYgPk0BXZq3mq4zImTRNuaU9slj9TVJ3ScT3L1bXwVuPJDzpr5GOFpaj+WwM\n" +
-            "Al8G7CqwoJOsW7Kddns=\n" +
-            "-----END PUBLIC KEY-----"));
-    assertNotNull(jwt);
-    assertEquals(jwt.subject, "1234567890");
-    assertEquals(jwt.getString("name"), "John Doe");
-    assertEquals(jwt.getBoolean("admin"), Boolean.TRUE);
-    assertEquals(jwt.getRawClaims().get("iat"), 1516239022L);
-    assertEquals(jwt.issuedAt, ZonedDateTime.ofInstant(Instant.ofEpochSecond(1516239022L), ZoneOffset.UTC));
-  }
-
-  @Test
-  public void test_ES_2() throws IOException {
-    Signer signer = ECSigner.newSHA256Signer(new String(Files.readAllBytes(Paths.get("src/test/resources/ec_private_key_p_256.pem"))));
-    Verifier verifier = ECVerifier.newVerifier(new String(Files.readAllBytes(ecPublicKey256Path)));
-
-    JWT jwt = new JWT().setSubject("123456789");
-    String encodedJWT = JWT.getEncoder().encode(jwt, signer);
-    JWT decoded = JWT.getDecoder().decode(encodedJWT, verifier);
-    assertNotNull(decoded);
-    assertEquals(decoded.subject, "123456789");
-  }
-
-  @Test
-  public void test_HS256() {
-    JWT jwt = new JWT().setSubject("123456789");
-
-    // String signer
-    Signer signer = HMACSigner.newSHA256Signer("super-secret-key-that-is-at-least-32-bytes-long!!");
-    String encodedJWT = JWT.getEncoder().encode(jwt, signer);
-    assertEquals(JWT.getDecoder().decode(encodedJWT, HMACVerifier.newVerifier("super-secret-key-that-is-at-least-32-bytes-long!!")).subject, jwt.subject);
-
-    // byte[] signer
-    signer = HMACSigner.newSHA256Signer("super-secret-key-that-is-at-least-32-bytes-long!!".getBytes(StandardCharsets.UTF_8));
-    encodedJWT = JWT.getEncoder().encode(jwt, signer);
-    assertEquals(JWT.getDecoder().decode(encodedJWT, HMACVerifier.newVerifier("super-secret-key-that-is-at-least-32-bytes-long!!".getBytes(StandardCharsets.UTF_8))).subject, jwt.subject);
-  }
-
-  @Test
-  public void test_HS256_manualAddedClaim() {
-    JWT jwt = new JWT().addClaim("test", "123456789");
-    Signer signer = HMACSigner.newSHA256Signer("super-secret-key-that-is-at-least-32-bytes-long!!");
-
-    String encodedJWT = JWT.getEncoder().encode(jwt, signer);
-    JWT decoded = JWT.getDecoder().decode(encodedJWT, HMACVerifier.newVerifier("super-secret-key-that-is-at-least-32-bytes-long!!"));
-    assertEquals(decoded.getString("test"), "123456789");
-  }
-
-  @Test
-  public void test_HS384() {
-    JWT jwt = new JWT().setSubject("123456789");
-
-    // String signer
-    Signer signer = HMACSigner.newSHA384Signer("super-secret-key-that-is-at-least-48-bytes-long-for-sha384-compat!!");
-    String encodedJWT = JWT.getEncoder().encode(jwt, signer);
-    assertEquals(JWT.getDecoder().decode(encodedJWT, HMACVerifier.newVerifier("super-secret-key-that-is-at-least-48-bytes-long-for-sha384-compat!!")).subject, jwt.subject);
-
-    // byte[] signer
-    signer = HMACSigner.newSHA384Signer("super-secret-key-that-is-at-least-48-bytes-long-for-sha384-compat!!".getBytes(StandardCharsets.UTF_8));
-    encodedJWT = JWT.getEncoder().encode(jwt, signer);
-    assertEquals(JWT.getDecoder().decode(encodedJWT, HMACVerifier.newVerifier("super-secret-key-that-is-at-least-48-bytes-long-for-sha384-compat!!".getBytes(StandardCharsets.UTF_8))).subject, jwt.subject);
-  }
-
-  @Test
-  public void test_HS512() {
-    JWT jwt = new JWT().setSubject("123456789");
-
-    // String signer
-    Signer signer = HMACSigner.newSHA512Signer("super-secret-key-that-is-at-least-64-bytes-long-for-sha512-algorithm-compat-requirement!!");
-    String encodedJWT = JWT.getEncoder().encode(jwt, signer);
-    assertEquals(JWT.getDecoder().decode(encodedJWT, HMACVerifier.newVerifier("super-secret-key-that-is-at-least-64-bytes-long-for-sha512-algorithm-compat-requirement!!")).subject, jwt.subject);
-
-    // byte[] signer
-    signer = HMACSigner.newSHA512Signer("super-secret-key-that-is-at-least-64-bytes-long-for-sha512-algorithm-compat-requirement!!".getBytes(StandardCharsets.UTF_8));
-    encodedJWT = JWT.getEncoder().encode(jwt, signer);
-    assertEquals(JWT.getDecoder().decode(encodedJWT, HMACVerifier.newVerifier("super-secret-key-that-is-at-least-64-bytes-long-for-sha512-algorithm-compat-requirement!!".getBytes(StandardCharsets.UTF_8))).subject, jwt.subject);
-  }
-
-  @Test
-  public void test_RS256() {
-    JWT jwt = new JWT().setSubject("123456789");
-    Signer signer = RSASigner.newSHA256Signer(rsaPrivateKey4096Pem);
-
-    assertEquals(JWT.getEncoder().encode(jwt, signer), "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkifQ.kRXJkOHC98D0LCT2oPg5fTmQJDFXkMRQJopbt7QM6prmQDHwjJL_xO-_EXRXnbvf5NLORto45By3XNn2ZzWmY3pAOxj46MlQ5elhROx2S-EnHZNLfQhoG8ZXPZ54q-Obz_6K7ZSlkAQ8jmeZUO3Ryi8jRlHQ2PT4LbBtLpaf982SGJfeTyUMw1LbvowZUTZSF-E6JARaokmmx8M2GeLuKcFhU-YsBTXUarKp0IJCy3jpMQ2zW_HGjyVWH8WwSIbSdpBn7ztoQEJYO-R5H3qVaAz2BsTuGLRxoyIu1iy2-QcDp5uTufmX1roXM8ciQMpcfwKGiyNpKVIZm-lF8aROXRL4kk4rqp6KUzJuOPljPXRU--xKSua-DeR0BEerKzI9hbwIMWiblCslAciNminoSc9G7pUyVwV5Z5IT8CGJkVgoyVGELeBmYCDy7LHwXrr0poc0hPbE3mJXhzolga4BB84nCg2Hb9tCNiHU8F-rKgZWCONaSSIdhQ49x8OiPafFh2DJBEBe5Xbm6xdCfh3KVG0qe4XL18R5s98aIP9UIC4i62UEgPy6W7Fr7QgUxpXrjRCERBV3MiNu4L8NNJb3oZleq5lQi72EfdS-Bt8ZUOVInIcAvSmu-3i8jB_2sF38XUXdl8gkW8k_b9dJkzDcivCFehvSqGmm3vBm5X4bNmk");
-  }
-
-  @Test
-  public void test_PS256() throws IOException {
-    JWT jwt = new JWT().setSubject("1234567890");
-
-    // Sign the JWT
-    Signer signer = RSAPSSSigner.newSHA256Signer(new String(Files.readAllBytes(Paths.get("src/test/resources/rsa_private_key_2048.pem"))));
-    String encodedJWT = JWT.getEncoder().encode(jwt, signer);
-
-    // Verify the JWT
-    Verifier verifier = RSAPSSVerifier.newVerifier(rsaPublicKey2048Path);
-    JWT actual = JWT.getDecoder().decode(encodedJWT, verifier);
-
-    assertEquals(actual.subject, jwt.subject);
-  }
-
-  @Test
-  public void test_PS384() throws IOException {
-    JWT jwt = new JWT().setSubject("1234567890");
-
-    // Sign the JWT
-    Signer signer = RSAPSSSigner.newSHA384Signer(new String(Files.readAllBytes(Paths.get("src/test/resources/rsa_private_key_2048.pem"))));
-    String encodedJWT = JWT.getEncoder().encode(jwt, signer);
-
-    // Verify the JWT
-    Verifier verifier = RSAPSSVerifier.newVerifier(rsaPublicKey2048Path);
-    JWT actual = JWT.getDecoder().decode(encodedJWT, verifier);
-
-    assertEquals(actual.subject, jwt.subject);
-  }
-
-  @Test
-  public void test_PS512() throws IOException {
-    JWT jwt = new JWT().setSubject("1234567890");
-
-    // Sign the JWT
-    Signer signer = RSAPSSSigner.newSHA512Signer(new String(Files.readAllBytes(Paths.get("src/test/resources/rsa_private_key_3072.pem"))));
-    String encodedJWT = JWT.getEncoder().encode(jwt, signer);
-
-    // Verify the JWT
-    Verifier verifier = RSAPSSVerifier.newVerifier(Paths.get("src/test/resources/rsa_public_key_3072.pem"));
-    JWT actual = JWT.getDecoder().decode(encodedJWT, verifier);
-
-    assertEquals(actual.subject, jwt.subject);
-  }
-
-  @Test
-  public void test_RS384() throws Exception {
-    JWT jwt = new JWT().setSubject("123456789");
-    Signer signer = RSASigner.newSHA384Signer(rsaPrivateKey4096Pem);
-
-    String encodedJWT = JWT.getEncoder().encode(jwt, signer);
-    assertEquals(encodedJWT, "eyJhbGciOiJSUzM4NCIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkifQ.OkmWXzhTm7mtfpeMVNLlFjw3fJvc7yMQ1rgI5BXBPqaLSb_fpLHYAq_q5pQDDaIGg8klg9y2f784smc7-o9czX3JnzEDvO9e_sA10YIEA6Q9qRh17EATNXFG-WzSocpxPgEOQZ8lqSqZ_0waCGaUMwK5J5BB1A_70AcNGPnI7PrX76lWNNHwdK0OjkhkxX7vHR6B-uAIzih0ntQP_afr1UIzXkllmnnb1oU9cgFFD1AGDa3V0XCgitVYZA_ozbGELGMrUl_7fB_uNVEvcreUoZIEI4cfUKI6iZ8Ll4j_iLAdlpH4GRGNiQ7gMLq35AqqxKbEG8r-S-SrlRL6PkKlaJ-viMVLxoHreZow634r8A1fxR1mnrdUnn0vGmOthyjpP_TgfAsER9EJ_UUIamsKC8s6pip2jcPB7G6huHocyKBTxsoxclQgk1jOy4lZq4Js2KKM5sGfcq5SWQTW4B44KlUU1kWWmUg21jtflna38sWFdTk845phi5ITOBZ_ElJ9MdYVAgjvDsRFs_XxFENlwpwKeLD9PsaCiJhdG7EJN5qJvVogYuUMM0wyS-SOGZ1ILsTeYsjc7TtI0JUKndlUXFPubwaaxW_06zrCJR-dvWye99fIDH-u3I74XK5MKhknlgewzsXpsiPdvsMW59WUbdIZqkvok5vdkIlm4XGIqcM");
-
-    assertEquals(JWT.getDecoder().decode(encodedJWT, RSAVerifier.newVerifier(new String(Files.readAllBytes(rsaPublicKey4096Path)))).subject, jwt.subject);
-
-    // Re-test using a pre-built RSAPublicKey
-    assertEquals(JWT.getDecoder().decode(encodedJWT, RSAVerifier.newVerifier((RSAPublicKey) PEM.decode(rsaPublicKey4096Path).getPublicKey())).subject, jwt.subject);
-  }
-
-  @Test
-  public void test_RS512() {
-    JWT jwt = new JWT().setSubject("123456789");
-    Signer signer = RSASigner.newSHA512Signer(rsaPrivateKey4096Pem);
-
-    assertEquals(JWT.getEncoder().encode(jwt, signer), "eyJhbGciOiJSUzUxMiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkifQ.ei28WNoJdUpMlLnHr78HiTnnuKwSRLYcOpgUC3daVInT5RAc0kk2Ipx16Z-bHL_eFLSYgF3TSKdymFpNf8cnEu5T6rH0azYSZLrPmVCetDxjo-ixXK9asPOF3JuIbDjN7ow3K-CMbMCWzWp04ZAh-DNecYEd3HiGgooPVGA4HuVXZFHH8XfQ9TD-64ppBQTWgW32vkna8ILKyIXdwWXSEfCZYfLzLZnilJrz820wZJ5JMXimv2au0OwwRobUMLEBUM4iuEPXLf5wFJU6LcU0XMuovavfIXKDpvP9Yfz6UplMlFvIr9y72xExfaNt32vwneAP-Fpg2x9wYvR0W8LhXKZaFRfcYwhbj17GCAbpx34hjiqnwyFStn5Qx_QHz_Y7ck-ZXB2MGUkiYGj9y_8bQNx-LIaTQUX6sONTNdVVCfnOnMHFqVbupGho24K7885-8BxCRojvA0ggneF6dsKCQvAt2rsVRso0TrCVxwYItb9tRsyhCbWou-zh_08JlYGVXPiGY3RRQDfxCc9RHQUflWRS9CBcPtoaco4mFKZSM-9e_xoYx__DEzM3UjaI4jReLM-IARwlVPoHJa2Vcb5wngZTaxGf2ToMq7R_8KecZymb3OaA2X1e8GS2300ySwsXbOz0sJv2a7_JUncSEBPSsb2vMMurxSJ4E3RTAc4s3aU");
-  }
-
-  @Test
-  public void test_RSA_1024Key() {
-    expectException(InvalidKeyLengthException.class, ()
-        -> RSASigner.newSHA256Signer(new String(Files.readAllBytes(Paths.get("src/test/resources/rsa_private_key_1024.pem")))));
-    expectException(InvalidKeyLengthException.class, ()
-        -> RSAVerifier.newVerifier(new String(Files.readAllBytes(Paths.get("src/test/resources/rsa_public_key_1024.pem")))));
-    expectException(InvalidKeyLengthException.class, ()
-        -> RSAVerifier.newVerifier((RSAPublicKey) PEM.decode(Files.readAllBytes(Paths.get("src/test/resources/rsa_public_key_1024.pem"))).getPublicKey()));
-  }
-
-  @Test
-  public void test_badEncoding() throws Exception {
-    Verifier verifier = RSAVerifier.newVerifier(new String(Files.readAllBytes(rsaPublicKey2048Path)));
-    // add a space to the header, invalid Base64 character point 20 (space)
-    expectException(InvalidJWTException.class, ()
-        -> JWT.getDecoder().decode("eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9 .foo.bar", verifier));
-  }
-
-  @Test
-  public void test_complexPayload() {
-    JWT expectedJWT = new JWT()
-        .setAudience(Arrays.asList("www.acme.com", "www.vandelayindustries.com"))
-        .setExpiration(ZonedDateTime.now(ZoneOffset.UTC).plusMinutes(60).truncatedTo(ChronoUnit.SECONDS))
-        .setIssuedAt(ZonedDateTime.now(ZoneOffset.UTC).truncatedTo(ChronoUnit.SECONDS))
-        .setIssuer("www.inversoft.com")
-        .setNotBefore(ZonedDateTime.now(ZoneOffset.UTC).minusMinutes(5).truncatedTo(ChronoUnit.SECONDS))
-        .setUniqueId(UUID.randomUUID().toString())
-        .setSubject("123456789")
-        .addClaim("foo", "bar")
-        .addClaim("timestamp", 1476062602926L)
-        .addClaim("bigInteger", new BigInteger("100000000000000000000000000000000000000000000000000000000000000000000000000000000"))
-        .addClaim("bigDecimal", new BigDecimal("11.2398732934908570987534209857423098743209857"))
-        .addClaim("double", 3.14d)
-        .addClaim("float", 3.14f)
-        .addClaim("meaningOfLife", 42)
-        .addClaim("bar", Arrays.asList("bing", "bam", "boo"))
-        .addClaim("object", Collections.singletonMap("nested", Collections.singletonMap("foo", "bar")))
-        .addClaim("www.inversoft.com/claims/is_admin", true);
-
-    Signer signer = HMACSigner.newSHA256Signer("super-secret-key-that-is-at-least-32-bytes-long!!");
-    Verifier verifier = HMACVerifier.newVerifier("super-secret-key-that-is-at-least-32-bytes-long!!");
-
-    String encodedJWT = JWT.getEncoder().encode(expectedJWT, signer, () -> new Header()
-        .set("gty", Collections.singletonList("client_credentials"))
-        .set("kid", "1234"));
-    JWT actualJwt = JWT.getDecoder().decode(encodedJWT, verifier);
-
-    assertEquals(actualJwt.header.algorithm, Algorithm.HS256);
-    assertEquals(actualJwt.header.type, "JWT");
-
-    // Get manually and with helper.
-    assertEquals(actualJwt.header.get("gty"), Collections.singletonList("client_credentials"));
-    assertEquals(actualJwt.getHeaderClaim("gty"), Collections.singletonList("client_credentials"));
-    // Get manually and with helper.
-    assertEquals(actualJwt.header.get("kid"), "1234");
-    assertEquals(actualJwt.getHeaderClaim("kid"), "1234");
-    // Get missing attribute
-    assertNull(actualJwt.header.get("foo"));
-    assertNull(actualJwt.getHeaderClaim("foo"));
-
-    assertEquals(actualJwt.audience, expectedJWT.audience);
-    assertEquals(actualJwt.expiration, expectedJWT.expiration);
-    assertEquals(actualJwt.issuedAt, expectedJWT.issuedAt);
-    assertEquals(actualJwt.issuer, expectedJWT.issuer);
-    assertEquals(actualJwt.notBefore, expectedJWT.notBefore);
-    assertEquals(actualJwt.uniqueId, expectedJWT.uniqueId);
-    assertEquals(actualJwt.subject, expectedJWT.subject);
-    assertEquals(actualJwt.getString("foo"), expectedJWT.getString("foo"));
-    assertEquals(actualJwt.getBigInteger("timestamp"), expectedJWT.getBigInteger("timestamp"));
-    assertEquals(actualJwt.getLong("timestamp"), expectedJWT.getLong("timestamp"));
-    assertEquals(actualJwt.getNumber("timestamp"), expectedJWT.getNumber("timestamp"));
-    assertEquals(actualJwt.getBigInteger("meaningOfLife"), expectedJWT.getBigInteger("meaningOfLife"));
-    assertEquals(actualJwt.getInteger("meaningOfLife"), expectedJWT.getInteger("meaningOfLife"));
-    assertEquals(actualJwt.getNumber("meaningOfLife"), expectedJWT.getNumber("meaningOfLife"));
-    assertEquals(actualJwt.getBigDecimal("double"), expectedJWT.getBigDecimal("double"));
-    assertEquals(actualJwt.getDouble("double"), expectedJWT.getDouble("double"));
-    assertEquals(actualJwt.getNumber("double"), expectedJWT.getNumber("double"));
-    assertEquals(actualJwt.getBigDecimal("float"), expectedJWT.getBigDecimal("float"));
-    assertEquals(actualJwt.getFloat("float"), expectedJWT.getFloat("float"));
-    assertEquals(actualJwt.getNumber("float"), expectedJWT.getNumber("float"));
-    assertEquals(actualJwt.getBigInteger("bigInteger"), expectedJWT.getBigInteger("bigInteger"));
-    assertEquals(actualJwt.getNumber("bigInteger"), expectedJWT.getNumber("bigInteger"));
-    assertEquals(actualJwt.getBigDecimal("bigDecimal"), expectedJWT.getBigDecimal("bigDecimal"));
-    assertEquals(actualJwt.getNumber("bigDecimal"), expectedJWT.getNumber("bigDecimal"));
-    assertEquals(actualJwt.getObject("bar"), expectedJWT.getObject("bar"));
-    assertEquals(actualJwt.getList("bar"), expectedJWT.getList("bar"));
-    assertEquals(actualJwt.getMap("object"), expectedJWT.getObject("object"));
-    assertEquals(actualJwt.getBoolean("www.inversoft.com/claims/is_admin"), expectedJWT.getBoolean("www.inversoft.com/claims/is_admin"));
-
-    // validate raw claims
-    Map<String, Object> rawClaims = actualJwt.getRawClaims();
-    assertEquals(rawClaims.get("aud"), expectedJWT.audience);
-    assertEquals(rawClaims.get("exp"), expectedJWT.expiration.toEpochSecond());
-    assertEquals(rawClaims.get("iat"), expectedJWT.issuedAt.toEpochSecond());
-    assertEquals(rawClaims.get("iss"), expectedJWT.issuer);
-    assertEquals(rawClaims.get("nbf"), expectedJWT.notBefore.toEpochSecond());
-    assertEquals(rawClaims.get("jti"), expectedJWT.uniqueId);
-    assertEquals(rawClaims.get("sub"), expectedJWT.subject);
-    assertEquals(rawClaims.get("foo"), expectedJWT.getString("foo"));
-    assertEquals(rawClaims.get("timestamp"), expectedJWT.getBigInteger("timestamp"));
-    assertEquals(rawClaims.get("meaningOfLife"), expectedJWT.getBigInteger("meaningOfLife"));
-    assertEquals(rawClaims.get("bar"), expectedJWT.getObject("bar"));
-    assertEquals(rawClaims.get("object"), expectedJWT.getObject("object"));
-    assertEquals(rawClaims.get("www.inversoft.com/claims/is_admin"), expectedJWT.getBoolean("www.inversoft.com/claims/is_admin"));
-
-    // validate all claims
-    Map<String, Object> allClaims = actualJwt.getAllClaims();
-    assertEquals(allClaims.get("aud"), expectedJWT.audience);
-    assertEquals(allClaims.get("exp"), expectedJWT.expiration);
-    assertEquals(allClaims.get("iat"), expectedJWT.issuedAt);
-    assertEquals(allClaims.get("iss"), expectedJWT.issuer);
-    assertEquals(allClaims.get("nbf"), expectedJWT.notBefore);
-    assertEquals(allClaims.get("jti"), expectedJWT.uniqueId);
-    assertEquals(allClaims.get("sub"), expectedJWT.subject);
-    assertEquals(allClaims.get("foo"), expectedJWT.getString("foo"));
-    assertEquals(allClaims.get("timestamp"), expectedJWT.getBigInteger("timestamp"));
-    assertEquals(allClaims.get("meaningOfLife"), expectedJWT.getBigInteger("meaningOfLife"));
-    assertEquals(allClaims.get("bar"), expectedJWT.getObject("bar"));
-    assertEquals(allClaims.get("object"), expectedJWT.getObject("object"));
-    assertEquals(allClaims.get("www.inversoft.com/claims/is_admin"), expectedJWT.getBoolean("www.inversoft.com/claims/is_admin"));
-  }
-
-  @Test
-  public void test_expiredThrows() {
-    JWT expectedJWT = new JWT()
-        .setExpiration(ZonedDateTime.now(ZoneOffset.UTC).minusMinutes(1).truncatedTo(ChronoUnit.SECONDS));
-
-    Signer signer = HMACSigner.newSHA256Signer("super-secret-key-that-is-at-least-32-bytes-long!!");
-    Verifier verifier = HMACVerifier.newVerifier("super-secret-key-that-is-at-least-32-bytes-long!!");
-
-    String encodedJWT = JWT.getEncoder().encode(expectedJWT, signer);
-
-    expectException(JWTExpiredException.class, ()
-        -> JWT.getDecoder().decode(encodedJWT, verifier));
-  }
-
-  @Test
-  public void test_notBefore_clockSkew() {
-    JWT expectedJWT = new JWT()
-        .setSubject("1234567890")
-        .setNotBefore(ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(60).truncatedTo(ChronoUnit.SECONDS))
-        .setExpiration(ZonedDateTime.now(ZoneOffset.UTC).plusMinutes(5).truncatedTo(ChronoUnit.SECONDS));
-
-    Signer signer = HMACSigner.newSHA256Signer("super-secret-key-that-is-at-least-32-bytes-long!!");
-    Verifier verifier = HMACVerifier.newVerifier("super-secret-key-that-is-at-least-32-bytes-long!!");
-
-    String encodedJWT = JWT.getEncoder().encode(expectedJWT, signer);
-
-    // Not allowed to be used until 60 seconds from now, skew equal to future availability minus 1 second
-    expectException(JWTUnavailableForProcessingException.class, ()
-        -> JWT.getDecoder()
-        .withClockSkew(59)
-        .decode(encodedJWT, verifier));
-
-    // Not allowed to be used until 60 seconds from now, skew equal to future availability minus 1 second
-    // - Use a time machine to change 'now'
-    expectException(JWTUnavailableForProcessingException.class, ()
-        // Provide a 'now' that is 59 seconds in the future
-        -> JWT.getTimeMachineDecoder(ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(59))
-        .decode(encodedJWT, verifier));
-
-    // Allow for 60 seconds of skew, ok.
-    JWT actual = JWT.getDecoder()
-        .withClockSkew(60)
-        .decode(encodedJWT, verifier);
-    assertEquals(actual.subject, "1234567890");
-
-    // Use a time machine to modify the 'now' instead of the skew
-    actual = JWT.getTimeMachineDecoder(ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(60))
-        .decode(encodedJWT, verifier);
-    assertEquals(actual.subject, "1234567890");
-  }
-
-  @Test
-  public void test_headerType() {
-    String encodedJWT = "eyJhbGciOiJSUzI1NiIsImtpZCI6IkVCQTRGRDNDRUExMDREOTlBODkwODkyNEJBMjNDMEYwIiwidHlwIjoiYXQrand0In0.eyJuYmYiOjE2MDUwMjIwMTUsImV4cCI6MTYwNTAyMjA5MCwiaXNzIjoiaHR0cHM6Ly9kZW1vLmlkZW50aXR5c2VydmVyLmlvIiwiYXVkIjoiYXBpIiwiY2xpZW50X2lkIjoibTJtLnNob3J0IiwianRpIjoiNDUzMTY3N0YwOTg2RTM0NEEyODI4NjVFQ0VBNTM1RjciLCJpYXQiOjE2MDUwMjIwMTUsInNjb3BlIjpbImFwaSJdfQ.qYX88SwfkdexCp_uZ6JeG1k7lJwHZU-Iq8W00P4xsH4MyB8zwkIL2QJ_P8ThfsTYswi1vdD5UJyqC8mbuvJsroq2dhMvml38YU-kunFlnbYoPR_Mah4Y_IZ-Fs48EaYF_kL3PA-0uG7eZDaQHIDBj3vnBdfcdIvfkE_hPzpWE6vLunArvrrMYe2--MkJnyThgqHBxKe2XAV2GfKkkJIceNSfpw8e_cVvc_Y3YVT4uKrURPYcZA_63fI7nHmCWaBvP5K77qzmDciICosp3jhyGUMfy7GzljHqnFDy_S-DHn5OL50DUImpuodKZ5RgFw2-ty7F0SrbEd1OqMhWtMuGcw";
-    Header header = JWTUtils.decodeHeader(encodedJWT);
-    assertEquals(header.type, "at+jwt");
-  }
-
-  @Test
-  public void test_expiration_clockSkew() {
-    JWT expectedJWT = new JWT()
-        .setSubject("1234567890")
-        .setExpiration(ZonedDateTime.now(ZoneOffset.UTC).minusSeconds(60).truncatedTo(ChronoUnit.SECONDS));
-
-    Signer signer = HMACSigner.newSHA256Signer("super-secret-key-that-is-at-least-32-bytes-long!!");
-    Verifier verifier = HMACVerifier.newVerifier("super-secret-key-that-is-at-least-32-bytes-long!!");
-
-    String encodedJWT = JWT.getEncoder().encode(expectedJWT, signer);
-
-    // Expired still, skew equal to expiration duration minus 1 second
-    expectException(JWTExpiredException.class, ()
-        -> JWT.getDecoder()
-        .withClockSkew(59)
-        .decode(encodedJWT, verifier));
-
-    // Expired still, skew equal to expiration duration
-    expectException(JWTExpiredException.class, ()
-        -> JWT.getDecoder()
-        .withClockSkew(60)
-        .decode(encodedJWT, verifier));
-
-    // Expired still, use a time machine to modify the 'now' instead of the skew
-    expectException(JWTExpiredException.class, ()
-        // Provide a 'now' that is 60 seconds in the past.
-        -> JWT.getTimeMachineDecoder(ZonedDateTime.now(ZoneOffset.UTC).minusSeconds(60))
-        .decode(encodedJWT, verifier));
-
-    // Allow for 61 seconds of skew, ok.
-    JWT actual = JWT.getDecoder()
-        .withClockSkew(61)
-        .decode(encodedJWT, verifier);
-    assertEquals(actual.subject, "1234567890");
-
-    // Use a time machine to modify the 'now' instead, provide a 'now' that is 61 seconds in the past.
-    actual = JWT.getTimeMachineDecoder(ZonedDateTime.now(ZoneOffset.UTC).minusSeconds(61))
-        .decode(encodedJWT, verifier);
-    assertEquals(actual.subject, "1234567890");
-  }
-
-  @Test(invocationCount = 2_000)
-  public void test_external_ec_521() {
-    // The purpose of the large invocation is to ensure we are consistently extracting the r and s components of the DER encoded signature.
-    // - Performing this test 1-3k times is generally sufficient to produce at least 1-3 errors prior to fixing the bug.
-    JWT jwt = new JWT()
-        .setSubject("1234567890")
-        .addClaim("name", "John Doe")
-        .addClaim("admin", true)
-        .addClaim("iat", 1516239022);
-
-    // PKCS#8 PEM, needs no encapsulation
-    Signer signer = ECSigner.newSHA512Signer(
-        "-----BEGIN PRIVATE KEY-----\n" +
-            "MIHtAgEAMBAGByqGSM49AgEGBSuBBAAjBIHVMIHSAgEBBEHzl1DpZSQJ8YhCbN/u\n" +
-            "vo5SOu0BjDDX9Gub6zsBW6B2TxRzb5sBeQaWVscDUZha4Xr1HEWpVtua9+nEQU/9\n" +
-            "Aq9Pl6GBiQOBhgAEAJhvCa6S89ePqlLO6MRV9KQqHvdAITDAf/WRDcvCmfrrNuov\n" +
-            "+j4gQXO12ohIukPCHM9rYms8Eqciz3gaxVTxZD4CAA8i2k9H6ew9iSh1qXa1kLxi\n" +
-            "yzMBqmAmmg4u/SroD6OleG56SwZVbWx+KIINB6r/PQVciGX8FjwgR/mbLHotVZYD\n" +
-            "-----END PRIVATE KEY-----");
-    String encodedJWT = JWT.getEncoder().encode(jwt, signer, header
-        -> header.set("kid", "xZDfZpry4P9vZPZyG2fNBRj-7Lz5omVdm7tHoCgSNfY"));
-
-    Verifier verifier = ECVerifier.newVerifier(
-        "-----BEGIN PUBLIC KEY-----\n" +
-            "MIGbMBAGByqGSM49AgEGBSuBBAAjA4GGAAQAmG8JrpLz14+qUs7oxFX0pCoe90Ah\n" +
-            "MMB/9ZENy8KZ+us26i/6PiBBc7XaiEi6Q8Icz2tiazwSpyLPeBrFVPFkPgIADyLa\n" +
-            "T0fp7D2JKHWpdrWQvGLLMwGqYCaaDi79KugPo6V4bnpLBlVtbH4ogg0Hqv89BVyI\n" +
-            "ZfwWPCBH+Zssei1VlgM=\n" +
-            "-----END PUBLIC KEY-----");
-
-    JWT actual = JWT.getDecoder().decode(encodedJWT, verifier);
-    assertEquals(actual.subject, jwt.subject);
-
-    // Use the function
-    actual = JWT.getDecoder().decode(encodedJWT, key -> verifier);
-    assertEquals(actual.subject, jwt.subject);
-  }
-
-  @Test(invocationCount = 2_000)
-  public void test_external_ec_p256() {
-    // The purpose of the large invocation is to ensure we are consistently extracting the r and s components of the DER encoded signature.
-    // - Performing this test 1-3k times is generally sufficient to produce at least 1-3 errors prior to fixing the bug.
-    JWT jwt = new JWT()
-        .setSubject("1234567890")
-        .addClaim("name", "John Doe")
-        .addClaim("admin", true)
-        .addClaim("iat", 1516239022);
-
-    // PKCS#8 PEM, needs no encapsulation
-    Signer signer = ECSigner.newSHA256Signer(
-        "-----BEGIN PRIVATE KEY-----\n" +
-            "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgPGJGAm4X1fvBuC1z\n" +
-            "SpO/4Izx6PXfNMaiKaS5RUkFqEGhRANCAARCBvmeksd3QGTrVs2eMrrfa7CYF+sX\n" +
-            "sjyGg+Bo5mPKGH4Gs8M7oIvoP9pb/I85tdebtKlmiCZHAZE5w4DfJSV6\n" +
-            "-----END PRIVATE KEY-----");
-    String encodedJWT = JWT.getEncoder().encode(jwt, signer, header
-        -> header.set("kid", "xZDfZpry4P9vZPZyG2fNBRj-7Lz5omVdm7tHoCgSNfY"));
-
-    Verifier verifier = ECVerifier.newVerifier(
-        "-----BEGIN PUBLIC KEY-----\n" +
-            "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEQgb5npLHd0Bk61bNnjK632uwmBfr\n" +
-            "F7I8hoPgaOZjyhh+BrPDO6CL6D/aW/yPObXXm7SpZogmRwGROcOA3yUleg==\n" +
-            "-----END PUBLIC KEY-----");
-
-    JWT actual = JWT.getDecoder().decode(encodedJWT, verifier);
-    assertEquals(actual.subject, jwt.subject);
-  }
-
-  @Test(invocationCount = 2_000)
-  public void test_external_ec_p384() {
-    // The purpose of the large invocation is to ensure we are consistently extracting the r and s components of the DER encoded signature.
-    // - Performing this test 1-3k times is generally sufficient to produce at least 1-3 errors prior to fixing the bug.
-    JWT jwt = new JWT()
-        .setSubject("1234567890")
-        .addClaim("name", "John Doe")
-        .addClaim("admin", true)
-        .addClaim("iat", 1516239022);
-
-    // PKCS#8 PEM, needs no encapsulation
-    Signer signer = ECSigner.newSHA384Signer(
-        "-----BEGIN PRIVATE KEY-----\n" +
-            "MIG2AgEAMBAGByqGSM49AgEGBSuBBAAiBIGeMIGbAgEBBDCVWQsOJHjKD0I4cXOY\n" +
-            "Jm4G8i5c7IMhFbxFq57OUlrTVmND43dvvNW1oQ6i6NiXEQWhZANiAASezSGlAu4w\n" +
-            "AaJe4676mQM0F/5slI+EkdptRJdfsQP9mNxe7RdzHgcSw7j/Wxa45nlnFnFrPPL4\n" +
-            "viJKOBRxMB1jjVA9my9PixxJGoB22qDQwFbP8ldmEp6abwdBsXNaePM=\n" +
-            "-----END PRIVATE KEY-----");
-    String encodedJWT = JWT.getEncoder().encode(jwt, signer, header
-        -> header.set("kid", "xZDfZpry4P9vZPZyG2fNBRj-7Lz5omVdm7tHoCgSNfY"));
-
-    Verifier verifier = ECVerifier.newVerifier(
-        "-----BEGIN PUBLIC KEY-----\n" +
-            "MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAEns0hpQLuMAGiXuOu+pkDNBf+bJSPhJHa\n" +
-            "bUSXX7ED/ZjcXu0Xcx4HEsO4/1sWuOZ5ZxZxazzy+L4iSjgUcTAdY41QPZsvT4sc\n" +
-            "SRqAdtqg0MBWz/JXZhKemm8HQbFzWnjz\n" +
-            "-----END PUBLIC KEY-----");
-
-    JWT actual = JWT.getDecoder().decode(encodedJWT, verifier);
-    assertEquals(actual.subject, jwt.subject);
-
-    // Use the function
-    actual = JWT.getDecoder().decode(encodedJWT, key -> verifier);
-    assertEquals(actual.subject, jwt.subject);
-  }
-
-  @Test
-  public void test_loading_keys() throws Exception {
-    // Ensure no explosions, loading different ways
-
-    // RSA
-    assertNotNull(RSAVerifier.newVerifier(rsaPublicKey2048Path));
-    assertNotNull(RSAVerifier.newVerifier(Files.readAllBytes(rsaPublicKey2048Path)));
-    assertNotNull(RSAVerifier.newVerifier(new String(Files.readAllBytes(rsaPublicKey2048Path))));
-    // RSA Verifier can also take a pre-built key
-    assertNotNull(RSAVerifier.newVerifier((RSAPublicKey) PEM.decode(Files.readAllBytes(rsaPublicKey2048Path)).getPublicKey()));
-
-    // EC
-    assertNotNull(ECVerifier.newVerifier(ecPublicKey256Path));
-    assertNotNull(ECVerifier.newVerifier(Files.readAllBytes(ecPublicKey256Path)));
-    assertNotNull(ECVerifier.newVerifier(new String(Files.readAllBytes(ecPublicKey256Path))));
-    // EC Verifier can also take a pre-built key
-    assertNotNull(ECVerifier.newVerifier((ECPublicKey) PEM.decode(Files.readAllBytes(ecPublicKey256Path)).getPublicKey()));
-
-    // HMAC
-    assertNotNull(HMACVerifier.newVerifier(secretPath));
-    assertNotNull(HMACVerifier.newVerifier(Files.readAllBytes(secretPath)));
-    assertNotNull(HMACVerifier.newVerifier(new String(Files.readAllBytes(secretPath))));
-  }
-
-  @Test
-  public void test_multipleSignersAndVerifiers() throws Exception {
-    JWT jwt = new JWT().setSubject("123456789");
-
-    // Three separate signers
-    Signer signer1 = HMACSigner.newSHA512Signer("super-secret-key-1-that-is-at-least-64-bytes-long-for-sha512-algorithm-compat-req!!");
-    Signer signer2 = HMACSigner.newSHA512Signer("super-secret-key-2-that-is-at-least-64-bytes-long-for-sha512-algorithm-compat-req!!");
-    Signer signer3 = RSASigner.newSHA256Signer(new String(Files.readAllBytes(Paths.get("src/test/resources/rsa_private_key_2048.pem"))));
-
-    // Encode the same JWT with each signer, writing the Key ID to the header
-    String encodedJWT1 = JWT.getEncoder().encode(jwt, signer1, h -> h.set("kid", "verifier1"));
-    String encodedJWT2 = JWT.getEncoder().encode(jwt, signer2, h -> h.set("kid", "verifier2"));
-    String encodedJWT3 = JWT.getEncoder().encode(jwt, signer3, h -> h.set("kid", "verifier3"));
-
-    Verifier verifier1 = HMACVerifier.newVerifier("super-secret-key-1-that-is-at-least-64-bytes-long-for-sha512-algorithm-compat-req!!");
-    Verifier verifier2 = HMACVerifier.newVerifier("super-secret-key-2-that-is-at-least-64-bytes-long-for-sha512-algorithm-compat-req!!");
-    Verifier verifier3 = RSAVerifier.newVerifier(new String(Files.readAllBytes(rsaPublicKey2048Path)));
-
-    Map<String, Verifier> verifiers = new HashMap<>();
-    verifiers.put("verifier1", verifier1);
-    verifiers.put("verifier2", verifier2);
-    verifiers.put("verifier3", verifier3);
-
-    // decode all the encoded JWTs and ensure they come out the same.
-    JWT jwt1 = JWT.getDecoder().decode(encodedJWT1, verifiers);
-    JWT jwt2 = JWT.getDecoder().decode(encodedJWT2, verifiers);
-    JWT jwt3 = JWT.getDecoder().decode(encodedJWT3, verifiers);
-
-    assertEquals(jwt1.subject, jwt2.subject);
-    assertEquals(jwt2.subject, jwt3.subject);
-  }
-
-
-  @Test
-  public void test_notBeforeThrows() {
-    JWT expectedJWT = new JWT()
-        .setExpiration(ZonedDateTime.now(ZoneOffset.UTC).plusMinutes(60).truncatedTo(ChronoUnit.SECONDS))
-        .setIssuedAt(ZonedDateTime.now(ZoneOffset.UTC).truncatedTo(ChronoUnit.SECONDS))
-        .setIssuer("www.inversoft.com")
-        .setNotBefore(ZonedDateTime.now(ZoneOffset.UTC).plusMinutes(5).truncatedTo(ChronoUnit.SECONDS));
-
-    Signer signer = HMACSigner.newSHA256Signer("super-secret-key-that-is-at-least-32-bytes-long!!");
-    Verifier verifier = HMACVerifier.newVerifier("super-secret-key-that-is-at-least-32-bytes-long!!");
-
-    String encodedJWT = JWT.getEncoder().encode(expectedJWT, signer);
-
-    expectException(JWTUnavailableForProcessingException.class, ()
-        -> JWT.getDecoder().decode(encodedJWT, verifier));
-  }
-
-  @Test
-  public void test_nullFailFast() {
-    expectException(NullPointerException.class, () -> new JWTDecoder().decode(null));
-    expectException(NullPointerException.class, () -> new JWTDecoder().decode(null, null, null, null));
-    expectException(NullPointerException.class, () -> new JWTDecoder().decode("foo", Collections.emptyMap(), null));
-    expectException(NullPointerException.class, () -> new JWTDecoder().decode("foo", key -> null, null));
-    expectException(NullPointerException.class, () -> new JWTDecoder().decode("foo", key -> null, null));
-  }
-
-  @Test
-  public void test_openssl_keys_p_256() {
-    JWT jwt = new JWT()
-        .setSubject("1234567890")
-        .addClaim("name", "John Doe")
-        .addClaim("admin", true)
-        .addClaim("iat", 1516239022);
-
-    // PKCS#8 PEM, needs no encapsulation
-    Signer signer = ECSigner.newSHA256Signer(
-        "-----BEGIN PRIVATE KEY-----\n" +
-            "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgy3F4UN/uqaNn4o4G\n" +
-            "8UHT3Gq6Ab/2CdjFeoDpLREcGaChRANCAAR2dqbsTukFi1nBHI4wOOApeczUf8pG\n" +
-            "8g+hsTDTedkDj4q9686mgx+OwHwbT5XOt+sNEhyz0jxUz6Vy+6l6DeUQ\n" +
-            "-----END PRIVATE KEY-----");
-    String encodedJWT = JWT.getEncoder().encode(jwt, signer, header
-        -> header.set("kid", "xZDfZpry4P9vZPZyG2fNBRj-7Lz5omVdm7tHoCgSNfY"));
-
-    Verifier verifier = ECVerifier.newVerifier(
-        "-----BEGIN PUBLIC KEY-----\n" +
-            "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEdnam7E7pBYtZwRyOMDjgKXnM1H/K\n" +
-            "RvIPobEw03nZA4+KvevOpoMfjsB8G0+VzrfrDRIcs9I8VM+lcvupeg3lEA==\n" +
-            "-----END PUBLIC KEY-----");
-
-    JWT actual = JWT.getDecoder().decode(encodedJWT, verifier);
-    assertEquals(actual.subject, jwt.subject);
-  }
-
-  @Test(invocationCount = 2_000)
-  public void test_openssl_keys_p_521() {
-    // The purpose of the large invocation is to ensure we are consistently extracting the r and s components of the DER encoded signature.
-    // - Performing this test 1-3k times is generally sufficient to produce at least 1-3 errors prior to fixing the bug.
-    JWT jwt = new JWT()
-        .setSubject("1234567890")
-        .addClaim("name", "John Doe")
-        .addClaim("admin", true)
-        .addClaim("iat", 1516239022);
-
-    // PKCS#8 PEM, needs no encapsulation
-    Signer signer = ECSigner.newSHA512Signer(
-        "-----BEGIN PRIVATE KEY-----\n" +
-            "MIHtAgEAMBAGByqGSM49AgEGBSuBBAAjBIHVMIHSAgEBBEHdgM7Q2N5VAu1JXri9\n" +
-            "5AYmCZo+rVbdtYbz58D0mWB+TZs8YPvawg6u3m1xGNJXoqPBr/KSVvqHkpgLONlU\n" +
-            "NGs5t6GBiQOBhgAEAYsJ/uVsOJR5FrCynbKsuWhkj/+2PdFnIlnJp1s0l0T13gtE\n" +
-            "iIcpzSDLHuvJS3812NlC5ZYGvhqIoWfMBy4KTfdyAenIeyriM/P6gJeR1HYMZIP0\n" +
-            "PFNr0EghmYCIK51MamQAlEcvhoPri1phF6Fa6mZtrCqaaIB3VDNRaabcJfsFHl94\n" +
-            "-----END PRIVATE KEY-----");
-    String encodedJWT = JWT.getEncoder().encode(jwt, signer, header
-        -> header.set("kid", "xZDfZpry4P9vZPZyG2fNBRj-7Lz5omVdm7tHoCgSNfY"));
-
-    Verifier verifier = ECVerifier.newVerifier(
-        "-----BEGIN PUBLIC KEY-----\n" +
-            "MIGbMBAGByqGSM49AgEGBSuBBAAjA4GGAAQBiwn+5Ww4lHkWsLKdsqy5aGSP/7Y9\n" +
-            "0WciWcmnWzSXRPXeC0SIhynNIMse68lLfzXY2ULllga+GoihZ8wHLgpN93IB6ch7\n" +
-            "KuIz8/qAl5HUdgxkg/Q8U2vQSCGZgIgrnUxqZACURy+Gg+uLWmEXoVrqZm2sKppo\n" +
-            "gHdUM1Fpptwl+wUeX3g=\n" +
-            "-----END PUBLIC KEY-----");
-    JWT actual = JWT.getDecoder().decode(encodedJWT, verifier);
-    assertEquals(actual.subject, jwt.subject);
-  }
-
-  @Test
-  public void test_zonedDateTime() {
-    ZonedDateTime expiration = ZonedDateTime.now(ZoneOffset.UTC).plusMinutes(60).truncatedTo(ChronoUnit.SECONDS);
-    JWT expectedJWT = new JWT().setExpiration(expiration);
-
-    Signer signer = HMACSigner.newSHA256Signer("super-secret-key-that-is-at-least-32-bytes-long!!");
-    Verifier verifier = HMACVerifier.newVerifier("super-secret-key-that-is-at-least-32-bytes-long!!");
-
-    String encodedJWT1 = JWT.getEncoder().encode(expectedJWT, signer);
-    JWT actualJWT1 = JWT.getDecoder().decode(encodedJWT1, verifier);
-
-    assertEquals(actualJWT1.expiration, expectedJWT.expiration);
-  }
-
-  @Test
-  public void test_Ed25519() {
-    JWT jwt = new JWT().setSubject("123456789");
-    Signer signer = EdDSASigner.newSigner(readFile("ed_dsa_ed25519_private_key.pem"));
-    String encodedJWT = JWT.getEncoder().encode(jwt, signer);
-    JWT actual = JWT.getDecoder().decode(encodedJWT, EdDSAVerifier.newVerifier(getPath("ed_dsa_ed25519_public_key.pem")));
-    assertEquals(actual.subject, jwt.subject);
-    assertEquals(actual.header.algorithm, Algorithm.Ed25519);
-  }
-
-  @Test
-  public void test_Ed448() {
-    JWT jwt = new JWT().setSubject("123456789");
-    Signer signer = EdDSASigner.newSigner(readFile("ed_dsa_ed448_private_key.pem"));
-    String encodedJWT = JWT.getEncoder().encode(jwt, signer);
-    JWT actual = JWT.getDecoder().decode(encodedJWT, EdDSAVerifier.newVerifier(getPath("ed_dsa_ed448_public_key.pem")));
-    assertEquals(actual.subject, jwt.subject);
-    assertEquals(actual.header.algorithm, Algorithm.Ed448);
-  }
-
-  @Test
-  public void test_Ed25519_control() {
-    // Control test, known encoded Ed25519 JWT
-    String encodedJWT = "eyJhbGciOiJFZDI1NTE5IiwidHlwIjoiSldUIn0.eyJpYXQiOjE1MTYyMzkwMjIsInN1YiI6IjEyMzQ1Njc4OTAiLCJuYW1lIjoiSm9obiBEb2UiLCJhZG1pbiI6dHJ1ZX0.rrQkXWgLKzHe4selt8TX6_qGk7vevkS0UvOAfA4swDQ4E3gRYM2mLiea8tMTc5QooPIPQ-8Ke_sIEute2CcuAw";
-
-    JWT jwt = JWT.getDecoder().decode(encodedJWT, EdDSAVerifier.newVerifier(
-        ("-----BEGIN PUBLIC KEY-----\n" +
-            "MCowBQYDK2VwAyEAm3hg6spkvQ31omhXHH//ux5BwleSlufOXEfOlUWOl30=\n" +
-            "-----END PUBLIC KEY-----").getBytes(StandardCharsets.UTF_8)));
-    assertNotNull(jwt);
-    assertEquals(jwt.subject, "1234567890");
-    assertEquals(jwt.getString("name"), "John Doe");
-    assertEquals(jwt.getBoolean("admin"), Boolean.TRUE);
-    assertEquals(jwt.getRawClaims().get("iat"), 1516239022L);
-    assertEquals(jwt.issuedAt, ZonedDateTime.ofInstant(Instant.ofEpochSecond(1516239022L), ZoneOffset.UTC));
-  }
-
-  @Test
-  public void test_Ed448_control() {
-    // Control test, known encoded Ed448 JWT
-    String encodedJWT = "eyJhbGciOiJFZDQ0OCIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1MTYyMzkwMjIsInN1YiI6IjEyMzQ1Njc4OTAiLCJuYW1lIjoiSm9obiBEb2UiLCJhZG1pbiI6dHJ1ZX0.L5i6mL2Z1U-fJlQ-mmeKBJ8DlXnQmiTL_LXDknAOLerJnWryPtIg4380OUdWlTovNzQ8dKLejzqAxt2pQwAE02zU8XpVGPe4QZnxxF5-3e2Mo9xhB2yXDnu56diDa_90_g9aTgIF6b881Ab2eKOMTBAA";
-
-    JWT jwt = JWT.getDecoder().decode(encodedJWT, EdDSAVerifier.newVerifier(
-        ("-----BEGIN PUBLIC KEY-----\n" +
-            "MEMwBQYDK2VxAzoAgWl4sYkZhkljqw4C0GDCjDgU44Q3+Sxnd9XXZKcP+kcIoEMm\n" +
-            "coSFW7aMWJXcWKa5BB6/eyuTE1IA\n" +
-            "-----END PUBLIC KEY-----").getBytes(StandardCharsets.UTF_8)));
-    assertNotNull(jwt);
-    assertEquals(jwt.subject, "1234567890");
-    assertEquals(jwt.getString("name"), "John Doe");
-    assertEquals(jwt.getBoolean("admin"), Boolean.TRUE);
-    assertEquals(jwt.getRawClaims().get("iat"), 1516239022L);
-    assertEquals(jwt.issuedAt, ZonedDateTime.ofInstant(Instant.ofEpochSecond(1516239022L), ZoneOffset.UTC));
-  }
-
-  @Test
-  public void test_wrongSecret_HMAC() {
-    JWT jwt = new JWT().setSubject("123456789");
-    Signer signer = HMACSigner.newSHA256Signer("super-secret-key-that-is-at-least-32-bytes-long!!");
-    String encodedJWT = JWT.getEncoder().encode(jwt, signer);
-    expectException(InvalidJWTSignatureException.class, () ->
-        JWT.getDecoder().decode(encodedJWT, HMACVerifier.newVerifier("wrong-secret-key-that-is-at-least-32-bytes-long!!")));
-  }
-
-  @Test
-  public void test_wrongKey_RSA() {
-    JWT jwt = new JWT().setSubject("123456789");
-    Signer signer = RSASigner.newSHA256Signer(readFile("rsa_private_key_2048.pem"));
-    String encodedJWT = JWT.getEncoder().encode(jwt, signer);
-    // Verify with a different RSA public key (4096-bit)
-    expectException(InvalidJWTSignatureException.class, () ->
-        JWT.getDecoder().decode(encodedJWT, RSAVerifier.newVerifier(rsaPublicKey4096Path)));
-  }
-
-  @Test
-  public void test_wrongKey_EC() {
-    JWT jwt = new JWT().setSubject("123456789");
-    Signer signer = ECSigner.newSHA256Signer(readFile("ec_private_key_p_256.pem"));
-    String encodedJWT = JWT.getEncoder().encode(jwt, signer);
-    // Generate a different EC key pair and verify with it
-    KeyPair differentKey = JWTUtils.generate256_ECKeyPair();
-    expectException(InvalidJWTSignatureException.class, () ->
-        JWT.getDecoder().decode(encodedJWT, ECVerifier.newVerifier(differentKey.publicKey)));
-  }
-
-  @Test
-  public void test_wrongKey_EdDSA() {
-    JWT jwt = new JWT().setSubject("123456789");
-    Signer signer = EdDSASigner.newSigner(readFile("ed_dsa_ed25519_private_key.pem"));
-    String encodedJWT = JWT.getEncoder().encode(jwt, signer);
-    // Generate a different Ed25519 key pair and verify with it
-    KeyPair differentKey = JWTUtils.generate_ed25519_EdDSAKeyPair();
-    expectException(InvalidJWTSignatureException.class, () ->
-        JWT.getDecoder().decode(encodedJWT, EdDSAVerifier.newVerifier(differentKey.publicKey.getBytes(StandardCharsets.UTF_8))));
+  // Silence unused-import warnings on platforms with strict lint:
+  @SuppressWarnings("unused")
+  private static void __unused() {
+    fail();
   }
 }

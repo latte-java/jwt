@@ -25,7 +25,6 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import java.nio.charset.StandardCharsets;
-import java.security.InvalidParameterException;
 import java.security.interfaces.ECPublicKey;
 import java.util.Arrays;
 
@@ -69,7 +68,7 @@ public class ECVerifierTest extends BaseJWTTest {
 
   private void assertECVerifier(Verifier verifier, Algorithm expectedAlgorithm) {
     // Only the curve-matching algorithm should return true
-    for (Algorithm alg : Algorithm.values()) {
+    for (Algorithm alg : Algorithm.standardValues()) {
       if (alg == expectedAlgorithm) {
         assertTrue(verifier.canVerify(alg), "Expected canVerify(" + alg + ") to be true");
       } else {
@@ -81,11 +80,10 @@ public class ECVerifierTest extends BaseJWTTest {
   private void assertFailed(String fileName) {
     try {
       ECVerifier.newVerifier(readFile(fileName));
-      Assert.fail("Expected [InvalidParameterException] exception");
-    } catch (InvalidParameterException e) {
-      assertEquals(e.getMessage(), "Unexpected Public Key Format", "[" + fileName + "]");
+      Assert.fail("Expected [MissingPublicKeyException] exception");
     } catch (MissingPublicKeyException e) {
-      assertEquals(e.getMessage(), "The provided PEM encoded string did not contain a public key.");
+      assertTrue(e.getMessage() != null && e.getMessage().startsWith("PEM did not contain a public key"),
+          "[" + fileName + "] got: " + e.getMessage());
     } catch (Exception e) {
       Assert.fail("Unexpected exception when parsing file [" + fileName + "]", e);
     }

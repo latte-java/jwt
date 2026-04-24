@@ -16,7 +16,7 @@
 
 package org.lattejava.jwt;
 
-import org.lattejava.jwt.json.Mapper;
+import org.lattejava.jwt.jwks.JSONWebKey;
 import org.testng.Assert;
 
 import java.io.IOException;
@@ -25,6 +25,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -35,6 +36,8 @@ import static org.testng.Assert.fail;
  * @author Daniel DeGroff
  */
 public abstract class BaseJWTTest extends BaseTest {
+  private static final LatteJSONProcessor JSON = new LatteJSONProcessor();
+
   @SuppressWarnings({"unchecked", "rawtypes"})
   private static Map<String, Object> deepSort(Map<String, Object> response) {
     Map<String, Object> sorted = new TreeMap<>();
@@ -64,23 +67,48 @@ public abstract class BaseJWTTest extends BaseTest {
       }
     });
 
-    sorted.sort(Comparator.comparing(value -> new String(Mapper.prettyPrint(value))));
+    sorted.sort(Comparator.comparing(BaseJWTTest::sortKey));
     return sorted;
   }
 
   @SuppressWarnings("unchecked")
+  private static String sortKey(Object value) {
+    if (value == null) {
+      return "";
+    }
+    if (value instanceof Map) {
+      return new String(JSON.serialize((Map<String, Object>) value));
+    }
+    return String.valueOf(value);
+  }
+
   protected void assertJSONEquals(Object object, String jsonFile) throws IOException {
-    Map<String, Object> actual = Mapper.deserialize(Mapper.serialize(object), Map.class);
-    Map<String, Object> expected = Mapper.deserialize(Files.readAllBytes(Paths.get(jsonFile)), Map.class);
+    Map<String, Object> actual = toMap(object);
+    Map<String, Object> expected = JSON.deserialize(Files.readAllBytes(Paths.get(jsonFile)));
 
     actual = deepSort(actual);
     expected = deepSort(expected);
 
     if (!actual.equals(expected)) {
-      String actualString = new String(Mapper.prettyPrint(actual));
-      String expectedString = new String(Mapper.prettyPrint(expected));
+      String actualString = new String(JSON.serialize(actual));
+      String expectedString = new String(JSON.serialize(expected));
       throw new AssertionError("The actual JSON doesn't match the expected JSON output. expected [" + expectedString + "] but found [" + actualString + "]");
     }
+  }
+
+  /**
+   * LatteJSONProcessor only deals in {@link Map} structures. Convert the given
+   * test fixture object to a Map suitable for round-trip comparison.
+   */
+  @SuppressWarnings("unchecked")
+  private static Map<String, Object> toMap(Object object) {
+    if (object instanceof JSONWebKey) {
+      return new LinkedHashMap<>(((JSONWebKey) object).toSerializableMap());
+    }
+    if (object instanceof Map) {
+      return (Map<String, Object>) object;
+    }
+    throw new AssertionError("BaseJWTTest.assertJSONEquals does not know how to serialize " + object.getClass());
   }
 
   protected void expectException(Class<? extends Exception> expected, ThrowingRunnable runnable) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2020, FusionAuth, All Rights Reserved
+ * Copyright (c) 2018-2026, FusionAuth, All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,14 +16,12 @@
 
 package org.lattejava.jwt.algorithm.ec;
 
-import org.lattejava.jwt.InvalidKeyTypeException;
-import org.lattejava.jwt.JWTSigningException;
-import org.lattejava.jwt.MissingPrivateKeyException;
-import org.lattejava.jwt.Signer;
 import org.lattejava.jwt.Algorithm;
-import org.lattejava.jwt.pem.PEM;
+import org.lattejava.jwt.JWTSigningException;
+import org.lattejava.jwt.Signer;
+import org.lattejava.jwt.algorithm.KeyCoercion;
+import org.lattejava.jwt.internal.JOSEConverter;
 
-import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
@@ -33,6 +31,14 @@ import java.security.interfaces.ECPrivateKey;
 import java.util.Objects;
 
 /**
+ * ECDSA {@link Signer} for the {@code ES256} / {@code ES384} / {@code ES512}
+ * / {@code ES256K} JWA algorithms (RFC 7518 §3.4 and RFC 8812 §3.2).
+ *
+ * <p>Each call to {@link #sign(byte[])} obtains a fresh {@link Signature}
+ * instance ({@link Signature} is not thread-safe), produces a DER-encoded
+ * ECDSA signature, then converts it to JOSE {@code R || S} fixed-length form
+ * via {@link JOSEConverter#derToJose(byte[], int)}.</p>
+ *
  * @author Daniel DeGroff
  */
 public class ECSigner implements Signer {
@@ -45,195 +51,104 @@ public class ECSigner implements Signer {
   private ECSigner(Algorithm algorithm, PrivateKey privateKey, String kid) {
     Objects.requireNonNull(algorithm);
     Objects.requireNonNull(privateKey);
-
     this.algorithm = algorithm;
     this.kid = kid;
-
-    if (!(privateKey instanceof ECPrivateKey)) {
-      throw new InvalidKeyTypeException("Expecting a private key of type [ECPrivateKey], but found [" + privateKey.getClass().getSimpleName() + "].");
-    }
-
-    this.privateKey = (ECPrivateKey) privateKey;
-    validateCurve(this.privateKey, algorithm);
+    this.privateKey = KeyCoercion.asPrivate(privateKey, ECPrivateKey.class);
+    ECFamily.assertCurveMatchesAlgorithm(this.privateKey.getParams(), algorithm);
   }
 
-  private ECSigner(Algorithm algorithm, String privateKey, String kid) {
+  private ECSigner(Algorithm algorithm, String pemPrivateKey, String kid) {
     Objects.requireNonNull(algorithm);
-    Objects.requireNonNull(privateKey);
-
+    Objects.requireNonNull(pemPrivateKey);
     this.algorithm = algorithm;
     this.kid = kid;
-    PEM pem = PEM.decode(privateKey);
-    if (pem.privateKey == null) {
-      throw new MissingPrivateKeyException("The provided PEM encoded string did not contain a private key.");
-    }
-
-    if (!(pem.privateKey instanceof ECPrivateKey)) {
-      throw new InvalidKeyTypeException("Expecting a private key of type [ECPrivateKey], but found [" + pem.privateKey.getClass().getSimpleName() + "].");
-    }
-
-    this.privateKey = pem.getPrivateKey();
-    validateCurve(this.privateKey, algorithm);
+    this.privateKey = KeyCoercion.privateFromPem(pemPrivateKey, ECPrivateKey.class);
+    ECFamily.assertCurveMatchesAlgorithm(this.privateKey.getParams(), algorithm);
   }
 
-  private static void validateCurve(ECPrivateKey key, Algorithm algorithm) {
-    int fieldSize = key.getParams().getCurve().getField().getFieldSize();
-    Algorithm expected = switch (fieldSize) {
-      case 256 -> Algorithm.ES256;
-      case 384 -> Algorithm.ES384;
-      case 521 -> Algorithm.ES512;
-      default -> throw new InvalidKeyTypeException("Unsupported EC curve with field size [" + fieldSize + "]. Expected 256, 384, or 521.");
-    };
-    if (expected != algorithm) {
-      throw new InvalidKeyTypeException("The provided EC key uses curve with field size [" + fieldSize + "] which is not compatible with algorithm [" + algorithm.name() + "].");
-    }
+  public static ECSigner newSHA256Signer(String pemPrivateKey) {
+    return new ECSigner(Algorithm.ES256, pemPrivateKey, null);
   }
 
-  /**
-   * Build a new EC signer using a SHA-256 hash.
-   *
-   * @param privateKey The private key PEM expected to be in PKCS#1 or PKCS#8 format.
-   * @return a new EC signer.
-   */
-  public static ECSigner newSHA256Signer(String privateKey) {
-    return new ECSigner(Algorithm.ES256, privateKey, null);
+  public static ECSigner newSHA256Signer(String pemPrivateKey, String kid) {
+    return new ECSigner(Algorithm.ES256, pemPrivateKey, kid);
   }
 
-  /**
-   * Build a new EC signer using a SHA-256 hash.
-   *
-   * @param privateKey The private key PEM expected to be in PKCS#1 or PKCS#8 format.
-   * @param kid        The key identifier. This will be used by the JWTEncoder to write the 'kid' header.
-   * @return a new EC signer.
-   */
-  public static ECSigner newSHA256Signer(String privateKey, String kid) {
-    return new ECSigner(Algorithm.ES256, privateKey, kid);
-  }
-
-  /**
-   * Build a new EC signer using a SHA-256 hash.
-   *
-   * @param privateKey The private key.
-   * @return a new EC signer.
-   */
   public static ECSigner newSHA256Signer(PrivateKey privateKey) {
     return new ECSigner(Algorithm.ES256, privateKey, null);
   }
 
-  /**
-   * Build a new EC signer using a SHA-256 hash.
-   *
-   * @param privateKey The private key.
-   * @param kid        The key identifier. This will be used by the JWTEncoder to write the 'kid' header.
-   * @return a new EC signer.
-   */
   public static ECSigner newSHA256Signer(PrivateKey privateKey, String kid) {
     return new ECSigner(Algorithm.ES256, privateKey, kid);
   }
 
-  /**
-   * Build a new EC signer using a SHA-384 hash.
-   *
-   * @param privateKey The private key PEM expected to be in PKCS#1 or PKCS#8 format.
-   * @return a new EC signer.
-   */
-  public static ECSigner newSHA384Signer(String privateKey) {
-    return new ECSigner(Algorithm.ES384, privateKey, null);
+  public static ECSigner newSHA384Signer(String pemPrivateKey) {
+    return new ECSigner(Algorithm.ES384, pemPrivateKey, null);
   }
 
-  /**
-   * Build a new EC signer using a SHA-384 hash.
-   *
-   * @param privateKey The private key PEM expected to be in PKCS#1 or PKCS#8 format.
-   * @param kid        The key identifier. This will be used by the JWTEncoder to write the 'kid' header.
-   * @return a new EC signer.
-   */
-  public static ECSigner newSHA384Signer(String privateKey, String kid) {
-    return new ECSigner(Algorithm.ES384, privateKey, kid);
+  public static ECSigner newSHA384Signer(String pemPrivateKey, String kid) {
+    return new ECSigner(Algorithm.ES384, pemPrivateKey, kid);
   }
 
-  /**
-   * Build a new EC signer using a SHA-384 hash.
-   *
-   * @param privateKey The private key.
-   * @return a new EC signer.
-   */
   public static ECSigner newSHA384Signer(PrivateKey privateKey) {
     return new ECSigner(Algorithm.ES384, privateKey, null);
   }
 
-  /**
-   * Build a new EC signer using a SHA-384 hash.
-   *
-   * @param privateKey The private key.
-   * @param kid        The key identifier. This will be used by the JWTEncoder to write the 'kid' header.
-   * @return a new EC signer.
-   */
   public static ECSigner newSHA384Signer(PrivateKey privateKey, String kid) {
     return new ECSigner(Algorithm.ES384, privateKey, kid);
   }
 
-  /**
-   * Build a new EC signer using a SHA-512 hash.
-   *
-   * @param privateKey The private key PEM expected to be in PKCS#1 or PKCS#8 format.
-   * @return a new EC signer.
-   */
-  public static ECSigner newSHA512Signer(String privateKey) {
-    return new ECSigner(Algorithm.ES512, privateKey, null);
+  public static ECSigner newSHA512Signer(String pemPrivateKey) {
+    return new ECSigner(Algorithm.ES512, pemPrivateKey, null);
   }
 
-  /**
-   * Build a new EC signer using a SHA-512 hash.
-   *
-   * @param privateKey The private key PEM expected to be in PKCS#1 or PKCS#8 format.
-   * @param kid        The key identifier. This will be used by the JWTEncoder to write the 'kid' header.
-   * @return a new EC signer.
-   */
-  public static ECSigner newSHA512Signer(String privateKey, String kid) {
-    return new ECSigner(Algorithm.ES512, privateKey, kid);
+  public static ECSigner newSHA512Signer(String pemPrivateKey, String kid) {
+    return new ECSigner(Algorithm.ES512, pemPrivateKey, kid);
   }
 
-  /**
-   * Build a new EC signer using a SHA-512 hash.
-   *
-   * @param privateKey The private key.
-   * @return a new EC signer.
-   */
   public static ECSigner newSHA512Signer(PrivateKey privateKey) {
     return new ECSigner(Algorithm.ES512, privateKey, null);
   }
 
-  /**
-   * Build a new EC signer using a SHA-512 hash.
-   *
-   * @param privateKey The private key.
-   * @param kid        The key identifier. This will be used by the JWTEncoder to write the 'kid' header.
-   * @return a new EC signer.
-   */
   public static ECSigner newSHA512Signer(PrivateKey privateKey, String kid) {
     return new ECSigner(Algorithm.ES512, privateKey, kid);
   }
 
+  public static ECSigner newSecp256k1Signer(String pemPrivateKey) {
+    return new ECSigner(Algorithm.ES256K, pemPrivateKey, null);
+  }
+
+  public static ECSigner newSecp256k1Signer(String pemPrivateKey, String kid) {
+    return new ECSigner(Algorithm.ES256K, pemPrivateKey, kid);
+  }
+
+  public static ECSigner newSecp256k1Signer(PrivateKey privateKey) {
+    return new ECSigner(Algorithm.ES256K, privateKey, null);
+  }
+
+  public static ECSigner newSecp256k1Signer(PrivateKey privateKey, String kid) {
+    return new ECSigner(Algorithm.ES256K, privateKey, kid);
+  }
+
   @Override
-  public Algorithm getAlgorithm() {
+  public Algorithm algorithm() {
     return algorithm;
   }
 
   @Override
-  public String getKid() {
+  public String kid() {
     return kid;
   }
 
   @Override
-  public byte[] sign(String message) {
+  public byte[] sign(byte[] message) {
     Objects.requireNonNull(message);
-
     try {
-      Signature signature = Signature.getInstance(algorithm.getName() + "inP1363Format");
+      Signature signature = Signature.getInstance(ECFamily.toJCA(algorithm));
       signature.initSign(privateKey);
-      signature.update((message).getBytes(StandardCharsets.UTF_8));
-      return signature.sign();
+      signature.update(message);
+      byte[] der = signature.sign();
+      return JOSEConverter.derToJose(der, ECFamily.curveIntLength(algorithm));
     } catch (InvalidKeyException | NoSuchAlgorithmException | SignatureException e) {
       throw new JWTSigningException("An unexpected exception occurred when attempting to sign the JWT", e);
     }

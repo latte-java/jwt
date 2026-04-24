@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2023, FusionAuth, All Rights Reserved
+ * Copyright (c) 2016-2026, FusionAuth, All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,485 +16,853 @@
 
 package org.lattejava.jwt;
 
-import com.fasterxml.jackson.annotation.JsonAnyGetter;
-import com.fasterxml.jackson.annotation.JsonAnySetter;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import org.lattejava.jwt.json.Mapper;
-import org.lattejava.jwt.json.ZonedDateTimeDeserializer;
-import org.lattejava.jwt.json.ZonedDateTimeSerializer;
-
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.time.Clock;
 import java.time.Instant;
-import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * JSON Web Token (JWT) as defined by RFC 7519.
- * <pre>
- * From RFC 7519 Section 1. Introduction:
- *    The suggested pronunciation of JWT is the same as the English word "jot".
- * </pre>
- * The JWT is not Thread-Safe and should not be re-used.
+ *
+ * <p>This type is immutable. Instances are created via the {@link #builder()}
+ * fluent API or hydrated from a JSON map via {@link #fromMap(Map, Header)}.</p>
  *
  * @author Daniel DeGroff
  */
-public class JWT {
-  /**
-   * The decoded JWT header. This is not considered part of the JWT payload, but is available here for convenience.
-   */
-  @JsonIgnore
-  public Header header;
+public final class JWT {
+  private static final Set<String> REGISTERED_CLAIM_NAMES = new HashSet<>(Arrays.asList(
+      "iss", "sub", "aud", "exp", "nbf", "iat", "jti"
+  ));
+
+  private static final BigInteger MAX_INSTANT_SECOND = BigInteger.valueOf(Instant.MAX.getEpochSecond());
+
+  private static final BigInteger MIN_INSTANT_SECOND = BigInteger.valueOf(Instant.MIN.getEpochSecond());
+
+  private final String issuer;
+
+  private final String subject;
+
+  private final List<String> audience;
+
+  private final AudienceSerialization audienceSerialization;
+
+  private final Instant expiresAt;
+
+  private final Instant notBefore;
+
+  private final Instant issuedAt;
+
+  private final String id;
+
+  private final Map<String, Object> customClaims;
+
+  private final Header header;
+
+  private JWT(Builder b) {
+    this.issuer = b.issuer;
+    this.subject = b.subject;
+    if (b.audience == null) {
+      this.audience = Collections.emptyList();
+      this.audienceSerialization = null;
+    } else {
+      this.audience = Collections.unmodifiableList(new ArrayList<>(b.audience));
+      this.audienceSerialization = b.audienceSerialization == null
+          ? AudienceSerialization.ALWAYS_ARRAY
+          : b.audienceSerialization;
+    }
+    this.expiresAt = b.expiresAt;
+    this.notBefore = b.notBefore;
+    this.issuedAt = b.issuedAt;
+    this.id = b.id;
+    this.customClaims = Collections.unmodifiableMap(new LinkedHashMap<>(b.customClaims));
+    this.header = b.header;
+  }
+
+  // ---------- Fluent getters ----------
 
   /**
-   * Registered Claim <code>aud</code> as defined by RFC 7519 Section 4.1.3. Use of this claim is OPTIONAL.
+   * Registered Claim {@code iss} as defined by RFC 7519 §4.1.1. Use of this claim is OPTIONAL.
    * <p>
-   * The audience claim identifies the recipients that the JWT is intended for. This may be an array of strings or a
-   * single string, in either case if the string value contains a <code>:</code> it must be a URI.
+   * The issuer claim identifies the principal that issued the JWT. If the value contains a
+   * {@code :} it must be a URI.
    */
-  @JsonProperty("aud")
-  public Object audience;
-
-  /**
-   * Registered Claim <code>exp</code> as defined by RFC 7519 Section 4.1.4. Use of this claim is OPTIONAL.
-   * <p>
-   * The expiration time claim identifies the expiration time on or after which the JWT MUST NOT be accepted for
-   * processing. The expiration time is expected to provided in UNIX time, or the number of seconds since Epoch.
-   */
-  @JsonProperty("exp")
-  @JsonDeserialize(using = ZonedDateTimeDeserializer.class)
-  @JsonSerialize(using = ZonedDateTimeSerializer.class)
-  public ZonedDateTime expiration;
-
-  /**
-   * Registered Claim <code>iat</code> as defined by RFC 7519 Section 4.1.6. Use of this claim is OPTIONAL.
-   * <p>
-   * The issued at claim identifies the time at which the JWT was issued. The issued at time is expected to provided in
-   * UNIX time, or the number of seconds since Epoch.
-   */
-  @JsonProperty("iat")
-  @JsonDeserialize(using = ZonedDateTimeDeserializer.class)
-  @JsonSerialize(using = ZonedDateTimeSerializer.class)
-  public ZonedDateTime issuedAt;
-
-  /**
-   * Registered Claim <code>iss</code> as defined by RFC 7519 Section 4.1.1. Use of this claim is OPTIONAL.
-   * <p>
-   * The issuer claim identifies the principal that issued the JWT. If the value contains a <code>:</code> it must be a
-   * URI.
-   */
-  @JsonProperty("iss")
-  public String issuer;
-
-  /**
-   * Registered Claim <code>nbf</code> as defined by RFC 7519 Section 4.1.5. Use of this claim is OPTIONAL.
-   * <p>
-   * This claim identifies the time before which the JWT MUST NOT be accepted for processing. The not before value is
-   * expected to be provided in UNIX time, or the number of seconds since Epoch.
-   */
-  @JsonProperty("nbf")
-  @JsonDeserialize(using = ZonedDateTimeDeserializer.class)
-  @JsonSerialize(using = ZonedDateTimeSerializer.class)
-  public ZonedDateTime notBefore;
-
-  /**
-   * This Map will contain all the claims that aren't specifically defined in the specification. These still might be
-   * IANA registered claims, but are not known JWT specification claims.
-   */
-  @JsonAnySetter
-  public Map<String, Object> otherClaims = new LinkedHashMap<>();
-
-  /**
-   * Registered Claim <code>sub</code> as defined by RFC 7519 Section 4.1.2. Use of this claim is OPTIONAL.
-   * <p>
-   * The subject claim identifies the principal that is the subject of the JWT. If the value contains a <code>:</code>
-   * it must be a URI.
-   */
-  @JsonProperty("sub")
-  public String subject;
-
-  /**
-   * Registered Claim <code>jti</code> as defined by RFC 7519 Section 4.1.7. Use of this claim is OPTIONAL.
-   * <p>
-   * The JWT unique ID claim provides a unique identifier for the JWT.
-   */
-  @JsonProperty("jti")
-  public String uniqueId;
-
-  /**
-   * Return an instance of the JWT Decoder.
-   *
-   * @return a JWT decoder.
-   */
-  public static JWTDecoder getDecoder() {
-    return new JWTDecoder();
+  public String issuer() {
+    return issuer;
   }
 
   /**
-   * Return a JWT Decoder that allows you to go back or of forward in time. Use this at your own risk.
+   * Registered Claim {@code sub} as defined by RFC 7519 §4.1.2. Use of this claim is OPTIONAL.
    * <p>
-   * Generally speaking, there should not be a use for this in production code since 'now' should always be 'now',
-   * but it may come in handy in a test.
-   *
-   * @param now a 'now' that can be in the past, present or future.
-   * @return a JWT decoder with time machine capability.
+   * The subject claim identifies the principal that is the subject of the JWT. If the value
+   * contains a {@code :} it must be a URI.
    */
-  public static JWTDecoder getTimeMachineDecoder(ZonedDateTime now) {
-    return new TimeMachineJWTDecoder(now);
+  public String subject() {
+    return subject;
   }
 
   /**
-   * Return an instance of the JWT encoder.
-   *
-   * @return a JWT encoder.
+   * Registered Claim {@code exp} as defined by RFC 7519 §4.1.4. Use of this claim is OPTIONAL.
+   * <p>
+   * The expiration time claim identifies the expiration time on or after which the JWT MUST NOT
+   * be accepted for processing. Serialized as NumericDate (seconds since Epoch).
    */
-  public static JWTEncoder getEncoder() {
-    return new JWTEncoder();
-  }
-
-  @JsonIgnore
-  public Object getHeaderClaim(String name) {
-    return header != null ? header.get(name) : null;
+  public Instant expiresAt() {
+    return expiresAt;
   }
 
   /**
-   * Add a claim to this JWT. This claim can be public or private, it is up to the caller to properly name the claim as
-   * to avoid collision.
-   *
-   * @param name  The name of the JWT claim.
-   * @param value The value of the JWT claim. This value is an object and is expected to properly serialize.
-   * @return this.
+   * Registered Claim {@code nbf} as defined by RFC 7519 §4.1.5. Use of this claim is OPTIONAL.
+   * <p>
+   * This claim identifies the time before which the JWT MUST NOT be accepted for processing.
+   * Serialized as NumericDate (seconds since Epoch).
    */
-  public JWT addClaim(String name, Object value) {
+  public Instant notBefore() {
+    return notBefore;
+  }
+
+  /**
+   * Registered Claim {@code iat} as defined by RFC 7519 §4.1.6. Use of this claim is OPTIONAL.
+   * <p>
+   * The issued at claim identifies the time at which the JWT was issued. Serialized as
+   * NumericDate (seconds since Epoch).
+   */
+  public Instant issuedAt() {
+    return issuedAt;
+  }
+
+  /**
+   * Registered Claim {@code jti} as defined by RFC 7519 §4.1.7. Use of this claim is OPTIONAL.
+   * <p>
+   * The JWT ID claim provides a unique identifier for the JWT.
+   */
+  public String id() {
+    return id;
+  }
+
+  /**
+   * The decoded JWT header. This is not considered part of the JWT payload, but is attached
+   * here for caller convenience.
+   */
+  public Header header() {
+    return header;
+  }
+
+  // ---------- Audience ----------
+
+  /**
+   * Registered Claim {@code aud} as defined by RFC 7519 §4.1.3. Use of this claim is OPTIONAL.
+   * <p>
+   * The audience claim identifies the recipients that the JWT is intended for. On the wire this
+   * may be an array of strings or a single string; any string values containing a {@code :} must
+   * be URIs. This accessor always returns a list (empty if the claim is absent); the
+   * {@link AudienceSerialization} mode selects the serialized form and is available via
+   * {@link #audienceSerialization()}.
+   */
+  public List<String> audience() {
+    return audience;
+  }
+
+  /**
+   * The {@link AudienceSerialization} mode for this JWT, or {@code null} when
+   * {@code aud} is absent.
+   */
+  public AudienceSerialization audienceSerialization() {
+    return audienceSerialization;
+  }
+
+  /**
+   * Returns {@code true} if {@code value} appears in the {@code aud} claim.
+   * {@code null} input returns {@code false}.
+   */
+  public boolean hasAudience(String value) {
+    return value != null && audience.contains(value);
+  }
+
+  // ---------- Custom-claim accessors ----------
+
+  /*
+   * The get* family looks up a claim by name (registered or custom) and
+   * coerces to the requested Java type. Absent claims return null; present
+   * claims of the wrong JSON type throw InvalidJWTException (or
+   * ClassCastException for typed list elements).
+   */
+
+  /** Look up a claim as a {@link String}. Returns {@code null} if absent; throws if the claim is not a JSON string. */
+  public String getString(String name) {
+    Object value = lookup(name);
     if (value == null) {
-      return this;
+      return null;
     }
-
-    switch (name) {
-      case "aud":
-        this.audience = value;
-        break;
-      case "exp":
-        this.expiration = toZonedDateTime("exp", value);
-        break;
-      case "iat":
-        this.issuedAt = toZonedDateTime("iat", value);
-        break;
-      case "iss":
-        this.issuer = (String) value;
-        break;
-      case "jti":
-        this.uniqueId = (String) value;
-        break;
-      case "nbf":
-        this.notBefore = toZonedDateTime("nbf", value);
-        break;
-      case "sub":
-        this.subject = (String) value;
-        break;
-      default:
-        if (value instanceof Double || value instanceof Float) {
-          value = BigDecimal.valueOf(((Number) value).doubleValue());
-        } else if (value instanceof Integer || value instanceof Long) {
-          value = BigInteger.valueOf(((Number) value).longValue());
-        }
-        otherClaims.put(name, value);
-        break;
+    if (value instanceof String s) {
+      return s;
     }
-    return this;
+    throw new InvalidJWTException("Claim [" + name + "] is not a String");
   }
 
+  /** Look up a numeric claim and narrow to {@code int} via {@link Number#intValue()}; returns {@code null} if absent. */
+  public Integer getInteger(String name) {
+    Number n = (Number) lookup(name);
+    return n == null ? null : n.intValue();
+  }
+
+  /** Look up a numeric claim and narrow to {@code long} via {@link Number#longValue()}; returns {@code null} if absent. */
+  public Long getLong(String name) {
+    Number n = (Number) lookup(name);
+    return n == null ? null : n.longValue();
+  }
+
+  /** Look up a numeric claim and narrow to {@code float} via {@link Number#floatValue()}; returns {@code null} if absent. */
+  public Float getFloat(String name) {
+    Number n = (Number) lookup(name);
+    return n == null ? null : n.floatValue();
+  }
+
+  /** Look up a numeric claim and narrow to {@code double} via {@link Number#doubleValue()}; returns {@code null} if absent. */
+  public Double getDouble(String name) {
+    Number n = (Number) lookup(name);
+    return n == null ? null : n.doubleValue();
+  }
+
+  /** Look up a boolean claim. Returns {@code null} if absent; throws if the claim is not a JSON boolean. */
+  public Boolean getBoolean(String name) {
+    Object value = lookup(name);
+    if (value == null) {
+      return null;
+    }
+    if (value instanceof Boolean b) {
+      return b;
+    }
+    throw new InvalidJWTException("Claim [" + name + "] is not a Boolean");
+  }
+
+  /**
+   * Look up a numeric claim as a {@link BigDecimal}. Accepts values already
+   * of type {@code BigDecimal}, {@code BigInteger}, or any {@link Number}
+   * (narrowed via {@code doubleValue()}). Returns {@code null} if absent.
+   */
+  public BigDecimal getBigDecimal(String name) {
+    Object value = lookup(name);
+    if (value == null) {
+      return null;
+    }
+    if (value instanceof BigDecimal bd) {
+      return bd;
+    }
+    if (value instanceof BigInteger bi) {
+      return new BigDecimal(bi);
+    }
+    if (value instanceof Number n) {
+      return BigDecimal.valueOf(n.doubleValue());
+    }
+    throw new InvalidJWTException("Claim [" + name + "] is not a numeric value");
+  }
+
+  /**
+   * Look up a numeric claim as a {@link BigInteger}. Accepts values already
+   * of type {@code BigInteger}, {@code BigDecimal} (truncated), or any
+   * {@link Number} (narrowed via {@code longValue()}). Returns {@code null}
+   * if absent.
+   */
+  public BigInteger getBigInteger(String name) {
+    Object value = lookup(name);
+    if (value == null) {
+      return null;
+    }
+    if (value instanceof BigInteger bi) {
+      return bi;
+    }
+    if (value instanceof BigDecimal bd) {
+      return bd.toBigInteger();
+    }
+    if (value instanceof Number n) {
+      return BigInteger.valueOf(n.longValue());
+    }
+    throw new InvalidJWTException("Claim [" + name + "] is not a numeric value");
+  }
+
+  /** Look up a numeric claim as a raw {@link Number}. Returns {@code null} if absent; throws if the claim is not a JSON number. */
+  public Number getNumber(String name) {
+    Object value = lookup(name);
+    if (value == null) {
+      return null;
+    }
+    if (value instanceof Number n) {
+      return n;
+    }
+    throw new InvalidJWTException("Claim [" + name + "] is not a Number");
+  }
+
+  /** Look up a claim as its raw Java value (no type check). Returns {@code null} if absent. */
+  public Object getObject(String name) {
+    return lookup(name);
+  }
+
+  /** Look up a claim as a {@link Map}. Returns {@code null} if absent; throws if the claim is not a JSON object. */
+  @SuppressWarnings("unchecked")
+  public Map<String, Object> getMap(String name) {
+    Object value = lookup(name);
+    if (value == null) {
+      return null;
+    }
+    if (value instanceof Map) {
+      return (Map<String, Object>) value;
+    }
+    throw new InvalidJWTException("Claim [" + name + "] is not a Map");
+  }
+
+  /** Look up a claim as a raw {@link List}. Returns {@code null} if absent; throws if the claim is not a JSON array. */
+  @SuppressWarnings("unchecked")
+  public List<Object> getList(String name) {
+    Object value = lookup(name);
+    if (value == null) {
+      return null;
+    }
+    if (value instanceof List) {
+      return (List<Object>) value;
+    }
+    throw new InvalidJWTException("Claim [" + name + "] is not a List");
+  }
+
+  /**
+   * Look up a claim as a list of a specific element type. Returns {@code null}
+   * if absent; throws {@link ClassCastException} on the first element that is
+   * not an instance of {@code elementType}. Null elements are permitted.
+   */
+  public <T> List<T> getList(String name, Class<T> elementType) {
+    List<Object> raw = getList(name);
+    if (raw == null) {
+      return null;
+    }
+    List<T> result = new ArrayList<>(raw.size());
+    for (Object element : raw) {
+      if (element != null && !elementType.isInstance(element)) {
+        throw new ClassCastException("Claim [" + name + "] element is not of type [" + elementType.getName() + "]");
+      }
+      result.add(elementType.cast(element));
+    }
+    return result;
+  }
+
+  // ---------- Maps ----------
+
+  /**
+   * Returns all claims (registered + custom) as Java-typed values — timestamps are returned as
+   * {@link Instant}, not as epoch-seconds. Suitable for callers reading claim state; for JSON
+   * serialization use {@link #toSerializableMap()} which emits timestamps as NumericDate.
+   */
+  public Map<String, Object> claims() {
+    Map<String, Object> merged = new LinkedHashMap<>();
+    if (issuer != null) merged.put("iss", issuer);
+    if (subject != null) merged.put("sub", subject);
+    if (!audience.isEmpty()) merged.put("aud", audience);
+    if (expiresAt != null) merged.put("exp", expiresAt);
+    if (notBefore != null) merged.put("nbf", notBefore);
+    if (issuedAt != null) merged.put("iat", issuedAt);
+    if (id != null) merged.put("jti", id);
+    for (Map.Entry<String, Object> e : customClaims.entrySet()) {
+      if (e.getValue() != null) {
+        merged.put(e.getKey(), e.getValue());
+      }
+    }
+    return Collections.unmodifiableMap(merged);
+  }
+
+  /**
+   * Returns a JSON-serializable view of the claims. Timestamps ({@code exp}, {@code nbf},
+   * {@code iat}) are emitted as NumericDate (epoch seconds) per RFC 7519 §2, and {@code aud} is
+   * emitted as either a single string or an array to match the recorded
+   * {@link AudienceSerialization} mode.
+   */
+  public Map<String, Object> toSerializableMap() {
+    Map<String, Object> out = new LinkedHashMap<>();
+    if (issuer != null) out.put("iss", issuer);
+    if (subject != null) out.put("sub", subject);
+    if (!audience.isEmpty()) {
+      if (audienceSerialization == AudienceSerialization.STRING_WHEN_SINGLE && audience.size() == 1) {
+        out.put("aud", audience.get(0));
+      } else {
+        out.put("aud", new ArrayList<>(audience));
+      }
+    }
+    if (expiresAt != null) out.put("exp", expiresAt.getEpochSecond());
+    if (notBefore != null) out.put("nbf", notBefore.getEpochSecond());
+    if (issuedAt != null) out.put("iat", issuedAt.getEpochSecond());
+    if (id != null) out.put("jti", id);
+    for (Map.Entry<String, Object> e : customClaims.entrySet()) {
+      if (e.getValue() != null) {
+        out.put(e.getKey(), e.getValue());
+      }
+    }
+    return Collections.unmodifiableMap(out);
+  }
+
+  // ---------- Convenience ----------
+  public boolean isExpired() {
+    return isExpired(Instant.now(Clock.systemUTC()));
+  }
+
+  public boolean isExpired(Instant now) {
+    // RFC 7519 §4.1.4: "the expiration time on or after which the JWT MUST
+    // NOT be accepted". The boundary (now == exp) is expired.
+    return expiresAt != null && !expiresAt.isAfter(now);
+  }
+
+  public boolean isUnavailableForProcessing() {
+    return isUnavailableForProcessing(Instant.now(Clock.systemUTC()));
+  }
+
+  public boolean isUnavailableForProcessing(Instant now) {
+    return notBefore != null && notBefore.isAfter(now);
+  }
+
+  // ---------- Factory ----------
+
+  /**
+   * Build a {@link JWT} from a parsed JSON object map and an already-parsed
+   * {@link Header}. Registered claims ({@code iss}, {@code sub}, {@code aud},
+   * {@code exp}, {@code nbf}, {@code iat}, {@code jti}) are validated for
+   * type; all other entries are stored as custom claims.
+   *
+   * <p><strong>Aliasing note.</strong> Custom-claim values that are
+   * {@code List} or {@code Map} instances are stored by reference rather
+   * than deep-copied. Callers that retain a mutable alias to such a value
+   * can observe their later mutations through {@link #getObject(String)},
+   * {@link #getMap(String)}, or {@link #getList(String)} on the returned
+   * {@link JWT}. To preserve full immutability, callers must not mutate
+   * the input map's collection values after this method returns. The same
+   * caveat applies to {@code Builder.claim}.</p>
+   */
+  public static JWT fromMap(Map<String, Object> map, Header header) {
+    Objects.requireNonNull(map, "map");
+    Builder b = new Builder();
+    b.header = header;
+
+    for (Map.Entry<String, Object> entry : map.entrySet()) {
+      String name = entry.getKey();
+      Object value = entry.getValue();
+      if (value == null) {
+        continue;
+      }
+      switch (name) {
+        case "iss":
+          b.issuer = expectString(name, value);
+          break;
+        case "sub":
+          b.subject = expectString(name, value);
+          break;
+        case "jti":
+          b.id = expectString(name, value);
+          break;
+        case "exp":
+          b.expiresAt = expectInstant(name, value);
+          break;
+        case "nbf":
+          b.notBefore = expectInstant(name, value);
+          break;
+        case "iat":
+          b.issuedAt = expectInstant(name, value);
+          break;
+        case "aud":
+          if (value instanceof String s) {
+            b.audience = new ArrayList<>(Collections.singletonList(s));
+            b.audienceSerialization = AudienceSerialization.STRING_WHEN_SINGLE;
+          } else if (value instanceof List<?> raw) {
+            List<String> strs = new ArrayList<>(raw.size());
+            for (Object element : raw) {
+              if (!(element instanceof String str)) {
+                throw new InvalidJWTException("Claim [aud] must be a string or an array of strings");
+              }
+              strs.add(str);
+            }
+            b.audience = strs;
+            b.audienceSerialization = AudienceSerialization.ALWAYS_ARRAY;
+          } else {
+            throw new InvalidJWTException("Claim [aud] must be a string or an array of strings");
+          }
+          break;
+        default:
+          b.customClaims.put(name, value);
+          break;
+      }
+    }
+
+    return b.build();
+  }
+
+  // ---------- equals / hashCode / claimsEquals / toString ----------
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
-    if (o == null || getClass() != o.getClass()) return false;
-    JWT jwt = (JWT) o;
-    return Objects.equals(audience, jwt.audience) &&
-        Objects.equals(otherClaims, jwt.otherClaims) &&
-        Objects.equals(expiration, jwt.expiration) &&
-        Objects.equals(issuedAt, jwt.issuedAt) &&
-        Objects.equals(issuer, jwt.issuer) &&
-        Objects.equals(notBefore, jwt.notBefore) &&
-        Objects.equals(subject, jwt.subject) &&
-        Objects.equals(uniqueId, jwt.uniqueId);
-  }
-
-  /**
-   * @return Returns all the claims as cool Java types like ZonedDateTime (where appropriate of course). This will
-   * contain the otherClaims and the known JWT claims.
-   */
-  @JsonIgnore
-  public Map<String, Object> getAllClaims() {
-    Map<String, Object> rawClaims = new HashMap<>(otherClaims);
-
-    if (audience != null) {
-      rawClaims.put("aud", audience);
-    }
-
-    if (expiration != null) {
-      rawClaims.put("exp", expiration);
-    }
-
-    if (issuedAt != null) {
-      rawClaims.put("iat", issuedAt);
-    }
-
-    if (issuer != null) {
-      rawClaims.put("iss", issuer);
-    }
-
-    if (notBefore != null) {
-      rawClaims.put("nbf", notBefore);
-    }
-
-    if (subject != null) {
-      rawClaims.put("sub", subject);
-    }
-
-    if (uniqueId != null) {
-      rawClaims.put("jti", uniqueId);
-    }
-
-    return rawClaims;
-  }
-
-  public BigDecimal getBigDecimal(String key) {
-    return (BigDecimal) lookupClaim(key);
-  }
-
-  public BigInteger getBigInteger(String key) {
-    return (BigInteger) lookupClaim(key);
-  }
-
-  public Boolean getBoolean(String key) {
-    return (Boolean) lookupClaim(key);
-  }
-
-  public Double getDouble(String key) {
-    BigDecimal value = (BigDecimal) lookupClaim(key);
-    if (value == null) {
-      return null;
-    }
-
-    return value.doubleValue();
-  }
-
-  public Float getFloat(String key) {
-    BigDecimal value = (BigDecimal) lookupClaim(key);
-    if (value == null) {
-      return null;
-    }
-
-    return value.floatValue();
-  }
-
-  public Integer getInteger(String key) {
-    BigInteger value = (BigInteger) lookupClaim(key);
-    if (value == null) {
-      return null;
-    }
-
-    return value.intValue();
-  }
-
-  public List<Object> getList(String key) {
-    //noinspection unchecked
-    return (List<Object>) otherClaims.get(key);
-  }
-
-  public Long getLong(String key) {
-    BigInteger value = (BigInteger) lookupClaim(key);
-    if (value == null) {
-      return null;
-    }
-
-    return value.longValue();
-  }
-
-  public Map<String, Object> getMap(String key) {
-    //noinspection unchecked
-    return (Map<String, Object>) lookupClaim(key);
-  }
-
-  public Number getNumber(String key) {
-    return (Number) lookupClaim(key);
-  }
-
-  public Object getObject(String key) {
-    return lookupClaim(key);
-  }
-
-  @JsonAnyGetter
-  public Map<String, Object> getOtherClaims() {
-    return otherClaims;
-  }
-
-  /**
-   * @return Returns the original claims from the JWT without any Java data types like ZonedDateTime. This will contain
-   * the otherClaims and the known JWT claims.
-   */
-  @JsonIgnore
-  public Map<String, Object> getRawClaims() {
-    Map<String, Object> rawClaims = new HashMap<>(otherClaims);
-
-    if (audience != null) {
-      rawClaims.put("aud", audience);
-    }
-
-    if (expiration != null) {
-      rawClaims.put("exp", expiration.toEpochSecond());
-    }
-
-    if (issuedAt != null) {
-      rawClaims.put("iat", issuedAt.toEpochSecond());
-    }
-
-    if (issuer != null) {
-      rawClaims.put("iss", issuer);
-    }
-
-    if (notBefore != null) {
-      rawClaims.put("nbf", notBefore.toEpochSecond());
-    }
-
-    if (subject != null) {
-      rawClaims.put("sub", subject);
-    }
-
-    if (uniqueId != null) {
-      rawClaims.put("jti", uniqueId);
-    }
-
-    return rawClaims;
-  }
-
-  public String getString(String key) {
-    return (String) lookupClaim(key);
+    if (!(o instanceof JWT other)) return false;
+    return Objects.equals(issuer, other.issuer)
+        && Objects.equals(subject, other.subject)
+        && Objects.equals(audience, other.audience)
+        && audienceSerialization == other.audienceSerialization
+        && Objects.equals(expiresAt, other.expiresAt)
+        && Objects.equals(notBefore, other.notBefore)
+        && Objects.equals(issuedAt, other.issuedAt)
+        && Objects.equals(id, other.id)
+        && Objects.equals(customClaims, other.customClaims)
+        && Objects.equals(header, other.header);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(audience, otherClaims, expiration, issuedAt, issuer, notBefore, subject, uniqueId);
+    return Objects.hash(issuer, subject, audience, audienceSerialization, expiresAt,
+        notBefore, issuedAt, id, customClaims, header);
   }
 
   /**
-   * Return true if this JWT is expired.
-   *
-   * @return true if expired, false if not.
+   * Returns true if the claim fields of this JWT equal the claim fields of the
+   * other JWT. The {@link Header} is intentionally not consulted, and the
+   * {@link AudienceSerialization} mode is intentionally ignored - audience is
+   * compared by list contents.
    */
-  @JsonIgnore
-  public boolean isExpired() {
-    return isExpired(ZonedDateTime.now(ZoneOffset.UTC));
-  }
-
-  /**
-   * Return true if this JWT is expired.
-   *
-   * @param now the 'now' you wish to use.
-   * @return true if expired, false if not.
-   */
-  @JsonIgnore
-  public boolean isExpired(ZonedDateTime now) {
-    return expiration != null && expiration.isBefore(now);
-  }
-
-  /**
-   * Return true if this JWT is un-available for processing.
-   *
-   * @param now the 'now' you wish to use.
-   * @return true if un-available, false if not.
-   */
-  @JsonIgnore
-  public boolean isUnavailableForProcessing(ZonedDateTime now) {
-    return notBefore != null && notBefore.isAfter(now);
-  }
-
-  /**
-   * Return true if this JWT is un-available for processing.
-   *
-   * @return true if un-available, false if not.
-   */
-  @JsonIgnore
-  public boolean isUnavailableForProcessing() {
-    return isUnavailableForProcessing(ZonedDateTime.now(ZoneOffset.UTC));
-  }
-
-  public JWT setAudience(Object audience) {
-    this.audience = audience;
-    return this;
-  }
-
-  public JWT setExpiration(ZonedDateTime expiration) {
-    this.expiration = expiration;
-    return this;
-  }
-
-  public JWT setIssuedAt(ZonedDateTime issuedAt) {
-    this.issuedAt = issuedAt;
-    return this;
-  }
-
-  public JWT setIssuer(String issuer) {
-    this.issuer = issuer;
-    return this;
-  }
-
-  public JWT setNotBefore(ZonedDateTime notBefore) {
-    this.notBefore = notBefore;
-    return this;
-  }
-
-  public JWT setSubject(String subject) {
-    this.subject = subject;
-    return this;
-  }
-
-  public JWT setUniqueId(String uniqueId) {
-    this.uniqueId = uniqueId;
-    return this;
+  public boolean claimsEquals(JWT other) {
+    if (this == other) return true;
+    if (other == null) return false;
+    return Objects.equals(issuer, other.issuer)
+        && Objects.equals(subject, other.subject)
+        && Objects.equals(audience, other.audience)
+        && Objects.equals(expiresAt, other.expiresAt)
+        && Objects.equals(notBefore, other.notBefore)
+        && Objects.equals(issuedAt, other.issuedAt)
+        && Objects.equals(id, other.id)
+        && Objects.equals(customClaims, other.customClaims);
   }
 
   @Override
   public String toString() {
-    return new String(Mapper.prettyPrint(this));
+    return new String(new LatteJSONProcessor().serialize(toSerializableMap()));
   }
 
-  private Object lookupClaim(String key) {
-    switch (key) {
-      case "aud":
-        return audience;
-      case "exp":
-        return expiration;
-      case "iat":
-        return issuedAt;
+  // ---------- Builder ----------
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  private Object lookup(String name) {
+    if (name == null) {
+      return null;
+    }
+    switch (name) {
       case "iss":
         return issuer;
-      case "jti":
-        return uniqueId;
-      case "nbf":
-        return notBefore;
       case "sub":
         return subject;
+      case "aud":
+        return audience.isEmpty() ? null : audience;
+      case "exp":
+        return expiresAt;
+      case "nbf":
+        return notBefore;
+      case "iat":
+        return issuedAt;
+      case "jti":
+        return id;
       default:
-        return otherClaims.get(key);
+        return customClaims.get(name);
     }
   }
 
-  private ZonedDateTime toZonedDateTime(String claim, Object value) {
-    if (value instanceof ZonedDateTime) {
-      return (ZonedDateTime) value;
-    } else if (value instanceof Number) {
-      return Instant.ofEpochSecond(((Number) value).longValue()).atZone(ZoneOffset.UTC);
+  private static String expectString(String name, Object value) {
+    if (!(value instanceof String s)) {
+      throw new InvalidJWTException("Claim [" + name + "] must be a String");
+    }
+    return s;
+  }
+
+  private static Instant expectInstant(String name, Object value) {
+    if (!(value instanceof Number n)) {
+      throw new InvalidJWTException("Claim [" + name + "] must be a numeric value (NumericDate)");
+    }
+    BigInteger asInt;
+    if (n instanceof BigInteger bi) {
+      asInt = bi;
+    } else if (n instanceof BigDecimal bd) {
+      asInt = bd.toBigInteger();
     } else {
-      throw new IllegalArgumentException("Invalid numeric value for [" + claim + "] claim");
+      asInt = BigInteger.valueOf(n.longValue());
+    }
+    if (asInt.compareTo(MAX_INSTANT_SECOND) > 0 || asInt.compareTo(MIN_INSTANT_SECOND) < 0) {
+      throw new InvalidJWTException("Claim [" + name + "] numeric value is outside the supported Instant range");
+    }
+    try {
+      return Instant.ofEpochSecond(asInt.longValueExact());
+    } catch (ArithmeticException e) {
+      throw new InvalidJWTException("Claim [" + name + "] numeric value cannot be represented as a long", e);
+    }
+  }
+
+  /**
+   * Mutable, reusable builder for {@link JWT}. After {@link #build()} is
+   * called, the builder retains its state and may be further modified to
+   * produce additional independent {@link JWT} instances; each
+   * {@code build()} call produces a fresh immutable instance with an
+   * independent copy of any collection fields.
+   */
+  public static final class Builder {
+    private String issuer;
+
+    private String subject;
+
+    private List<String> audience;
+
+    private AudienceSerialization audienceSerialization;
+
+    private Instant expiresAt;
+
+    private Instant notBefore;
+
+    private Instant issuedAt;
+
+    private String id;
+
+    private final Map<String, Object> customClaims = new LinkedHashMap<>();
+
+    private Header header;
+
+    private Builder() {}
+
+    /**
+     * Registered Claim {@code iss} as defined by RFC 7519 §4.1.1. Use of this claim is OPTIONAL.
+     * <p>
+     * The issuer claim identifies the principal that issued the JWT. If the value contains a
+     * {@code :} it must be a URI.
+     */
+    public Builder issuer(String issuer) {
+      this.issuer = issuer;
+      return this;
+    }
+
+    /**
+     * Registered Claim {@code sub} as defined by RFC 7519 §4.1.2. Use of this claim is OPTIONAL.
+     * <p>
+     * The subject claim identifies the principal that is the subject of the JWT. If the value
+     * contains a {@code :} it must be a URI.
+     */
+    public Builder subject(String subject) {
+      this.subject = subject;
+      return this;
+    }
+
+    /**
+     * Registered Claim {@code aud} as defined by RFC 7519 §4.1.3. Use of this claim is OPTIONAL.
+     * <p>
+     * The audience claim identifies the recipients that the JWT is intended for. On the wire this
+     * may be an array of strings or a single string; any string values containing a {@code :} must
+     * be URIs.
+     * <p>
+     * This overload sets a single-element audience. Serialization defaults to
+     * {@link AudienceSerialization#ALWAYS_ARRAY}; call
+     * {@link #audienceSerialization(AudienceSerialization)} to opt in to
+     * {@link AudienceSerialization#STRING_WHEN_SINGLE}.
+     */
+    public Builder audience(String audience) {
+      if (audience == null) {
+        this.audience = null;
+      } else {
+        this.audience = new ArrayList<>(Collections.singletonList(audience));
+      }
+      return this;
+    }
+
+    /**
+     * Registered Claim {@code aud} as defined by RFC 7519 §4.1.3. Use of this claim is OPTIONAL.
+     * <p>
+     * The audience claim identifies the recipients that the JWT is intended for. On the wire this
+     * may be an array of strings or a single string; any string values containing a {@code :} must
+     * be URIs.
+     * <p>
+     * This overload sets the audience from a list. Serialization defaults to
+     * {@link AudienceSerialization#ALWAYS_ARRAY}.
+     */
+    public Builder audience(List<String> audiences) {
+      if (audiences == null) {
+        this.audience = null;
+      } else {
+        this.audience = new ArrayList<>(audiences);
+      }
+      return this;
+    }
+
+    /**
+     * Override the serialization form of the {@code aud} claim. Passing
+     * {@code null} restores the builder default
+     * ({@link AudienceSerialization#ALWAYS_ARRAY}). Has no effect when the
+     * audience is absent.
+     */
+    public Builder audienceSerialization(AudienceSerialization mode) {
+      this.audienceSerialization = mode;
+      return this;
+    }
+
+    /**
+     * Registered Claim {@code exp} as defined by RFC 7519 §4.1.4. Use of this claim is OPTIONAL.
+     * <p>
+     * The expiration time claim identifies the expiration time on or after which the JWT MUST NOT
+     * be accepted for processing. Serialized as NumericDate (seconds since Epoch).
+     */
+    public Builder expiresAt(Instant expiration) {
+      this.expiresAt = expiration;
+      return this;
+    }
+
+    /**
+     * Registered Claim {@code exp} as defined by RFC 7519 §4.1.4. Use of this claim is OPTIONAL.
+     * <p>
+     * The expiration time claim identifies the expiration time on or after which the JWT MUST NOT
+     * be accepted for processing. Serialized as NumericDate (seconds since Epoch).
+     */
+    public Builder expiresAt(long epochSeconds) {
+      this.expiresAt = Instant.ofEpochSecond(epochSeconds);
+      return this;
+    }
+
+    /**
+     * Registered Claim {@code nbf} as defined by RFC 7519 §4.1.5. Use of this claim is OPTIONAL.
+     * <p>
+     * This claim identifies the time before which the JWT MUST NOT be accepted for processing.
+     * Serialized as NumericDate (seconds since Epoch).
+     */
+    public Builder notBefore(Instant notBefore) {
+      this.notBefore = notBefore;
+      return this;
+    }
+
+    /**
+     * Registered Claim {@code nbf} as defined by RFC 7519 §4.1.5. Use of this claim is OPTIONAL.
+     * <p>
+     * This claim identifies the time before which the JWT MUST NOT be accepted for processing.
+     * Serialized as NumericDate (seconds since Epoch).
+     */
+    public Builder notBefore(long epochSeconds) {
+      this.notBefore = Instant.ofEpochSecond(epochSeconds);
+      return this;
+    }
+
+    /**
+     * Registered Claim {@code iat} as defined by RFC 7519 §4.1.6. Use of this claim is OPTIONAL.
+     * <p>
+     * The issued at claim identifies the time at which the JWT was issued. Serialized as
+     * NumericDate (seconds since Epoch).
+     */
+    public Builder issuedAt(Instant issuedAt) {
+      this.issuedAt = issuedAt;
+      return this;
+    }
+
+    /**
+     * Registered Claim {@code iat} as defined by RFC 7519 §4.1.6. Use of this claim is OPTIONAL.
+     * <p>
+     * The issued at claim identifies the time at which the JWT was issued. Serialized as
+     * NumericDate (seconds since Epoch).
+     */
+    public Builder issuedAt(long epochSeconds) {
+      this.issuedAt = Instant.ofEpochSecond(epochSeconds);
+      return this;
+    }
+
+    /**
+     * Registered Claim {@code jti} as defined by RFC 7519 §4.1.7. Use of this claim is OPTIONAL.
+     * <p>
+     * The JWT ID claim provides a unique identifier for the JWT.
+     */
+    public Builder id(String jwtId) {
+      this.id = jwtId;
+      return this;
+    }
+
+    /**
+     * Add a claim. If the name matches a registered claim (iss, sub, aud, exp,
+     * nbf, iat, jti), the value is routed to the corresponding typed setter
+     * with type coercion. A value that cannot be coerced throws
+     * {@link IllegalArgumentException}. Unrecognized names are stored in
+     * {@code customClaims}.
+     */
+    public Builder claim(String name, Object value) {
+      Objects.requireNonNull(name, "name");
+      if (value == null) {
+        return this;
+      }
+      switch (name) {
+        case "iss":
+          if (!(value instanceof String s)) {
+            throw new IllegalArgumentException("Claim [iss] must be a String");
+          }
+          this.issuer = s;
+          return this;
+        case "sub":
+          if (!(value instanceof String s)) {
+            throw new IllegalArgumentException("Claim [sub] must be a String");
+          }
+          this.subject = s;
+          return this;
+        case "jti":
+          if (!(value instanceof String s)) {
+            throw new IllegalArgumentException("Claim [jti] must be a String");
+          }
+          this.id = s;
+          return this;
+        case "exp":
+          this.expiresAt = coerceToInstant("exp", value);
+          return this;
+        case "nbf":
+          this.notBefore = coerceToInstant("nbf", value);
+          return this;
+        case "iat":
+          this.issuedAt = coerceToInstant("iat", value);
+          return this;
+        case "aud":
+          if (value instanceof String s) {
+            return audience(s);
+          }
+          if (value instanceof List<?> raw) {
+            List<String> strs = new ArrayList<>(raw.size());
+            for (Object element : raw) {
+              if (!(element instanceof String es)) {
+                throw new IllegalArgumentException("Claim [aud] list elements must be Strings");
+              }
+              strs.add(es);
+            }
+            return audience(strs);
+          }
+          throw new IllegalArgumentException("Claim [aud] must be a String or List<String>");
+        default:
+          if (REGISTERED_CLAIM_NAMES.contains(name)) {
+            // defensive (should not happen given the switch above)
+            throw new IllegalArgumentException("Registered claim [" + name + "] not handled by Builder.claim()");
+          }
+          this.customClaims.put(name, value);
+          return this;
+      }
+    }
+
+    public JWT build() {
+      return new JWT(this);
+    }
+
+    private static Instant coerceToInstant(String name, Object value) {
+      if (value instanceof Instant instant) {
+        return instant;
+      }
+      if (value instanceof ZonedDateTime zdt) {
+        return zdt.toInstant();
+      }
+      if (value instanceof Number n) {
+        return Instant.ofEpochSecond(n.longValue());
+      }
+      throw new IllegalArgumentException("Claim [" + name + "] cannot be coerced to Instant from value of type [" + value.getClass().getName() + "]");
     }
   }
 }

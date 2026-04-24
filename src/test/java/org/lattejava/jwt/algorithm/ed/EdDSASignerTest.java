@@ -20,7 +20,10 @@ import org.lattejava.jwt.BaseJWTTest;
 import org.lattejava.jwt.MissingVerifierException;
 import org.lattejava.jwt.Signer;
 import org.lattejava.jwt.Verifier;
+import org.lattejava.jwt.VerifierResolver;
 import org.lattejava.jwt.JWT;
+import org.lattejava.jwt.JWTDecoder;
+import org.lattejava.jwt.JWTEncoder;
 import org.lattejava.jwt.pem.PEM;
 import org.testng.annotations.Test;
 
@@ -38,27 +41,27 @@ import static org.testng.Assert.fail;
 public class EdDSASignerTest extends BaseJWTTest {
   @Test
   public void signAndVerify() throws Exception {
-    JWT jwt = new JWT().setSubject("1234567890");
+    JWT jwt = JWT.builder().subject("1234567890").build();
 
     // Sign the JWT
     Signer signer = EdDSASigner.newSigner(new String(Files.readAllBytes(Paths.get("src/test/resources/ed_dsa_ed25519_private_key_2.pem"))));
-    String encodedJWT = JWT.getEncoder().encode(jwt, signer);
+    String encodedJWT = new JWTEncoder().encode(jwt, signer);
 
     // Verify the JWT
     Verifier verifier = EdDSAVerifier.newVerifier(Paths.get("src/test/resources/ed_dsa_ed25519_public_key_2.pem"));
-    JWT actual = JWT.getDecoder().decode(encodedJWT, verifier);
+    JWT actual = new JWTDecoder().decode(encodedJWT, VerifierResolver.of(verifier));
 
-    assertEquals(actual.subject, jwt.subject);
-    assertEquals(actual.header.algorithm.name(), "Ed25519");
+    assertEquals(actual.subject(), jwt.subject());
+    assertEquals(actual.header().alg().name(), "Ed25519");
 
     Verifier verifier448 = EdDSAVerifier.newVerifier(getPath("ed_dsa_ed448_public_key.pem"));
     try {
       // You can't double stamp a triple stamp, or verify a JWT signed using Ed25519 with an Ed448 verifier.
-      JWT.getDecoder().decode(encodedJWT, verifier448);
+      new JWTDecoder().decode(encodedJWT, VerifierResolver.of(verifier448));
       fail("Expected an exception to be thrown.");
     } catch (Exception e) {
       assertTrue(e instanceof MissingVerifierException);
-      assertEquals(e.getMessage(), "No Verifier has been provided for verify a signature signed using [Ed25519]");
+      assertEquals(e.getMessage(), "No verifier provided to verify signature signed using [Ed25519]");
     }
   }
 
@@ -75,11 +78,11 @@ public class EdDSASignerTest extends BaseJWTTest {
     // Add kid
 
     // Key as string
-    assertNotNull(EdDSASigner.newSigner(readFile("ed_dsa_ed25519_private_key.pem"), "abc").getKid(), "abc");
-    assertNotNull(EdDSASigner.newSigner(readFile("ed_dsa_ed448_private_key.pem"), "abc").getKid(), "abc");
+    assertNotNull(EdDSASigner.newSigner(readFile("ed_dsa_ed25519_private_key.pem"), "abc").kid(), "abc");
+    assertNotNull(EdDSASigner.newSigner(readFile("ed_dsa_ed448_private_key.pem"), "abc").kid(), "abc");
 
     // Key as object
-    assertNotNull(EdDSASigner.newSigner(PEM.decode(getPath("ed_dsa_ed25519_private_key.pem")).privateKey, "abc").getKid(), "abc");
-    assertNotNull(EdDSASigner.newSigner(PEM.decode(getPath("ed_dsa_ed448_private_key.pem")).privateKey, "abc").getKid(), "abc");
+    assertNotNull(EdDSASigner.newSigner(PEM.decode(getPath("ed_dsa_ed25519_private_key.pem")).privateKey, "abc").kid(), "abc");
+    assertNotNull(EdDSASigner.newSigner(PEM.decode(getPath("ed_dsa_ed448_private_key.pem")).privateKey, "abc").kid(), "abc");
   }
 }

@@ -16,10 +16,41 @@
 
 package org.lattejava.jwt;
 
+import java.time.Duration;
+import java.time.Instant;
+
 /**
  * The JWT is not yet valid. The JWT has claimed it is not valid before a time that is in the future.
+ * <p>
+ * Carries the {@code nbf} claim, the clock reading used for the check, and the
+ * applied clock skew so consumers diagnosing clock-sync issues can read the
+ * numbers directly instead of parsing them out of a message. Any of the three
+ * may be {@code null} if the exception was thrown without diagnostic context.
  *
  * @author Daniel DeGroff
  */
 public class JWTUnavailableForProcessingException extends JWTException {
+  private final Instant notBefore;
+
+  private final Instant now;
+
+  private final Duration clockSkew;
+
+  public JWTUnavailableForProcessingException(Instant notBefore, Instant now, Duration clockSkew) {
+    this.notBefore = notBefore;
+    this.now = now;
+    this.clockSkew = clockSkew;
+  }
+
+  public Duration getClockSkew() {
+    return clockSkew;
+  }
+
+  public Instant getNotBefore() {
+    return notBefore;
+  }
+
+  public Instant getNow() {
+    return now;
+  }
 }

@@ -16,8 +16,6 @@
 
 package org.lattejava.jwt.pem;
 
-import org.lattejava.jwt.Buildable;
-
 import java.nio.file.Path;
 import java.security.Key;
 import java.security.PrivateKey;
@@ -28,7 +26,7 @@ import java.util.Objects;
 /**
  * @author Daniel DeGroff
  */
-public class PEM implements Buildable<PEM> {
+public class PEM {
   // PEM Encoded EC Private key End Tag
   public static final String EC_PRIVATE_KEY_PREFIX = "-----BEGIN EC PRIVATE KEY-----";
 
@@ -65,28 +63,32 @@ public class PEM implements Buildable<PEM> {
   // PEM Encoded Public Key (X.509) End Tag
   public static final String X509_PUBLIC_KEY_SUFFIX = "-----END PUBLIC KEY-----";
 
-  public Certificate certificate;
+  public final Certificate certificate;
 
-  public PrivateKey privateKey;
+  public final PrivateKey privateKey;
 
-  public PublicKey publicKey;
+  public final PublicKey publicKey;
 
-  public PEM(PrivateKey privateKey, PublicKey publicKey) {
+  private PEM(Certificate certificate, PrivateKey privateKey, PublicKey publicKey) {
+    this.certificate = certificate;
     this.privateKey = privateKey;
     this.publicKey = publicKey;
+  }
+
+  public PEM(PrivateKey privateKey, PublicKey publicKey) {
+    this(null, privateKey, publicKey);
   }
 
   public PEM(PublicKey publicKey) {
-    this.publicKey = publicKey;
+    this(null, null, publicKey);
   }
 
   public PEM(Certificate certificate) {
-    this.certificate = certificate;
-    this.publicKey = certificate.getPublicKey();
+    this(certificate, null, certificate.getPublicKey());
   }
 
   public PEM(PrivateKey privateKey) {
-    this.privateKey = privateKey;
+    this(null, privateKey, null);
   }
 
   /**
@@ -155,14 +157,12 @@ public class PEM implements Buildable<PEM> {
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
-    if (!(o instanceof PEM)) return false;
-    PEM pem = (PEM) o;
+    if (!(o instanceof PEM pem)) return false;
     return Objects.equals(certificate, pem.certificate) &&
         Objects.equals(privateKey, pem.privateKey) &&
         Objects.equals(publicKey, pem.publicKey);
   }
 
-  @SuppressWarnings("unused")
   public Certificate getCertificate() {
     return certificate;
   }

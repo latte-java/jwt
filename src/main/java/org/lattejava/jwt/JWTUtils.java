@@ -16,20 +16,14 @@
 
 package org.lattejava.jwt;
 
-import org.lattejava.jwt.internal.HexUtils;
+import org.lattejava.jwt.internal.JWKThumbprint;
 import org.lattejava.jwt.jwks.JSONWebKey;
-import org.lattejava.jwt.json.Mapper;
 import org.lattejava.jwt.pem.PEM;
 
-import java.nio.charset.StandardCharsets;
 import java.security.KeyPairGenerator;
-import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Base64;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Objects;
 
 /**
  * Helper to generate new HMAC secrets, EC and RSA public / private key pairs and other fun things.
@@ -37,73 +31,6 @@ import java.util.Objects;
  * @author Daniel DeGroff
  */
 public class JWTUtils {
-  /**
-   * Convert a HEX <code>SHA-1</code> or <code>SHA-256</code> X.509 certificate fingerprint to an <code>x5t</code>
-   * or <code>x5t#256</code> thumbprint respectively.
-   *
-   * @param fingerprint the SHA-1 or SHA-256 fingerprint
-   * @return a x5t hash.
-   */
-  public static String convertFingerprintToThumbprint(String fingerprint) {
-    byte[] bytes = HexUtils.toBytes(fingerprint);
-    return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-  }
-
-  /**
-   * Convert an X.509 certificate thumbprint to a HEX <code>SHA-1</code> or <code>SHA-256</code> fingerprint respectively.
-   * <p>
-   * If a <code>x5t</code> thumbprint is provided, a SHA-1 HEX encoded fingerprint will be returned.
-   * <p>
-   * If a <code>x5t#256</code> thumbprint is provided, a SHA-256 HEX encoded fingerprint will be returned.
-   *
-   * @param x5tHash the x5t hash
-   * @return a SHA-1 or SHA-256 fingerprint
-   */
-  public static String convertThumbprintToFingerprint(String x5tHash) {
-    byte[] bytes = Base64.getUrlDecoder().decode(x5tHash.getBytes(StandardCharsets.UTF_8));
-    return HexUtils.fromBytes(bytes);
-  }
-
-  /**
-   * WARNING!! This is not a secure or safe way to decode a JWT, this will not perform any validation on the signature.
-   * <p>
-   * Consider the header returned from this method as un-trustworthy. This is intended for utility and a nice way to
-   * read the JWT header, but do not use it in production to verify the integrity.
-   *
-   * @param encodedJWT the encoded JWT
-   * @return a Header object
-   */
-  public static Header decodeHeader(String encodedJWT) {
-    Objects.requireNonNull(encodedJWT);
-
-    String[] parts = encodedJWT.split("\\.");
-    if (parts.length == 3 || (parts.length == 2 && encodedJWT.endsWith("."))) {
-      return Mapper.deserialize(Base64.getUrlDecoder().decode(parts[0]), Header.class);
-    }
-
-    throw new InvalidJWTException("The encoded JWT is not properly formatted. Expected a three part dot separated string.");
-  }
-
-  /**
-   * WARNING!! This is not a secure or safe way to decode a JWT, this will not perform any validation on the signature.
-   * <p>
-   * Consider the JWT returned from this method as un-trustworthy. This is intended for utility and a nice way to
-   * read the JWT, but do not use it in production to verify the claims contained in this JWT.
-   *
-   * @param encodedJWT the encoded JWT
-   * @return a JWT object
-   */
-  public static JWT decodePayload(String encodedJWT) {
-    Objects.requireNonNull(encodedJWT);
-
-    String[] parts = encodedJWT.split("\\.");
-    if (parts.length == 3 || (parts.length == 2 && encodedJWT.endsWith("."))) {
-      return Mapper.deserialize(Base64.getUrlDecoder().decode(parts[1]), JWT.class);
-    }
-
-    throw new InvalidJWTException("The encoded JWT is not properly formatted. Expected a three part dot separated string.");
-  }
-
   /**
    * Generate a new public / private key pair using a 2048-bit RSA key. This is the minimum key length for use with an
    * RSA signing scheme for JWT.
@@ -208,102 +135,27 @@ public class JWTUtils {
   }
 
   /**
-   * Generate the JWK Thumbprint as per RFC 7638.
-   * EdDSA thumbprint per RFC 8037
-   *
-   * @param algorithm the algorithm used to calculate the hash of the thumbprint, generally SHA-1 or SHA-256.
-   * @param key       the {@link JSONWebKey} to determine the thumbprint for
-   * @return the base64url-encoded JWK Thumbprint
-   */
-  public static String generateJWS_kid(String algorithm, JSONWebKey key) {
-    Map<String, Object> thumbPrint = new LinkedHashMap<>(4);
-
-    switch (key.kty) {
-      case EC:
-        thumbPrint.put("crv", key.crv);
-        thumbPrint.put("kty", key.kty);
-        thumbPrint.put("x", key.x);
-        thumbPrint.put("y", key.y);
-        break;
-      case RSA:
-      case RSASSA_PSS:
-        thumbPrint.put("e", key.e);
-        thumbPrint.put("kty", key.kty);
-        thumbPrint.put("n", key.n);
-        break;
-      case OKP:
-        thumbPrint.put("crv", key.crv);
-        thumbPrint.put("kty", key.kty);
-        thumbPrint.put("x", key.x);
-        break;
-      default:
-        throw new IllegalArgumentException("Unsupported key type [" + key.kty + "]");
-    }
-
-    return digest(algorithm, Mapper.serialize(thumbPrint));
-  }
-
-  /**
-   * Generate the JWK SHA-1 Thumbprint as per RFC 7638.
+   * Generate the JWK SHA-256 Thumbprint as per RFC 7638 (EdDSA per RFC 8037). Suitable for use
+   * as the JWS {@code kid} header. SHA-256 is the modern default; prefer this over
+   * {@link #generateJWS_kidSHA1(JSONWebKey)}.
    *
    * @param key the {@link JSONWebKey} to determine the thumbprint for
    * @return the base64url-encoded JWK Thumbprint
    */
-  public static String generateJWS_kid(JSONWebKey key) {
-    return generateJWS_kid("SHA-1", key);
+  public static String generateJWS_kidSHA256(JSONWebKey key) {
+    return JWKThumbprint.compute("SHA-256", key);
   }
 
   /**
-   * Generate the JWK SHA-256 Thumbprint as per RFC 7638.
+   * Generate the JWK SHA-1 Thumbprint as per RFC 7638 (EdDSA per RFC 8037). Provided for
+   * interoperability with systems that still emit SHA-1 thumbprints. Prefer
+   * {@link #generateJWS_kidSHA256(JSONWebKey)}.
    *
    * @param key the {@link JSONWebKey} to determine the thumbprint for
    * @return the base64url-encoded JWK Thumbprint
    */
-  public static String generateJWS_kid_S256(JSONWebKey key) {
-    return generateJWS_kid("SHA-256", key);
-  }
-
-  /**
-   * Generate the <code>x5t</code> - the X.509 certificate thumbprint to be used in JWT header.
-   *
-   * @param encodedCertificate the Base64 encoded certificate
-   * @return an x5t hash.
-   */
-  public static String generateJWS_x5t(String encodedCertificate) {
-    return generateJWS_x5t("SHA-1", encodedCertificate);
-  }
-
-  /**
-   * Generate the <code>x5t</code> - the X.509 certificate thumbprint to be used in JWT header.
-   *
-   * @param algorithm          the algorithm used to calculate the hash, generally SHA-1 or SHA-256.
-   * @param encodedCertificate the Base64 encoded certificate
-   * @return an x5t hash.
-   */
-  public static String generateJWS_x5t(String algorithm, String encodedCertificate) {
-    byte[] bytes = Base64.getDecoder().decode(encodedCertificate.getBytes(StandardCharsets.UTF_8));
-    return generateJWS_x5t(algorithm, bytes);
-  }
-
-  /**
-   * Generate the <code>x5t</code> - the X.509 certificate thumbprint to be used in JWT header.
-   *
-   * @param derEncodedCertificate the DER encoded certificate
-   * @return an x5t hash.
-   */
-  public static String generateJWS_x5t(byte[] derEncodedCertificate) {
-    return generateJWS_x5t("SHA-1", derEncodedCertificate);
-  }
-
-  /**
-   * Generate the <code>x5t</code> - the X.509 certificate thumbprint to be used in JWT header.
-   *
-   * @param algorithm             the algorithm used to calculate the hash, generally SHA-1 or SHA-256.
-   * @param derEncodedCertificate the DER encoded certificate
-   * @return an x5t hash.
-   */
-  public static String generateJWS_x5t(String algorithm, byte[] derEncodedCertificate) {
-    return digest(algorithm, derEncodedCertificate);
+  public static String generateJWS_kidSHA1(JSONWebKey key) {
+    return JWKThumbprint.compute("SHA-1", key);
   }
 
   /**
@@ -345,18 +197,6 @@ public class JWTUtils {
     return Base64.getEncoder().encodeToString(buffer);
   }
 
-  private static String digest(String algorithm, byte[] bytes) {
-    MessageDigest messageDigest;
-    try {
-      messageDigest = MessageDigest.getInstance(algorithm);
-    } catch (NoSuchAlgorithmException e) {
-      throw new IllegalArgumentException("No such algorithm [" + algorithm + "]");
-    }
-
-    byte[] digest = messageDigest.digest(bytes);
-    return new String(Base64.getUrlEncoder().withoutPadding().encode(digest));
-  }
-
   /**
    * Generate a new Public / Private key pair with a key size of the provided length.
    *
@@ -376,7 +216,7 @@ public class JWTUtils {
       String publicKey = PEM.encode(keyPair.getPublic());
       return new KeyPair(privateKey, publicKey);
     } catch (NoSuchAlgorithmException e) {
-      throw new RuntimeException(e);
+      throw new JWTSigningException("Required key pair algorithm [" + algorithm + "] is not registered with this JVM", e);
     }
   }
 }

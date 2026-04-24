@@ -48,7 +48,7 @@ import static org.testng.Assert.assertTrue;
  * @author Daniel DeGroff
  */
 public class PEMEncoderTest extends BaseTest {
-  @Test(invocationCount = 250)
+  @Test
   public void eddsa() throws Exception {
     String privateKeyPEM = new String(Files.readAllBytes(Paths.get("src/test/resources/ed_dsa_ed25519_private_key.pem"))).trim();
     String publicKeyPEM = new String(Files.readAllBytes(Paths.get("src/test/resources/ed_dsa_ed25519_public_key.pem"))).trim();
@@ -98,7 +98,7 @@ public class PEMEncoderTest extends BaseTest {
     assertEquals(pem3.getPublicKey().getAlgorithm(), FipsEnabled ? "Ed25519" : "EdDSA");
   }
 
-  @Test(invocationCount = 250)
+  @Test(invocationCount = 1_000)
   public void ec() throws Exception {
     KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("EC");
     keyPairGenerator.initialize(256);
@@ -127,7 +127,7 @@ public class PEMEncoderTest extends BaseTest {
     assertNotNull(pem2.getPublicKey());
   }
 
-  @Test(invocationCount = 250)
+  @Test
   public void ec_backAndForth() throws Exception {
     // Start with openSSL PKCS#8 private key and X.509 public key
     String expectedPrivate = new String(Files.readAllBytes(Paths.get("src/test/resources/ec_private_prime256v1_p_256_openssl_pkcs8.pem"))).trim();
@@ -180,7 +180,7 @@ public class PEMEncoderTest extends BaseTest {
     assertNotNull(pem.getPublicKey());
   }
 
-  @Test(invocationCount = 250)
+  @Test
   public void rsa_backAndForth_pkcs_1() throws Exception {
     // Start externally created PKCS#1 private key and X.509 public key
     String expectedPrivate_pkcs_1 = new String(Files.readAllBytes(Paths.get("src/test/resources/rsa_private_key_2048_pkcs_1_control.pem"))).trim();
@@ -212,7 +212,7 @@ public class PEMEncoderTest extends BaseTest {
     assertEquals(encodedPublicKey, expectedPublic);
   }
 
-  @Test(invocationCount = 250)
+  @Test
   public void rsa_backAndForth_pkcs_8() throws Exception {
     // Start externally created PKCS#1 private key and X.509 public key
     String expectedPrivate = new String(Files.readAllBytes(Paths.get("src/test/resources/rsa_private_key_2048_pkcs_8_control.pem"))).trim();

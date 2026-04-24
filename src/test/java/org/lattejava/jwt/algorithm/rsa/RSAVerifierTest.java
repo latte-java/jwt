@@ -30,8 +30,8 @@ import java.nio.file.Paths;
 import java.security.interfaces.RSAPublicKey;
 import java.util.Arrays;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertTrue;
 
 /**
  * @author Daniel DeGroff
@@ -50,14 +50,16 @@ public class RSAVerifierTest extends BaseJWTTest {
             "rsa_pss_public_key_3072.pem",
             "rsa_pss_public_key_4096.pem")
         .forEach(fileName -> {
-          // Take a String arg
-          assertRSAVerifier(RSAVerifier.newVerifier(getPath(fileName)));
-          // Take a Path arg
-          assertRSAVerifier(RSAVerifier.newVerifier(readFile(fileName)));
-          // Take a byte[] arg
-          assertRSAVerifier(RSAVerifier.newVerifier(readFile(fileName).getBytes(StandardCharsets.UTF_8)));
-          // Take a public key arg
-          assertRSAVerifier(RSAVerifier.newVerifier((RSAPublicKey) PEM.decode(readFile(fileName)).getPublicKey()));
+          for (Algorithm alg : new Algorithm[]{Algorithm.RS256, Algorithm.RS384, Algorithm.RS512}) {
+            // Take a Path arg
+            assertRSAVerifier(RSAVerifier.newVerifier(alg, getPath(fileName)), alg);
+            // Take a String arg
+            assertRSAVerifier(RSAVerifier.newVerifier(alg, readFile(fileName)), alg);
+            // Take a byte[] arg
+            assertRSAVerifier(RSAVerifier.newVerifier(alg, readFile(fileName).getBytes(StandardCharsets.UTF_8)), alg);
+            // Take a public key arg
+            assertRSAVerifier(RSAVerifier.newVerifier(alg, (RSAPublicKey) PEM.decode(readFile(fileName)).getPublicKey()), alg);
+          }
         });
 
     // Public key parsing also works with private keys since the public key is encoded in the private
@@ -70,21 +72,23 @@ public class RSAVerifierTest extends BaseJWTTest {
             "rsa_pss_private_key_3072.pem",
             "rsa_pss_private_key_4096.pem")
         .forEach((fileName -> {
-          // Take a String arg
-          assertRSAVerifier(RSAVerifier.newVerifier(getPath(fileName)));
-          // Take a Path arg
-          assertRSAVerifier(RSAVerifier.newVerifier(readFile(fileName)));
-          // Take a byte[] arg
-          assertRSAVerifier(RSAVerifier.newVerifier(readFile(fileName).getBytes(StandardCharsets.UTF_8)));
-          // Take a public key arg
-          assertRSAVerifier(RSAVerifier.newVerifier((RSAPublicKey) PEM.decode(readFile(fileName)).getPublicKey()));
+          for (Algorithm alg : new Algorithm[]{Algorithm.RS256, Algorithm.RS384, Algorithm.RS512}) {
+            // Take a Path arg
+            assertRSAVerifier(RSAVerifier.newVerifier(alg, getPath(fileName)), alg);
+            // Take a String arg
+            assertRSAVerifier(RSAVerifier.newVerifier(alg, readFile(fileName)), alg);
+            // Take a byte[] arg
+            assertRSAVerifier(RSAVerifier.newVerifier(alg, readFile(fileName).getBytes(StandardCharsets.UTF_8)), alg);
+            // Take a public key arg
+            assertRSAVerifier(RSAVerifier.newVerifier(alg, (RSAPublicKey) PEM.decode(readFile(fileName)).getPublicKey()), alg);
+          }
         }));
   }
 
   @Test
   public void test_rsa_1024_pem() {
     try {
-      RSAVerifier.newVerifier(new String(Files.readAllBytes(Paths.get("src/test/resources/rsa_public_key_1024.pem"))));
+      RSAVerifier.newVerifier(Algorithm.RS256, new String(Files.readAllBytes(Paths.get("src/test/resources/rsa_public_key_1024.pem"))));
       Assert.fail("Expected [InvalidKeyLengthException] exception");
     } catch (InvalidKeyLengthException ignore) {
     } catch (Exception e) {
@@ -92,7 +96,8 @@ public class RSAVerifierTest extends BaseJWTTest {
     }
   }
 
-  private void assertRSAVerifier(Verifier verifier) {
+  private void assertRSAVerifier(Verifier verifier, Algorithm bound) {
+    // Use case: verifier accepts ONLY its bound RS* algorithm; every other algorithm rejected.
     assertFalse(verifier.canVerify(Algorithm.ES256));
     assertFalse(verifier.canVerify(Algorithm.ES384));
     assertFalse(verifier.canVerify(Algorithm.ES512));
@@ -105,8 +110,8 @@ public class RSAVerifierTest extends BaseJWTTest {
     assertFalse(verifier.canVerify(Algorithm.PS384));
     assertFalse(verifier.canVerify(Algorithm.PS512));
 
-    assertTrue(verifier.canVerify(Algorithm.RS256));
-    assertTrue(verifier.canVerify(Algorithm.RS384));
-    assertTrue(verifier.canVerify(Algorithm.RS512));
+    assertEquals(verifier.canVerify(Algorithm.RS256), bound == Algorithm.RS256);
+    assertEquals(verifier.canVerify(Algorithm.RS384), bound == Algorithm.RS384);
+    assertEquals(verifier.canVerify(Algorithm.RS512), bound == Algorithm.RS512);
   }
 }

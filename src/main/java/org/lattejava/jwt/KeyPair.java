@@ -23,7 +23,7 @@ import java.util.Objects;
 /**
  * @author Daniel DeGroff
  */
-public class KeyPair implements Buildable<KeyPair> {
+public class KeyPair {
   public PEM pem;
 
   public String privateKey;

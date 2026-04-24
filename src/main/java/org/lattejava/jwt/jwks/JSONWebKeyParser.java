@@ -17,6 +17,7 @@
 package org.lattejava.jwt.jwks;
 
 import org.lattejava.jwt.KeyType;
+import org.lattejava.jwt.internal.MessageSanitizer;
 import org.lattejava.jwt.pem.PEMEncoder;
 import org.lattejava.jwt.pem.PEM;
 
@@ -25,6 +26,7 @@ import java.security.AlgorithmParameters;
 import java.security.KeyFactory;
 import java.security.PublicKey;
 import java.security.interfaces.ECPublicKey;
+import java.security.interfaces.EdECPublicKey;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.ECGenParameterSpec;
 import java.security.spec.ECParameterSpec;
@@ -55,21 +57,21 @@ public class JSONWebKeyParser {
 
     try {
       // RSA Public key
-      if (key.kty == KeyType.RSA) {
-        BigInteger modulus = base64DecodeUint(key.n);
-        BigInteger publicExponent = base64DecodeUint(key.e);
+      if (key.kty() == KeyType.RSA) {
+        BigInteger modulus = base64DecodeUint(key.n());
+        BigInteger publicExponent = base64DecodeUint(key.e());
         PublicKey publicKey = KeyFactory.getInstance("RSA").generatePublic(new RSAPublicKeySpec(modulus, publicExponent));
 
         // If the x5c is non-null, verify the public key
-        if (key.x5c != null && key.x5c.size() > 0) {
+        if (key.x5c() != null && key.x5c().size() > 0) {
           verifyX5cRSA(key, modulus, publicExponent);
         }
 
         return publicKey;
-      } else if (key.kty == KeyType.EC) {
+      } else if (key.kty() == KeyType.EC) {
         // EC Public key
         AlgorithmParameters parameters = AlgorithmParameters.getInstance("EC");
-        switch (key.crv) {
+        switch (key.crv()) {
           case "P-256":
             parameters.init(new ECGenParameterSpec("secp256r1"));
             break;
@@ -80,27 +82,27 @@ public class JSONWebKeyParser {
             parameters.init(new ECGenParameterSpec("secp521r1"));
             break;
           default:
-            throw new UnsupportedOperationException("Unsupported EC algorithm. Support algorithms include P-256, P-384 and P-521.");
+            throw new UnsupportedOperationException("Unsupported EC curve [" + MessageSanitizer.forMessage(key.crv()) + "], expected [P-256], [P-384], or [P-521]");
         }
 
         ECParameterSpec ecParameterSpec = parameters.getParameterSpec(ECParameterSpec.class);
-        BigInteger xCoordinate = base64DecodeUint(key.x);
-        BigInteger yCoordinate = base64DecodeUint(key.y);
+        BigInteger xCoordinate = base64DecodeUint(key.x());
+        BigInteger yCoordinate = base64DecodeUint(key.y());
         ECPoint ecPoint = new ECPoint(xCoordinate, yCoordinate);
         PublicKey publicKey = KeyFactory.getInstance("EC").generatePublic(new ECPublicKeySpec(ecPoint, ecParameterSpec));
 
         // If the x5x is non-null, verify the public key
-        if (key.x5c != null && key.x5c.size() > 0) {
+        if (key.x5c() != null && key.x5c().size() > 0) {
           verifyX5cEC(key, xCoordinate, yCoordinate);
         }
 
         return publicKey;
-      } else if (key.kty == KeyType.OKP) {
-        if (!"Ed25519".equals(key.crv) && !"Ed448".equals(key.crv)) {
-          throw new UnsupportedOperationException("Only a Ed25519 or Ed448 OKP JSON Web key may be parsed.");
+      } else if (key.kty() == KeyType.OKP) {
+        if (!"Ed25519".equals(key.crv()) && !"Ed448".equals(key.crv())) {
+          throw new UnsupportedOperationException("Unsupported OKP curve [" + MessageSanitizer.forMessage(key.crv()) + "], expected [Ed25519] or [Ed448]");
         }
 
-        byte[] bytes = Base64.getUrlDecoder().decode(key.x);
+        byte[] bytes = Base64.getUrlDecoder().decode(key.x());
         reverseArray(bytes);
 
         int lastBit = bytes[0] & 0xFF;
@@ -108,16 +110,23 @@ public class JSONWebKeyParser {
         bytes[0] = (byte) (lastBit & Byte.MAX_VALUE);
         BigInteger y = new BigInteger(1, bytes);
 
-        KeySpec keySpec = new EdECPublicKeySpec(new NamedParameterSpec(key.crv), new EdECPoint(xOdd, y));
-        return KeyFactory.getInstance(key.crv).generatePublic(keySpec);
+        KeySpec keySpec = new EdECPublicKeySpec(new NamedParameterSpec(key.crv()), new EdECPoint(xOdd, y));
+        PublicKey publicKey = KeyFactory.getInstance(key.crv()).generatePublic(keySpec);
+
+        // If the x5c is non-null, verify the public key
+        if (key.x5c() != null && key.x5c().size() > 0) {
+          verifyX5cOKP(key, y, xOdd);
+        }
+
+        return publicKey;
       }
     } catch (JSONWebKeyParserException e) {
       throw e;
     } catch (Exception e) {
-      throw new JSONWebKeyParserException("Failed to parse the provided JSON Web Key", e);
+      throw new JSONWebKeyParserException("Failed to parse JWK", e);
     }
 
-    throw new UnsupportedOperationException("Only RSA, EC or OKP JSON Web Keys may be parsed.");
+    throw new UnsupportedOperationException("Unsupported JWK [kty] [" + MessageSanitizer.forMessage(String.valueOf(key.kty())) + "], expected [RSA], [EC], or [OKP]");
   }
 
   /**
@@ -137,51 +146,39 @@ public class JSONWebKeyParser {
   public boolean containsPrivateKeyParams(JSONWebKey key) throws JSONWebKeyParserException{
     Objects.requireNonNull(key);
 
-    if (key.kty == KeyType.RSA) {
+    if (key.kty() == KeyType.RSA) {
       // RSA public key only has n, e
-      if (key.p != null || key.q != null || key.d != null || key.dp != null || key.dq != null || key.qi != null) {
-        return true;
-      } else {
-        return false;
-      }
-    } else if (key.kty == KeyType.EC) {
+      return key.p() != null || key.q() != null || key.d() != null || key.dp() != null || key.dq() != null || key.qi() != null;
+    } else if (key.kty() == KeyType.EC) {
       // EC Public key only has crv, x, y
-      if (key.d != null) {
-        return true;
-      } else {
-        return false;
-      }
-    } else if (key.kty == KeyType.OKP) {
+      return key.d() != null;
+    } else if (key.kty() == KeyType.OKP) {
       // EdDSA Public keys have crv and x
-      if (key.d != null) {
-        return true;
-      } else {
-        return false;
-      }
+      return key.d() != null;
     }
 
-    throw new UnsupportedOperationException("Only RSA, EC or OKP JSON Web Keys may be parsed.");
+    throw new UnsupportedOperationException("Unsupported JWK [kty] [" + MessageSanitizer.forMessage(String.valueOf(key.kty())) + "], expected [RSA], [EC], or [OKP]");
   }
 
   private void verifyX5cEC(JSONWebKey key, BigInteger expectedXCoordinate, BigInteger expectedYCoordinate) {
     // The first key in this array MUST contain the public key.
     // >  https://tools.ietf.org/html/rfc7517#section-4.7
-    String encodedCertificate = key.x5c.get(0);
+    String encodedCertificate = key.x5c().get(0);
     String pem = new PEMEncoder().parseEncodedCertificate(encodedCertificate);
     PublicKey actual = PEM.decode(pem).publicKey;
     if (!(actual instanceof ECPublicKey ecPublicKey)) {
-      throw new JSONWebKeyParserException("The public key found in the [x5c] property does not match the expected key type specified by the [kty] property.");
+      throw new JSONWebKeyParserException("Public key in [x5c] does not match the key type declared in [kty]");
     }
 
     ECPoint point = ecPublicKey.getW();
 
     if (!point.getAffineX().equals(expectedXCoordinate)) {
-      throw new JSONWebKeyParserException("Expected an x coordinate value of [" + expectedXCoordinate + "] but found [" + point.getAffineX() + "].  The certificate found in [x5c] does not match the [x] coordinate property.");
+      throw new JSONWebKeyParserException("Certificate in [x5c] does not match the [x] coordinate: expected [" + expectedXCoordinate + "] but found [" + point.getAffineX() + "]");
     }
 
     //noinspection SuspiciousNameCombination
     if (!point.getAffineY().equals(expectedYCoordinate)) {
-      throw new JSONWebKeyParserException("Expected a y coordinate value of [" + expectedYCoordinate + "] but found [" + point.getAffineY() + "].  The certificate found in [x5c] does not match the [y] coordinate property.");
+      throw new JSONWebKeyParserException("Certificate in [x5c] does not match the [y] coordinate: expected [" + expectedYCoordinate + "] but found [" + point.getAffineY() + "]");
     }
   }
 
@@ -198,23 +195,48 @@ public class JSONWebKeyParser {
     }
   }
 
+  private void verifyX5cOKP(JSONWebKey key, BigInteger expectedY, boolean expectedXOdd) {
+    // The first key in this array MUST contain the public key.
+    // >  https://tools.ietf.org/html/rfc7517#section-4.7
+    String encodedCertificate = key.x5c().get(0);
+    String pem = new PEMEncoder().parseEncodedCertificate(encodedCertificate);
+    PublicKey actual = PEM.decode(pem).publicKey;
+    if (!(actual instanceof EdECPublicKey edECPublicKey)) {
+      throw new JSONWebKeyParserException("Public key in [x5c] does not match the key type declared in [kty]");
+    }
+
+    String certCurve = edECPublicKey.getParams().getName();
+    if (!certCurve.equals(key.crv())) {
+      throw new JSONWebKeyParserException("Certificate in [x5c] declares curve [" + certCurve + "] but JWK declares [crv] [" + key.crv() + "]");
+    }
+
+    EdECPoint point = edECPublicKey.getPoint();
+    if (!point.getY().equals(expectedY)) {
+      throw new JSONWebKeyParserException("Certificate in [x5c] does not match the [x] coordinate y-value: expected [" + expectedY + "] but found [" + point.getY() + "]");
+    }
+
+    if (point.isXOdd() != expectedXOdd) {
+      throw new JSONWebKeyParserException("Certificate in [x5c] does not match the [x] coordinate x-parity");
+    }
+  }
+
   private void verifyX5cRSA(JSONWebKey key, BigInteger expectedModulus, BigInteger expectedPublicExponent) {
     // The first key in this array MUST contain the public key.
     // >  https://tools.ietf.org/html/rfc7517#section-4.7
-    String encodedCertificate = key.x5c.get(0);
+    String encodedCertificate = key.x5c().get(0);
     String pem = new PEMEncoder().parseEncodedCertificate(encodedCertificate);
     PublicKey actual = PEM.decode(pem).publicKey;
 
     if (!(actual instanceof RSAPublicKey rsaPublicKey)) {
-      throw new JSONWebKeyParserException("The public key found in the [x5c] property does not match the expected key type specified by the [kty] property.");
+      throw new JSONWebKeyParserException("Public key in [x5c] does not match the key type declared in [kty]");
     }
 
     if (!rsaPublicKey.getModulus().equals(expectedModulus)) {
-      throw new JSONWebKeyParserException("Expected a modulus value of [" + expectedModulus + "] but found [" + rsaPublicKey.getModulus() + "].  The certificate found in [x5c] does not match the [n] property.");
+      throw new JSONWebKeyParserException("Certificate in [x5c] does not match [n]: expected [" + expectedModulus + "] but found [" + rsaPublicKey.getModulus() + "]");
     }
 
     if (!rsaPublicKey.getPublicExponent().equals(expectedPublicExponent)) {
-      throw new JSONWebKeyParserException("Expected a public exponent value of [" + expectedPublicExponent + "] but found [" + rsaPublicKey.getPublicExponent() + "].  The certificate found in [x5c] does not match the [e] property.");
+      throw new JSONWebKeyParserException("Certificate in [x5c] does not match [e]: expected [" + expectedPublicExponent + "] but found [" + rsaPublicKey.getPublicExponent() + "]");
     }
   }
 }

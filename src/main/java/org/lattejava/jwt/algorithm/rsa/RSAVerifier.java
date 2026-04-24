@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2025, FusionAuth, All Rights Reserved
+ * Copyright (c) 2016-2026, FusionAuth, All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,16 +16,14 @@
 
 package org.lattejava.jwt.algorithm.rsa;
 
-import org.lattejava.jwt.InvalidJWTSignatureException;
-import org.lattejava.jwt.InvalidKeyLengthException;
-import org.lattejava.jwt.InvalidKeyTypeException;
-import org.lattejava.jwt.JWTVerifierException;
-import org.lattejava.jwt.MissingPublicKeyException;
-import org.lattejava.jwt.Verifier;
 import org.lattejava.jwt.Algorithm;
-import org.lattejava.jwt.pem.PEM;
+import org.lattejava.jwt.InvalidJWTSignatureException;
+import org.lattejava.jwt.JWTVerifierException;
+import org.lattejava.jwt.Verifier;
+import org.lattejava.jwt.algorithm.KeyCoercion;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.InvalidKeyException;
@@ -37,122 +35,101 @@ import java.security.interfaces.RSAPublicKey;
 import java.util.Objects;
 
 /**
- * This class is used to verify a JWT with an RSA signature using an RSA Public Key.
+ * RSASSA-PKCS1-v1_5 {@link Verifier} for the {@code RS256} / {@code RS384}
+ * / {@code RS512} JWA algorithms (RFC 7518 §3.3).
+ *
+ * <p>Each instance is bound to a single JWA algorithm at construction time;
+ * {@link #canVerify(Algorithm)} returns true only for that exact algorithm.
+ * Binding at construction prevents algorithm-confusion attacks where a
+ * tampered header {@code alg} could coax a family-accepting verifier into
+ * using a weaker hash than the caller intended (RFC 8725 §3.1).</p>
+ *
+ * <p>Each call to {@link #verify(byte[], byte[])} obtains a fresh
+ * {@link Signature} instance ({@link Signature} is not thread-safe).</p>
  *
  * @author Daniel DeGroff
  */
 public class RSAVerifier implements Verifier {
+  private final Algorithm algorithm;
+
   private final RSAPublicKey publicKey;
 
-  private RSAVerifier(PublicKey publicKey) {
-    Objects.requireNonNull(publicKey);
-
-    if (!(publicKey instanceof RSAPublicKey)) {
-      throw new InvalidKeyTypeException("Expecting a public key of type [RSAPublicKey], but found [" + publicKey.getClass().getSimpleName() + "].");
-    }
-    this.publicKey = (RSAPublicKey) publicKey;
-    assertValidKeyLength();
+  private RSAVerifier(Algorithm algorithm, PublicKey publicKey) {
+    Objects.requireNonNull(algorithm, "algorithm");
+    Objects.requireNonNull(publicKey, "publicKey");
+    requireRSA(algorithm);
+    this.algorithm = algorithm;
+    this.publicKey = KeyCoercion.asPublic(publicKey, RSAPublicKey.class);
+    RSAFamily.assertMinimumModulus(this.publicKey.getModulus().bitLength());
+    RSAFamily.assertAcceptablePublicExponent(this.publicKey.getPublicExponent());
   }
 
-  private RSAVerifier(String publicKey) {
-    Objects.requireNonNull(publicKey);
-
-    PEM pem = PEM.decode(publicKey);
-    if (pem.publicKey == null) {
-      throw new MissingPublicKeyException("The provided PEM encoded string did not contain a public key.");
-    }
-    if (!(pem.publicKey instanceof RSAPublicKey)) {
-      throw new InvalidKeyTypeException("Expecting a public key of type [RSAPublicKey], but found [" + pem.publicKey.getClass().getSimpleName() + "].");
-    }
-
-    this.publicKey = pem.getPublicKey();
-    assertValidKeyLength();
+  private RSAVerifier(Algorithm algorithm, String pemPublicKey) {
+    Objects.requireNonNull(algorithm, "algorithm");
+    Objects.requireNonNull(pemPublicKey, "pemPublicKey");
+    requireRSA(algorithm);
+    this.algorithm = algorithm;
+    this.publicKey = KeyCoercion.publicFromPem(pemPublicKey, RSAPublicKey.class);
+    RSAFamily.assertMinimumModulus(this.publicKey.getModulus().bitLength());
+    RSAFamily.assertAcceptablePublicExponent(this.publicKey.getPublicExponent());
   }
 
-  /**
-   * Return a new instance of the RSA Verifier with the provided public key.
-   *
-   * @param publicKey The RSA public key object.
-   * @return a new instance of the RSA verifier.
-   */
-  public static RSAVerifier newVerifier(PublicKey publicKey) {
-    return new RSAVerifier(publicKey);
+  public static RSAVerifier newVerifier(Algorithm algorithm, PublicKey publicKey) {
+    return new RSAVerifier(algorithm, publicKey);
   }
 
-  /**
-   * Return a new instance of the RSA Verifier with the provided public key.
-   *
-   * @param publicKey The RSA public key PEM.
-   * @return a new instance of the RSA verifier.
-   */
-  public static RSAVerifier newVerifier(String publicKey) {
-    return new RSAVerifier(publicKey);
+  public static RSAVerifier newVerifier(Algorithm algorithm, String pemPublicKey) {
+    return new RSAVerifier(algorithm, pemPublicKey);
   }
 
-  /**
-   * Return a new instance of the RSA Verifier with the provided public key.
-   *
-   * @param path The path to the RSA public key PEM.
-   * @return a new instance of the RSA verifier.
-   */
-  public static RSAVerifier newVerifier(Path path) {
-    Objects.requireNonNull(path);
+  public static RSAVerifier newVerifier(Algorithm algorithm, byte[] bytes) {
+    Objects.requireNonNull(bytes, "bytes");
+    return new RSAVerifier(algorithm, new String(bytes, StandardCharsets.UTF_8));
+  }
 
+  public static RSAVerifier newVerifier(Algorithm algorithm, Path path) {
+    Objects.requireNonNull(path, "path");
     try {
-      return new RSAVerifier(new String(Files.readAllBytes(path)));
+      return new RSAVerifier(algorithm, new String(Files.readAllBytes(path), StandardCharsets.UTF_8));
     } catch (IOException e) {
-      throw new JWTVerifierException("Unable to read the file from path [" + path.toAbsolutePath() + "]", e);
+      throw new JWTVerifierException("Unable to read file from path [" + path + "]", e);
     }
-  }
-
-  /**
-   * Return a new instance of the RSA Verifier with the provided public key.
-   *
-   * @param bytes The bytes of the RSA public key PEM.
-   * @return a new instance of the RSA verifier.
-   */
-  public static RSAVerifier newVerifier(byte[] bytes) {
-    Objects.requireNonNull(bytes);
-    return new RSAVerifier((new String(bytes)));
   }
 
   @Override
-  @SuppressWarnings("Duplicates")
   public boolean canVerify(Algorithm algorithm) {
-    return switch (algorithm) {
-      case RS256, RS384, RS512 -> true;
-      default -> false;
-    };
+    return algorithm != null && this.algorithm.name().equals(algorithm.name());
   }
 
-  public void verify(Algorithm algorithm, byte[] message, byte[] signature) {
-    Objects.requireNonNull(algorithm);
+  @Override
+  public void verify(byte[] message, byte[] signature) {
     Objects.requireNonNull(message);
     Objects.requireNonNull(signature);
-
     try {
-      Signature verifier = Signature.getInstance(algorithm.getName());
+      Signature verifier = Signature.getInstance(RSAFamily.toJCA(this.algorithm));
       verifier.initVerify(publicKey);
       verifier.update(message);
-      // Depending upon the JCE provider, an invalid signature may cause verify() to return false
-      // or throw a SignatureException. For example, the signature length may not match the key size.
       try {
         if (!verifier.verify(signature)) {
           throw new InvalidJWTSignatureException();
         }
       } catch (SignatureException e) {
-        throw new InvalidJWTSignatureException(e);
+        // JCA signals malformed/truncated signature bytes via SignatureException. The cause
+        // is intentionally dropped: the bare exception type is the signal.
+        throw new InvalidJWTSignatureException();
       }
     } catch (InvalidKeyException | NoSuchAlgorithmException | SignatureException | SecurityException e) {
       throw new JWTVerifierException("An unexpected exception occurred when attempting to verify the JWT", e);
     }
   }
 
-  private void assertValidKeyLength() {
-    int keyLength = this.publicKey.getModulus().bitLength();
-    // We would normally expect 2048, but it turns out it is possible for an RSA key to be generated of length 2047.
-    if (keyLength < 2047) {
-      throw new InvalidKeyLengthException("Key length of [" + keyLength + "] is less than the required key length of 2048 bits.");
+  private static void requireRSA(Algorithm algorithm) {
+    switch (algorithm.name()) {
+      case "RS256", "RS384", "RS512" -> {
+      }
+
+      default -> throw new IllegalArgumentException(
+          "Expected RSASSA-PKCS1-v1_5 algorithm but found [" + algorithm.name() + "]");
     }
   }
 }

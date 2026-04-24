@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2019, FusionAuth, All Rights Reserved
+ * Copyright (c) 2016-2026, FusionAuth, All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,33 +17,45 @@
 package org.lattejava.jwt;
 
 /**
- * JWT Signer.
+ * A {@code Signer} produces a signature for the JWT signing-input bytes
+ * (header.payload encoded as UTF-8).
+ *
+ * <p>Implementations MUST be safe to share across threads. Each call to
+ * {@link #sign(byte[])} MUST obtain a fresh JCA primitive
+ * ({@code Mac}/{@code Signature}) and MUST NOT cache and reuse it across
+ * threads -- the JDK explicitly documents these as not thread-safe.</p>
  *
  * @author Daniel DeGroff
  */
 public interface Signer {
 
   /**
-   * Return the algorithm supported by this signer.
+   * Returns the JWA algorithm for this signer.
    *
-   * @return the algorithm.
+   * @return the algorithm
    */
-  Algorithm getAlgorithm();
-
-  /**
-   * Return the kid used for this signer.
-   *
-   * @return the kid
-   */
-  default String getKid() {
-    throw new UnsupportedOperationException();
-  }
+  Algorithm algorithm();
 
   /**
    * Sign the provided message and return the signature.
    *
-   * @param payload The JWT payload to sign.
-   * @return The message signature in a byte array.
+   * @param message The message bytes to sign (header.payload encoded as UTF-8).
+   * @return The signature bytes.
+   * @throws InvalidKeyLengthException if the signer's key is too short for its algorithm
+   * @throws InvalidKeyTypeException if the signer's key is not compatible with its algorithm
+   * @throws JWTSigningException if an underlying JCE operation fails (e.g.,
+   *         {@code NoSuchAlgorithmException} from a missing JCE provider for
+   *         Ed25519 / Ed448 / ES256K on an unsupported JDK)
    */
-  byte[] sign(String payload);
+  byte[] sign(byte[] message);
+
+  /**
+   * Returns the key ID for this signer, or {@code null} if no key ID is set.
+   * The encoder uses this to populate the {@code "kid"} header parameter.
+   *
+   * @return the kid, or {@code null}
+   */
+  default String kid() {
+    return null;
+  }
 }

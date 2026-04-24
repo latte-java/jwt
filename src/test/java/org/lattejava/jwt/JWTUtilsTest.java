@@ -41,14 +41,16 @@ import static org.testng.Assert.assertTrue;
  * @author Daniel DeGroff
  */
 public class JWTUtilsTest extends BaseTest {
+  // decodeHeader/decodePayload moved to JWTDecoder.decodeUnsecured().
   @Test
   public void decodePayload() {
-    JWT jwt = new JWT().setSubject("123456789");
+    JWT jwt = JWT.builder().subject("123456789").build();
 
     // HMAC signed
-    String encodedJWT = JWT.getEncoder().encode(jwt, HMACSigner.newSHA512Signer("super-secret-key-1-that-is-at-least-64-bytes-long-for-sha512-algorithm-compat-req!!"));
-    assertEquals(JWTUtils.decodePayload(encodedJWT).subject, "123456789");
-    assertEquals(JWTUtils.decodeHeader(encodedJWT).algorithm, Algorithm.HS512);
+    String encodedJWT = new org.lattejava.jwt.JWTEncoder().encode(jwt, HMACSigner.newSHA512Signer("super-secret-key-1-that-is-at-least-64-bytes-long-for-sha512-algorithm-compat-req!!"));
+    JWT decoded = new JWTDecoder().decodeUnsecured(encodedJWT);
+    assertEquals(decoded.subject(), "123456789");
+    assertEquals(decoded.header().alg(), Algorithm.HS512);
   }
 
   @Test
@@ -328,102 +330,53 @@ public class JWTUtilsTest extends BaseTest {
   }
 
   @Test
-  public void jws_x5t() {
-    String encodedCertificate = "MIIC5jCCAc6gAwIBAgIQNCdDZLmeeL5H6O2BE+aQCjANBgkqhkiG9w0BAQsFADAvMS0wKwYDVQQDEyRBREZTIFNpZ25pbmcgLSB1bWdjb25uZWN0LnVtdXNpYy5jb20wHhcNMTcxMDE4MTUyOTAzWhcNMTgxMDE4MTUyOTAzWjAvMS0wKwYDVQQDEyRBREZTIFNpZ25pbmcgLSB1bWdjb25uZWN0LnVtdXNpYy5jb20wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDnUl7AwWO1fjpijswRY40bs8jegA4Kz4ycM12h8PqD0CbydWyCnPmY/mzI8EPWsaT3uJ4QaYEEq+taNTu/GB8eFDs1flDb1JNjkZ2ECDZpdwgAS/z+RvI7D+tRARNUU7QvkMAOfFTb3zS4Cx52RoXlp3Bdrtzk9KaO/DJc7IoxLCAWuXL8kxuBRwfPzeQXX/i+wIRtkJAFotOq7j/XxgYO0/UzCenZDAr+Xbl8JfmrkFaegEQFwAC2/jlAP9OYjF39qD+9kI/HP9CcnXxoAIbq8lJkIKvuoURV9mErlel2Oj+tgvveq28NEV36RwqnfAqAIsAT4BTs739JUsnoHnKbAgMBAAEwDQYJKoZIhvcNAQELBQADggEBAGesHLA8V2/4ljxwbjeBsBBk8fJ4DGVufKJJXBit7jb37/9/XVtkVg1Y2IuVoYnzpnOxAZ/Zizp8/HKH2bApqEOcAU3oZ471FZlzXAv1G51S0i1UUD/OWgc3z84pk9AMtWSka26GOWA4pb/Mw/nrBrG3R8NY6ZgLZQqbYR2GQBj5JXbDsJtzYkVXY6N5KmsBekVJ92ddjKMy5SfcGY0j3BFFsBOUpaONWgBFAD2rOH9FnwoY7tcTKa5u4MfwSXMYLal/Vk9kFAtBV2Uqe/MgitB8OgAGYYqGU8VRPVH4K/n8sx5EarZPXcOJkHbI/C70Puc0jxra4e4/2c4HqifMAYQ=";
-    byte[] derEncodedCertificate = Base64.getDecoder().decode(encodedCertificate.getBytes(StandardCharsets.UTF_8));
-
-    // Pass in Base64 encode certificate
-    assertEquals(JWTUtils.generateJWS_x5t(encodedCertificate), "vDT213a_AF5eRdElKZla9-9dpc8");
-    assertEquals(JWTUtils.generateJWS_x5t("SHA-1", encodedCertificate), "vDT213a_AF5eRdElKZla9-9dpc8");
-
-    // Pass in DER encoded certificate
-    assertEquals(JWTUtils.generateJWS_x5t(derEncodedCertificate), "vDT213a_AF5eRdElKZla9-9dpc8");
-    assertEquals(JWTUtils.generateJWS_x5t("SHA-1", derEncodedCertificate), "vDT213a_AF5eRdElKZla9-9dpc8");
-
-    // Base64 Encoded and DER Encoded using SHA-256
-    assertEquals(JWTUtils.generateJWS_x5t("SHA-256", encodedCertificate), "tIFNLfPYY14sM0DLTp6T-BZ3yPaPUPKc8Hnh6evXTeM");
-    assertEquals(JWTUtils.generateJWS_x5t("SHA-256", derEncodedCertificate), "tIFNLfPYY14sM0DLTp6T-BZ3yPaPUPKc8Hnh6evXTeM");
-
-    // Convert HEX SHA-1 Fingerprint --> x5t
-    assertEquals(JWTUtils.convertFingerprintToThumbprint("BC34F6D776BF005E5E45D12529995AF7EF5DA5CF"), "vDT213a_AF5eRdElKZla9-9dpc8");
-    // Convert SHA-256 Fingerprint to x5t#256
-    assertEquals(JWTUtils.convertFingerprintToThumbprint("B4814D2DF3D8635E2C3340CB4E9E93F81677C8F68F50F29CF079E1E9EBD74DE3"), "tIFNLfPYY14sM0DLTp6T-BZ3yPaPUPKc8Hnh6evXTeM");
-
-    // Convert x5t --> HEX SHA-1 Fingerprint
-    assertEquals(JWTUtils.convertThumbprintToFingerprint("vDT213a_AF5eRdElKZla9-9dpc8"), "BC34F6D776BF005E5E45D12529995AF7EF5DA5CF");
-    // Convert x5t#256 --> HEX SHA-256 Fingerprint
-    assertEquals(JWTUtils.convertThumbprintToFingerprint("tIFNLfPYY14sM0DLTp6T-BZ3yPaPUPKc8Hnh6evXTeM"), "B4814D2DF3D8635E2C3340CB4E9E93F81677C8F68F50F29CF079E1E9EBD74DE3");
-  }
-
-  @Test
   public void jws_kid_rsaControl() {
     // Control example from RFC 7638
     // https://tools.ietf.org/html/rfc7638#section-3.1
-    JSONWebKey rsaKey = new JSONWebKey();
-    rsaKey.kty = KeyType.RSA;
-    rsaKey.n = "0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw";
-    rsaKey.e = "AQAB";
+    JSONWebKey rsaKey = JSONWebKey.builder()
+        .kty(KeyType.RSA)
+        .n("0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw")
+        .e("AQAB")
+        .build();
 
     // SHA-1
-    assertEquals(JWTUtils.generateJWS_kid(rsaKey), "nMGlFRw9Y5POaSOaIaRBc9P2nfA");
-    assertEquals(JWTUtils.generateJWS_kid("SHA-1", rsaKey), "nMGlFRw9Y5POaSOaIaRBc9P2nfA");
+    assertEquals(JWTUtils.generateJWS_kidSHA1(rsaKey), "nMGlFRw9Y5POaSOaIaRBc9P2nfA");
 
     // SHA-256
-    assertEquals(JWTUtils.generateJWS_kid_S256(rsaKey), "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs");
-    assertEquals(JWTUtils.generateJWS_kid("SHA-256", rsaKey), "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs");
-  }
-
-  @Test
-  public void jws_kid_pssControl() {
-    // Same elements as rsa control, but we have a different key type,
-    // so we'll get different sha values.
-    JSONWebKey pssKey = new JSONWebKey();
-    pssKey.kty = KeyType.RSASSA_PSS;
-    pssKey.n = "0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw";
-    pssKey.e = "AQAB";
-
-    // SHA-1
-    assertEquals(JWTUtils.generateJWS_kid(pssKey), "cQP8OQaKDsN3IcB7kS48XMywclQ");
-    assertEquals(JWTUtils.generateJWS_kid("SHA-1", pssKey), "cQP8OQaKDsN3IcB7kS48XMywclQ");
-
-    // SHA-256
-    assertEquals(JWTUtils.generateJWS_kid_S256(pssKey), "BAQAQh9ReyFN-FTuSC_vWqCvGb7Bdn3apRpnnT-BtRw");
-    assertEquals(JWTUtils.generateJWS_kid("SHA-256", pssKey), "BAQAQh9ReyFN-FTuSC_vWqCvGb7Bdn3apRpnnT-BtRw");
+    assertEquals(JWTUtils.generateJWS_kidSHA256(rsaKey), "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs");
   }
 
   @Test
   public void jws_kid_ec() {
-    JSONWebKey ecKey = new JSONWebKey();
-    ecKey.kty = KeyType.EC;
-    ecKey.crv = "P-256";
-    ecKey.x = "MKBCTNIcKUSDii11ySs3526iDZ8AiTo7Tu6KPAqv7D4";
-    ecKey.y = "4Etl6SRW2YiLUrN5vfvVHuhp7x8PxltmWWlbbM4IFyM";
+    JSONWebKey ecKey = JSONWebKey.builder()
+        .kty(KeyType.EC)
+        .crv("P-256")
+        .x("MKBCTNIcKUSDii11ySs3526iDZ8AiTo7Tu6KPAqv7D4")
+        .y("4Etl6SRW2YiLUrN5vfvVHuhp7x8PxltmWWlbbM4IFyM")
+        .build();
 
     // SHA-1
-    assertEquals(JWTUtils.generateJWS_kid(ecKey), "VHriznG7vJAFpXMXRmGgAkA5sEE");
-    assertEquals(JWTUtils.generateJWS_kid("SHA-1", ecKey), "VHriznG7vJAFpXMXRmGgAkA5sEE");
+    assertEquals(JWTUtils.generateJWS_kidSHA1(ecKey), "VHriznG7vJAFpXMXRmGgAkA5sEE");
 
     // SHA-256
-    assertEquals(JWTUtils.generateJWS_kid_S256(ecKey), "cn-I_WNMClehiVp51i_0VpOENW1upEerA8sEam5hn-s");
-    assertEquals(JWTUtils.generateJWS_kid("SHA-256", ecKey), "cn-I_WNMClehiVp51i_0VpOENW1upEerA8sEam5hn-s");
+    assertEquals(JWTUtils.generateJWS_kidSHA256(ecKey), "cn-I_WNMClehiVp51i_0VpOENW1upEerA8sEam5hn-s");
   }
 
   @Test
   public void jws_kid_eddsa() {
     // Control example from RFC 8037 (the SHA-256 thumbprint)
     // https://www.rfc-editor.org/rfc/rfc8037.html#appendix-A.3
-    JSONWebKey eddsaKey = new JSONWebKey();
-    eddsaKey.kty = KeyType.OKP;
-    eddsaKey.crv = "Ed25519";
-    eddsaKey.x = "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo";
+    JSONWebKey eddsaKey = JSONWebKey.builder()
+        .kty(KeyType.OKP)
+        .crv("Ed25519")
+        .x("11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo")
+        .build();
 
     // SHA-1
-    assertEquals(JWTUtils.generateJWS_kid(eddsaKey), "VmxEWEmFxGLRPOX30HXyts0yJOE");
-    assertEquals(JWTUtils.generateJWS_kid("SHA-1", eddsaKey), "VmxEWEmFxGLRPOX30HXyts0yJOE");
+    assertEquals(JWTUtils.generateJWS_kidSHA1(eddsaKey), "VmxEWEmFxGLRPOX30HXyts0yJOE");
 
     // SHA-256
-    assertEquals(JWTUtils.generateJWS_kid_S256(eddsaKey), "kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k");
-    assertEquals(JWTUtils.generateJWS_kid("SHA-256", eddsaKey), "kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k");
+    assertEquals(JWTUtils.generateJWS_kidSHA256(eddsaKey), "kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k");
   }
 
   private void assertPrefix(String key, String prefix) {

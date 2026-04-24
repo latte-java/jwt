@@ -19,8 +19,10 @@ package org.lattejava.jwt.algorithm.rsa;
 import org.lattejava.jwt.BaseJWTTest;
 import org.lattejava.jwt.InvalidKeyLengthException;
 import org.lattejava.jwt.Verifier;
+import org.lattejava.jwt.VerifierResolver;
 import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.JWT;
+import org.lattejava.jwt.JWTDecoder;
 import org.lattejava.jwt.pem.PEM;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -52,14 +54,16 @@ public class RSAPSSVerifierTest extends BaseJWTTest {
             "rsa_pss_public_key_3072.pem",
             "rsa_pss_public_key_4096.pem")
         .forEach(fileName -> {
-          // Take a String arg
-          assertRSAPSAVerifier(RSAPSSVerifier.newVerifier(getPath(fileName)));
-          // Take a Path arg
-          assertRSAPSAVerifier(RSAPSSVerifier.newVerifier(readFile(fileName)));
-          // Take a byte[] arg
-          assertRSAPSAVerifier(RSAPSSVerifier.newVerifier(readFile(fileName).getBytes(StandardCharsets.UTF_8)));
-          // Take a public key arg
-          assertRSAPSAVerifier(RSAPSSVerifier.newVerifier((RSAPublicKey) PEM.decode(readFile(fileName)).getPublicKey()));
+          for (Algorithm alg : new Algorithm[]{Algorithm.PS256, Algorithm.PS384, Algorithm.PS512}) {
+            // Take a Path arg
+            assertRSAPSSVerifier(RSAPSSVerifier.newVerifier(alg, getPath(fileName)), alg);
+            // Take a String arg
+            assertRSAPSSVerifier(RSAPSSVerifier.newVerifier(alg, readFile(fileName)), alg);
+            // Take a byte[] arg
+            assertRSAPSSVerifier(RSAPSSVerifier.newVerifier(alg, readFile(fileName).getBytes(StandardCharsets.UTF_8)), alg);
+            // Take a public key arg
+            assertRSAPSSVerifier(RSAPSSVerifier.newVerifier(alg, (RSAPublicKey) PEM.decode(readFile(fileName)).getPublicKey()), alg);
+          }
         });
 
     // Public key parsing also works with private keys since the public key is encoded in the private
@@ -72,21 +76,23 @@ public class RSAPSSVerifierTest extends BaseJWTTest {
             "rsa_pss_private_key_3072.pem",
             "rsa_pss_private_key_4096.pem")
         .forEach((fileName -> {
-          // Take a String arg
-          assertRSAPSAVerifier(RSAPSSVerifier.newVerifier(getPath(fileName)));
-          // Take a Path arg
-          assertRSAPSAVerifier(RSAPSSVerifier.newVerifier(readFile(fileName)));
-          // Take a byte[] arg
-          assertRSAPSAVerifier(RSAPSSVerifier.newVerifier(readFile(fileName).getBytes(StandardCharsets.UTF_8)));
-          // Take a public key arg
-          assertRSAPSAVerifier(RSAPSSVerifier.newVerifier((RSAPublicKey) PEM.decode(readFile(fileName)).getPublicKey()));
+          for (Algorithm alg : new Algorithm[]{Algorithm.PS256, Algorithm.PS384, Algorithm.PS512}) {
+            // Take a Path arg
+            assertRSAPSSVerifier(RSAPSSVerifier.newVerifier(alg, getPath(fileName)), alg);
+            // Take a String arg
+            assertRSAPSSVerifier(RSAPSSVerifier.newVerifier(alg, readFile(fileName)), alg);
+            // Take a byte[] arg
+            assertRSAPSSVerifier(RSAPSSVerifier.newVerifier(alg, readFile(fileName).getBytes(StandardCharsets.UTF_8)), alg);
+            // Take a public key arg
+            assertRSAPSSVerifier(RSAPSSVerifier.newVerifier(alg, (RSAPublicKey) PEM.decode(readFile(fileName)).getPublicKey()), alg);
+          }
         }));
   }
 
   @Test
   public void test_rsa_1024_pem() {
     try {
-      RSAPSSVerifier.newVerifier(new String(Files.readAllBytes(Paths.get("src/test/resources/rsa_public_key_1024.pem"))));
+      RSAPSSVerifier.newVerifier(Algorithm.PS256, new String(Files.readAllBytes(Paths.get("src/test/resources/rsa_public_key_1024.pem"))));
       Assert.fail("Expected [InvalidKeyLengthException] exception");
     } catch (InvalidKeyLengthException ignore) {
     } catch (Exception e) {
@@ -108,15 +114,16 @@ public class RSAPSSVerifierTest extends BaseJWTTest {
         "-----END PUBLIC KEY-----";
 
 
-    Verifier verifier = RSAPSSVerifier.newVerifier(publicKeyPEM);
-    JWT jwt = JWT.getDecoder().decode(encodedJWT, verifier);
+    Verifier verifier = RSAPSSVerifier.newVerifier(Algorithm.PS256, publicKeyPEM);
+    JWT jwt = new JWTDecoder().decode(encodedJWT, VerifierResolver.of(verifier));
     assertNotNull(jwt);
-    assertEquals(jwt.subject, "1234567890");
+    assertEquals(jwt.subject(), "1234567890");
     assertEquals(jwt.getString("name"), "John Doe");
     assertEquals(jwt.getBoolean("admin"), Boolean.TRUE);
   }
 
-  private void assertRSAPSAVerifier(Verifier verifier) {
+  private void assertRSAPSSVerifier(Verifier verifier, Algorithm bound) {
+    // Use case: verifier accepts ONLY its bound PS* algorithm; every other algorithm rejected.
     assertFalse(verifier.canVerify(Algorithm.ES256));
     assertFalse(verifier.canVerify(Algorithm.ES384));
     assertFalse(verifier.canVerify(Algorithm.ES512));
@@ -125,9 +132,9 @@ public class RSAPSSVerifierTest extends BaseJWTTest {
     assertFalse(verifier.canVerify(Algorithm.HS384));
     assertFalse(verifier.canVerify(Algorithm.HS512));
 
-    assertTrue(verifier.canVerify(Algorithm.PS256));
-    assertTrue(verifier.canVerify(Algorithm.PS384));
-    assertTrue(verifier.canVerify(Algorithm.PS512));
+    assertEquals(verifier.canVerify(Algorithm.PS256), bound == Algorithm.PS256);
+    assertEquals(verifier.canVerify(Algorithm.PS384), bound == Algorithm.PS384);
+    assertEquals(verifier.canVerify(Algorithm.PS512), bound == Algorithm.PS512);
 
     assertFalse(verifier.canVerify(Algorithm.RS256));
     assertFalse(verifier.canVerify(Algorithm.RS384));

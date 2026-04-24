@@ -54,7 +54,7 @@ public class JWKUtils {
    */
   public static String base64EncodeUint(BigInteger value, int minimumLength) {
     if (value.signum() < 0) {
-      throw new JSONWebKeyBuilderException("Illegal parameter, cannot encode a negative number.", new IllegalArgumentException());
+      throw new JSONWebKeyException("Cannot encode a negative number", new IllegalArgumentException());
     }
 
     byte[] bytes = value.toByteArray();

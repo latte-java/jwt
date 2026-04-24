@@ -47,14 +47,14 @@ public class ECSignerTest extends BaseJWTTest {
       ECSigner.newSHA256Signer(readFile("rsa_private_key_2048.pem"));
       fail("Expected exception.");
     } catch (InvalidKeyTypeException e) {
-      assertTrue(e.getMessage().startsWith("Expecting a private key of type [ECPrivateKey], but found ["));
+      assertTrue(e.getMessage().startsWith("Expected private key of type [ECPrivateKey] but found ["));
     }
 
     try {
       ECSigner.newSHA256Signer(PEM.decode(readFile("rsa_private_key_2048.pem")).privateKey);
       fail("Expected exception.");
     } catch (InvalidKeyTypeException e) {
-      assertTrue(e.getMessage().startsWith("Expecting a private key of type [ECPrivateKey], but found ["));
+      assertTrue(e.getMessage().startsWith("Expected private key of type [ECPrivateKey] but found ["));
     }
   }
 
@@ -120,8 +120,8 @@ public class ECSignerTest extends BaseJWTTest {
     expectException(InvalidKeyTypeException.class, () -> ECSigner.newSHA512Signer(readFile("ec_private_key_p_384.pem")));
 
     // With kid — only matching curve/algorithm
-    assertEquals(ECSigner.newSHA256Signer(readFile("ec_private_key_p_256.pem"), "abc").getKid(), "abc");
-    assertEquals(ECSigner.newSHA384Signer(readFile("ec_private_key_p_384.pem"), "abc").getKid(), "abc");
-    assertEquals(ECSigner.newSHA512Signer(readFile("ec_private_key_p_521.pem"), "abc").getKid(), "abc");
+    assertEquals(ECSigner.newSHA256Signer(readFile("ec_private_key_p_256.pem"), "abc").kid(), "abc");
+    assertEquals(ECSigner.newSHA384Signer(readFile("ec_private_key_p_384.pem"), "abc").kid(), "abc");
+    assertEquals(ECSigner.newSHA512Signer(readFile("ec_private_key_p_521.pem"), "abc").kid(), "abc");
   }
 }

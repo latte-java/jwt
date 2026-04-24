@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2022, FusionAuth, All Rights Reserved
+ * Copyright (c) 2016-2026, FusionAuth, All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,240 +16,533 @@
 
 package org.lattejava.jwt;
 
-import org.lattejava.jwt.json.Mapper;
+import org.lattejava.jwt.internal.MessageSanitizer;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
-import java.util.Arrays;
 import java.util.Base64;
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.function.Function;
+import java.util.Set;
+import java.util.function.Consumer;
 
 /**
+ * Decodes a compact JWS into a {@link JWT}.
+ *
+ * <p>Defaults: {@code clockSkew=Duration.ZERO},
+ * {@code maxInputBytes=262144}, {@code maxNestingDepth=16},
+ * {@code maxNumberLength=1000}, {@code maxObjectMembers=1000},
+ * {@code maxArrayElements=10000}, {@code allowDuplicateJSONKeys=false}.</p>
+ *
+ * <p>All fields are final; instances are immutable and safe to share. Use
+ * {@link Builder} for advanced configuration (custom {@link Clock},
+ * {@code expectedType}, {@code expectedAlgorithms}, {@code criticalHeaders},
+ * size/depth/number-length limits).</p>
+ *
  * @author Daniel DeGroff
  */
 public class JWTDecoder {
-  private int clockSkew = 0;
+  /** Default: 256 KiB. */
+  static final int DEFAULT_MAX_INPUT_BYTES = 262_144;
 
-  /**
-   * Decode the JWT using one of they provided verifiers. One more verifiers may be provided, the first verifier found
-   * supporting the algorithm reported by the JWT header will be utilized.
-   * <p>
-   * A JWT that is expired or not yet valid will not be decoded, instead a {@link JWTExpiredException} or {@link
-   * JWTUnavailableForProcessingException} exception will be thrown respectively.
-   *
-   * @param encodedJWT The encoded JWT in string format.
-   * @param verifiers  A map of verifiers.
-   * @return a decoded JWT.
-   */
-  public JWT decode(String encodedJWT, Verifier... verifiers) {
-    Objects.requireNonNull(encodedJWT);
-    Objects.requireNonNull(verifiers);
+  /** Default: 16. */
+  static final int DEFAULT_MAX_NESTING_DEPTH = 16;
 
-    String[] parts = getParts(encodedJWT);
+  /** Default: 1000. */
+  static final int DEFAULT_MAX_NUMBER_LENGTH = 1000;
 
-    Header header = Mapper.deserialize(base64Decode(parts[0]), Header.class);
-    Verifier verifier = Arrays.stream(verifiers).filter(v -> v.canVerify(header.algorithm)).findFirst().orElse(null);
+  private final JSONProcessor jsonProcessor;
+  private final Clock clock;
+  private final Duration clockSkew;
+  private final Set<String> criticalHeaders;
+  private final String expectedType;
+  /** Internally keyed by {@code Algorithm.name()} so hostile {@code equals}
+   * implementations on custom {@link Algorithm}s cannot subvert the whitelist. */
+  private final Set<String> expectedAlgorithmNames;
+  private final int maxInputBytes;
 
-    return validate(encodedJWT, parts, header, verifier);
+  /** Constructs a decoder with all defaults. */
+  public JWTDecoder() {
+    this(builderDefaults());
   }
 
   /**
-   * Specify the number of seconds allowed for clock skew used for calculating the expiration and not before instants of a JWT.
-   * <p>
-   * The default value is <code>0</code>.
+   * Constructs a decoder using the supplied {@link JSONProcessor} (defaults
+   * for everything else).
    *
-   * @param clockSkew the number of seconds allowed for clock skew.
-   * @return this
+   * @param jsonProcessor the JSON processor; must be non-null
    */
-  public JWTDecoder withClockSkew(int clockSkew) {
-    this.clockSkew = clockSkew;
-    return this;
+  public JWTDecoder(JSONProcessor jsonProcessor) {
+    this(builderDefaults().jsonProcessor(jsonProcessor));
   }
 
   /**
-   * Decode the JWT using one of they provided verifiers. A JWT header value named <code>kid</code> is expected to
-   * contain the key to look up the correct verifier.
-   * <p>
-   * A JWT that is expired or not yet valid will not be decoded, instead a {@link JWTExpiredException} or {@link
-   * JWTUnavailableForProcessingException} exception will be thrown respectively.
+   * Constructs a decoder with the supplied symmetric clock skew (defaults
+   * for everything else).
    *
-   * @param encodedJWT The encoded JWT in string format.
-   * @param verifiers  A map of verifiers.
-   * @return a decoded JWT.
+   * @param clockSkew clock skew applied symmetrically to {@code exp}/{@code nbf};
+   *                  must be non-null and non-negative
    */
-  public JWT decode(String encodedJWT, Map<String, Verifier> verifiers) {
-    return decode(encodedJWT, verifiers, h -> h.getString("kid"));
+  public JWTDecoder(Duration clockSkew) {
+    this(builderDefaults().clockSkew(clockSkew));
   }
 
   /**
-   * Decode the JWT using one of they provided verifiers. A JWT header value named <code>kid</code> is expected to
-   * contain the key to look up the correct verifier.
-   * <p>
-   * A JWT that is expired or not yet valid will not be decoded, instead a {@link JWTExpiredException} or {@link
-   * JWTUnavailableForProcessingException} exception will be thrown respectively.
+   * Constructs a decoder with the supplied {@link JSONProcessor} and
+   * symmetric clock skew (defaults for everything else).
    *
-   * @param encodedJWT       The encoded JWT in string format.
-   * @param verifierFunction A function that takes a key identifier and returns a verifier.
-   * @return a decoded JWT.
+   * @param jsonProcessor the JSON processor; must be non-null
+   * @param clockSkew     clock skew applied symmetrically to {@code exp}/{@code nbf};
+   *                      must be non-null and non-negative
    */
-  public JWT decode(String encodedJWT, Function<String, Verifier> verifierFunction) {
-    return decode(encodedJWT, verifierFunction, h -> h.getString("kid"));
+  public JWTDecoder(JSONProcessor jsonProcessor, Duration clockSkew) {
+    this(builderDefaults().jsonProcessor(jsonProcessor).clockSkew(clockSkew));
   }
 
-  /**
-   * Decode the JWT using one of they provided verifiers. A JWT header value named <code>kid</code> is expected to
-   * contain the key to look up the correct verifier.
-   * <p>
-   * A JWT that is expired or not yet valid will not be decoded, instead a {@link JWTExpiredException} or {@link
-   * JWTUnavailableForProcessingException} exception will be thrown respectively.
-   *
-   * @param encodedJWT       The encoded JWT in string format.
-   * @param verifierFunction A function that takes a key identifier returns a verifier.
-   * @param keyFunction      A function used to look up the verifier key from the header.
-   * @return a decoded JWT.
-   */
-  public JWT decode(String encodedJWT, Function<String, Verifier> verifierFunction, Function<Header, String> keyFunction) {
-    Objects.requireNonNull(encodedJWT);
-    Objects.requireNonNull(verifierFunction);
-    Objects.requireNonNull(keyFunction);
-    return decodeJWT(encodedJWT, verifierFunction, keyFunction);
-  }
-
-  private JWT decodeJWT(String encodedJWT, Function<String, Verifier> verifierFunction, Function<Header, String> keyFunction) {
-    String[] parts = getParts(encodedJWT);
-
-    Header header = Mapper.deserialize(base64Decode(parts[0]), Header.class);
-    String key = keyFunction.apply(header);
-    Verifier verifier = verifierFunction.apply(key);
-
-    return validate(encodedJWT, parts, header, verifier);
-  }
-
-  /**
-   * Decode the JWT using one of they provided verifiers. The key used to look up the correct verifier is provided by the
-   * <code>keyFunction</code>. The key function is provided the JWT header and is expected to return a string key to
-   * look up the correct verifier.
-   * <p>
-   * A JWT that is expired or not yet valid will not be decoded, instead a {@link JWTExpiredException} or {@link
-   * JWTUnavailableForProcessingException} exception will be thrown respectively.
-   *
-   * @param encodedJWT  The encoded JWT in string format.
-   * @param verifiers   A map of verifiers.
-   * @param keyFunction A function used to look up the verifier key from the header.
-   * @return a decoded JWT.
-   */
-  public JWT decode(String encodedJWT, Map<String, Verifier> verifiers, Function<Header, String> keyFunction) {
-    Objects.requireNonNull(encodedJWT);
-    Objects.requireNonNull(verifiers);
-    Objects.requireNonNull(keyFunction);
-    return decodeJWT(encodedJWT, verifiers::get, keyFunction);
-  }
-
-  /**
-   * Decode the provided base64 encoded string.
-   *
-   * @param string the input string to decode, it is expected to be a valid base64 encoded string.
-   * @return a decoded byte array
-   */
-  private byte[] base64Decode(String string) {
-    try {
-      // Equal to calling : .decode(string.getBytes(StandardCharsets.ISO_8859_1))
-      // If this is a properly base64 encoded string, decoding using ISO_8859_1 should be fine.
-      return Base64.getUrlDecoder().decode(string);
-    } catch (IllegalArgumentException e) {
-      throw new InvalidJWTException("The encoded JWT is not properly Base64 encoded.", e);
+  private JWTDecoder(Builder b) {
+    // Resolve the default JSON processor lazily (so the parse-DoS limits captured
+    // on the builder flow into the LatteJSONProcessor when no caller-supplied
+    // processor was provided).
+    if (!b.jsonProcessorExplicit) {
+      b.jsonProcessor = new LatteJSONProcessor(
+          b.maxNestingDepth, b.maxNumberLength, b.maxObjectMembers, b.maxArrayElements,
+          b.allowDuplicateJSONKeys);
     }
+    this.jsonProcessor = b.jsonProcessor;
+    this.clock = b.clock;
+    this.clockSkew = b.clockSkew;
+    this.criticalHeaders = Collections.unmodifiableSet(new LinkedHashSet<>(b.criticalHeaders));
+    this.expectedType = b.expectedType;
+    if (b.expectedAlgorithms == null) {
+      this.expectedAlgorithmNames = null;
+    } else {
+      LinkedHashSet<String> names = new LinkedHashSet<>(b.expectedAlgorithms.size());
+      for (Algorithm a : b.expectedAlgorithms) {
+        names.add(a.name());
+      }
+      this.expectedAlgorithmNames = Collections.unmodifiableSet(names);
+    }
+    this.maxInputBytes = b.maxInputBytes;
+  }
+
+  private static Builder builderDefaults() {
+    return new Builder();
+  }
+
+  // -------------------------------------------------------------------
+  // Public decode API
+  // -------------------------------------------------------------------
+
+  /**
+   * Decode a JWT, resolving the {@link Verifier} via the supplied
+   * {@link VerifierResolver}. Signature verification runs BEFORE payload
+   * deserialization so a malformed payload cannot be observed until the
+   * signature has been validated.
+   *
+   * @param encodedJWT the compact JWS string; must be non-null
+   * @param resolver   the verifier resolver; must be non-null
+   * @return the decoded {@link JWT}
+   */
+  public JWT decode(String encodedJWT, VerifierResolver resolver) {
+    return decode(encodedJWT, resolver, null);
   }
 
   /**
-   * Split the encoded JWT on a period (.), and return the parts.
-   * <p>
-   * A JWT will be in the format: <code>XXXXX.YYYYY.ZZZZZ</code>.
+   * Decode a JWT with an optional post-decode validator. The validator
+   * runs after signature verification and built-in time validation;
+   * implementations throw any {@link JWTException} subclass to reject the
+   * token.
    *
-   * @param encodedJWT the encoded form of the JWT
-   * @return an array of parts.
+   * @param encodedJWT the compact JWS string; must be non-null
+   * @param resolver   the verifier resolver; must be non-null
+   * @param validator  optional post-decode validator; may be null
+   * @return the decoded {@link JWT}
    */
-  private String[] getParts(String encodedJWT) {
-    String[] parts = encodedJWT.split("\\.");
-    if (parts.length == 3 || (parts.length == 2 && encodedJWT.endsWith("."))) {
-      return parts;
+  public JWT decode(String encodedJWT, VerifierResolver resolver, Consumer<JWT> validator) {
+    Objects.requireNonNull(encodedJWT, "encodedJWT");
+    Objects.requireNonNull(resolver, "resolver");
+
+    Segments segments = parseSegments(encodedJWT, /* requireSignature */ true);
+    Header header = parseHeader(segments.headerB64);
+
+    // Algorithm whitelist.
+    if (expectedAlgorithmNames != null
+        && !expectedAlgorithmNames.contains(header.alg().name())) {
+      throw new InvalidJWTException(
+          "Header [alg] [" + header.alg().name() + "] is not in the expectedAlgorithms whitelist");
     }
 
-    throw new InvalidJWTException("The encoded JWT is not properly formatted. Expected a three part dot separated string.");
-  }
+    enforceExpectedType(header);
+    enforceCrit(header);
 
-  /**
-   * Validate the encoded JWT and return the constructed JWT object if valid.
-   *
-   * @param encodedJWT the encoded JWT
-   * @param parts      the parts of the encoded JWT
-   * @param header     the JWT header
-   * @param verifier   the selected JWT verifier
-   * @return the constructed JWT object containing identity claims
-   */
-  private JWT validate(String encodedJWT, String[] parts, Header header, Verifier verifier) {
-    // When parts.length == 2, we have no signature — always reject.
-    if (parts.length == 2) {
-      throw new MissingSignatureException("The JWT is missing a signature");
+    Verifier verifier = resolver.resolve(header);
+    if (verifier == null || !verifier.canVerify(header.alg())) {
+      throw new MissingVerifierException(
+          "No verifier provided to verify signature signed using ["
+              + header.alg().name() + "]");
     }
 
-    if (verifier == null) {
-      throw new MissingVerifierException("No Verifier has been provided for verify a signature signed using [" + header.algorithm.name() + "]");
-    }
+    // Verify the signature BEFORE parsing the payload so that untrusted
+    // payload bytes never reach the JSON parser unless authenticated.
+    String signingInput = segments.headerB64 + "." + segments.payloadB64;
+    byte[] message = signingInput.getBytes(StandardCharsets.UTF_8);
+    byte[] signatureBytes = strictBase64UrlDecode(segments.signatureB64, "signature");
+    verifier.verify(message, signatureBytes);
 
-    // When the verifier has been selected based upon the 'kid' or other identifier in the header, we must verify it can verify the algorithm.
-    // - When multiple verifiers are provided to .decode w/out a kid, we may have already called 'canVerify', this is ok.
-    if (!verifier.canVerify(header.algorithm)) {
-      throw new MissingVerifierException("No Verifier has been provided for verify a signature signed using [" + header.algorithm.name() + "]");
-    }
+    JWT jwt = parsePayload(segments.payloadB64, header);
+    enforceTimeClaims(jwt);
 
-    verifySignature(verifier, header, parts[2], encodedJWT);
-
-    // Signature is valid, verify time based JWT claims
-    JWT jwt = Mapper.deserialize(base64Decode(parts[1]), JWT.class);
-    jwt.header = header;
-    ZonedDateTime now = now();
-
-    // Verify expiration claim
-    ZonedDateTime nowMinusSkew = now.minusSeconds(clockSkew);
-    if (jwt.isExpired(nowMinusSkew)) {
-      throw new JWTExpiredException();
-    }
-
-    // Verify the notBefore claim
-    ZonedDateTime nowPlusSkew = now.plusSeconds(clockSkew);
-    if (jwt.isUnavailableForProcessing(nowPlusSkew)) {
-      throw new JWTUnavailableForProcessingException();
+    if (validator != null) {
+      validator.accept(jwt);
     }
 
     return jwt;
   }
 
   /**
-   * @return the 'now' to be used to validate 'exp' and 'nbf' claims.
+   * <strong>WARNING: This method does NOT verify the JWT signature.</strong>
+   * The returned {@link JWT} has its header and claims populated but the
+   * token's authenticity has not been validated. Size and structural defenses
+   * still run (input size cap, segment count, base64url strictness, typ check).
+   *
+   * @param encodedJWT the compact JWS string; must be non-null
+   * @return a {@link JWT} populated from the unverified token
    */
-  protected ZonedDateTime now() {
-    return ZonedDateTime.now(ZoneOffset.UTC);
+  public JWT decodeUnsecured(String encodedJWT) {
+    Objects.requireNonNull(encodedJWT, "encodedJWT");
+
+    Segments segments = parseSegments(encodedJWT, /* requireSignature */ false);
+    Header header = parseHeader(segments.headerB64);
+    enforceExpectedType(header);   // typ check still runs on unsecured decode
+    return parsePayload(segments.payloadB64, header);
+  }
+
+  // -------------------------------------------------------------------
+  // Internals
+  // -------------------------------------------------------------------
+
+  /** Parse the input into segments after enforcing size and structural defenses. */
+  private Segments parseSegments(String encodedJWT, boolean requireSignature) {
+    if (encodedJWT.getBytes(StandardCharsets.UTF_8).length > maxInputBytes) {
+      throw new InvalidJWTException(
+          "Encoded JWT exceeds maxInputBytes [" + maxInputBytes + "]");
+    }
+
+    // Count separator positions directly -- String.split would trim a trailing
+    // empty signature segment and we need to distinguish "a.b." (3 segments,
+    // empty signature) from "a.b" (2 segments, no separator).
+    int firstDot = encodedJWT.indexOf('.');
+    int secondDot = firstDot < 0 ? -1 : encodedJWT.indexOf('.', firstDot + 1);
+    int thirdDot = secondDot < 0 ? -1 : encodedJWT.indexOf('.', secondDot + 1);
+
+    if (firstDot < 0 || secondDot < 0) {
+      // Fewer than 2 separators -> 1 or 2 segments -> missing signature
+      throw new MissingSignatureException(
+          "Encoded JWT is missing a signature; expected three dot-separated segments");
+    }
+    if (thirdDot >= 0) {
+      throw new InvalidJWTException(
+          "Encoded JWT has more than three segments; expected exactly two '.' separators");
+    }
+
+    String headerB64 = encodedJWT.substring(0, firstDot);
+    String payloadB64 = encodedJWT.substring(firstDot + 1, secondDot);
+    String signatureB64 = encodedJWT.substring(secondDot + 1);
+
+    if (headerB64.isEmpty()) {
+      throw new InvalidJWTException("Encoded JWT header segment is empty");
+    }
+    if (payloadB64.isEmpty()) {
+      throw new InvalidJWTException("Encoded JWT payload segment is empty");
+    }
+
+    // Base64url strictness on header and payload; signature strictness runs
+    // when we decode the signature bytes below.
+    enforceStrictBase64Url(headerB64, "header");
+    enforceStrictBase64Url(payloadB64, "payload");
+    if (!signatureB64.isEmpty()) {
+      enforceStrictBase64Url(signatureB64, "signature");
+    } else if (requireSignature) {
+      // For authenticated decode we still pass empty bytes through to the
+      // verifier; built-in verifiers reject. We do not raise
+      // MissingSignatureException here -- "a.b." is structurally valid, so
+      // the rejection is handled by the verifier path. Resolver may still
+      // return null first -> MissingVerifierException.
+    }
+
+    return new Segments(headerB64, payloadB64, signatureB64);
+  }
+
+  private Header parseHeader(String headerB64) {
+    byte[] headerJson = strictBase64UrlDecode(headerB64, "header");
+    Map<String, Object> raw = jsonProcessor.deserialize(headerJson);
+    return Header.fromMap(raw);
+  }
+
+  private JWT parsePayload(String payloadB64, Header header) {
+    byte[] payloadJson = strictBase64UrlDecode(payloadB64, "payload");
+    Map<String, Object> raw = jsonProcessor.deserialize(payloadJson);
+    return JWT.fromMap(raw, header);
+  }
+
+  private void enforceExpectedType(Header header) {
+    if (expectedType == null) {
+      return;
+    }
+    String typ = header.typ();
+    if (typ == null || !typ.equalsIgnoreCase(expectedType)) {
+      throw new InvalidJWTException("Header [typ] [" + MessageSanitizer.forMessage(typ)
+          + "] does not match expectedType [" + expectedType + "]");
+    }
+  }
+
+  private void enforceCrit(Header header) {
+    Object critValue = header.get("crit");
+    if (critValue == null) {
+      return;
+    }
+    if (!(critValue instanceof List<?> critList)) {
+      // Header.fromMap already structurally validated, but defense-in-depth.
+      throw new InvalidJWTException("Header [crit] must be a JSON array of strings");
+    }
+    for (Object name : critList) {
+      if (!(name instanceof String entry)) {
+        throw new InvalidJWTException("Header [crit] elements must be strings");
+      }
+      if (!criticalHeaders.contains(entry)) {
+        throw new InvalidJWTException(
+            "Header [crit] lists unrecognized critical parameter [" + MessageSanitizer.forMessage(entry) + "]");
+      }
+    }
+  }
+
+  private void enforceTimeClaims(JWT jwt) {
+    long skewSeconds = clockSkew.getSeconds();
+    Instant now = Instant.now(clock);
+    Instant nowMinusSkew = skewSeconds > 0 ? now.minusSeconds(skewSeconds) : now;
+    if (jwt.isExpired(nowMinusSkew)) {
+      throw new JWTExpiredException(jwt.expiresAt(), now, clockSkew);
+    }
+    Instant nowPlusSkew = skewSeconds > 0 ? now.plusSeconds(skewSeconds) : now;
+    if (jwt.isUnavailableForProcessing(nowPlusSkew)) {
+      throw new JWTUnavailableForProcessingException(jwt.notBefore(), now, clockSkew);
+    }
+  }
+
+  // -------------------------------------------------------------------
+  // Strict base64url decode (alphabet, no padding, no whitespace)
+  // -------------------------------------------------------------------
+
+  static byte[] strictBase64UrlDecode(String segment, String name) {
+    int len = segment.length();
+    for (int i = 0; i < len; i++) {
+      char c = segment.charAt(i);
+      boolean ok = (c >= 'A' && c <= 'Z')
+          || (c >= 'a' && c <= 'z')
+          || (c >= '0' && c <= '9')
+          || c == '-' || c == '_';
+      if (!ok) {
+        throw new InvalidJWTException(
+            "JWT [" + name + "] segment contains invalid base64url character ["
+                + c + "] at position [" + i + "]");
+      }
+    }
+    try {
+      return Base64.getUrlDecoder().decode(segment);
+    } catch (IllegalArgumentException e) {
+      throw new InvalidJWTException(
+          "JWT [" + name + "] segment is not valid base64url", e);
+    }
+  }
+
+  static void enforceStrictBase64Url(String segment, String name) {
+    int len = segment.length();
+    for (int i = 0; i < len; i++) {
+      char c = segment.charAt(i);
+      boolean ok = (c >= 'A' && c <= 'Z')
+          || (c >= 'a' && c <= 'z')
+          || (c >= '0' && c <= '9')
+          || c == '-' || c == '_';
+      if (!ok) {
+        throw new InvalidJWTException(
+            "JWT [" + name + "] segment contains invalid base64url character ["
+                + c + "] at position [" + i + "]");
+      }
+    }
+  }
+
+  private static final class Segments {
+    final String headerB64;
+    final String payloadB64;
+    final String signatureB64;
+
+    Segments(String h, String p, String s) {
+      this.headerB64 = h;
+      this.payloadB64 = p;
+      this.signatureB64 = s;
+    }
+  }
+
+  // -------------------------------------------------------------------
+  // Builder
+  // -------------------------------------------------------------------
+
+  /**
+   * Returns a new {@link Builder} preconfigured with library defaults. This
+   * is the canonical entry point for advanced decoder construction.
+   */
+  public static Builder builder() {
+    return new Builder();
   }
 
   /**
-   * Verify the signature of the encoded JWT. If the signature is invalid a {@link InvalidJWTSignatureException} will be thrown.
-   *
-   * @param verifier   the verifier
-   * @param header     the JWT header
-   * @param signature  the JWT signature
-   * @param encodedJWT the encoded JWT
-   * @throws InvalidJWTSignatureException if the JWT signature is invalid.
+   * Mutable, reusable builder for {@link JWTDecoder}. After {@link #build()}
+   * is called, the builder retains its state and may be further modified to
+   * produce additional independent {@link JWTDecoder} instances; each
+   * {@code build()} call produces a fresh immutable instance with an
+   * independent copy of any collection fields.
    */
-  private void verifySignature(Verifier verifier, Header header, String signature, String encodedJWT) {
-    // The message comprises the first two segments of the entire JWT, the signature is the last segment.
-    int index = encodedJWT.lastIndexOf('.');
-    byte[] message = encodedJWT.substring(0, index).getBytes(StandardCharsets.UTF_8);
+  public static final class Builder {
+    private JSONProcessor jsonProcessor;
+    private Clock clock = Clock.systemUTC();
+    private Duration clockSkew = Duration.ZERO;
+    private Set<String> criticalHeaders = Collections.emptySet();
+    private String expectedType = null;
+    private Set<Algorithm> expectedAlgorithms = null;
+    private int maxInputBytes = DEFAULT_MAX_INPUT_BYTES;
+    private int maxNestingDepth = DEFAULT_MAX_NESTING_DEPTH;
+    private int maxNumberLength = DEFAULT_MAX_NUMBER_LENGTH;
+    private int maxObjectMembers = LatteJSONProcessor.DEFAULT_MAX_OBJECT_MEMBERS;
+    private int maxArrayElements = LatteJSONProcessor.DEFAULT_MAX_ARRAY_ELEMENTS;
+    private boolean allowDuplicateJSONKeys = false;
+    private boolean jsonProcessorExplicit = false;
 
-    byte[] signatureBytes = base64Decode(signature);
-    verifier.verify(header.algorithm, message, signatureBytes);
+    private Builder() {}
+
+    public Builder jsonProcessor(JSONProcessor jsonProcessor) {
+      this.jsonProcessor = Objects.requireNonNull(jsonProcessor, "jsonProcessor");
+      this.jsonProcessorExplicit = true;
+      return this;
+    }
+
+    /**
+     * Override the {@link Clock} used for time validation.
+     *
+     * <p><strong>Tests and time travelers only.</strong> Production code must
+     * leave this at {@link Clock#systemUTC()}.</p>
+     */
+    public Builder clock(Clock clock) {
+      this.clock = Objects.requireNonNull(clock, "clock");
+      return this;
+    }
+
+    /** Convenience for {@code clock(Clock.fixed(instant, ZoneOffset.UTC))}. */
+    public Builder fixedTime(Instant instant) {
+      Objects.requireNonNull(instant, "instant");
+      this.clock = Clock.fixed(instant, ZoneOffset.UTC);
+      return this;
+    }
+
+    public Builder clockSkew(Duration clockSkew) {
+      Objects.requireNonNull(clockSkew, "clockSkew");
+      if (clockSkew.isNegative()) {
+        throw new IllegalArgumentException("clockSkew must not be negative");
+      }
+      this.clockSkew = clockSkew;
+      return this;
+    }
+
+    public Builder criticalHeaders(Set<String> criticalHeaders) {
+      this.criticalHeaders = criticalHeaders == null
+          ? Collections.emptySet()
+          : new LinkedHashSet<>(criticalHeaders);
+      return this;
+    }
+
+    public Builder expectedType(String expectedType) {
+      this.expectedType = expectedType;
+      return this;
+    }
+
+    /**
+     * Whitelist of algorithms this decoder will accept. A header {@code alg}
+     * outside this set is rejected before verifier resolution, even if a
+     * matching verifier exists.
+     *
+     * <p>Every {@link Verifier} is already 1:1 bound to a single algorithm
+     * at construction time, so this whitelist is a policy layer on top of
+     * the structural protection -- not the primary defense against
+     * algorithm confusion. Typical uses: subsetting a shared verifier pool
+     * for one endpoint, deprecation windows where old-algorithm keys
+     * remain in the keystore but are no longer accepted, and
+     * defense-in-depth pinning.</p>
+     *
+     * <p>Null or empty disables the whitelist (all resolvable algorithms
+     * accepted).</p>
+     *
+     * @param expectedAlgorithms the whitelist, or null to disable
+     * @return this builder
+     */
+    public Builder expectedAlgorithms(Set<Algorithm> expectedAlgorithms) {
+      this.expectedAlgorithms = expectedAlgorithms == null
+          ? null
+          : new LinkedHashSet<>(expectedAlgorithms);
+      return this;
+    }
+
+    public Builder maxInputBytes(int maxInputBytes) {
+      if (maxInputBytes <= 0) {
+        throw new IllegalArgumentException("maxInputBytes must be > 0");
+      }
+      this.maxInputBytes = maxInputBytes;
+      return this;
+    }
+
+    public Builder maxNestingDepth(int maxNestingDepth) {
+      if (maxNestingDepth <= 0) {
+        throw new IllegalArgumentException("maxNestingDepth must be > 0");
+      }
+      this.maxNestingDepth = maxNestingDepth;
+      return this;
+    }
+
+    public Builder maxNumberLength(int maxNumberLength) {
+      if (maxNumberLength <= 0) {
+        throw new IllegalArgumentException("maxNumberLength must be > 0");
+      }
+      this.maxNumberLength = maxNumberLength;
+      return this;
+    }
+
+    public Builder maxObjectMembers(int maxObjectMembers) {
+      if (maxObjectMembers <= 0) {
+        throw new IllegalArgumentException("maxObjectMembers must be > 0");
+      }
+      this.maxObjectMembers = maxObjectMembers;
+      return this;
+    }
+
+    public Builder maxArrayElements(int maxArrayElements) {
+      if (maxArrayElements <= 0) {
+        throw new IllegalArgumentException("maxArrayElements must be > 0");
+      }
+      this.maxArrayElements = maxArrayElements;
+      return this;
+    }
+
+    public Builder allowDuplicateJSONKeys(boolean allow) {
+      this.allowDuplicateJSONKeys = allow;
+      return this;
+    }
+
+    public JWTDecoder build() {
+      return new JWTDecoder(this);
+    }
   }
 }
