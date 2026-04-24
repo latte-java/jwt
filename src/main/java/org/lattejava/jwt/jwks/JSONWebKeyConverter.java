@@ -17,13 +17,13 @@
 package org.lattejava.jwt.jwks;
 
 import org.lattejava.jwt.Algorithm;
-import org.lattejava.jwt.JWTUtils;
 import org.lattejava.jwt.KeyType;
 import org.lattejava.jwt.internal.der.DerDecodingException;
 import org.lattejava.jwt.internal.der.DerInputStream;
 import org.lattejava.jwt.internal.der.ObjectIdentifier;
 import org.lattejava.jwt.internal.KeyUtils;
 import org.lattejava.jwt.pem.PEM;
+import org.lattejava.jwt.x509.X509;
 
 import java.io.IOException;
 import java.math.BigInteger;
@@ -218,8 +218,8 @@ class JSONWebKeyConverter {
           .p(base.p()).q(base.q()).qi(base.qi())
           .x(base.x()).y(base.y())
           .x5c(Collections.singletonList(encodedCertificate))
-          .x5t(JWTUtils.generateJWS_x5t(encodedCertificate))
-          .x5tS256(JWTUtils.generateJWS_x5t("SHA-256", encodedCertificate))
+          .x5t(X509.thumbprintSHA1(x509Certificate))
+          .x5tS256(X509.thumbprintSHA256(x509Certificate))
           .build();
     } catch (CertificateEncodingException e) {
       throw new JSONWebKeyException("Failed to encode X.509 certificate", e);
