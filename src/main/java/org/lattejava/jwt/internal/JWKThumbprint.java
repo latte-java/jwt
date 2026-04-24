@@ -37,7 +37,7 @@ import java.util.Map;
  * {@link CanonicalJSONWriter} (NOT the user-pluggable {@code JSONProcessor}).
  *
  * <p>This class is the internal entry point used by
- * {@code JWTUtils.generateJWS_kid*}; {@link CanonicalJSONWriter} itself
+ * {@code JWTUtils.generateJWS_kidSHA*}; {@link CanonicalJSONWriter} itself
  * remains package-private so no user-pluggable JSON serializer can
  * influence thumbprint bytes.
  *

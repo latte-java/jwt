@@ -340,12 +340,10 @@ public class JWTUtilsTest extends BaseTest {
         .build();
 
     // SHA-1
-    assertEquals(JWTUtils.generateJWS_kid(rsaKey), "nMGlFRw9Y5POaSOaIaRBc9P2nfA");
-    assertEquals(JWTUtils.generateJWS_kid("SHA-1", rsaKey), "nMGlFRw9Y5POaSOaIaRBc9P2nfA");
+    assertEquals(JWTUtils.generateJWS_kidSHA1(rsaKey), "nMGlFRw9Y5POaSOaIaRBc9P2nfA");
 
     // SHA-256
-    assertEquals(JWTUtils.generateJWS_kid_S256(rsaKey), "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs");
-    assertEquals(JWTUtils.generateJWS_kid("SHA-256", rsaKey), "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs");
+    assertEquals(JWTUtils.generateJWS_kidSHA256(rsaKey), "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs");
   }
 
   @Test
@@ -358,12 +356,10 @@ public class JWTUtilsTest extends BaseTest {
         .build();
 
     // SHA-1
-    assertEquals(JWTUtils.generateJWS_kid(ecKey), "VHriznG7vJAFpXMXRmGgAkA5sEE");
-    assertEquals(JWTUtils.generateJWS_kid("SHA-1", ecKey), "VHriznG7vJAFpXMXRmGgAkA5sEE");
+    assertEquals(JWTUtils.generateJWS_kidSHA1(ecKey), "VHriznG7vJAFpXMXRmGgAkA5sEE");
 
     // SHA-256
-    assertEquals(JWTUtils.generateJWS_kid_S256(ecKey), "cn-I_WNMClehiVp51i_0VpOENW1upEerA8sEam5hn-s");
-    assertEquals(JWTUtils.generateJWS_kid("SHA-256", ecKey), "cn-I_WNMClehiVp51i_0VpOENW1upEerA8sEam5hn-s");
+    assertEquals(JWTUtils.generateJWS_kidSHA256(ecKey), "cn-I_WNMClehiVp51i_0VpOENW1upEerA8sEam5hn-s");
   }
 
   @Test
@@ -377,12 +373,10 @@ public class JWTUtilsTest extends BaseTest {
         .build();
 
     // SHA-1
-    assertEquals(JWTUtils.generateJWS_kid(eddsaKey), "VmxEWEmFxGLRPOX30HXyts0yJOE");
-    assertEquals(JWTUtils.generateJWS_kid("SHA-1", eddsaKey), "VmxEWEmFxGLRPOX30HXyts0yJOE");
+    assertEquals(JWTUtils.generateJWS_kidSHA1(eddsaKey), "VmxEWEmFxGLRPOX30HXyts0yJOE");
 
     // SHA-256
-    assertEquals(JWTUtils.generateJWS_kid_S256(eddsaKey), "kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k");
-    assertEquals(JWTUtils.generateJWS_kid("SHA-256", eddsaKey), "kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k");
+    assertEquals(JWTUtils.generateJWS_kidSHA256(eddsaKey), "kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k");
   }
 
   private void assertPrefix(String key, String prefix) {

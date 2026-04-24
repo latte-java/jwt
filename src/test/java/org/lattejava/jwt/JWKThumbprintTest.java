@@ -60,11 +60,11 @@ public class JWKThumbprintTest {
   @Test
   public void base64url_matchesJwtUtilsPath() {
     // Use case: the public compute() + base64url() pair produces the identical
-    // kid that JWTUtils.generateJWS_kid_S256() returns, so users can swap in
+    // kid that JWTUtils.generateJWS_kidSHA256() returns, so users can swap in
     // the low-level API without changing output.
     byte[] digest = JWKThumbprint.compute("SHA-256", rfc7638Rsa());
     String viaPublic = JWKThumbprint.base64url(digest);
-    String viaUtils = JWTUtils.generateJWS_kid_S256(rfc7638Rsa());
+    String viaUtils = JWTUtils.generateJWS_kidSHA256(rfc7638Rsa());
     assertEquals(viaPublic, viaUtils);
   }
 

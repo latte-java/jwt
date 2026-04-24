@@ -32,7 +32,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotEquals;
 
 /**
- * Tests for {@code JWTUtils.generateJWS_kid*} thumbprints computed via
+ * Tests for {@code JWTUtils.generateJWS_kidSHA*} thumbprints computed via
  * {@link CanonicalJSONWriter}.
  *
  * <p>Vectors:
@@ -69,14 +69,14 @@ public class JWKThumbprintTest {
   @Test
   public void rfc7638RSA_S256() {
     // Use case: RFC 7638 §3.1 RSA SHA-256 thumbprint matches the documented bytes.
-    String thumbprint = JWTUtils.generateJWS_kid_S256(rfc7638Rsa());
+    String thumbprint = JWTUtils.generateJWS_kidSHA256(rfc7638Rsa());
     assertEquals(thumbprint, "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs");
   }
 
   @Test
   public void rfc8037Ed25519_S256() {
     // Use case: RFC 8037 §A.3 Ed25519 OKP SHA-256 thumbprint matches RFC.
-    String thumbprint = JWTUtils.generateJWS_kid_S256(rfc8037Ed25519());
+    String thumbprint = JWTUtils.generateJWS_kidSHA256(rfc8037Ed25519());
     assertEquals(thumbprint, "kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k");
   }
 
@@ -92,7 +92,7 @@ public class JWKThumbprintTest {
         .build();
     // Pinned: this matches both the existing JWTUtilsTest vector AND the
     // canonical RFC 7638 §3.2 EC member set {crv,kty,x,y} in lex order.
-    assertEquals(JWTUtils.generateJWS_kid_S256(k),
+    assertEquals(JWTUtils.generateJWS_kidSHA256(k),
         "cn-I_WNMClehiVp51i_0VpOENW1upEerA8sEam5hn-s");
   }
 
@@ -105,8 +105,8 @@ public class JWKThumbprintTest {
         .x("lInTxl8fjLKp_UCrxI0WDkldCpkVRbEOEuiBkpNkWAxgM5XvtFeBHPXkN3xWwe-X")
         .y("y6N1IC-2mXxHreETBW7K3mBcw0qGr3CWHCs-yl09yCQRLcyfGv7XhqAngHOu51Zv")
         .build();
-    String t1 = JWTUtils.generateJWS_kid_S256(k);
-    String t2 = JWTUtils.generateJWS_kid_S256(k);
+    String t1 = JWTUtils.generateJWS_kidSHA256(k);
+    String t2 = JWTUtils.generateJWS_kidSHA256(k);
     assertEquals(t1, t2);
   }
 
@@ -119,8 +119,8 @@ public class JWKThumbprintTest {
         .x("AHKZLLOsCOzz5cY97ewNUajB957y-C-U88c3v13nmGZx6sYl_oJXu9A5RkTKqjqvjyekWF-7ytDyRXYgCF5cj0Kt")
         .y("AdymlHvOiLxXkEhayXQnNCvDX4h9htZaCJN34kfmC6pV5OhQHiraVySsUdaQkAgDPrwQrJmbnX9cwlGfP-HqHZR1")
         .build();
-    String t1 = JWTUtils.generateJWS_kid_S256(k);
-    String t2 = JWTUtils.generateJWS_kid_S256(k);
+    String t1 = JWTUtils.generateJWS_kidSHA256(k);
+    String t2 = JWTUtils.generateJWS_kidSHA256(k);
     assertEquals(t1, t2);
   }
 
@@ -134,7 +134,7 @@ public class JWKThumbprintTest {
     // even after constructing a JSONWebKey from a Map (which exercises the
     // processor path).
     JSONWebKey k1 = rfc7638Rsa();
-    String t1 = JWTUtils.generateJWS_kid_S256(k1);
+    String t1 = JWTUtils.generateJWS_kidSHA256(k1);
     assertEquals(t1, "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs");
 
     // Different field-construction order should not affect the thumbprint
@@ -144,28 +144,19 @@ public class JWKThumbprintTest {
         .n(k1.n())
         .kty(KeyType.RSA)
         .build();
-    String t2 = JWTUtils.generateJWS_kid_S256(k2);
+    String t2 = JWTUtils.generateJWS_kidSHA256(k2);
     assertEquals(t2, t1, "thumbprint must be insensitive to JSONWebKey field-set order");
   }
 
   @Test
   public void sha1Thumbprints() {
-    // Use case: SHA-1 (legacy generateJWS_kid default) thumbprint differs from
+    // Use case: SHA-1 (via generateJWS_kidSHA1) thumbprint differs from
     // SHA-256 and is stable. Pinned from the existing JWTUtilsTest vectors.
     JSONWebKey k = rfc7638Rsa();
-    String s1 = JWTUtils.generateJWS_kid(k);
-    String s256 = JWTUtils.generateJWS_kid_S256(k);
+    String s1 = JWTUtils.generateJWS_kidSHA1(k);
+    String s256 = JWTUtils.generateJWS_kidSHA256(k);
     assertNotEquals(s1, s256);
     assertEquals(s1, "nMGlFRw9Y5POaSOaIaRBc9P2nfA");
-  }
-
-  @Test
-  public void explicitAlgorithm_S256() {
-    // Use case: explicit-algorithm overload with SHA-256 produces same as _S256.
-    JSONWebKey k = rfc7638Rsa();
-    assertEquals(
-        JWTUtils.generateJWS_kid("SHA-256", k),
-        JWTUtils.generateJWS_kid_S256(k));
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
@@ -173,6 +164,6 @@ public class JWKThumbprintTest {
     // Use case: unsupported kty throws IllegalArgumentException.
     // kty defaults to null when not set on the builder.
     JSONWebKey k = JSONWebKey.builder().build();
-    JWTUtils.generateJWS_kid_S256(k);
+    JWTUtils.generateJWS_kidSHA256(k);
   }
 }
