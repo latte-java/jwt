@@ -140,25 +140,13 @@ public class JSONWebKeyParser {
 
     if (key.kty() == KeyType.RSA) {
       // RSA public key only has n, e
-      if (key.p() != null || key.q() != null || key.d() != null || key.dp() != null || key.dq() != null || key.qi() != null) {
-        return true;
-      } else {
-        return false;
-      }
+      return key.p() != null || key.q() != null || key.d() != null || key.dp() != null || key.dq() != null || key.qi() != null;
     } else if (key.kty() == KeyType.EC) {
       // EC Public key only has crv, x, y
-      if (key.d() != null) {
-        return true;
-      } else {
-        return false;
-      }
+      return key.d() != null;
     } else if (key.kty() == KeyType.OKP) {
       // EdDSA Public keys have crv and x
-      if (key.d() != null) {
-        return true;
-      } else {
-        return false;
-      }
+      return key.d() != null;
     }
 
     throw new UnsupportedOperationException("Unsupported JWK [kty] [" + MessageSanitizer.forMessage(String.valueOf(key.kty())) + "], expected [RSA], [EC], or [OKP]");

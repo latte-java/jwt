@@ -179,10 +179,10 @@ public class PEMEncoder {
    * @return a PEM encoded key
    */
   public String encode(Key key) {
-    if (key instanceof PrivateKey) {
-      return encode((PrivateKey) key, null);
-    } else if (key instanceof PublicKey) {
-      return encode(null, (PublicKey) key);
+    if (key instanceof PrivateKey privateKey) {
+      return encode(privateKey, null);
+    } else if (key instanceof PublicKey publicKey) {
+      return encode(null, publicKey);
     }
 
     throw new PEMEncoderException(new InvalidParameterException("Expected key type [PrivateKey | PublicKey] but found [" + key.getClass().getCanonicalName() + "]"));

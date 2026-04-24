@@ -185,10 +185,7 @@ public final class JWT {
    * {@code null} input returns {@code false}.
    */
   public boolean hasAudience(String value) {
-    if (value == null) {
-      return false;
-    }
-    return audience.contains(value);
+    return value != null && audience.contains(value);
   }
 
   // ---------- Custom-claim accessors ----------
@@ -206,8 +203,8 @@ public final class JWT {
     if (value == null) {
       return null;
     }
-    if (value instanceof String) {
-      return (String) value;
+    if (value instanceof String s) {
+      return s;
     }
     throw new InvalidJWTException("Claim [" + name + "] is not a String");
   }
@@ -242,8 +239,8 @@ public final class JWT {
     if (value == null) {
       return null;
     }
-    if (value instanceof Boolean) {
-      return (Boolean) value;
+    if (value instanceof Boolean b) {
+      return b;
     }
     throw new InvalidJWTException("Claim [" + name + "] is not a Boolean");
   }
@@ -258,14 +255,14 @@ public final class JWT {
     if (value == null) {
       return null;
     }
-    if (value instanceof BigDecimal) {
-      return (BigDecimal) value;
+    if (value instanceof BigDecimal bd) {
+      return bd;
     }
-    if (value instanceof BigInteger) {
-      return new BigDecimal((BigInteger) value);
+    if (value instanceof BigInteger bi) {
+      return new BigDecimal(bi);
     }
-    if (value instanceof Number) {
-      return BigDecimal.valueOf(((Number) value).doubleValue());
+    if (value instanceof Number n) {
+      return BigDecimal.valueOf(n.doubleValue());
     }
     throw new InvalidJWTException("Claim [" + name + "] is not a numeric value");
   }
@@ -281,14 +278,14 @@ public final class JWT {
     if (value == null) {
       return null;
     }
-    if (value instanceof BigInteger) {
-      return (BigInteger) value;
+    if (value instanceof BigInteger bi) {
+      return bi;
     }
-    if (value instanceof BigDecimal) {
-      return ((BigDecimal) value).toBigInteger();
+    if (value instanceof BigDecimal bd) {
+      return bd.toBigInteger();
     }
-    if (value instanceof Number) {
-      return BigInteger.valueOf(((Number) value).longValue());
+    if (value instanceof Number n) {
+      return BigInteger.valueOf(n.longValue());
     }
     throw new InvalidJWTException("Claim [" + name + "] is not a numeric value");
   }
@@ -299,8 +296,8 @@ public final class JWT {
     if (value == null) {
       return null;
     }
-    if (value instanceof Number) {
-      return (Number) value;
+    if (value instanceof Number n) {
+      return n;
     }
     throw new InvalidJWTException("Claim [" + name + "] is not a Number");
   }
@@ -458,17 +455,16 @@ public final class JWT {
           b.issuedAt = expectInstant(name, value);
           break;
         case "aud":
-          if (value instanceof String) {
-            b.audience = new ArrayList<>(Collections.singletonList((String) value));
+          if (value instanceof String s) {
+            b.audience = new ArrayList<>(Collections.singletonList(s));
             b.audienceSerialization = AudienceSerialization.STRING_WHEN_SINGLE;
-          } else if (value instanceof List) {
-            List<?> raw = (List<?>) value;
+          } else if (value instanceof List<?> raw) {
             List<String> strs = new ArrayList<>(raw.size());
             for (Object element : raw) {
-              if (!(element instanceof String)) {
+              if (!(element instanceof String str)) {
                 throw new InvalidJWTException("Claim [aud] must be a string or an array of strings");
               }
-              strs.add((String) element);
+              strs.add(str);
             }
             b.audience = strs;
             b.audienceSerialization = AudienceSerialization.ALWAYS_ARRAY;
@@ -489,8 +485,7 @@ public final class JWT {
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
-    if (!(o instanceof JWT)) return false;
-    JWT other = (JWT) o;
+    if (!(o instanceof JWT other)) return false;
     return Objects.equals(issuer, other.issuer)
         && Objects.equals(subject, other.subject)
         && Objects.equals(audience, other.audience)
@@ -563,23 +558,23 @@ public final class JWT {
   }
 
   private static String expectString(String name, Object value) {
-    if (!(value instanceof String)) {
+    if (!(value instanceof String s)) {
       throw new InvalidJWTException("Claim [" + name + "] must be a String");
     }
-    return (String) value;
+    return s;
   }
 
   private static Instant expectInstant(String name, Object value) {
-    if (!(value instanceof Number)) {
+    if (!(value instanceof Number n)) {
       throw new InvalidJWTException("Claim [" + name + "] must be a numeric value (NumericDate)");
     }
     BigInteger asInt;
-    if (value instanceof BigInteger) {
-      asInt = (BigInteger) value;
-    } else if (value instanceof BigDecimal) {
-      asInt = ((BigDecimal) value).toBigInteger();
+    if (n instanceof BigInteger bi) {
+      asInt = bi;
+    } else if (n instanceof BigDecimal bd) {
+      asInt = bd.toBigInteger();
     } else {
-      asInt = BigInteger.valueOf(((Number) value).longValue());
+      asInt = BigInteger.valueOf(n.longValue());
     }
     if (asInt.compareTo(MAX_INSTANT_SECOND) > 0 || asInt.compareTo(MIN_INSTANT_SECOND) < 0) {
       throw new InvalidJWTException("Claim [" + name + "] numeric value is outside the supported Instant range");
@@ -784,22 +779,22 @@ public final class JWT {
       }
       switch (name) {
         case "iss":
-          if (!(value instanceof String)) {
+          if (!(value instanceof String s)) {
             throw new IllegalArgumentException("Claim [iss] must be a String");
           }
-          this.issuer = (String) value;
+          this.issuer = s;
           return this;
         case "sub":
-          if (!(value instanceof String)) {
+          if (!(value instanceof String s)) {
             throw new IllegalArgumentException("Claim [sub] must be a String");
           }
-          this.subject = (String) value;
+          this.subject = s;
           return this;
         case "jti":
-          if (!(value instanceof String)) {
+          if (!(value instanceof String s)) {
             throw new IllegalArgumentException("Claim [jti] must be a String");
           }
-          this.id = (String) value;
+          this.id = s;
           return this;
         case "exp":
           this.expiresAt = coerceToInstant("exp", value);
@@ -811,17 +806,16 @@ public final class JWT {
           this.issuedAt = coerceToInstant("iat", value);
           return this;
         case "aud":
-          if (value instanceof String) {
-            return audience((String) value);
+          if (value instanceof String s) {
+            return audience(s);
           }
-          if (value instanceof List) {
-            List<?> raw = (List<?>) value;
+          if (value instanceof List<?> raw) {
             List<String> strs = new ArrayList<>(raw.size());
             for (Object element : raw) {
-              if (!(element instanceof String)) {
+              if (!(element instanceof String es)) {
                 throw new IllegalArgumentException("Claim [aud] list elements must be Strings");
               }
-              strs.add((String) element);
+              strs.add(es);
             }
             return audience(strs);
           }
@@ -841,14 +835,14 @@ public final class JWT {
     }
 
     private static Instant coerceToInstant(String name, Object value) {
-      if (value instanceof Instant) {
-        return (Instant) value;
+      if (value instanceof Instant instant) {
+        return instant;
       }
-      if (value instanceof ZonedDateTime) {
-        return ((ZonedDateTime) value).toInstant();
+      if (value instanceof ZonedDateTime zdt) {
+        return zdt.toInstant();
       }
-      if (value instanceof Number) {
-        return Instant.ofEpochSecond(((Number) value).longValue());
+      if (value instanceof Number n) {
+        return Instant.ofEpochSecond(n.longValue());
       }
       throw new IllegalArgumentException("Claim [" + name + "] cannot be coerced to Instant from value of type [" + value.getClass().getName() + "]");
     }

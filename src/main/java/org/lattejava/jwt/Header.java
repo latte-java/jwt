@@ -159,10 +159,10 @@ public final class Header {
     if (algRaw == null) {
       throw new InvalidJWTException("Header [alg] is missing");
     }
-    if (!(algRaw instanceof String)) {
+    if (!(algRaw instanceof String algName)) {
       throw new InvalidJWTException("Header [alg] must be a String");
     }
-    b.alg = Algorithm.of((String) algRaw);
+    b.alg = Algorithm.of(algName);
 
     for (Map.Entry<String, Object> entry : map.entrySet()) {
       String name = entry.getKey();
@@ -172,16 +172,16 @@ public final class Header {
       }
       switch (name) {
         case "typ":
-          if (!(value instanceof String)) {
+          if (!(value instanceof String typ)) {
             throw new InvalidJWTException("Header [typ] must be a String");
           }
-          b.typ = (String) value;
+          b.typ = typ;
           break;
         case "kid":
-          if (!(value instanceof String)) {
+          if (!(value instanceof String kid)) {
             throw new InvalidJWTException("Header [kid] must be a String");
           }
-          b.kid = (String) value;
+          b.kid = kid;
           break;
         case "cty":
         case "x5t":
@@ -193,10 +193,10 @@ public final class Header {
           b.customParameters.put(name, value);
           break;
         case "x5c":
-          if (!(value instanceof List)) {
+          if (!(value instanceof List<?> x5c)) {
             throw new InvalidJWTException("Header [x5c] must be an array of strings");
           }
-          for (Object element : (List<?>) value) {
+          for (Object element : x5c) {
             if (!(element instanceof String)) {
               throw new InvalidJWTException("Header [x5c] must be an array of strings");
             }
@@ -221,16 +221,14 @@ public final class Header {
    * understood-parameters check is performed by {@code JWTDecoder}, not here.
    */
   private static void validateCrit(Object value) {
-    if (!(value instanceof List)) {
+    if (!(value instanceof List<?> raw)) {
       throw new InvalidJWTException("Header [crit] must be a JSON array of strings");
     }
-    List<?> raw = (List<?>) value;
     Set<String> seen = new LinkedHashSet<>();
     for (Object element : raw) {
-      if (!(element instanceof String)) {
+      if (!(element instanceof String s)) {
         throw new InvalidJWTException("Header [crit] elements must be strings");
       }
-      String s = (String) element;
       if (s.isEmpty()) {
         throw new InvalidJWTException("Header [crit] elements must be non-empty strings");
       }
@@ -247,8 +245,7 @@ public final class Header {
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
-    if (!(o instanceof Header)) return false;
-    Header other = (Header) o;
+    if (!(o instanceof Header other)) return false;
     return Objects.equals(alg, other.alg)
         && Objects.equals(typ, other.typ)
         && Objects.equals(kid, other.kid)
@@ -338,10 +335,10 @@ public final class Header {
           this.alg = null;
           return this;
         }
-        if (!(value instanceof Algorithm)) {
+        if (!(value instanceof Algorithm a)) {
           throw new IllegalArgumentException("Header [alg] must be an Algorithm instance");
         }
-        this.alg = (Algorithm) value;
+        this.alg = a;
         return this;
       }
       if ("typ".equals(name)) {
@@ -349,10 +346,10 @@ public final class Header {
           this.typ = null;
           return this;
         }
-        if (!(value instanceof String)) {
+        if (!(value instanceof String s)) {
           throw new IllegalArgumentException("Header [typ] must be a String");
         }
-        this.typ = (String) value;
+        this.typ = s;
         return this;
       }
       if ("kid".equals(name)) {
@@ -360,10 +357,10 @@ public final class Header {
           this.kid = null;
           return this;
         }
-        if (!(value instanceof String)) {
+        if (!(value instanceof String s)) {
           throw new IllegalArgumentException("Header [kid] must be a String");
         }
-        this.kid = (String) value;
+        this.kid = s;
         return this;
       }
       if (value == null) {

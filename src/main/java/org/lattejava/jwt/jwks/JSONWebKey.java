@@ -390,24 +390,24 @@ public final class JSONWebKey {
       if (value == null) continue;
       switch (name) {
         case "alg":
-          b.alg = value instanceof Algorithm ? (Algorithm) value : Algorithm.of(value.toString());
+          b.alg = value instanceof Algorithm a ? a : Algorithm.of(value.toString());
           break;
         case "crv":  b.crv = value.toString(); break;
         case "kid":  b.kid = value.toString(); break;
         case "kty":
-          b.kty = value instanceof KeyType ? (KeyType) value : KeyType.of(value.toString());
+          b.kty = value instanceof KeyType kt ? kt : KeyType.of(value.toString());
           break;
         case "use":  b.use = value.toString(); break;
         case "key_ops":
-          if (!(value instanceof List)) {
+          if (!(value instanceof List<?> keyOpsList)) {
             throw new IllegalArgumentException("JWK [key_ops] must be an array of strings");
           }
           List<String> ops = new java.util.ArrayList<>();
-          for (Object element : (List<Object>) value) {
-            if (!(element instanceof String)) {
+          for (Object element : keyOpsList) {
+            if (!(element instanceof String op)) {
               throw new IllegalArgumentException("JWK [key_ops] must be an array of strings");
             }
-            ops.add((String) element);
+            ops.add(op);
           }
           b.key_ops = ops;
           break;
@@ -423,15 +423,15 @@ public final class JSONWebKey {
         case "x":    b.x = value.toString(); break;
         case "y":    b.y = value.toString(); break;
         case "x5c":
-          if (!(value instanceof List)) {
+          if (!(value instanceof List<?> x5cList)) {
             throw new IllegalArgumentException("JWK [x5c] must be an array of strings");
           }
           List<String> chain = new java.util.ArrayList<>();
-          for (Object element : (List<Object>) value) {
-            if (!(element instanceof String)) {
+          for (Object element : x5cList) {
+            if (!(element instanceof String cert)) {
               throw new IllegalArgumentException("JWK [x5c] must be an array of strings");
             }
-            chain.add((String) element);
+            chain.add(cert);
           }
           b.x5c = chain;
           break;
@@ -519,8 +519,7 @@ public final class JSONWebKey {
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
-    if (!(o instanceof JSONWebKey)) return false;
-    JSONWebKey that = (JSONWebKey) o;
+    if (!(o instanceof JSONWebKey that)) return false;
     return Objects.equals(algName(alg), algName(that.alg))
         && Objects.equals(crv, that.crv)
         && Objects.equals(d, that.d)

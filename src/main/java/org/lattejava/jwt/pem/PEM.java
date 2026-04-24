@@ -157,8 +157,7 @@ public class PEM {
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
-    if (!(o instanceof PEM)) return false;
-    PEM pem = (PEM) o;
+    if (!(o instanceof PEM pem)) return false;
     return Objects.equals(certificate, pem.certificate) &&
         Objects.equals(privateKey, pem.privateKey) &&
         Objects.equals(publicKey, pem.publicKey);

@@ -90,12 +90,12 @@ final class CanonicalJSONWriter {
   private static void writeValue(StringBuilder sb, Object v) {
     if (v == null) {
       sb.append("null");
-    } else if (v instanceof String) {
-      writeString(sb, (String) v);
-    } else if (v instanceof Boolean) {
-      sb.append(((Boolean) v) ? "true" : "false");
-    } else if (v instanceof BigDecimal) {
-      sb.append(((BigDecimal) v).toPlainString());
+    } else if (v instanceof String s) {
+      writeString(sb, s);
+    } else if (v instanceof Boolean b) {
+      sb.append(b ? "true" : "false");
+    } else if (v instanceof BigDecimal bd) {
+      sb.append(bd.toPlainString());
     } else if (v instanceof Integer || v instanceof Long || v instanceof Short
         || v instanceof Byte || v instanceof BigInteger) {
       sb.append(v.toString());

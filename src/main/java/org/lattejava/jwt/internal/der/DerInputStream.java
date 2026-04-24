@@ -44,8 +44,7 @@ public class DerInputStream {
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
-    if (!(o instanceof DerInputStream)) return false;
-    DerInputStream that = (DerInputStream) o;
+    if (!(o instanceof DerInputStream that)) return false;
     return length == that.length &&
         Arrays.equals(toByteArray(), that.toByteArray());
   }

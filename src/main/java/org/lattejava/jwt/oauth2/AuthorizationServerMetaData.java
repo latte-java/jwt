@@ -310,17 +310,16 @@ public class AuthorizationServerMetaData {
     return b.build();
   }
 
-  @SuppressWarnings("unchecked")
   private static List<String> stringList(Object value, String name) {
-    if (!(value instanceof List)) {
+    if (!(value instanceof List<?> list)) {
       throw new IllegalArgumentException("Server metadata field [" + name + "] must be an array of strings");
     }
     List<String> result = new ArrayList<>();
-    for (Object element : (List<Object>) value) {
-      if (!(element instanceof String)) {
+    for (Object element : list) {
+      if (!(element instanceof String s)) {
         throw new IllegalArgumentException("Server metadata field [" + name + "] must be an array of strings");
       }
-      result.add((String) element);
+      result.add(s);
     }
     return result;
   }

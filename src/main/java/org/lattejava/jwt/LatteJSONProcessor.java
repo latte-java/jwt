@@ -149,10 +149,10 @@ public class LatteJSONProcessor implements JSONProcessor {
   private void writeValue(Object value, ByteArrayOutputStream out) throws IOException {
     if (value == null) {
       out.write('n'); out.write('u'); out.write('l'); out.write('l');
-    } else if (value instanceof String) {
-      writeString((String) value, out);
-    } else if (value instanceof Boolean) {
-      String s = ((Boolean) value) ? "true" : "false";
+    } else if (value instanceof String s) {
+      writeString(s, out);
+    } else if (value instanceof Boolean bool) {
+      String s = bool ? "true" : "false";
       out.write(s.getBytes(StandardCharsets.UTF_8));
     } else if (value instanceof Integer
         || value instanceof Long
@@ -160,8 +160,8 @@ public class LatteJSONProcessor implements JSONProcessor {
         || value instanceof Byte
         || value instanceof BigInteger) {
       out.write(value.toString().getBytes(StandardCharsets.UTF_8));
-    } else if (value instanceof BigDecimal) {
-      out.write(((BigDecimal) value).toPlainString().getBytes(StandardCharsets.UTF_8));
+    } else if (value instanceof BigDecimal bd) {
+      out.write(bd.toPlainString().getBytes(StandardCharsets.UTF_8));
     } else if (value instanceof Float || value instanceof Double) {
       double d = ((Number) value).doubleValue();
       if (Double.isNaN(d) || Double.isInfinite(d)) {
@@ -172,8 +172,8 @@ public class LatteJSONProcessor implements JSONProcessor {
       @SuppressWarnings("unchecked")
       Map<String, Object> m = (Map<String, Object>) value;
       writeMap(m, out);
-    } else if (value instanceof List) {
-      writeList((List<?>) value, out);
+    } else if (value instanceof List<?> list) {
+      writeList(list, out);
     } else {
       throw new JSONProcessingException("Unsupported value type [" + value.getClass().getName() + "]");
     }
@@ -188,11 +188,11 @@ public class LatteJSONProcessor implements JSONProcessor {
       }
       first = false;
       Object k = e.getKey();
-      if (!(k instanceof String)) {
+      if (!(k instanceof String keyStr)) {
         throw new JSONProcessingException("Expected String map key but found ["
             + (k == null ? "null" : k.getClass().getName()) + "]");
       }
-      writeString((String) k, out);
+      writeString(keyStr, out);
       out.write(':');
       writeValue(e.getValue(), out);
     }

@@ -202,11 +202,11 @@ public class JSONWebKeySetHelper extends AbstractHttpHelper {
         is -> {
           Map<String, Object> response = parseJSON(is);
           Object jwksURI = response.get("jwks_uri");
-          if (!(jwksURI instanceof String) || ((String) jwksURI).isEmpty()) {
+          if (!(jwksURI instanceof String uri) || uri.isEmpty()) {
             String endpoint = httpURLConnection.getURL().toString();
             throw new JSONWebKeySetException("Well-known endpoint [" + endpoint + "] response is missing the [jwks_uri] property");
           }
-          return retrieveKeysFromJWKS((String) jwksURI);
+          return retrieveKeysFromJWKS(uri);
         },
         JSONWebKeyException::new);
   }
@@ -262,12 +262,12 @@ public class JSONWebKeySetHelper extends AbstractHttpHelper {
         is -> {
           Map<String, Object> response = parseJSON(is);
           Object keys = response.get("keys");
-          if (!(keys instanceof List)) {
+          if (!(keys instanceof List<?> keyList)) {
             String endpoint = httpURLConnection.getURL().toString();
             throw new JSONWebKeySetException("JWKS endpoint [" + endpoint + "] response is missing the [keys] array");
           }
           List<JSONWebKey> result = new ArrayList<>();
-          for (Object element : (List<Object>) keys) {
+          for (Object element : keyList) {
             if (!(element instanceof Map)) {
               String endpoint = httpURLConnection.getURL().toString();
               throw new JSONWebKeySetException("JWKS endpoint [" + endpoint + "] response contains a non-object element in [keys]");

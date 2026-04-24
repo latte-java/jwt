@@ -296,19 +296,19 @@ public class PEMDecoder {
     PrivateKey privateKey = KeyFactory.getInstance(jcaKeyFactoryName(algorithmOID.decode(), type)).generatePrivate(new PKCS8EncodedKeySpec(bytes));
 
     // Attempt to extract the public key if available
-    if (privateKey instanceof ECPrivateKey) {
+    if (privateKey instanceof ECPrivateKey ecPrivateKey) {
       DerValue[] privateKeySequence = new DerInputStream(sequence[2]).getSequence();
       if (privateKeySequence.length == 3 && privateKeySequence[2].tag.rawByte == (byte) 0xA1) {
         DerValue bitString = new DerInputStream(privateKeySequence[2]).readDerValue();
-        PublicKey publicKey = getPublicKeyFromPrivateEC(bitString, (ECPrivateKey) privateKey);
+        PublicKey publicKey = getPublicKeyFromPrivateEC(bitString, ecPrivateKey);
         return new PEM(privateKey, publicKey);
       } else {
         // The private key did not contain the public key
         return new PEM(privateKey);
       }
-    } else if (privateKey instanceof RSAPrivateCrtKey) {
-      BigInteger modulus = ((RSAPrivateCrtKey) privateKey).getModulus();
-      BigInteger publicExponent = ((RSAPrivateCrtKey) privateKey).getPublicExponent();
+    } else if (privateKey instanceof RSAPrivateCrtKey rsaPrivateCrtKey) {
+      BigInteger modulus = rsaPrivateCrtKey.getModulus();
+      BigInteger publicExponent = rsaPrivateCrtKey.getPublicExponent();
       PublicKey publicKey = KeyFactory.getInstance("RSA").generatePublic(new RSAPublicKeySpec(modulus, publicExponent));
       return new PEM(privateKey, publicKey);
     } else if (privateKey instanceof EdECPrivateKey edECPrivateKey) {
