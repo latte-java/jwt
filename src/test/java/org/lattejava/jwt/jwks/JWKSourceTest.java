@@ -106,6 +106,66 @@ public class JWKSourceTest extends BaseTest {
   }
 
   @Test
+  public void resolve_cacheHit_returnsVerifier() throws Exception {
+    // Use case: kid in the snapshot resolves to a verifier without a network hop.
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = RSA_JWKS_BODY)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+
+    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json").build();
+    org.lattejava.jwt.Header h = org.lattejava.jwt.Header.builder()
+        .alg(org.lattejava.jwt.Algorithm.RS256).kid("k1").build();
+    org.lattejava.jwt.Verifier v = source.resolve(h);
+    assertNotNull(v);
+    assertTrue(v.canVerify(org.lattejava.jwt.Algorithm.RS256));
+    source.close();
+  }
+
+  @Test
+  public void resolve_canVerifyMismatch_returnsNull() throws Exception {
+    // Use case: header alg disagrees with the resolved verifier's bound alg → null.
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = RSA_JWKS_BODY)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+
+    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json").build();
+    org.lattejava.jwt.Header h = org.lattejava.jwt.Header.builder()
+        .alg(org.lattejava.jwt.Algorithm.RS512).kid("k1").build();
+    assertNull(source.resolve(h));
+    source.close();
+  }
+
+  @Test
+  public void resolve_unknownKid_refreshOnMissFalse_returnsNullWithoutFetch() throws Exception {
+    // Use case: refreshOnMiss=false makes the on-miss path return null immediately.
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = RSA_JWKS_BODY)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+
+    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+        .refreshOnMiss(false)
+        .build();
+    int callsBefore = httpHandlers.get(0).called;
+    org.lattejava.jwt.Header h = org.lattejava.jwt.Header.builder()
+        .alg(org.lattejava.jwt.Algorithm.RS256).kid("unknown").build();
+    assertNull(source.resolve(h));
+    assertEquals(httpHandlers.get(0).called, callsBefore);
+    source.close();
+  }
+
+  @Test
   public void build_initialLoad_failure_leavesSourceUsable() {
     // Use case: build() returns normally on a network failure; source has empty
     // cache, consecutiveFailures=1, lastSuccessfulRefresh()==null.

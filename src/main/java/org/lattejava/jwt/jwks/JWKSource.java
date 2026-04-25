@@ -94,7 +94,18 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
 
   @Override
   public Verifier resolve(Header header) {
-    // Implemented in Task 11.
+    Objects.requireNonNull(header, "header");
+    String kid = header.kid();
+    if (kid == null) return null;
+
+    Snapshot snapshot = ref.get();
+    Verifier v = snapshot.byKid().get(kid);
+    if (v != null) {
+      return v.canVerify(header.alg()) ? v : null;
+    }
+    if (!refreshOnMiss) return null;
+
+    // Step 5+ (nextDueAt gate + singleflight) added in Task 13.
     return null;
   }
 
