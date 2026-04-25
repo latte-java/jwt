@@ -19,7 +19,7 @@ package org.lattejava.jwt.jwks;
 import org.lattejava.jwt.JSONProcessor;
 import org.lattejava.jwt.JSONProcessingException;
 import org.lattejava.jwt.LatteJSONProcessor;
-import org.lattejava.jwt.internal.http.AbstractHttpHelper;
+import org.lattejava.jwt.internal.http.AbstractHTTPHelper;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
@@ -60,7 +60,7 @@ import java.util.function.Consumer;
  *
  * @author Daniel DeGroff
  */
-public class JSONWebKeySetHelper extends AbstractHttpHelper {
+public class JSONWebKeySetHelper extends AbstractHTTPHelper {
   /** Default JSON parse limits mirror {@link org.lattejava.jwt.JWTDecoder}. */
   public static final int DEFAULT_MAX_NESTING_DEPTH = 16;
 
@@ -248,11 +248,11 @@ public class JSONWebKeySetHelper extends AbstractHttpHelper {
 
   private static String retrieveJWKSURI(HttpURLConnection httpURLConnection) {
     return get(httpURLConnection, maxResponseSize, maxRedirects,
-        is -> {
+        (conn, is) -> {
           Map<String, Object> response = parseJSON(is);
           Object jwksURI = response.get("jwks_uri");
           if (!(jwksURI instanceof String uri) || uri.isEmpty()) {
-            String endpoint = httpURLConnection.getURL().toString();
+            String endpoint = conn.getURL().toString();
             throw new JSONWebKeySetException("Well-known endpoint [" + endpoint + "] response is missing the [jwks_uri] property");
           }
           return uri;
@@ -287,17 +287,17 @@ public class JSONWebKeySetHelper extends AbstractHttpHelper {
   @SuppressWarnings("unchecked")
   public static List<JSONWebKey> retrieveKeysFromJWKS(HttpURLConnection httpURLConnection) {
     return get(httpURLConnection, maxResponseSize, maxRedirects,
-        is -> {
+        (conn, is) -> {
           Map<String, Object> response = parseJSON(is);
           Object keys = response.get("keys");
           if (!(keys instanceof List<?> keyList)) {
-            String endpoint = httpURLConnection.getURL().toString();
+            String endpoint = conn.getURL().toString();
             throw new JSONWebKeySetException("JWKS endpoint [" + endpoint + "] response is missing the [keys] array");
           }
           List<JSONWebKey> result = new ArrayList<>();
           for (Object element : keyList) {
             if (!(element instanceof Map)) {
-              String endpoint = httpURLConnection.getURL().toString();
+              String endpoint = conn.getURL().toString();
               throw new JSONWebKeySetException("JWKS endpoint [" + endpoint + "] response contains a non-object element in [keys]");
             }
             result.add(JSONWebKey.fromMap((Map<String, Object>) element));
