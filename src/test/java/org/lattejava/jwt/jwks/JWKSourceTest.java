@@ -24,13 +24,29 @@
 package org.lattejava.jwt.jwks;
 
 import org.lattejava.jwt.BaseTest;
+import org.lattejava.jwt.ExpectedResponse;
 import org.testng.annotations.Test;
 
 import java.time.Duration;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
 
 public class JWKSourceTest extends BaseTest {
+  private static final int PORT = 4244;
+
+  private static final String RSA_JWKS_BODY = "{\"keys\":[{"
+      + "\"kty\":\"RSA\","
+      + "\"kid\":\"k1\","
+      + "\"alg\":\"RS256\","
+      + "\"use\":\"sig\","
+      + "\"n\":\"sXch9_uEVyZw4d4XNjUMl7-DnbBwfXz9V_DwiHCNL5KNg6oHEcF7T7zJDSsBmWxAOKtc6vK4Ek5oN_R5kxdovfBdRRiClNxrRwmExZGMC8oBROHFEJiOFdDmqNJZbJ-w_e8KE2j_yWctgxX9LowhOWy0VEArLjr5tLqhwAtFm6gK_DfXXyZjU2DBBL_3Iaiu0YQz-jRR4lA1IAKVLA98m_4cP3pUvP6m9Eds3qpf0CzrI4DT9byOPQQX-FQOPaWTBcOJG6L9_kg7XYmbgrUKf6JhPYiTEVNvSXpHlxF6PoJiLvCNpyhGzFtOZf3GkmwNRbAdyOJ2HyjgNtuKnHcPlw\","
+      + "\"e\":\"AQAB\""
+      + "}]}";
+
   @Test
   public void builder_rejects_nonPositive_refreshInterval() {
     assertThrows(IllegalArgumentException.class,
@@ -68,5 +84,37 @@ public class JWKSourceTest extends BaseTest {
   public void builder_rejects_null_or_empty_URL() {
     assertThrows(IllegalArgumentException.class, () -> JWKSource.fromJWKS("").build());
     assertThrows(NullPointerException.class, () -> JWKSource.fromJWKS(null).build());
+  }
+
+  @Test
+  public void build_initialLoad_success_populatesSnapshot() throws Exception {
+    // Use case: build() performs a synchronous initial JWKS fetch; first resolve()
+    // reads from the cache without triggering another fetch.
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = RSA_JWKS_BODY)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+
+    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json").build();
+    assertNotNull(source.lastSuccessfulRefresh());
+    assertEquals(source.consecutiveFailures(), 0);
+    assertEquals(source.currentKids(), java.util.Set.of("k1"));
+    source.close();
+  }
+
+  @Test
+  public void build_initialLoad_failure_leavesSourceUsable() {
+    // Use case: build() returns normally on a network failure; source has empty
+    // cache, consecutiveFailures=1, lastSuccessfulRefresh()==null.
+    JWKSource source = JWKSource.fromJWKS("http://127.0.0.1:1/jwks.json")
+        .refreshTimeout(Duration.ofMillis(500))
+        .build();
+    assertNull(source.lastSuccessfulRefresh());
+    assertEquals(source.consecutiveFailures(), 1);
+    assertTrue(source.currentKids().isEmpty());
+    source.close();
   }
 }

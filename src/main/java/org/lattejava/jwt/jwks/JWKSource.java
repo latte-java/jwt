@@ -26,6 +26,7 @@ package org.lattejava.jwt.jwks;
 import org.lattejava.jwt.Header;
 import org.lattejava.jwt.Verifier;
 import org.lattejava.jwt.VerifierResolver;
+import org.lattejava.jwt.Verifiers;
 import org.lattejava.jwt.log.Logger;
 import org.lattejava.jwt.log.NoOpLogger;
 
@@ -34,6 +35,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Objects;
@@ -71,8 +73,7 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
     this.scheduledRefresh = b.scheduledRefresh;
     this.source = b.source;
     this.url = b.url();
-    // Initial-load semantics + scheduler startup: filled in by Tasks 10 / 18.
-    this.ref.set(new Snapshot(Map.of(), Instant.EPOCH, Instant.EPOCH, 0, null));
+    this.ref.set(doRefresh(null));
   }
 
   // --- Factory entry points ---
@@ -126,6 +127,71 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
 
   public Instant nextDueAt() {
     return ref.get().nextDueAt();
+  }
+
+  // --- Refresh internals ---
+
+  private static Duration maxOf(Duration a, Duration b) {
+    return a.compareTo(b) >= 0 ? a : b;
+  }
+
+  /**
+   * Single-threaded refresh used by the constructor. Returns the Snapshot to install.
+   * Singleflight wiring is added in Task 13; the constructor calls this directly.
+   */
+  private Snapshot doRefresh(Snapshot prev) {
+    Instant now = Instant.now(clock);
+    try {
+      JWKSResponse resp = fetch();
+      Map<String, Verifier> byKid = new LinkedHashMap<>();
+      for (JSONWebKey jwk : resp.keys()) {
+        Verifier v = Verifiers.fromJWK(jwk);
+        if (v == null) continue;
+        if (byKid.containsKey(jwk.kid())) {
+          if (logger.isWarnEnabled()) {
+            logger.warn("JWKS contains duplicate kid [" + jwk.kid() + "]; first-write-wins");
+          }
+          continue;
+        }
+        byKid.put(jwk.kid(), v);
+      }
+      if (byKid.isEmpty()) {
+        if (logger.isErrorEnabled()) {
+          logger.error("JWKS refresh produced an empty kid map; treating as failure");
+        }
+        return failureSnapshot(prev, now, new IllegalStateException("Empty kid map after JWK conversion"));
+      }
+      Duration chosenInterval = refreshInterval;
+      Instant nextDue = now.plus(maxOf(minRefreshInterval, chosenInterval));
+      if (logger.isInfoEnabled()) {
+        logger.info("JWKS refresh succeeded; kids=" + byKid.keySet());
+      }
+      return new Snapshot(Map.copyOf(byKid), now, nextDue, 0, null);
+    } catch (RuntimeException e) {
+      if (logger.isErrorEnabled()) {
+        logger.error("JWKS refresh failed", e);
+      }
+      return failureSnapshot(prev, now, e);
+    }
+  }
+
+  private JWKSResponse fetch() {
+    return switch (source) {
+      case ISSUER     -> JSONWebKeySetHelper.retrieveJWKSResponseFromIssuer(url, httpConnectionCustomizer);
+      case WELL_KNOWN -> JSONWebKeySetHelper.retrieveJWKSResponseFromWellKnownConfiguration(url, httpConnectionCustomizer);
+      case JWKS       -> JSONWebKeySetHelper.retrieveJWKSResponseFromJWKS(url, httpConnectionCustomizer);
+    };
+  }
+
+  /**
+   * Failure-path Snapshot. Backoff and Retry-After are applied in Tasks 15/16;
+   * for now nextDueAt = now + minRefreshInterval.
+   */
+  private Snapshot failureSnapshot(Snapshot prev, Instant now, Throwable cause) {
+    int prior = (prev == null) ? 0 : prev.consecutiveFailures();
+    Map<String, Verifier> byKid = (prev == null) ? Map.of() : prev.byKid();
+    Instant fetchedAt = (prev == null) ? Instant.EPOCH : prev.fetchedAt();
+    return new Snapshot(byKid, fetchedAt, now.plus(minRefreshInterval), prior + 1, now);
   }
 
   // --- Internal types ---
