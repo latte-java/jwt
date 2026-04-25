@@ -75,6 +75,8 @@ public final class JWT {
       this.audience = Collections.emptyList();
       this.audienceSerialization = null;
     } else {
+      // Defensive copy is null-permissive (preserves any null elements) by going
+      // through ArrayList rather than List.copyOf, which rejects nulls.
       this.audience = Collections.unmodifiableList(new ArrayList<>(b.audience));
       this.audienceSerialization = b.audienceSerialization == null
           ? AudienceSerialization.ALWAYS_ARRAY
@@ -84,7 +86,9 @@ public final class JWT {
     this.notBefore = b.notBefore;
     this.issuedAt = b.issuedAt;
     this.id = b.id;
-    this.customClaims = Collections.unmodifiableMap(new LinkedHashMap<>(b.customClaims));
+    this.customClaims = b.customClaims == null || b.customClaims.isEmpty()
+        ? Collections.emptyMap()
+        : Collections.unmodifiableMap(new LinkedHashMap<>(b.customClaims));
     this.header = b.header;
   }
 
@@ -481,7 +485,7 @@ public final class JWT {
           break;
         case "aud":
           if (value instanceof String s) {
-            b.audience = new ArrayList<>(Collections.singletonList(s));
+            b.audience = List.of(s);
             b.audienceSerialization = AudienceSerialization.STRING_WHEN_SINGLE;
           } else if (value instanceof List<?> raw) {
             List<String> strs = new ArrayList<>(raw.size());
@@ -498,7 +502,7 @@ public final class JWT {
           }
           break;
         default:
-          b.customClaims.put(name, value);
+          b.customClaimsForWrite().put(name, value);
           break;
       }
     }
@@ -635,11 +639,18 @@ public final class JWT {
 
     private String id;
 
-    private final Map<String, Object> customClaims = new LinkedHashMap<>();
+    private Map<String, Object> customClaims;
 
     private Header header;
 
     private Builder() {}
+
+    private Map<String, Object> customClaimsForWrite() {
+      if (customClaims == null) {
+        customClaims = new LinkedHashMap<>();
+      }
+      return customClaims;
+    }
 
     /**
      * Registered Claim {@code iss} as defined by RFC 7519 §4.1.1. Use of this claim is OPTIONAL.
@@ -676,11 +687,7 @@ public final class JWT {
      * {@link AudienceSerialization#STRING_WHEN_SINGLE}.
      */
     public Builder audience(String audience) {
-      if (audience == null) {
-        this.audience = null;
-      } else {
-        this.audience = new ArrayList<>(Collections.singletonList(audience));
-      }
+      this.audience = audience == null ? null : List.of(audience);
       return this;
     }
 
@@ -850,7 +857,7 @@ public final class JWT {
             // defensive (should not happen given the switch above)
             throw new IllegalArgumentException("Registered claim [" + name + "] not handled by Builder.claim()");
           }
-          this.customClaims.put(name, value);
+          customClaimsForWrite().put(name, value);
           return this;
       }
     }
