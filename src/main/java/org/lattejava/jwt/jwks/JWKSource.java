@@ -83,7 +83,24 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
     this.scheduledRefresh = b.scheduledRefresh;
     this.source = b.source;
     this.url = b.url();
-    this.ref.set(doRefresh(null));
+    // Empty initial snapshot. nextDueAt=EPOCH so the first on-miss / scheduler
+    // tick / build-time await is allowed to dispatch a refresh.
+    this.ref.set(new Snapshot(Map.of(), Instant.EPOCH, Instant.EPOCH, 0, null));
+    // Dispatch initial refresh through the singleflight and await up to
+    // refreshTimeout. Per spec §2.1, build() bounds the awaiter by
+    // refreshTimeout but does not throw on a network failure — failures land
+    // in the snapshot via singleflight; timeouts leave the empty initial
+    // snapshot in place while the in-flight fetch continues.
+    CompletableFuture<Snapshot> initial = singleflightRefresh();
+    try {
+      initial.get(refreshTimeout.toMillis(), TimeUnit.MILLISECONDS);
+    } catch (TimeoutException ignored) {
+      // empty snapshot stays; VT continues asynchronously
+    } catch (InterruptedException ie) {
+      Thread.currentThread().interrupt();
+    } catch (ExecutionException ignored) {
+      // failure snapshot is already installed by singleflight's catch path
+    }
     if (scheduledRefresh) {
       this.scheduler = Executors.newSingleThreadScheduledExecutor(Thread.ofVirtual().factory());
       long tickMs = minRefreshInterval.toMillis();

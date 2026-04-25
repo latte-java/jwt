@@ -26,6 +26,9 @@ import java.util.Map;
 public class ExpectedResponse implements Buildable<ExpectedResponse> {
   public String contentType = "application/json";
 
+  /** When &gt; 0, the handler sleeps this many ms before responding. */
+  public long delayMillis;
+
   /** Arbitrary response headers emitted before sendResponseHeaders. */
   public Map<String, String> headers = new HashMap<>();
 

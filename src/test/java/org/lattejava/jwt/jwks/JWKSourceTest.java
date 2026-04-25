@@ -106,6 +106,67 @@ public class JWKSourceTest extends BaseTest {
   }
 
   @Test
+  public void refreshTimeout_doesNotCountAsFailure() throws Exception {
+    // Use case: spec test #25 — refreshTimeout elapsing on the awaiter is not a refresh failure.
+    // Handler sleeps 800ms; refreshTimeout=100ms. Awaiter times out, but the in-flight fetch
+    // eventually succeeds and updates the snapshot.
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = RSA_JWKS_BODY)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")
+            .with(r -> r.delayMillis = 800)));
+
+    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+        .refreshTimeout(Duration.ofMillis(100))
+        .build();
+    // Initial build's load timed out on the awaiter; consecutiveFailures stays 0
+    // because the in-flight fetch is still running.
+    assertEquals(source.consecutiveFailures(), 0);
+
+    Thread.sleep(2_000);
+    assertNotNull(source.lastSuccessfulRefresh());
+    source.close();
+  }
+
+  @Test
+  public void failure_preservesPriorKeys_andAdvancesObservability() throws Exception {
+    // Use case: spec test #19 — refresh fails, prior kids still resolve;
+    // lastSuccessfulRefresh does not advance, lastFailedRefresh and consecutiveFailures do.
+    org.lattejava.jwt.HttpServerBuilder b = new org.lattejava.jwt.HttpServerBuilder()
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = RSA_JWKS_BODY)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json"));
+    startHttpServer(b);
+
+    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+        .minRefreshInterval(Duration.ofMillis(100))
+        .refreshInterval(Duration.ofSeconds(60))
+        .build();
+    java.time.Instant priorSuccess = source.lastSuccessfulRefresh();
+    assertNotNull(priorSuccess);
+    assertNull(source.lastFailedRefresh());
+    assertEquals(source.consecutiveFailures(), 0);
+
+    b.responses.get("/jwks.json").status = 500;
+    assertThrows(RuntimeException.class, source::refresh);
+
+    assertEquals(source.lastSuccessfulRefresh(), priorSuccess,
+        "lastSuccessfulRefresh must not advance on failure");
+    assertNotNull(source.lastFailedRefresh());
+    assertEquals(source.consecutiveFailures(), 1);
+
+    assertNotNull(source.resolve(org.lattejava.jwt.Header.builder()
+        .alg(org.lattejava.jwt.Algorithm.RS256).kid("k1").build()));
+    source.close();
+  }
+
+  @Test
   public void close_cancelsScheduler_andResolveReturnsNull() throws Exception {
     startHttpServer(server -> server
         .listenOn(PORT)

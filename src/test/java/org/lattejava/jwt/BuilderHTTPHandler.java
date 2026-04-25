@@ -59,6 +59,14 @@ public class BuilderHTTPHandler implements HttpHandler {
       return;
     }
 
+    if (expectedResult.delayMillis > 0) {
+      try {
+        Thread.sleep(expectedResult.delayMillis);
+      } catch (InterruptedException ignored) {
+        Thread.currentThread().interrupt();
+      }
+    }
+
     // Set headers BEFORE sendResponseHeaders (HttpExchange flushes once headers are committed).
     if (expectedResult.contentType != null) {
       httpExchange.getResponseHeaders().add("Content-Type", expectedResult.contentType);
