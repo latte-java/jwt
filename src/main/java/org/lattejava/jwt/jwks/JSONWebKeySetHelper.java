@@ -307,6 +307,61 @@ public class JSONWebKeySetHelper extends AbstractHTTPHelper {
         JSONWebKeyException::new);
   }
 
+  // -----------------------------------------------------------
+  // Package-visible richer responses for JWKSource (spec §6).
+  // -----------------------------------------------------------
+
+  static JWKSResponse retrieveJWKSResponseFromIssuer(String issuer, Consumer<HttpURLConnection> consumer) {
+    Objects.requireNonNull(issuer);
+    if (issuer.endsWith("/")) {
+      issuer = issuer.substring(0, issuer.length() - 1);
+    }
+    return retrieveJWKSResponseFromWellKnownConfiguration(issuer + "/.well-known/openid-configuration", consumer);
+  }
+
+  static JWKSResponse retrieveJWKSResponseFromWellKnownConfiguration(String endpoint, Consumer<HttpURLConnection> consumer) {
+    HttpURLConnection connection = buildURLConnection(endpoint, JSONWebKeyException::new);
+    if (consumer != null) {
+      consumer.accept(connection);
+    }
+    String jwksURI = retrieveJWKSURI(connection);
+    return retrieveJWKSResponseFromJWKS(jwksURI, consumer);
+  }
+
+  @SuppressWarnings("unchecked")
+  static JWKSResponse retrieveJWKSResponseFromJWKS(String endpoint, Consumer<HttpURLConnection> consumer) {
+    HttpURLConnection connection = buildURLConnection(endpoint, JSONWebKeyException::new);
+    if (consumer != null) {
+      consumer.accept(connection);
+    }
+    return get(connection, maxResponseSize, maxRedirects,
+        (conn, is) -> {
+          Map<String, Object> response = parseJSON(is);
+          Object keys = response.get("keys");
+          if (!(keys instanceof List<?> keyList)) {
+            String url = conn.getURL().toString();
+            throw new JSONWebKeySetException("JWKS endpoint [" + url + "] response is missing the [keys] array");
+          }
+          List<JSONWebKey> result = new ArrayList<>();
+          for (Object element : keyList) {
+            if (!(element instanceof Map)) {
+              String url = conn.getURL().toString();
+              throw new JSONWebKeySetException("JWKS endpoint [" + url + "] response contains a non-object element in [keys]");
+            }
+            result.add(JSONWebKey.fromMap((Map<String, Object>) element));
+          }
+          int status = 200;
+          try { status = conn.getResponseCode(); } catch (java.io.IOException ignored) {}
+          Map<String, String> sel = new java.util.TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+          for (String name : new String[]{"Cache-Control", "Retry-After"}) {
+            String v = conn.getHeaderField(name);
+            if (v != null) sel.put(name, v);
+          }
+          return new JWKSResponse(result, status, sel);
+        },
+        JSONWebKeyException::new);
+  }
+
   /**
    * Read the input stream fully (subject to the per-hop response-size cap
    * that the caller already wrapped it with) and parse as a top-level JSON

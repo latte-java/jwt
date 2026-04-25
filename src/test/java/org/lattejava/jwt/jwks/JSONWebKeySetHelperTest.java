@@ -450,6 +450,25 @@ public class JSONWebKeySetHelperTest extends BaseTest {
   }
 
   @Test
+  public void retrieveJWKSResponseFromJWKS_basicSuccess() throws Exception {
+    // Use case: JWKSource consumes JWKSResponse for both keys and HTTP status.
+    // Cache-Control header coverage lands in Task 8 once ExpectedResponse supports headers.
+    String body = "{\"keys\":[]}";
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = body)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+
+    JWKSResponse resp = JSONWebKeySetHelper.retrieveJWKSResponseFromJWKS(
+        "http://localhost:" + PORT + "/jwks.json", null);
+    assertEquals(resp.statusCode(), 200);
+    assertEquals(resp.keys().size(), 0);
+  }
+
+  @Test
   public void non2xx_response_throws_with_HTTPResponseException_cause() throws Exception {
     // Use case: a 429 with Retry-After must be reachable from the thrown exception's
     // cause chain — JWKSource depends on this to honor Retry-After.
