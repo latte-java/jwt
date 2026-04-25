@@ -16,9 +16,10 @@
 
 package org.lattejava.jwt.jwks;
 
+import org.lattejava.jwt.internal.Base64URL;
+
 import java.math.BigInteger;
 import java.util.Arrays;
-import java.util.Base64;
 
 /**
  * @author Daniel DeGroff
@@ -31,7 +32,7 @@ public class JWKUtils {
    * @return a <code>BigInteger</code> representation of the encoded value.
    */
   public static BigInteger base64DecodeUint(String encoded) {
-    byte[] bytes = Base64.getUrlDecoder().decode(encoded);
+    byte[] bytes = Base64URL.decode(encoded);
     return new BigInteger(1, bytes);
   }
 
@@ -70,6 +71,6 @@ public class JWKUtils {
       }
     }
 
-    return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    return Base64URL.encodeToString(bytes);
   }
 }

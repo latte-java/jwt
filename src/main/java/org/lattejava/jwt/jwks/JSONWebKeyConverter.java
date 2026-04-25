@@ -18,6 +18,7 @@ package org.lattejava.jwt.jwks;
 
 import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.KeyType;
+import org.lattejava.jwt.internal.Base64URL;
 import org.lattejava.jwt.internal.der.DerDecodingException;
 import org.lattejava.jwt.internal.der.DerInputStream;
 import org.lattejava.jwt.internal.der.ObjectIdentifier;
@@ -122,10 +123,10 @@ class JSONWebKeyConverter {
 
       var privateKeyBytes = edPrivateKey.getBytes().orElseThrow(
           () -> new JSONWebKeyException("Failed to obtain private key bytes"));
-      b.d(Base64.getUrlEncoder().withoutPadding().encodeToString(privateKeyBytes));
+      b.d(Base64URL.encodeToString(privateKeyBytes));
       try {
         byte[] publicKeyBytes = KeyUtils.deriveEdDSAPublicKeyFromPrivate(privateKeyBytes, crv);
-        b.x(Base64.getUrlEncoder().withoutPadding().encodeToString(publicKeyBytes));
+        b.x(Base64URL.encodeToString(publicKeyBytes));
       } catch (java.security.NoSuchAlgorithmException | java.security.InvalidAlgorithmParameterException e) {
         throw new JSONWebKeyException("Failed to derive EdDSA public key for curve [" + crv + "]", e);
       }

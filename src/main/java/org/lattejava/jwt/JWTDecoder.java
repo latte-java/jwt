@@ -16,6 +16,7 @@
 
 package org.lattejava.jwt;
 
+import org.lattejava.jwt.internal.Base64URL;
 import org.lattejava.jwt.internal.MessageSanitizer;
 
 import java.nio.charset.StandardCharsets;
@@ -23,7 +24,6 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.util.Base64;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -354,7 +354,7 @@ public class JWTDecoder {
       }
     }
     try {
-      return Base64.getUrlDecoder().decode(segment);
+      return Base64URL.decode(segment);
     } catch (IllegalArgumentException e) {
       throw new InvalidJWTException(
           "JWT [" + name + "] segment is not valid base64url", e);

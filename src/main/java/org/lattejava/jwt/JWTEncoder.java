@@ -17,9 +17,10 @@
 package org.lattejava.jwt;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.Objects;
 import java.util.function.Consumer;
+
+import org.lattejava.jwt.internal.Base64URL;
 
 /**
  * Encodes a {@link JWT} into a compact JWS string:
@@ -124,7 +125,7 @@ public class JWTEncoder {
   }
 
   private static String base64UrlEncode(byte[] bytes) {
-    return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    return Base64URL.encodeToString(bytes);
   }
 
   /**

@@ -28,7 +28,6 @@ import org.lattejava.jwt.jwks.JSONWebKey;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -80,7 +79,7 @@ public final class JWKThumbprint {
     } catch (NoSuchAlgorithmException e) {
       throw new IllegalArgumentException("No such algorithm [" + algorithm + "]", e);
     }
-    return Base64.getUrlEncoder().withoutPadding().encodeToString(md.digest(canonical));
+    return Base64URL.encodeToString(md.digest(canonical));
   }
 
   /**
