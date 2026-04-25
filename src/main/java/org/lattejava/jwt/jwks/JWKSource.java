@@ -121,6 +121,7 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
   @Override
   public Verifier resolve(Header header) {
     Objects.requireNonNull(header, "header");
+    if (closed) return null;
     String kid = header.kid();
     if (kid == null) return null;
 
@@ -174,7 +175,16 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
 
   @Override
   public void close() {
-    // Implemented in Task 19.
+    if (closed) return;
+    closed = true;
+    if (scheduler != null) {
+      scheduler.shutdownNow();
+    }
+    CompletableFuture<Snapshot> in = inflight.get();
+    if (in != null && !in.isDone()) {
+      in.complete(null);
+    }
+    if (logger.isDebugEnabled()) logger.debug("JWKSource closed");
   }
 
   public int consecutiveFailures() {
