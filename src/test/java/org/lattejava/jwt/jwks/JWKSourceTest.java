@@ -106,6 +106,27 @@ public class JWKSourceTest extends BaseTest {
   }
 
   @Test
+  public void successfulRefresh_setsNextDueAt_atLeastMinRefreshIntervalFromNow() throws Exception {
+    // Use case: even when refreshInterval > minRefreshInterval, nextDueAt = now + refreshInterval.
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = RSA_JWKS_BODY)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+
+    java.time.Instant fixedNow = java.time.Instant.parse("2026-04-25T12:00:00Z");
+    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+        .clock(java.time.Clock.fixed(fixedNow, java.time.ZoneOffset.UTC))
+        .refreshInterval(Duration.ofMinutes(15))
+        .minRefreshInterval(Duration.ofSeconds(30))
+        .build();
+    assertEquals(source.nextDueAt(), fixedNow.plus(Duration.ofMinutes(15)));
+    source.close();
+  }
+
+  @Test
   public void resolve_cacheHit_returnsVerifier() throws Exception {
     // Use case: kid in the snapshot resolves to a verifier without a network hop.
     startHttpServer(server -> server
