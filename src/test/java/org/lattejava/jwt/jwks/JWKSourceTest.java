@@ -178,11 +178,96 @@ public class JWKSourceTest extends BaseTest {
     JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
         .refreshOnMiss(false)
         .build();
-    int callsBefore = httpHandlers.get(0).called;
+    int callsBefore = httpHandlers.get(httpHandlers.size() - 1).called;
     org.lattejava.jwt.Header h = org.lattejava.jwt.Header.builder()
         .alg(org.lattejava.jwt.Algorithm.RS256).kid("unknown").build();
     assertNull(source.resolve(h));
-    assertEquals(httpHandlers.get(0).called, callsBefore);
+    assertEquals(httpHandlers.get(httpHandlers.size() - 1).called, callsBefore);
+    source.close();
+  }
+
+  @Test
+  public void resolve_unknownKid_refreshOnMissTrue_singleflight_oneFetch_for_concurrent_calls() throws Exception {
+    // Use case: 100 concurrent unknown-kid resolves past nextDueAt coalesce into a single fetch.
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = RSA_JWKS_BODY)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+
+    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+        .minRefreshInterval(Duration.ofMillis(200))
+        .refreshInterval(Duration.ofMillis(200))
+        .build();
+    int callsAfterBuild = httpHandlers.get(httpHandlers.size() - 1).called;
+    Thread.sleep(250);  // pass nextDueAt window
+
+    java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor();
+    java.util.List<java.util.concurrent.Future<org.lattejava.jwt.Verifier>> futures = new java.util.ArrayList<>();
+    for (int i = 0; i < 100; i++) {
+      futures.add(pool.submit(() -> source.resolve(org.lattejava.jwt.Header.builder()
+          .alg(org.lattejava.jwt.Algorithm.RS256).kid("unknown").build())));
+    }
+    for (var f : futures) f.get();
+    pool.shutdown();
+    assertEquals(httpHandlers.get(httpHandlers.size() - 1).called, callsAfterBuild + 1);
+    source.close();
+  }
+
+  @Test
+  public void resolve_unknownKid_inside_minRefreshInterval_returnsNullWithoutFetch() throws Exception {
+    // Use case: §2.2 step 5 — within nextDueAt's window, second miss does not refetch.
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = RSA_JWKS_BODY)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+
+    java.time.Instant fixedNow = java.time.Instant.parse("2026-04-25T12:00:00Z");
+    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+        .clock(java.time.Clock.fixed(fixedNow, java.time.ZoneOffset.UTC))
+        .minRefreshInterval(Duration.ofMinutes(5))
+        .refreshInterval(Duration.ofMinutes(60))
+        .build();
+    int callsAfterBuild = httpHandlers.get(httpHandlers.size() - 1).called;
+    for (int i = 0; i < 10; i++) {
+      assertNull(source.resolve(org.lattejava.jwt.Header.builder()
+          .alg(org.lattejava.jwt.Algorithm.RS256).kid("unknown").build()));
+    }
+    assertEquals(httpHandlers.get(httpHandlers.size() - 1).called, callsAfterBuild);
+    source.close();
+  }
+
+  @Test
+  public void resolve_onMissRefresh_findsNewlyAddedKid() throws Exception {
+    // Use case: rotation — a fresh kid not in the cache triggers a fetch and resolves.
+    String body1 = RSA_JWKS_BODY;
+    String body2 = body1.replace("\"kid\":\"k1\"", "\"kid\":\"k2\"");
+    org.lattejava.jwt.HttpServerBuilder b = new org.lattejava.jwt.HttpServerBuilder()
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = body1)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json"));
+    startHttpServer(b);
+
+    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+        .minRefreshInterval(Duration.ofMillis(100))
+        .refreshInterval(Duration.ofMillis(100))
+        .build();
+    assertEquals(source.currentKids(), java.util.Set.of("k1"));
+
+    b.responses.get("/jwks.json").response = body2;
+    Thread.sleep(150);  // pass nextDueAt window
+
+    org.lattejava.jwt.Verifier v = source.resolve(org.lattejava.jwt.Header.builder()
+        .alg(org.lattejava.jwt.Algorithm.RS256).kid("k2").build());
+    assertNotNull(v);
     source.close();
   }
 

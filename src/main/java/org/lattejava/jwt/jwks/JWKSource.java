@@ -40,6 +40,10 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
@@ -48,6 +52,7 @@ import java.util.function.Consumer;
  * See {@code specs/jwks-source.md} for the full specification (rev 3).
  */
 public final class JWKSource implements VerifierResolver, AutoCloseable {
+  private final AtomicReference<CompletableFuture<Snapshot>> inflight = new AtomicReference<>();
   private final AtomicReference<Snapshot> ref = new AtomicReference<>();
   private final CacheControlPolicy cacheControlPolicy;
   private final Clock clock;
@@ -105,8 +110,25 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
     }
     if (!refreshOnMiss) return null;
 
-    // Step 5+ (nextDueAt gate + singleflight) added in Task 13.
-    return null;
+    Instant now = Instant.now(clock);
+    if (now.isBefore(snapshot.nextDueAt())) return null;
+
+    CompletableFuture<Snapshot> fut = singleflightRefresh();
+    try {
+      fut.get(refreshTimeout.toMillis(), TimeUnit.MILLISECONDS);
+    } catch (TimeoutException te) {
+      return null;
+    } catch (InterruptedException ie) {
+      Thread.currentThread().interrupt();
+      return null;
+    } catch (ExecutionException ee) {
+      return null;
+    }
+
+    Snapshot fresh = ref.get();
+    Verifier v2 = fresh.byKid().get(kid);
+    if (v2 == null) return null;
+    return v2.canVerify(header.alg()) ? v2 : null;
   }
 
   public void refresh() {
@@ -184,6 +206,38 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
       }
       return failureSnapshot(prev, now, e);
     }
+  }
+
+  /**
+   * Returns the in-flight refresh future, dispatching a new one on a virtual
+   * thread if no refresh is currently active. Order on completion: snapshot
+   * updated first, then slot cleared. See spec §3.
+   */
+  private CompletableFuture<Snapshot> singleflightRefresh() {
+    CompletableFuture<Snapshot> existing = inflight.get();
+    if (existing != null) return existing;
+
+    CompletableFuture<Snapshot> mine = new CompletableFuture<>();
+    if (!inflight.compareAndSet(null, mine)) {
+      return inflight.get();
+    }
+
+    if (logger.isDebugEnabled()) {
+      logger.debug("JWKS refresh dispatched");
+    }
+    Thread.ofVirtual().start(() -> {
+      Snapshot fresh;
+      try {
+        fresh = doRefresh(ref.get());
+      } catch (Throwable t) {
+        fresh = failureSnapshot(ref.get(), Instant.now(clock), t);
+      }
+      ref.set(fresh);
+      mine.complete(fresh);
+      inflight.set(null);
+    });
+
+    return mine;
   }
 
   private JWKSResponse fetch() {
