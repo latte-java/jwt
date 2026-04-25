@@ -106,6 +106,29 @@ public class JWKSourceTest extends BaseTest {
   }
 
   @Test
+  public void scheduledRefresh_fires_atTickBoundary() throws Exception {
+    // Use case: with scheduledRefresh=true and a 200ms tick rate, the scheduler
+    // dispatches a refresh on its own. Real wall-clock time.
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = RSA_JWKS_BODY)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+
+    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+        .scheduledRefresh(true)
+        .minRefreshInterval(Duration.ofMillis(200))
+        .refreshInterval(Duration.ofMillis(200))
+        .build();
+    int callsAfterBuild = httpHandlers.get(httpHandlers.size() - 1).called;
+    Thread.sleep(700);
+    assertTrue(httpHandlers.get(httpHandlers.size() - 1).called > callsAfterBuild);
+    source.close();
+  }
+
+  @Test
   public void refresh_succeeds_updatesSnapshot() throws Exception {
     startHttpServer(server -> server
         .listenOn(PORT)

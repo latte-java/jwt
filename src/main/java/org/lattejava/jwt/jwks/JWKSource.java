@@ -43,6 +43,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
@@ -64,6 +66,7 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
   private final Duration refreshInterval;
   private final boolean refreshOnMiss;
   private final Duration refreshTimeout;
+  private final ScheduledExecutorService scheduler;
   private final boolean scheduledRefresh;
   private final FetchSource source;
   private final String url;
@@ -81,6 +84,22 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
     this.source = b.source;
     this.url = b.url();
     this.ref.set(doRefresh(null));
+    if (scheduledRefresh) {
+      this.scheduler = Executors.newSingleThreadScheduledExecutor(Thread.ofVirtual().factory());
+      long tickMs = minRefreshInterval.toMillis();
+      this.scheduler.scheduleAtFixedRate(this::onTick, tickMs, tickMs, TimeUnit.MILLISECONDS);
+    } else {
+      this.scheduler = null;
+    }
+  }
+
+  private void onTick() {
+    if (closed) return;
+    Snapshot s = ref.get();
+    Instant now = Instant.now(clock);
+    if (now.isBefore(s.nextDueAt())) return;
+    // Fire-and-forget: singleflightRefresh dispatches on a virtual thread; we do not await.
+    singleflightRefresh();
   }
 
   // --- Factory entry points ---
