@@ -44,9 +44,10 @@ public final class JWT {
       "iss", "sub", "aud", "exp", "nbf", "iat", "jti"
   ));
 
-  private static final BigInteger MAX_INSTANT_SECOND = BigInteger.valueOf(Instant.MAX.getEpochSecond());
-
-  private static final BigInteger MIN_INSTANT_SECOND = BigInteger.valueOf(Instant.MIN.getEpochSecond());
+  private static final long MAX_INSTANT_SECOND_LONG = Instant.MAX.getEpochSecond();
+  private static final long MIN_INSTANT_SECOND_LONG = Instant.MIN.getEpochSecond();
+  private static final BigInteger MAX_INSTANT_SECOND = BigInteger.valueOf(MAX_INSTANT_SECOND_LONG);
+  private static final BigInteger MIN_INSTANT_SECOND = BigInteger.valueOf(MIN_INSTANT_SECOND_LONG);
 
   private final String issuer;
 
@@ -596,6 +597,18 @@ public final class JWT {
   private static Instant expectInstant(String name, Object value) {
     if (!(value instanceof Number n)) {
       throw new InvalidJWTException("Claim [" + name + "] must be a numeric value (NumericDate)");
+    }
+    // Long fast-path: skips BigInteger materialization for values that already
+    // fit in a long (LatteJSONProcessor's parseNumber returns Long for digit
+    // runs <= 18, which covers every realistic NumericDate including epoch
+    // seconds well past year 2100). Long.MIN/MAX_VALUE are still wider than
+    // Instant.MIN/MAX, so the range check is required.
+    if (n instanceof Long l) {
+      long secs = l;
+      if (secs > MAX_INSTANT_SECOND_LONG || secs < MIN_INSTANT_SECOND_LONG) {
+        throw new InvalidJWTException("Claim [" + name + "] numeric value is outside the supported Instant range");
+      }
+      return Instant.ofEpochSecond(secs);
     }
     BigInteger asInt;
     if (n instanceof BigInteger bi) {
