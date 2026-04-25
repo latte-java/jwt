@@ -229,7 +229,10 @@ public class JWTDecoder {
 
   /** Parse the input into segments after enforcing size and structural defenses. */
   private Segments parseSegments(String encodedJWT, boolean requireSignature) {
-    if (encodedJWT.getBytes(StandardCharsets.UTF_8).length > maxInputBytes) {
+    // Compact JWS uses only base64url + '.', a strict ASCII subset, so the
+    // String char count equals the UTF-8 byte count. Any non-ASCII char would
+    // be rejected by the per-character base64url alphabet scan below.
+    if (encodedJWT.length() > maxInputBytes) {
       throw new InvalidJWTException(
           "Encoded JWT exceeds maxInputBytes [" + maxInputBytes + "]");
     }
