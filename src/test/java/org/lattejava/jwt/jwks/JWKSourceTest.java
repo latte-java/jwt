@@ -38,14 +38,17 @@ import static org.testng.Assert.assertTrue;
 public class JWKSourceTest extends BaseTest {
   private static final int PORT = 4244;
 
-  private static final String RSA_JWKS_BODY = "{\"keys\":[{"
-      + "\"kty\":\"RSA\","
-      + "\"kid\":\"k1\","
-      + "\"alg\":\"RS256\","
-      + "\"use\":\"sig\","
-      + "\"n\":\"sXch9_uEVyZw4d4XNjUMl7-DnbBwfXz9V_DwiHCNL5KNg6oHEcF7T7zJDSsBmWxAOKtc6vK4Ek5oN_R5kxdovfBdRRiClNxrRwmExZGMC8oBROHFEJiOFdDmqNJZbJ-w_e8KE2j_yWctgxX9LowhOWy0VEArLjr5tLqhwAtFm6gK_DfXXyZjU2DBBL_3Iaiu0YQz-jRR4lA1IAKVLA98m_4cP3pUvP6m9Eds3qpf0CzrI4DT9byOPQQX-FQOPaWTBcOJG6L9_kg7XYmbgrUKf6JhPYiTEVNvSXpHlxF6PoJiLvCNpyhGzFtOZf3GkmwNRbAdyOJ2HyjgNtuKnHcPlw\","
-      + "\"e\":\"AQAB\""
-      + "}]}";
+  private static final String RSA_JWKS_BODY = readResource("src/test/resources/jwks/rsa_one_key.json");
+
+  private static final String RSA_JWKS_DUPLICATE_KID_BODY = readResource("src/test/resources/jwks/rsa_duplicate_kid.json");
+
+  private static String readResource(String path) {
+    try {
+      return new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(path)));
+    } catch (java.io.IOException e) {
+      throw new RuntimeException("Failed to read test resource [" + path + "]", e);
+    }
+  }
 
   @Test
   public void builder_rejects_nonPositive_refreshInterval() {
@@ -314,15 +317,11 @@ public class JWKSourceTest extends BaseTest {
 
   @Test
   public void logger_emits_duplicateKid_at_warn() throws Exception {
-    String dupBody = "{\"keys\":[" +
-        "{\"kty\":\"RSA\",\"kid\":\"k1\",\"alg\":\"RS256\",\"use\":\"sig\",\"n\":\"sXch9_uEVyZw4d4XNjUMl7-DnbBwfXz9V_DwiHCNL5KNg6oHEcF7T7zJDSsBmWxAOKtc6vK4Ek5oN_R5kxdovfBdRRiClNxrRwmExZGMC8oBROHFEJiOFdDmqNJZbJ-w_e8KE2j_yWctgxX9LowhOWy0VEArLjr5tLqhwAtFm6gK_DfXXyZjU2DBBL_3Iaiu0YQz-jRR4lA1IAKVLA98m_4cP3pUvP6m9Eds3qpf0CzrI4DT9byOPQQX-FQOPaWTBcOJG6L9_kg7XYmbgrUKf6JhPYiTEVNvSXpHlxF6PoJiLvCNpyhGzFtOZf3GkmwNRbAdyOJ2HyjgNtuKnHcPlw\",\"e\":\"AQAB\"}," +
-        "{\"kty\":\"RSA\",\"kid\":\"k1\",\"alg\":\"RS256\",\"use\":\"sig\",\"n\":\"sXch9_uEVyZw4d4XNjUMl7-DnbBwfXz9V_DwiHCNL5KNg6oHEcF7T7zJDSsBmWxAOKtc6vK4Ek5oN_R5kxdovfBdRRiClNxrRwmExZGMC8oBROHFEJiOFdDmqNJZbJ-w_e8KE2j_yWctgxX9LowhOWy0VEArLjr5tLqhwAtFm6gK_DfXXyZjU2DBBL_3Iaiu0YQz-jRR4lA1IAKVLA98m_4cP3pUvP6m9Eds3qpf0CzrI4DT9byOPQQX-FQOPaWTBcOJG6L9_kg7XYmbgrUKf6JhPYiTEVNvSXpHlxF6PoJiLvCNpyhGzFtOZf3GkmwNRbAdyOJ2HyjgNtuKnHcPlw\",\"e\":\"AQAB\"}" +
-        "]}";
     startHttpServer(server -> server
         .listenOn(PORT)
         .handleURI("/jwks.json")
         .andReturn(new ExpectedResponse()
-            .with(r -> r.response = dupBody)
+            .with(r -> r.response = RSA_JWKS_DUPLICATE_KID_BODY)
             .with(r -> r.status = 200)
             .with(r -> r.contentType = "application/json")));
     RecordingLogger logger = new RecordingLogger();
@@ -689,7 +688,7 @@ public class JWKSourceTest extends BaseTest {
   public void resolve_onMissRefresh_findsNewlyAddedKid() throws Exception {
     // Use case: rotation — a fresh kid not in the cache triggers a fetch and resolves.
     String body1 = RSA_JWKS_BODY;
-    String body2 = body1.replace("\"kid\":\"k1\"", "\"kid\":\"k2\"");
+    String body2 = body1.replace("\"k1\"", "\"k2\"");
     org.lattejava.jwt.HttpServerBuilder b = new org.lattejava.jwt.HttpServerBuilder()
         .listenOn(PORT)
         .handleURI("/jwks.json")
