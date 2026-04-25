@@ -23,6 +23,7 @@
 
 package org.lattejava.jwt.jwks;
 
+import org.lattejava.jwt.HTTPResponseException;
 import org.lattejava.jwt.Header;
 import org.lattejava.jwt.Verifier;
 import org.lattejava.jwt.VerifierResolver;
@@ -318,7 +319,7 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
     };
   }
 
-  /** Failure-path Snapshot. Spec §2.7. Retry-After honoring lands in Task 16. */
+  /** Failure-path Snapshot. Spec §2.7 with Retry-After floor extension. */
   private Snapshot failureSnapshot(Snapshot prev, Instant now, Throwable cause) {
     int prior = (prev == null) ? 0 : prev.consecutiveFailures();
     int next = prior + 1;
@@ -326,7 +327,46 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
     Instant fetchedAt = (prev == null) ? Instant.EPOCH : prev.fetchedAt();
     Duration off = backoff(next, minRefreshInterval, refreshInterval);
     Instant nextDue = now.plus(off);
+
+    HTTPResponseException httpEx = unwrapHTTP(cause);
+    if (httpEx != null) {
+      String ra = httpEx.headerValue("Retry-After");
+      if (ra != null) {
+        Duration raDur = parseRetryAfter(ra);
+        if (raDur != null) {
+          Instant raNext = now.plus(raDur);
+          if (raNext.isAfter(nextDue)) {
+            nextDue = raNext;
+            if (logger.isInfoEnabled()) {
+              logger.info("Retry-After honored; nextDueAt extended by [" + raDur + "]");
+            }
+          }
+        }
+      }
+    }
     return new Snapshot(byKid, fetchedAt, nextDue, next, now);
+  }
+
+  private static HTTPResponseException unwrapHTTP(Throwable t) {
+    while (t != null) {
+      if (t instanceof HTTPResponseException he) return he;
+      t = t.getCause();
+    }
+    return null;
+  }
+
+  /**
+   * Parse a Retry-After header (RFC 9110 §10.2.3). Supports the seconds form;
+   * the HTTP-date form returns {@code null} (not needed in v1).
+   */
+  static Duration parseRetryAfter(String value) {
+    if (value == null) return null;
+    try {
+      long seconds = Long.parseLong(value.trim());
+      return seconds < 0 ? Duration.ZERO : Duration.ofSeconds(seconds);
+    } catch (NumberFormatException nfe) {
+      return null;
+    }
   }
 
   // --- Internal types ---

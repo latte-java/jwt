@@ -106,6 +106,48 @@ public class JWKSourceTest extends BaseTest {
   }
 
   @Test
+  public void retryAfter_extendsNextDueAt_aboveBackoff() throws Exception {
+    // Use case: 429 with Retry-After: 600s extends nextDueAt past the 30s backoff.
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = "{\"error\":\"throttled\"}")
+            .with(r -> r.status = 429)
+            .with(r -> r.contentType = "application/json")
+            .with(r -> r.headers = java.util.Map.of("Retry-After", "600"))));
+
+    java.time.Instant fixedNow = java.time.Instant.parse("2026-04-25T12:00:00Z");
+    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+        .clock(java.time.Clock.fixed(fixedNow, java.time.ZoneOffset.UTC))
+        .build();
+    assertEquals(source.consecutiveFailures(), 1);
+    assertTrue(!source.nextDueAt().isBefore(fixedNow.plusSeconds(600)));
+    source.close();
+  }
+
+  @Test
+  public void retryAfter_belowBackoff_doesNotShrinkNextDueAt() throws Exception {
+    // Use case: 429 with Retry-After: 1s does not pull nextDueAt below the 30s backoff floor.
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = "{}")
+            .with(r -> r.status = 429)
+            .with(r -> r.contentType = "application/json")
+            .with(r -> r.headers = java.util.Map.of("Retry-After", "1"))));
+
+    java.time.Instant fixedNow = java.time.Instant.parse("2026-04-25T12:00:00Z");
+    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+        .clock(java.time.Clock.fixed(fixedNow, java.time.ZoneOffset.UTC))
+        .minRefreshInterval(Duration.ofSeconds(30))
+        .build();
+    assertEquals(source.nextDueAt(), fixedNow.plusSeconds(30));
+    source.close();
+  }
+
+  @Test
   public void backoffSequence_30s_to_60m_capped() {
     // Use case: spec §2.7.2 backoff formula in long ms; sequence with default settings.
     Duration min = Duration.ofSeconds(30);
