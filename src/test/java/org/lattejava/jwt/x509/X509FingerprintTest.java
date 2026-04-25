@@ -24,6 +24,7 @@
 package org.lattejava.jwt.x509;
 
 import org.lattejava.jwt.BaseJWTTest;
+import org.lattejava.jwt.X509;
 import org.testng.annotations.Test;
 
 import java.io.ByteArrayInputStream;

@@ -53,7 +53,9 @@ target(name: "clean", description: "Cleans the build directory") {
 }
 
 target(name: "build", description: "Compiles the Java source files and creates a JAR") {
-  java.compile()
+  java.compileMain()
+  java.settings.compilerArguments = "--add-modules jdk.httpserver"
+  java.compileTest()
   java.jar()
 }
 
@@ -66,7 +68,7 @@ target(name: "test", description: "Runs the project's tests", dependsOn: ["build
   }
 
   fipsEnabled.each { enabled ->
-    javaTestNG.settings.jvmArguments = "-Dtest.fips=${enabled}"
+    javaTestNG.settings.jvmArguments = "-Dtest.fips=${enabled} --add-modules jdk.httpserver --add-reads org.lattejava.jwt=jdk.httpserver"
     javaTestNG.test()
   }
 }

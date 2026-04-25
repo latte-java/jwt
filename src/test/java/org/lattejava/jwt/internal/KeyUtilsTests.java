@@ -17,7 +17,7 @@
 package org.lattejava.jwt.internal;
 
 import org.lattejava.jwt.JWTUtils;
-import org.lattejava.jwt.pem.PEM;
+import org.lattejava.jwt.internal.pem.PEM;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 

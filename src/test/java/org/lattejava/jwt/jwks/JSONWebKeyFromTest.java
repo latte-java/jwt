@@ -17,7 +17,6 @@
 package org.lattejava.jwt.jwks;
 
 import org.lattejava.jwt.BaseJWTTest;
-import org.lattejava.jwt.JWTUtils;
 import org.lattejava.jwt.KeyType;
 import org.lattejava.jwt.Signer;
 import org.lattejava.jwt.Verifier;
@@ -27,7 +26,7 @@ import org.lattejava.jwt.JWT;
 import org.lattejava.jwt.algorithm.rsa.RSAPSSSigner;
 import org.lattejava.jwt.algorithm.rsa.RSAPSSVerifier;
 import org.lattejava.jwt.algorithm.rsa.RSASigner;
-import org.lattejava.jwt.pem.PEM;
+import org.lattejava.jwt.internal.pem.PEM;
 import org.testng.annotations.Test;
 
 import java.nio.charset.StandardCharsets;

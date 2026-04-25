@@ -16,8 +16,7 @@
 
 package org.lattejava.jwt.internal.der;
 
-import org.lattejava.jwt.internal.der.*;
-import org.lattejava.jwt.pem.PEM;
+import org.lattejava.jwt.internal.pem.PEM;
 import org.testng.annotations.Test;
 
 import java.nio.file.Files;

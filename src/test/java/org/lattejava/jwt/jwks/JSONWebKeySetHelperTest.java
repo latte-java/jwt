@@ -45,13 +45,7 @@ public class JSONWebKeySetHelperTest extends BaseTest {
   @AfterMethod
   public void resetHelperConfig() {
     // Restore defaults so tests stay isolated.
-    JSONWebKeySetHelper.setMaxResponseSize(JSONWebKeySetHelper.DEFAULT_MAX_RESPONSE_BYTES);
-    JSONWebKeySetHelper.setMaxRedirects(JSONWebKeySetHelper.DEFAULT_MAX_REDIRECTS);
-    JSONWebKeySetHelper.setMaxNestingDepth(JSONWebKeySetHelper.DEFAULT_MAX_NESTING_DEPTH);
-    JSONWebKeySetHelper.setMaxNumberLength(JSONWebKeySetHelper.DEFAULT_MAX_NUMBER_LENGTH);
-    JSONWebKeySetHelper.setMaxObjectMembers(JSONWebKeySetHelper.DEFAULT_MAX_OBJECT_MEMBERS);
-    JSONWebKeySetHelper.setMaxArrayElements(JSONWebKeySetHelper.DEFAULT_MAX_ARRAY_ELEMENTS);
-    JSONWebKeySetHelper.setAllowDuplicateJSONKeys(JSONWebKeySetHelper.DEFAULT_ALLOW_DUPLICATE_JSON_KEYS);
+    JSONWebKeySetHelper.resetDefaults();
   }
 
   @Test

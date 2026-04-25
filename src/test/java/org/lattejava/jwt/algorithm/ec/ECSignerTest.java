@@ -18,7 +18,7 @@ package org.lattejava.jwt.algorithm.ec;
 
 import org.lattejava.jwt.BaseJWTTest;
 import org.lattejava.jwt.InvalidKeyTypeException;
-import org.lattejava.jwt.pem.PEM;
+import org.lattejava.jwt.internal.pem.PEM;
 import org.testng.annotations.Test;
 
 import java.nio.charset.StandardCharsets;

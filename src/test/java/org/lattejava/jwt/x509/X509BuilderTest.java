@@ -25,9 +25,10 @@ package org.lattejava.jwt.x509;
 
 import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.BaseJWTTest;
-import org.lattejava.jwt.pem.PEM;
-import org.lattejava.jwt.pem.PEMDecoder;
-import org.lattejava.jwt.pem.PEMEncoder;
+import org.lattejava.jwt.X509;
+import org.lattejava.jwt.internal.pem.PEM;
+import org.lattejava.jwt.internal.pem.PEMDecoder;
+import org.lattejava.jwt.internal.pem.PEMEncoder;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -35,8 +36,6 @@ import java.io.ByteArrayInputStream;
 import java.math.BigInteger;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
-import java.security.PrivateKey;
-import java.security.PublicKey;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.security.spec.ECGenParameterSpec;

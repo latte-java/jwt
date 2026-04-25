@@ -44,7 +44,7 @@ public class DerValue {
 
   private final DerInputStream value;
 
-  public Tag tag;
+  public final Tag tag;
 
   public DerValue(Tag tag, byte[] value) {
     this.tag = tag;

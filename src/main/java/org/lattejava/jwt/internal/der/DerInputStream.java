@@ -28,9 +28,9 @@ import java.util.Objects;
  * @author Daniel DeGroff
  */
 public class DerInputStream {
-  public ByteArrayInputStream data;
+  public final ByteArrayInputStream data;
 
-  public int length;
+  public final int length;
 
   public DerInputStream(DerValue dervalue) {
     this(dervalue.toByteArray());

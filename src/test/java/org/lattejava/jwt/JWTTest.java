@@ -16,6 +16,7 @@
 
 package org.lattejava.jwt;
 
+import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -118,7 +119,7 @@ public class JWTTest {
     // form does not vary with which audience overload the caller happens to use.
     JWT jwt = JWT.builder().audience("svc").build();
     assertEquals(jwt.audience(), Collections.singletonList("svc"));
-    assertEquals(jwt.audienceSerialization(), AudienceSerialization.ALWAYS_ARRAY);
+    Assert.assertEquals(jwt.audienceSerialization(), AudienceSerialization.ALWAYS_ARRAY);
     assertEquals(jwt.toSerializableMap().get("aud"), Collections.singletonList("svc"));
   }
 

@@ -19,6 +19,7 @@ package org.lattejava.jwt.jwks;
 import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.KeyType;
 import org.lattejava.jwt.LatteJSONProcessor;
+import org.lattejava.jwt.internal.JWKThumbprint;
 
 import java.security.PrivateKey;
 import java.security.PublicKey;
@@ -303,6 +304,36 @@ public final class JSONWebKey {
    */
   public Map<String, Object> other() {
     return other;
+  }
+
+  // ---------- Thumbprints ----------
+
+  /**
+   * Returns the RFC 7638 / RFC 8037 SHA-256 JWK thumbprint of this key as a
+   * base64url-no-pad string. Suitable for use as the JWS {@code kid} value.
+   *
+   * <p>The thumbprint is computed from the canonical JSON serialization of
+   * the required member subset for {@link #kty()} (RFC 7638 §3.2 / RFC 8037
+   * §2). Canonicalisation is independent of any user-configured
+   * {@code JSONProcessor} so the bytes are stable across deployments.</p>
+   *
+   * @return the base64url-no-pad SHA-256 thumbprint
+   * @throws IllegalArgumentException if {@link #kty()} is null or unsupported
+   */
+  public String thumbprintSHA256() {
+    return JWKThumbprint.compute("SHA-256", this);
+  }
+
+  /**
+   * Returns the SHA-1 JWK thumbprint of this key as a base64url-no-pad
+   * string. Provided for interoperability with systems that still emit SHA-1
+   * thumbprints; prefer {@link #thumbprintSHA256()} for new use.
+   *
+   * @return the base64url-no-pad SHA-1 thumbprint
+   * @throws IllegalArgumentException if {@link #kty()} is null or unsupported
+   */
+  public String thumbprintSHA1() {
+    return JWKThumbprint.compute("SHA-1", this);
   }
 
   // ---------- Custom-parameter access ----------

@@ -19,7 +19,7 @@ package org.lattejava.jwt.algorithm.rsa;
 import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.JWTSigningException;
 import org.lattejava.jwt.Signer;
-import org.lattejava.jwt.algorithm.KeyCoercion;
+import org.lattejava.jwt.internal.KeyCoercion;
 
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;

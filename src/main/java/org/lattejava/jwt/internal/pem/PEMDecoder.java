@@ -14,8 +14,9 @@
  * language governing permissions and limitations under the License.
  */
 
-package org.lattejava.jwt.pem;
+package org.lattejava.jwt.internal.pem;
 
+import org.lattejava.jwt.PEMDecoderException;
 import org.lattejava.jwt.internal.der.DerInputStream;
 import org.lattejava.jwt.internal.der.DerOutputStream;
 import org.lattejava.jwt.internal.der.DerValue;
@@ -54,18 +55,18 @@ import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.Objects;
 
-import static org.lattejava.jwt.pem.PEM.EC_PRIVATE_KEY_PREFIX;
-import static org.lattejava.jwt.pem.PEM.EC_PRIVATE_KEY_SUFFIX;
-import static org.lattejava.jwt.pem.PEM.PKCS_1_PRIVATE_KEY_PREFIX;
-import static org.lattejava.jwt.pem.PEM.PKCS_1_PRIVATE_KEY_SUFFIX;
-import static org.lattejava.jwt.pem.PEM.PKCS_1_PUBLIC_KEY_PREFIX;
-import static org.lattejava.jwt.pem.PEM.PKCS_1_PUBLIC_KEY_SUFFIX;
-import static org.lattejava.jwt.pem.PEM.PKCS_8_PRIVATE_KEY_PREFIX;
-import static org.lattejava.jwt.pem.PEM.PKCS_8_PRIVATE_KEY_SUFFIX;
-import static org.lattejava.jwt.pem.PEM.X509_CERTIFICATE_PREFIX;
-import static org.lattejava.jwt.pem.PEM.X509_CERTIFICATE_SUFFIX;
-import static org.lattejava.jwt.pem.PEM.X509_PUBLIC_KEY_PREFIX;
-import static org.lattejava.jwt.pem.PEM.X509_PUBLIC_KEY_SUFFIX;
+import static org.lattejava.jwt.internal.pem.PEM.EC_PRIVATE_KEY_PREFIX;
+import static org.lattejava.jwt.internal.pem.PEM.EC_PRIVATE_KEY_SUFFIX;
+import static org.lattejava.jwt.internal.pem.PEM.PKCS_1_PRIVATE_KEY_PREFIX;
+import static org.lattejava.jwt.internal.pem.PEM.PKCS_1_PRIVATE_KEY_SUFFIX;
+import static org.lattejava.jwt.internal.pem.PEM.PKCS_1_PUBLIC_KEY_PREFIX;
+import static org.lattejava.jwt.internal.pem.PEM.PKCS_1_PUBLIC_KEY_SUFFIX;
+import static org.lattejava.jwt.internal.pem.PEM.PKCS_8_PRIVATE_KEY_PREFIX;
+import static org.lattejava.jwt.internal.pem.PEM.PKCS_8_PRIVATE_KEY_SUFFIX;
+import static org.lattejava.jwt.internal.pem.PEM.X509_CERTIFICATE_PREFIX;
+import static org.lattejava.jwt.internal.pem.PEM.X509_CERTIFICATE_SUFFIX;
+import static org.lattejava.jwt.internal.pem.PEM.X509_PUBLIC_KEY_PREFIX;
+import static org.lattejava.jwt.internal.pem.PEM.X509_PUBLIC_KEY_SUFFIX;
 
 /**
  * @author Daniel DeGroff

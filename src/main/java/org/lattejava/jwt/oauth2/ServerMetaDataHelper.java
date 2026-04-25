@@ -16,7 +16,7 @@
 
 package org.lattejava.jwt.oauth2;
 
-import org.lattejava.jwt.AbstractHttpHelper;
+import org.lattejava.jwt.internal.http.AbstractHttpHelper;
 import org.lattejava.jwt.jwks.JSONWebKeySetHelper;
 
 import java.net.HttpURLConnection;
@@ -30,9 +30,24 @@ import java.util.Objects;
  * @author Daniel DeGroff
  */
 public class ServerMetaDataHelper extends AbstractHttpHelper {
+  /** Default maximum response body size: 1 MiB. */
+  private static final int DEFAULT_MAX_RESPONSE_BYTES = 1024 * 1024;
+
+  /** Default maximum number of HTTP redirects to follow. */
+  private static final int DEFAULT_MAX_REDIRECTS = 3;
+
   private static volatile int maxResponseSize = DEFAULT_MAX_RESPONSE_BYTES;
 
   private static volatile int maxRedirects = DEFAULT_MAX_REDIRECTS;
+
+  /**
+   * Reset all tunable OAuth 2.0 metadata fetch defaults to their built-in
+   * values. Useful for tests that mutate these via setters.
+   */
+  public static void resetDefaults() {
+    maxResponseSize = DEFAULT_MAX_RESPONSE_BYTES;
+    maxRedirects = DEFAULT_MAX_REDIRECTS;
+  }
 
   /**
    * Set the maximum response size in bytes that will be read. Must be
@@ -83,7 +98,7 @@ public class ServerMetaDataHelper extends AbstractHttpHelper {
    * URL.
    */
   public static AuthorizationServerMetaData retrieveFromWellKnownConfiguration(String endpoint) {
-    return retrieveFromWellKnownConfiguration(buildURLConnection(endpoint));
+    return retrieveFromWellKnownConfiguration(buildURLConnection(endpoint, ServerMetaDataException::new));
   }
 
   public static class ServerMetaDataException extends RuntimeException {

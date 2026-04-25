@@ -17,8 +17,9 @@
 package org.lattejava.jwt.pem;
 
 import org.lattejava.jwt.Algorithm;
-import org.lattejava.jwt.pem.PEM;
-import org.lattejava.jwt.x509.X509;
+import org.lattejava.jwt.X509;
+import org.lattejava.jwt.internal.pem.PEM;
+import org.lattejava.jwt.internal.pem.PEMDecoder;
 import org.lattejava.jwt.x509.X509BuilderTest;
 import org.testng.annotations.Test;
 

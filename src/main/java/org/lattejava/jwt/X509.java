@@ -21,15 +21,13 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.lattejava.jwt.x509;
+package org.lattejava.jwt;
 
-import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.internal.HexUtils;
 import org.lattejava.jwt.internal.der.DerOutputStream;
 import org.lattejava.jwt.internal.der.DerValue;
 import org.lattejava.jwt.internal.der.ObjectIdentifier;
 import org.lattejava.jwt.internal.der.Tag;
-import org.lattejava.jwt.pem.PEMEncoderException;
 
 import java.io.ByteArrayInputStream;
 import java.math.BigInteger;

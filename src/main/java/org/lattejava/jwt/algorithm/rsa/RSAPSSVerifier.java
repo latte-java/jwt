@@ -20,7 +20,7 @@ import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.InvalidJWTSignatureException;
 import org.lattejava.jwt.JWTVerifierException;
 import org.lattejava.jwt.Verifier;
-import org.lattejava.jwt.algorithm.KeyCoercion;
+import org.lattejava.jwt.internal.KeyCoercion;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;

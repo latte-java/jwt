@@ -33,7 +33,7 @@ import org.lattejava.jwt.algorithm.rsa.RSAPSSSigner;
 import org.lattejava.jwt.algorithm.rsa.RSAPSSVerifier;
 import org.lattejava.jwt.algorithm.rsa.RSASigner;
 import org.lattejava.jwt.algorithm.rsa.RSAVerifier;
-import org.lattejava.jwt.pem.PEM;
+import org.lattejava.jwt.internal.pem.PEM;
 import org.testng.SkipException;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;

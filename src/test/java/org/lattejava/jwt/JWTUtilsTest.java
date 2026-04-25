@@ -18,7 +18,8 @@ package org.lattejava.jwt;
 
 import org.lattejava.jwt.jwks.JSONWebKey;
 import org.lattejava.jwt.algorithm.hmac.HMACSigner;
-import org.lattejava.jwt.pem.PEM;
+import org.lattejava.jwt.internal.pem.PEM;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import java.nio.charset.StandardCharsets;
@@ -30,10 +31,10 @@ import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.util.Base64;
 
-import static org.lattejava.jwt.pem.PEM.PKCS_8_PRIVATE_KEY_PREFIX;
-import static org.lattejava.jwt.pem.PEM.PKCS_8_PRIVATE_KEY_SUFFIX;
-import static org.lattejava.jwt.pem.PEM.X509_PUBLIC_KEY_PREFIX;
-import static org.lattejava.jwt.pem.PEM.X509_PUBLIC_KEY_SUFFIX;
+import static org.lattejava.jwt.internal.pem.PEM.PKCS_8_PRIVATE_KEY_PREFIX;
+import static org.lattejava.jwt.internal.pem.PEM.PKCS_8_PRIVATE_KEY_SUFFIX;
+import static org.lattejava.jwt.internal.pem.PEM.X509_PUBLIC_KEY_PREFIX;
+import static org.lattejava.jwt.internal.pem.PEM.X509_PUBLIC_KEY_SUFFIX;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
@@ -50,7 +51,7 @@ public class JWTUtilsTest extends BaseTest {
     String encodedJWT = new org.lattejava.jwt.JWTEncoder().encode(jwt, HMACSigner.newSHA512Signer("super-secret-key-1-that-is-at-least-64-bytes-long-for-sha512-algorithm-compat-req!!"));
     JWT decoded = new JWTDecoder().decodeUnsecured(encodedJWT);
     assertEquals(decoded.subject(), "123456789");
-    assertEquals(decoded.header().alg(), Algorithm.HS512);
+    Assert.assertEquals(decoded.header().alg(), Algorithm.HS512);
   }
 
   @Test
@@ -340,10 +341,10 @@ public class JWTUtilsTest extends BaseTest {
         .build();
 
     // SHA-1
-    assertEquals(JWTUtils.generateJWS_kidSHA1(rsaKey), "nMGlFRw9Y5POaSOaIaRBc9P2nfA");
+    assertEquals(rsaKey.thumbprintSHA1(), "nMGlFRw9Y5POaSOaIaRBc9P2nfA");
 
     // SHA-256
-    assertEquals(JWTUtils.generateJWS_kidSHA256(rsaKey), "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs");
+    assertEquals(rsaKey.thumbprintSHA256(), "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs");
   }
 
   @Test
@@ -356,10 +357,10 @@ public class JWTUtilsTest extends BaseTest {
         .build();
 
     // SHA-1
-    assertEquals(JWTUtils.generateJWS_kidSHA1(ecKey), "VHriznG7vJAFpXMXRmGgAkA5sEE");
+    assertEquals(ecKey.thumbprintSHA1(), "VHriznG7vJAFpXMXRmGgAkA5sEE");
 
     // SHA-256
-    assertEquals(JWTUtils.generateJWS_kidSHA256(ecKey), "cn-I_WNMClehiVp51i_0VpOENW1upEerA8sEam5hn-s");
+    assertEquals(ecKey.thumbprintSHA256(), "cn-I_WNMClehiVp51i_0VpOENW1upEerA8sEam5hn-s");
   }
 
   @Test
@@ -373,10 +374,10 @@ public class JWTUtilsTest extends BaseTest {
         .build();
 
     // SHA-1
-    assertEquals(JWTUtils.generateJWS_kidSHA1(eddsaKey), "VmxEWEmFxGLRPOX30HXyts0yJOE");
+    assertEquals(eddsaKey.thumbprintSHA1(), "VmxEWEmFxGLRPOX30HXyts0yJOE");
 
     // SHA-256
-    assertEquals(JWTUtils.generateJWS_kidSHA256(eddsaKey), "kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k");
+    assertEquals(eddsaKey.thumbprintSHA256(), "kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k");
   }
 
   private void assertPrefix(String key, String prefix) {

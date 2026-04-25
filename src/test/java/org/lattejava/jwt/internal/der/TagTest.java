@@ -16,8 +16,6 @@
 
 package org.lattejava.jwt.internal.der;
 
-import org.lattejava.jwt.internal.der.Tag;
-import org.lattejava.jwt.internal.der.TagClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
