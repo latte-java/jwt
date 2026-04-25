@@ -190,8 +190,7 @@ public class JWTDecoder {
 
     // Verify the signature BEFORE parsing the payload so that untrusted
     // payload bytes never reach the JSON parser unless authenticated.
-    String signingInput = segments.headerB64 + "." + segments.payloadB64;
-    byte[] message = signingInput.getBytes(StandardCharsets.UTF_8);
+    byte[] message = segments.signingInput.getBytes(StandardCharsets.UTF_8);
     byte[] signatureBytes = strictBase64UrlDecode(segments.signatureB64, "signature");
     verifier.verify(message, signatureBytes);
 
@@ -279,7 +278,10 @@ public class JWTDecoder {
       // return null first -> MissingVerifierException.
     }
 
-    return new Segments(headerB64, payloadB64, signatureB64);
+    // signingInput is a contiguous prefix of the original token, so a single
+    // substring is cheaper than reconstructing headerB64 + "." + payloadB64.
+    String signingInput = encodedJWT.substring(0, secondDot);
+    return new Segments(headerB64, payloadB64, signatureB64, signingInput);
   }
 
   private Header parseHeader(String headerB64) {
@@ -384,11 +386,14 @@ public class JWTDecoder {
     final String headerB64;
     final String payloadB64;
     final String signatureB64;
+    /** {@code headerB64.payloadB64} -- the JWS Signing Input (RFC 7515 §5.1). */
+    final String signingInput;
 
-    Segments(String h, String p, String s) {
+    Segments(String h, String p, String s, String signingInput) {
       this.headerB64 = h;
       this.payloadB64 = p;
       this.signatureB64 = s;
+      this.signingInput = signingInput;
     }
   }
 

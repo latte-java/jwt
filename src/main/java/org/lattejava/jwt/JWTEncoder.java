@@ -30,11 +30,16 @@ import org.lattejava.jwt.internal.Base64URL;
  *       {@link Signer#algorithm()} and {@code kid} from {@link Signer#kid()}.</li>
  *   <li>Serialize header via {@link JSONProcessor} and base64url-encode (no padding).</li>
  *   <li>Serialize JWT claims and base64url-encode (no padding).</li>
- *   <li>Concatenate {@code headerB64.payloadB64}.</li>
- *   <li>Convert the concatenated string to bytes via {@code getBytes(UTF_8)},
- *       call {@link Signer#sign(byte[])}, base64url-encode the signature.</li>
+ *   <li>Assemble {@code headerB64.payloadB64} as a single byte array, call
+ *       {@link Signer#sign(byte[])}, base64url-encode the signature.</li>
  *   <li>Return {@code headerB64.payloadB64.signatureB64}.</li>
  * </ol>
+ *
+ * <p>The pipeline operates on {@code byte[]} end-to-end: the base64url-encoded
+ * segments are kept as bytes through signing and only converted to a
+ * {@link String} for the final return value. Every byte produced is in the
+ * base64url alphabet plus {@code '.'} -- a strict ASCII subset -- so the
+ * UTF-8 {@code String} constructor performs no actual decoding work.</p>
  *
  * <p>The {@code alg} header parameter is always derived from the signer and
  * cannot be modified by the caller -- {@link HeaderCustomizer} intentionally
@@ -108,24 +113,24 @@ public class JWTEncoder {
               + "] but found [" + (header.alg() == null ? "null" : header.alg().name()) + "]");
     }
 
-    // Steps 2-3: serialize header and payload, base64url (no padding).
-    byte[] headerJson = jsonProcessor.serialize(header.toSerializableMap());
-    byte[] payloadJson = jsonProcessor.serialize(jwt.toSerializableMap());
+    // Steps 2-3: serialize header and payload, base64url (no padding) as bytes.
+    byte[] encodedHeader = Base64URL.encode(jsonProcessor.serialize(header.toSerializableMap()));
+    byte[] encodedPayload = Base64URL.encode(jsonProcessor.serialize(jwt.toSerializableMap()));
 
-    String encodedHeader = base64UrlEncode(headerJson);
-    String encodedPayload = base64UrlEncode(payloadJson);
+    // Step 4: assemble headerB64.payloadB64 as bytes and sign.
+    byte[] signingInput = new byte[encodedHeader.length + 1 + encodedPayload.length];
+    System.arraycopy(encodedHeader, 0, signingInput, 0, encodedHeader.length);
+    signingInput[encodedHeader.length] = '.';
+    System.arraycopy(encodedPayload, 0, signingInput, encodedHeader.length + 1, encodedPayload.length);
+    byte[] encodedSignature = Base64URL.encode(signer.sign(signingInput));
 
-    // Steps 4-5: concatenate, sign, base64url-encode the signature.
-    String signingInput = encodedHeader + "." + encodedPayload;
-    byte[] signature = signer.sign(signingInput.getBytes(StandardCharsets.UTF_8));
-    String encodedSignature = base64UrlEncode(signature);
-
-    // Step 6: return the compact JWS.
-    return signingInput + "." + encodedSignature;
-  }
-
-  private static String base64UrlEncode(byte[] bytes) {
-    return Base64URL.encodeToString(bytes);
+    // Step 5: assemble the final compact JWS bytes and wrap as String.
+    byte[] out = new byte[signingInput.length + 1 + encodedSignature.length];
+    System.arraycopy(signingInput, 0, out, 0, signingInput.length);
+    out[signingInput.length] = '.';
+    System.arraycopy(encodedSignature, 0, out, signingInput.length + 1, encodedSignature.length);
+    // Output bytes are entirely ASCII (base64url + '.'); UTF-8 decoding is a no-op fast path.
+    return new String(out, StandardCharsets.UTF_8);
   }
 
   /**
