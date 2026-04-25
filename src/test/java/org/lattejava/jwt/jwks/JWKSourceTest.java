@@ -106,6 +106,40 @@ public class JWKSourceTest extends BaseTest {
   }
 
   @Test
+  public void refresh_succeeds_updatesSnapshot() throws Exception {
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = RSA_JWKS_BODY)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+
+    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json").build();
+    int before = httpHandlers.get(httpHandlers.size() - 1).called;
+    source.refresh();
+    assertTrue(httpHandlers.get(httpHandlers.size() - 1).called > before);
+    source.close();
+  }
+
+  @Test
+  public void refresh_throwsOnFailure() throws Exception {
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = RSA_JWKS_BODY)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json").build();
+
+    httpServers.get(httpServers.size() - 1).stop(0);
+    assertThrows(RuntimeException.class, source::refresh);
+    assertEquals(source.consecutiveFailures(), 1);
+    source.close();
+  }
+
+  @Test
   public void retryAfter_extendsNextDueAt_aboveBackoff() throws Exception {
     // Use case: 429 with Retry-After: 600s extends nextDueAt past the 30s backoff.
     startHttpServer(server -> server

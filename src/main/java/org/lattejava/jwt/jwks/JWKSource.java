@@ -53,6 +53,7 @@ import java.util.function.Consumer;
  * See {@code specs/jwks-source.md} for the full specification (rev 3).
  */
 public final class JWKSource implements VerifierResolver, AutoCloseable {
+  private volatile boolean closed;
   private final AtomicReference<CompletableFuture<Snapshot>> inflight = new AtomicReference<>();
   private final AtomicReference<Snapshot> ref = new AtomicReference<>();
   private final CacheControlPolicy cacheControlPolicy;
@@ -133,8 +134,23 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
   }
 
   public void refresh() {
-    // Implemented in Task 17.
-    throw new UnsupportedOperationException("not yet implemented");
+    if (closed) {
+      if (logger.isDebugEnabled()) logger.debug("refresh() called on closed JWKSource");
+      return;
+    }
+    CompletableFuture<Snapshot> fut = singleflightRefresh();
+    try {
+      fut.get(refreshTimeout.toMillis(), TimeUnit.MILLISECONDS);
+    } catch (TimeoutException te) {
+      return;
+    } catch (InterruptedException ie) {
+      Thread.currentThread().interrupt();
+      return;
+    } catch (ExecutionException ee) {
+      Throwable c = ee.getCause();
+      if (c instanceof RuntimeException re) throw re;
+      throw new RuntimeException(c);
+    }
   }
 
   @Override
@@ -282,7 +298,11 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
   /**
    * Returns the in-flight refresh future, dispatching a new one on a virtual
    * thread if no refresh is currently active. Order on completion: snapshot
-   * updated first, then slot cleared. See spec §3.
+   * updated first, then awaiters notified, then slot cleared. See spec §3.
+   *
+   * <p>If the refresh fails, the future completes exceptionally with the
+   * underlying cause so that the operator-driven {@link #refresh()} path can
+   * surface it. The on-miss path swallows the exception.</p>
    */
   private CompletableFuture<Snapshot> singleflightRefresh() {
     CompletableFuture<Snapshot> existing = inflight.get();
@@ -297,18 +317,61 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
       logger.debug("JWKS refresh dispatched");
     }
     Thread.ofVirtual().start(() -> {
+      Snapshot prev = ref.get();
       Snapshot fresh;
+      Throwable failureCause = null;
       try {
-        fresh = doRefresh(ref.get());
+        fresh = doRefreshOrThrow(prev);
       } catch (Throwable t) {
-        fresh = failureSnapshot(ref.get(), Instant.now(clock), t);
+        failureCause = t;
+        fresh = failureSnapshot(prev, Instant.now(clock), t);
       }
-      ref.set(fresh);
-      mine.complete(fresh);
+      if (!closed) {
+        ref.set(fresh);
+      }
+      if (failureCause != null) {
+        mine.completeExceptionally(failureCause);
+      } else {
+        mine.complete(fresh);
+      }
       inflight.set(null);
     });
 
     return mine;
+  }
+
+  /**
+   * Like {@link #doRefresh} but throws the underlying cause instead of
+   * returning a failure snapshot. Used by the singleflight path so the
+   * operator-driven {@link #refresh()} can surface the cause.
+   */
+  private Snapshot doRefreshOrThrow(Snapshot prev) {
+    Instant now = Instant.now(clock);
+    JWKSResponse resp = fetch();
+    Map<String, Verifier> byKid = new LinkedHashMap<>();
+    for (JSONWebKey jwk : resp.keys()) {
+      Verifier v = Verifiers.fromJWK(jwk);
+      if (v == null) continue;
+      if (byKid.containsKey(jwk.kid())) {
+        if (logger.isWarnEnabled()) {
+          logger.warn("JWKS contains duplicate kid [" + jwk.kid() + "]; first-write-wins");
+        }
+        continue;
+      }
+      byKid.put(jwk.kid(), v);
+    }
+    if (byKid.isEmpty()) {
+      if (logger.isErrorEnabled()) {
+        logger.error("JWKS refresh produced an empty kid map; treating as failure");
+      }
+      throw new IllegalStateException("Empty kid map after JWK conversion");
+    }
+    Duration chosen = chosenInterval(resp);
+    Instant nextDue = now.plus(maxOf(minRefreshInterval, chosen));
+    if (logger.isInfoEnabled()) {
+      logger.info("JWKS refresh succeeded; kids=" + byKid.keySet());
+    }
+    return new Snapshot(Map.copyOf(byKid), now, nextDue, 0, null);
   }
 
   private JWKSResponse fetch() {
