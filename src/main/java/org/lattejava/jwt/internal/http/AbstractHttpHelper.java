@@ -14,10 +14,11 @@
  * language governing permissions and limitations under the License.
  */
 
-package org.lattejava.jwt;
+package org.lattejava.jwt.internal.http;
 
+import org.lattejava.jwt.ResponseTooLargeException;
+import org.lattejava.jwt.TooManyRedirectsException;
 import org.lattejava.jwt.internal.MessageSanitizer;
-import org.lattejava.jwt.jwks.JSONWebKeySetHelper;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
@@ -44,16 +45,6 @@ import java.util.function.Function;
  * @author Daniel DeGroff
  */
 public abstract class AbstractHttpHelper {
-  /** Default maximum response body size: 1 MiB. */
-  public static final int DEFAULT_MAX_RESPONSE_BYTES = 1024 * 1024;
-
-  /** Default maximum number of HTTP redirects to follow. */
-  public static final int DEFAULT_MAX_REDIRECTS = 3;
-
-  protected static <T> T get(HttpURLConnection urlConnection, int maxResponseSize, Function<InputStream, T> consumer, BiFunction<String, Throwable, ? extends RuntimeException> exception) {
-    return get(urlConnection, maxResponseSize, DEFAULT_MAX_REDIRECTS, consumer, exception);
-  }
-
   /**
    * Performs a GET on the supplied connection, manually following up to
    * {@code maxRedirects} 3xx responses, capping each hop's body at
@@ -125,7 +116,7 @@ public abstract class AbstractHttpHelper {
           // Only close() can throw here (getErrorStream() returns null, not throws), and an IOException
           // draining a hop we've already chosen to abandon is not actionable.
         }
-        current = buildURLConnection(nextURL.toString());
+        current = buildURLConnection(nextURL.toString(), exception);
         redirectsFollowed++;
         continue;
       }
@@ -214,7 +205,17 @@ public abstract class AbstractHttpHelper {
     }
   }
 
-  protected static HttpURLConnection buildURLConnection(String endpoint) {
+  /**
+   * Open and prepare an {@link HttpURLConnection} for {@code endpoint}.
+   *
+   * @param endpoint  the URL to open
+   * @param exception caller-supplied wrapper for any {@link IOException} surfaced while
+   *                  opening the connection. Passed through so each subclass can surface a
+   *                  domain-appropriate type (e.g. {@code JSONWebKeyException} for the JWKS
+   *                  helper, {@code ServerMetaDataException} for the OAuth2 helper) rather
+   *                  than leaking a JWKS-named exception out of an unrelated caller.
+   */
+  protected static HttpURLConnection buildURLConnection(String endpoint, BiFunction<String, Throwable, ? extends RuntimeException> exception) {
     try {
       HttpURLConnection urlConnection = (HttpURLConnection) new URL(endpoint).openConnection();
       urlConnection.setDoOutput(true);
@@ -223,7 +224,7 @@ public abstract class AbstractHttpHelper {
       urlConnection.addRequestProperty("User-Agent", "latte-jwt (https://github.com/latte-java/jwt)");
       return urlConnection;
     } catch (IOException e) {
-      throw new JSONWebKeySetHelper.JSONWebKeySetException("Failed to build connection to [" + MessageSanitizer.forMessage(endpoint) + "]", e);
+      throw exception.apply("Failed to build connection to [" + MessageSanitizer.forMessage(endpoint) + "]", e);
     }
   }
 }

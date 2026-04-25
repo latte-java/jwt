@@ -18,8 +18,8 @@ package org.lattejava.jwt.jwks;
 
 import org.lattejava.jwt.KeyType;
 import org.lattejava.jwt.internal.MessageSanitizer;
-import org.lattejava.jwt.pem.PEMEncoder;
-import org.lattejava.jwt.pem.PEM;
+import org.lattejava.jwt.internal.pem.PEMEncoder;
+import org.lattejava.jwt.internal.pem.PEM;
 
 import java.math.BigInteger;
 import java.security.AlgorithmParameters;

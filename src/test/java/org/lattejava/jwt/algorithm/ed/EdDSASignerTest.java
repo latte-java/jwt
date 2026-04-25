@@ -24,7 +24,7 @@ import org.lattejava.jwt.VerifierResolver;
 import org.lattejava.jwt.JWT;
 import org.lattejava.jwt.JWTDecoder;
 import org.lattejava.jwt.JWTEncoder;
-import org.lattejava.jwt.pem.PEM;
+import org.lattejava.jwt.internal.pem.PEM;
 import org.testng.annotations.Test;
 
 import java.nio.file.Files;

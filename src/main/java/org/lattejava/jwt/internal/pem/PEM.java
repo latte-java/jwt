@@ -14,7 +14,7 @@
  * language governing permissions and limitations under the License.
  */
 
-package org.lattejava.jwt.pem;
+package org.lattejava.jwt.internal.pem;
 
 import java.nio.file.Path;
 import java.security.Key;

@@ -17,6 +17,7 @@
 package org.lattejava.jwt.pem;
 
 import org.lattejava.jwt.BaseTest;
+import org.lattejava.jwt.internal.pem.PEM;
 import org.testng.annotations.Test;
 
 import java.math.BigInteger;

@@ -16,10 +16,10 @@
 
 package org.lattejava.jwt.jwks;
 
-import org.lattejava.jwt.AbstractHttpHelper;
 import org.lattejava.jwt.JSONProcessor;
 import org.lattejava.jwt.JSONProcessingException;
 import org.lattejava.jwt.LatteJSONProcessor;
+import org.lattejava.jwt.internal.http.AbstractHttpHelper;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
@@ -72,6 +72,12 @@ public class JSONWebKeySetHelper extends AbstractHttpHelper {
 
   public static final boolean DEFAULT_ALLOW_DUPLICATE_JSON_KEYS = false;
 
+  /** Default maximum response body size: 1 MiB. */
+  private static final int DEFAULT_MAX_RESPONSE_BYTES = 1024 * 1024;
+
+  /** Default maximum number of HTTP redirects to follow. */
+  private static final int DEFAULT_MAX_REDIRECTS = 3;
+
   private static volatile int maxResponseSize = DEFAULT_MAX_RESPONSE_BYTES;
 
   private static volatile int maxRedirects = DEFAULT_MAX_REDIRECTS;
@@ -85,6 +91,20 @@ public class JSONWebKeySetHelper extends AbstractHttpHelper {
   private static volatile int maxArrayElements = DEFAULT_MAX_ARRAY_ELEMENTS;
 
   private static volatile boolean allowDuplicateJSONKeys = DEFAULT_ALLOW_DUPLICATE_JSON_KEYS;
+
+  /**
+   * Reset all tunable JWKS / discovery fetch defaults to their built-in
+   * values. Useful for tests that mutate these via setters.
+   */
+  public static void resetDefaults() {
+    maxResponseSize = DEFAULT_MAX_RESPONSE_BYTES;
+    maxRedirects = DEFAULT_MAX_REDIRECTS;
+    maxNestingDepth = DEFAULT_MAX_NESTING_DEPTH;
+    maxNumberLength = DEFAULT_MAX_NUMBER_LENGTH;
+    maxObjectMembers = DEFAULT_MAX_OBJECT_MEMBERS;
+    maxArrayElements = DEFAULT_MAX_ARRAY_ELEMENTS;
+    allowDuplicateJSONKeys = DEFAULT_ALLOW_DUPLICATE_JSON_KEYS;
+  }
 
   /**
    * Set the maximum response size in bytes that will be read from an HTTP
@@ -224,7 +244,7 @@ public class JSONWebKeySetHelper extends AbstractHttpHelper {
    * endpoint URL, with an optional connection customizer.
    */
   public static List<JSONWebKey> retrieveKeysFromWellKnownConfiguration(String endpoint, Consumer<HttpURLConnection> consumer) {
-    HttpURLConnection connection = buildURLConnection(endpoint);
+    HttpURLConnection connection = buildURLConnection(endpoint, JSONWebKeyException::new);
     if (consumer != null) {
       consumer.accept(connection);
     }
@@ -244,7 +264,7 @@ public class JSONWebKeySetHelper extends AbstractHttpHelper {
    * connection customizer.
    */
   public static List<JSONWebKey> retrieveKeysFromJWKS(String endpoint, Consumer<HttpURLConnection> consumer) {
-    HttpURLConnection connection = buildURLConnection(endpoint);
+    HttpURLConnection connection = buildURLConnection(endpoint, JSONWebKeyException::new);
     if (consumer != null) {
       consumer.accept(connection);
     }
@@ -280,9 +300,9 @@ public class JSONWebKeySetHelper extends AbstractHttpHelper {
   }
 
   /**
-   * Read the input stream fully (subject to the {@link AbstractHttpHelper.LimitedInputStream}
-   * cap that the caller already wrapped it with) and parse as a top-level
-   * JSON object.
+   * Read the input stream fully (subject to the per-hop response-size cap
+   * that the caller already wrapped it with) and parse as a top-level JSON
+   * object.
    */
   public static Map<String, Object> parseJSON(InputStream is) {
     JSONProcessor processor = new LatteJSONProcessor(maxNestingDepth, maxNumberLength,

@@ -22,7 +22,7 @@ import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.KeyPair;
 import org.lattejava.jwt.KeyType;
 import org.lattejava.jwt.LatteJSONProcessor;
-import org.lattejava.jwt.pem.PEM;
+import org.lattejava.jwt.internal.pem.PEM;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 

@@ -23,7 +23,7 @@ import org.lattejava.jwt.VerifierResolver;
 import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.JWT;
 import org.lattejava.jwt.JWTDecoder;
-import org.lattejava.jwt.pem.PEM;
+import org.lattejava.jwt.internal.pem.PEM;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

@@ -22,8 +22,8 @@ import org.lattejava.jwt.internal.der.DerDecodingException;
 import org.lattejava.jwt.internal.der.DerInputStream;
 import org.lattejava.jwt.internal.der.ObjectIdentifier;
 import org.lattejava.jwt.internal.KeyUtils;
-import org.lattejava.jwt.pem.PEM;
-import org.lattejava.jwt.x509.X509;
+import org.lattejava.jwt.internal.pem.PEM;
+import org.lattejava.jwt.X509;
 
 import java.io.IOException;
 import java.math.BigInteger;

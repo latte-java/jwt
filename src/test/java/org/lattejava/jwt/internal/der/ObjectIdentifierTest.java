@@ -17,8 +17,6 @@
 package org.lattejava.jwt.internal.der;
 
 import org.lattejava.jwt.BaseJWTTest;
-import org.lattejava.jwt.internal.der.DerDecodingException;
-import org.lattejava.jwt.internal.der.ObjectIdentifier;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 

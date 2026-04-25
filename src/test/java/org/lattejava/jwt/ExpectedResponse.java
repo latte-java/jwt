@@ -16,8 +16,6 @@
 
 package org.lattejava.jwt;
 
-import org.lattejava.jwt.Buildable;
-
 import java.nio.file.Path;
 
 /**

@@ -21,7 +21,7 @@ import org.lattejava.jwt.InvalidJWTSignatureException;
 import org.lattejava.jwt.InvalidKeyTypeException;
 import org.lattejava.jwt.JWTVerifierException;
 import org.lattejava.jwt.Verifier;
-import org.lattejava.jwt.algorithm.KeyCoercion;
+import org.lattejava.jwt.internal.KeyCoercion;
 import org.lattejava.jwt.internal.JOSEConverter;
 
 import java.io.IOException;

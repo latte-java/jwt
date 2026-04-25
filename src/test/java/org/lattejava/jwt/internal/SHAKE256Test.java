@@ -34,6 +34,7 @@ import java.security.ProviderException;
 import java.security.Security;
 import java.util.HexFormat;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -131,7 +132,7 @@ public class SHAKE256Test {
   public void brokenProviderFallsBackToBundled() throws Exception {
     // Use case: A registered "SHAKE256" provider that returns wrong bytes is
     // detected by the probe self-test and the library falls back to bundled.
-    Provider broken = new BrokenShakeProvider();
+    BrokenShakeProvider broken = new BrokenShakeProvider();
     Security.insertProviderAt(broken, 1);
     try {
       // Reset any cached provider state from prior tests so the probe re-runs.
@@ -146,9 +147,12 @@ public class SHAKE256Test {
       assertFalse(SHAKE256.hasCachedProviderForTesting(),
           "cached provider must be null after KAT failure");
 
-      // Verify the broken provider WAS actually queried (otherwise the test
-      // would pass trivially when no provider is registered at all).
-      assertTrue(broken.toString().contains("BrokenShake"));
+      // Verify the broken provider WAS actually queried. Without this the test
+      // can silently pass when JCA falls through to another SHAKE256 provider
+      // (e.g. BC-FIPS) because BrokenShake's class could not be loaded —
+      // toString() alone does not prove the service was consulted.
+      assertTrue(BrokenShakeMessageDigest.INSTANTIATIONS.get() > 0,
+          "broken provider's SHAKE256 service must have been instantiated");
     } finally {
       Security.removeProvider(broken.getName());
       SHAKE256.resetProviderCacheForTesting();
@@ -198,20 +202,41 @@ public class SHAKE256Test {
     }
   }
 
-  /** Broken Provider used to validate the probe self-test path. */
+  /**
+   * Broken Provider used to validate the probe self-test path.
+   *
+   * <p>Registers via {@code putService(...)} with an overridden
+   * {@link Service#newInstance(Object)} rather than the legacy class-name
+   * form. The legacy form requires JCA ({@code java.base}) to reflectively
+   * instantiate the impl class — which fails with {@code IllegalAccessException}
+   * because {@code org.lattejava.jwt.internal} is not opened to {@code java.base}
+   * in this module. When that happens, JCA silently falls through to the next
+   * provider offering SHAKE256 (e.g. BC-FIPS under {@code test.fips=true}),
+   * which defeats the purpose of this test.
+   */
   private static final class BrokenShakeProvider extends Provider {
     BrokenShakeProvider() {
       super("BrokenShake", "1.0", "Test-only broken SHAKE256 provider");
-      put("MessageDigest.SHAKE256", BrokenShakeMessageDigest.class.getName());
+      putService(new Service(this, "MessageDigest", "SHAKE256",
+          BrokenShakeMessageDigest.class.getName(), null, null) {
+        @Override
+        public Object newInstance(Object constructorParameter) {
+          return new BrokenShakeMessageDigest();
+        }
+      });
     }
   }
 
   /** Always returns all-zeros; will fail the KAT self-test. */
   public static final class BrokenShakeMessageDigest extends MessageDigest {
+    /** Counts instantiations so tests can assert the service was actually consulted. */
+    static final AtomicInteger INSTANTIATIONS = new AtomicInteger();
+
     private int outLen = 32;
 
     public BrokenShakeMessageDigest() {
       super("SHAKE256");
+      INSTANTIATIONS.incrementAndGet();
     }
 
     @Override

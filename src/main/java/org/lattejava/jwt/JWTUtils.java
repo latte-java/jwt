@@ -16,9 +16,7 @@
 
 package org.lattejava.jwt;
 
-import org.lattejava.jwt.internal.JWKThumbprint;
-import org.lattejava.jwt.jwks.JSONWebKey;
-import org.lattejava.jwt.pem.PEM;
+import org.lattejava.jwt.internal.pem.PEM;
 
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
@@ -132,30 +130,6 @@ public class JWTUtils {
    */
   public static KeyPair generate_ed448_EdDSAKeyPair() {
     return generateKeyPair("ed448", null);
-  }
-
-  /**
-   * Generate the JWK SHA-256 Thumbprint as per RFC 7638 (EdDSA per RFC 8037). Suitable for use
-   * as the JWS {@code kid} header. SHA-256 is the modern default; prefer this over
-   * {@link #generateJWS_kidSHA1(JSONWebKey)}.
-   *
-   * @param key the {@link JSONWebKey} to determine the thumbprint for
-   * @return the base64url-encoded JWK Thumbprint
-   */
-  public static String generateJWS_kidSHA256(JSONWebKey key) {
-    return JWKThumbprint.compute("SHA-256", key);
-  }
-
-  /**
-   * Generate the JWK SHA-1 Thumbprint as per RFC 7638 (EdDSA per RFC 8037). Provided for
-   * interoperability with systems that still emit SHA-1 thumbprints. Prefer
-   * {@link #generateJWS_kidSHA256(JSONWebKey)}.
-   *
-   * @param key the {@link JSONWebKey} to determine the thumbprint for
-   * @return the base64url-encoded JWK Thumbprint
-   */
-  public static String generateJWS_kidSHA1(JSONWebKey key) {
-    return JWKThumbprint.compute("SHA-1", key);
   }
 
   /**

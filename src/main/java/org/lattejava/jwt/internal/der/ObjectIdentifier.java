@@ -119,7 +119,7 @@ public class ObjectIdentifier {
   /**
    * The raw byte array of this Object Identifier.
    */
-  public byte[] value;
+  public final byte[] value;
 
   /**
    * The string form of the byte array after it has been decoded.

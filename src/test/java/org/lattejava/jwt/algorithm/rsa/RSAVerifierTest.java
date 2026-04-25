@@ -20,7 +20,7 @@ import org.lattejava.jwt.BaseJWTTest;
 import org.lattejava.jwt.InvalidKeyLengthException;
 import org.lattejava.jwt.Verifier;
 import org.lattejava.jwt.Algorithm;
-import org.lattejava.jwt.pem.PEM;
+import org.lattejava.jwt.internal.pem.PEM;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

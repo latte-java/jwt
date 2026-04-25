@@ -16,19 +16,15 @@
 
 package org.lattejava.jwt;
 
-import org.lattejava.jwt.pem.PEM;
-
 import java.util.Objects;
 
 /**
  * @author Daniel DeGroff
  */
 public class KeyPair {
-  public PEM pem;
+  public final String privateKey;
 
-  public String privateKey;
-
-  public String publicKey;
+  public final String publicKey;
 
   public KeyPair(String privateKey, String publicKey) {
     this.privateKey = privateKey;
@@ -40,13 +36,12 @@ public class KeyPair {
     if (this == o) return true;
     if (o == null || getClass() != o.getClass()) return false;
     KeyPair that = (KeyPair) o;
-    return Objects.equals(pem, that.pem) &&
-        Objects.equals(privateKey, that.privateKey) &&
+    return Objects.equals(privateKey, that.privateKey) &&
         Objects.equals(publicKey, that.publicKey);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(pem, privateKey, publicKey);
+    return Objects.hash(privateKey, publicKey);
   }
 }

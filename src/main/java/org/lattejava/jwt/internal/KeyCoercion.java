@@ -21,12 +21,12 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.lattejava.jwt.algorithm;
+package org.lattejava.jwt.internal;
 
 import org.lattejava.jwt.InvalidKeyTypeException;
 import org.lattejava.jwt.MissingPrivateKeyException;
 import org.lattejava.jwt.MissingPublicKeyException;
-import org.lattejava.jwt.pem.PEM;
+import org.lattejava.jwt.internal.pem.PEM;
 
 import java.security.PrivateKey;
 import java.security.PublicKey;

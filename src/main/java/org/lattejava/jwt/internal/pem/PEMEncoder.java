@@ -14,8 +14,9 @@
  * language governing permissions and limitations under the License.
  */
 
-package org.lattejava.jwt.pem;
+package org.lattejava.jwt.internal.pem;
 
+import org.lattejava.jwt.PEMEncoderException;
 import org.lattejava.jwt.internal.der.DerInputStream;
 import org.lattejava.jwt.internal.der.DerOutputStream;
 import org.lattejava.jwt.internal.der.DerValue;
@@ -36,8 +37,8 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Objects;
 
-import static org.lattejava.jwt.pem.PEM.X509_CERTIFICATE_PREFIX;
-import static org.lattejava.jwt.pem.PEM.X509_CERTIFICATE_SUFFIX;
+import static org.lattejava.jwt.internal.pem.PEM.X509_CERTIFICATE_PREFIX;
+import static org.lattejava.jwt.internal.pem.PEM.X509_CERTIFICATE_SUFFIX;
 
 /**
  * Encode a <code>PrivateKey</code> or <code>PublicKey</code> into a PEM formatted string.

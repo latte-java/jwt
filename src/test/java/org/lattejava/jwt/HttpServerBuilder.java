@@ -17,7 +17,6 @@
 package org.lattejava.jwt;
 
 import com.sun.net.httpserver.HttpServer;
-import org.lattejava.jwt.Buildable;
 
 import java.net.InetSocketAddress;
 import java.nio.file.Files;
