@@ -450,9 +450,8 @@ public class JSONWebKeySetHelperTest extends BaseTest {
   }
 
   @Test
-  public void retrieveJWKSResponseFromJWKS_basicSuccess() throws Exception {
-    // Use case: JWKSource consumes JWKSResponse for both keys and HTTP status.
-    // Cache-Control header coverage lands in Task 8 once ExpectedResponse supports headers.
+  public void retrieveJWKSResponseFromJWKS_surfaces_status_and_CacheControl() throws Exception {
+    // Use case: JWKSource needs status + Cache-Control off the JWKS hop on success.
     String body = "{\"keys\":[]}";
     startHttpServer(server -> server
         .listenOn(PORT)
@@ -460,12 +459,14 @@ public class JSONWebKeySetHelperTest extends BaseTest {
         .andReturn(new ExpectedResponse()
             .with(r -> r.response = body)
             .with(r -> r.status = 200)
-            .with(r -> r.contentType = "application/json")));
+            .with(r -> r.contentType = "application/json")
+            .with(r -> r.headers = java.util.Map.of("Cache-Control", "public, max-age=300"))));
 
     JWKSResponse resp = JSONWebKeySetHelper.retrieveJWKSResponseFromJWKS(
         "http://localhost:" + PORT + "/jwks.json", null);
     assertEquals(resp.statusCode(), 200);
     assertEquals(resp.keys().size(), 0);
+    assertEquals(resp.selectedHeaders().get("Cache-Control"), "public, max-age=300");
   }
 
   @Test

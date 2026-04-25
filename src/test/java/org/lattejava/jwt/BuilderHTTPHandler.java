@@ -66,6 +66,11 @@ public class BuilderHTTPHandler implements HttpHandler {
     if (expectedResult.redirectLocation != null) {
       httpExchange.getResponseHeaders().add("Location", expectedResult.redirectLocation);
     }
+    if (expectedResult.headers != null) {
+      for (Map.Entry<String, String> entry : expectedResult.headers.entrySet()) {
+        httpExchange.getResponseHeaders().add(entry.getKey(), entry.getValue());
+      }
+    }
 
     if (expectedResult.responseSize > 0) {
       // Stream a synthesized body of exactly responseSize bytes. Content is a

@@ -17,12 +17,17 @@
 package org.lattejava.jwt;
 
 import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * @author Daniel DeGroff
  */
 public class ExpectedResponse implements Buildable<ExpectedResponse> {
   public String contentType = "application/json";
+
+  /** Arbitrary response headers emitted before sendResponseHeaders. */
+  public Map<String, String> headers = new HashMap<>();
 
   /** When set, sent as the {@code Location:} header (used with 3xx status codes). */
   public String redirectLocation;
