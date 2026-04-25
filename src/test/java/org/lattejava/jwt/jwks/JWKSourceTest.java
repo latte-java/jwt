@@ -189,6 +189,103 @@ public class JWKSourceTest extends BaseTest {
     source.close();
   }
 
+  static final class RecordingLogger implements org.lattejava.jwt.log.Logger {
+    final java.util.List<String> events = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    private void record(org.lattejava.jwt.log.Level level, String message, Throwable t) {
+      events.add(level + " " + message + (t == null ? "" : " :: " + t.getClass().getSimpleName()));
+    }
+    @Override public void trace(String m) { record(org.lattejava.jwt.log.Level.Trace, m, null); }
+    @Override public void trace(String m, Object... v) { record(org.lattejava.jwt.log.Level.Trace, m, null); }
+    @Override public void debug(String m) { record(org.lattejava.jwt.log.Level.Debug, m, null); }
+    @Override public void debug(String m, Object... v) { record(org.lattejava.jwt.log.Level.Debug, m, null); }
+    @Override public void debug(String m, Throwable t) { record(org.lattejava.jwt.log.Level.Debug, m, t); }
+    @Override public void info(String m) { record(org.lattejava.jwt.log.Level.Info, m, null); }
+    @Override public void info(String m, Object... v) { record(org.lattejava.jwt.log.Level.Info, m, null); }
+    @Override public void warn(String m) { record(org.lattejava.jwt.log.Level.Warn, m, null); }
+    @Override public void warn(String m, Object... v) { record(org.lattejava.jwt.log.Level.Warn, m, null); }
+    @Override public void warn(String m, Throwable t) { record(org.lattejava.jwt.log.Level.Warn, m, t); }
+    @Override public void error(String m) { record(org.lattejava.jwt.log.Level.Error, m, null); }
+    @Override public void error(String m, Throwable t) { record(org.lattejava.jwt.log.Level.Error, m, t); }
+    @Override public boolean isTraceEnabled() { return true; }
+    @Override public boolean isDebugEnabled() { return true; }
+    @Override public boolean isInfoEnabled() { return true; }
+    @Override public boolean isWarnEnabled() { return true; }
+    @Override public boolean isErrorEnabled() { return true; }
+    @Override public void setLevel(org.lattejava.jwt.log.Level level) {}
+  }
+
+  @Test
+  public void logger_emits_refreshSuccess_at_info() throws Exception {
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = RSA_JWKS_BODY)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+    RecordingLogger logger = new RecordingLogger();
+    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+        .logger(logger)
+        .build();
+    assertTrue(logger.events.stream().anyMatch(e ->
+        e.startsWith("Info ") && e.contains("JWKS refresh succeeded")));
+    source.close();
+  }
+
+  @Test
+  public void logger_emits_refreshFailure_at_error_with_throwable() {
+    RecordingLogger logger = new RecordingLogger();
+    JWKSource source = JWKSource.fromJWKS("http://127.0.0.1:1/jwks.json")
+        .refreshTimeout(Duration.ofMillis(500))
+        .logger(logger)
+        .build();
+    assertTrue(logger.events.stream().anyMatch(e -> e.startsWith("Error ")),
+        "expected an Error-level event, got: " + logger.events);
+    source.close();
+  }
+
+  @Test
+  public void logger_emits_duplicateKid_at_warn() throws Exception {
+    String dupBody = "{\"keys\":[" +
+        "{\"kty\":\"RSA\",\"kid\":\"k1\",\"alg\":\"RS256\",\"use\":\"sig\",\"n\":\"sXch9_uEVyZw4d4XNjUMl7-DnbBwfXz9V_DwiHCNL5KNg6oHEcF7T7zJDSsBmWxAOKtc6vK4Ek5oN_R5kxdovfBdRRiClNxrRwmExZGMC8oBROHFEJiOFdDmqNJZbJ-w_e8KE2j_yWctgxX9LowhOWy0VEArLjr5tLqhwAtFm6gK_DfXXyZjU2DBBL_3Iaiu0YQz-jRR4lA1IAKVLA98m_4cP3pUvP6m9Eds3qpf0CzrI4DT9byOPQQX-FQOPaWTBcOJG6L9_kg7XYmbgrUKf6JhPYiTEVNvSXpHlxF6PoJiLvCNpyhGzFtOZf3GkmwNRbAdyOJ2HyjgNtuKnHcPlw\",\"e\":\"AQAB\"}," +
+        "{\"kty\":\"RSA\",\"kid\":\"k1\",\"alg\":\"RS256\",\"use\":\"sig\",\"n\":\"sXch9_uEVyZw4d4XNjUMl7-DnbBwfXz9V_DwiHCNL5KNg6oHEcF7T7zJDSsBmWxAOKtc6vK4Ek5oN_R5kxdovfBdRRiClNxrRwmExZGMC8oBROHFEJiOFdDmqNJZbJ-w_e8KE2j_yWctgxX9LowhOWy0VEArLjr5tLqhwAtFm6gK_DfXXyZjU2DBBL_3Iaiu0YQz-jRR4lA1IAKVLA98m_4cP3pUvP6m9Eds3qpf0CzrI4DT9byOPQQX-FQOPaWTBcOJG6L9_kg7XYmbgrUKf6JhPYiTEVNvSXpHlxF6PoJiLvCNpyhGzFtOZf3GkmwNRbAdyOJ2HyjgNtuKnHcPlw\",\"e\":\"AQAB\"}" +
+        "]}";
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = dupBody)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+    RecordingLogger logger = new RecordingLogger();
+    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+        .logger(logger)
+        .build();
+    assertTrue(logger.events.stream().anyMatch(e ->
+        e.startsWith("Warn ") && e.contains("duplicate kid")), logger.events.toString());
+    source.close();
+  }
+
+  @Test
+  public void logger_emits_retryAfterHonored_at_info() throws Exception {
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = "{}")
+            .with(r -> r.status = 429)
+            .with(r -> r.contentType = "application/json")
+            .with(r -> r.headers = java.util.Map.of("Retry-After", "600"))));
+    RecordingLogger logger = new RecordingLogger();
+    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+        .logger(logger)
+        .build();
+    assertTrue(logger.events.stream().anyMatch(e ->
+        e.startsWith("Info ") && e.contains("Retry-After honored")), logger.events.toString());
+    source.close();
+  }
+
   @Test
   public void scheduledRefresh_fires_atTickBoundary() throws Exception {
     // Use case: with scheduledRefresh=true and a 200ms tick rate, the scheduler

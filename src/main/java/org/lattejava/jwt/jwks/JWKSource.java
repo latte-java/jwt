@@ -302,46 +302,6 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
   }
 
   /**
-   * Single-threaded refresh used by the constructor. Returns the Snapshot to install.
-   * Singleflight wiring is added in Task 13; the constructor calls this directly.
-   */
-  private Snapshot doRefresh(Snapshot prev) {
-    Instant now = Instant.now(clock);
-    try {
-      JWKSResponse resp = fetch();
-      Map<String, Verifier> byKid = new LinkedHashMap<>();
-      for (JSONWebKey jwk : resp.keys()) {
-        Verifier v = Verifiers.fromJWK(jwk);
-        if (v == null) continue;
-        if (byKid.containsKey(jwk.kid())) {
-          if (logger.isWarnEnabled()) {
-            logger.warn("JWKS contains duplicate kid [" + jwk.kid() + "]; first-write-wins");
-          }
-          continue;
-        }
-        byKid.put(jwk.kid(), v);
-      }
-      if (byKid.isEmpty()) {
-        if (logger.isErrorEnabled()) {
-          logger.error("JWKS refresh produced an empty kid map; treating as failure");
-        }
-        return failureSnapshot(prev, now, new IllegalStateException("Empty kid map after JWK conversion"));
-      }
-      Duration chosen = chosenInterval(resp);
-      Instant nextDue = now.plus(maxOf(minRefreshInterval, chosen));
-      if (logger.isInfoEnabled()) {
-        logger.info("JWKS refresh succeeded; kids=" + byKid.keySet());
-      }
-      return new Snapshot(Map.copyOf(byKid), now, nextDue, 0, null);
-    } catch (RuntimeException e) {
-      if (logger.isErrorEnabled()) {
-        logger.error("JWKS refresh failed", e);
-      }
-      return failureSnapshot(prev, now, e);
-    }
-  }
-
-  /**
    * Returns the in-flight refresh future, dispatching a new one on a virtual
    * thread if no refresh is currently active. Order on completion: snapshot
    * updated first, then awaiters notified, then slot cleared. See spec §3.
@@ -370,6 +330,9 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
         fresh = doRefreshOrThrow(prev);
       } catch (Throwable t) {
         failureCause = t;
+        if (logger.isErrorEnabled()) {
+          logger.error("JWKS refresh failed", t);
+        }
         fresh = failureSnapshot(prev, Instant.now(clock), t);
       }
       if (!closed) {
@@ -387,9 +350,10 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
   }
 
   /**
-   * Like {@link #doRefresh} but throws the underlying cause instead of
-   * returning a failure snapshot. Used by the singleflight path so the
-   * operator-driven {@link #refresh()} can surface the cause.
+   * Performs the refresh: fetch JWKS, build verifiers, install a Snapshot.
+   * Throws on network/parse/non-2xx/empty-result so the singleflight catch
+   * can complete the future exceptionally for the operator-driven
+   * {@link #refresh()} path.
    */
   private Snapshot doRefreshOrThrow(Snapshot prev) {
     Instant now = Instant.now(clock);
