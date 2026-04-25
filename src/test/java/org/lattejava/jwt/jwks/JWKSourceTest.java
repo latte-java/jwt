@@ -106,6 +106,19 @@ public class JWKSourceTest extends BaseTest {
   }
 
   @Test
+  public void backoffSequence_30s_to_60m_capped() {
+    // Use case: spec §2.7.2 backoff formula in long ms; sequence with default settings.
+    Duration min = Duration.ofSeconds(30);
+    Duration max = Duration.ofMinutes(60);
+    long[] expectedSeconds = {30, 60, 120, 240, 480, 960, 1920, 3600, 3600, 3600};
+    for (int i = 0; i < expectedSeconds.length; i++) {
+      Duration actual = JWKSource.backoff(i + 1, min, max);
+      assertEquals(actual.getSeconds(), expectedSeconds[i],
+          "consecutiveFailures=" + (i + 1));
+    }
+  }
+
+  @Test
   public void cacheControl_CLAMP_maxAgeWithinBounds_honored() throws Exception {
     // Use case: max-age=300 sits within [30s, 60m] — chosenInterval = 300s.
     startHttpServer(server -> server

@@ -165,6 +165,21 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
   // --- Refresh internals ---
 
   /**
+   * Exponential backoff per spec §2.7.2, computed in long ms to avoid integer
+   * overflow at high consecutive-failure counts. Returns
+   * {@code min(refreshInterval, minRefreshInterval * 2^(consecutiveFailures-1))}.
+   */
+  static Duration backoff(int consecutiveFailures, Duration minRefreshInterval, Duration refreshInterval) {
+    if (consecutiveFailures <= 0) return Duration.ZERO;
+    long minMs = minRefreshInterval.toMillis();
+    long capMs = refreshInterval.toMillis();
+    int shift = Math.min(consecutiveFailures - 1, 62);
+    long ms = Math.min(capMs, minMs * (1L << shift));
+    if (ms < 0 || ms > capMs) ms = capMs;
+    return Duration.ofMillis(ms);
+  }
+
+  /**
    * Compute chosenInterval per spec §2.6. Returns the duration to use for
    * nextDueAt; the caller still applies the minRefreshInterval floor in §2.4.
    */
@@ -303,15 +318,15 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
     };
   }
 
-  /**
-   * Failure-path Snapshot. Backoff and Retry-After are applied in Tasks 15/16;
-   * for now nextDueAt = now + minRefreshInterval.
-   */
+  /** Failure-path Snapshot. Spec §2.7. Retry-After honoring lands in Task 16. */
   private Snapshot failureSnapshot(Snapshot prev, Instant now, Throwable cause) {
     int prior = (prev == null) ? 0 : prev.consecutiveFailures();
+    int next = prior + 1;
     Map<String, Verifier> byKid = (prev == null) ? Map.of() : prev.byKid();
     Instant fetchedAt = (prev == null) ? Instant.EPOCH : prev.fetchedAt();
-    return new Snapshot(byKid, fetchedAt, now.plus(minRefreshInterval), prior + 1, now);
+    Duration off = backoff(next, minRefreshInterval, refreshInterval);
+    Instant nextDue = now.plus(off);
+    return new Snapshot(byKid, fetchedAt, nextDue, next, now);
   }
 
   // --- Internal types ---
