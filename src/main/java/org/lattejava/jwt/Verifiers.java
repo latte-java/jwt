@@ -28,6 +28,7 @@ import org.lattejava.jwt.algorithm.ed.EdDSAVerifier;
 import org.lattejava.jwt.algorithm.hmac.HMACVerifier;
 import org.lattejava.jwt.algorithm.rsa.RSAPSSVerifier;
 import org.lattejava.jwt.algorithm.rsa.RSAVerifier;
+import org.lattejava.jwt.jwks.JSONWebKey;
 
 import java.security.PublicKey;
 import java.util.Objects;
@@ -126,8 +127,80 @@ public final class Verifiers {
   }
 
   // ---------------------------------------------------------------------
+  // fromJWK -- JWKS-driven, applies the conversion rules in spec §2.8
+  // ---------------------------------------------------------------------
+
+  /**
+   * Build a {@link Verifier} from a JSON Web Key, applying the conversion rules
+   * documented in the JWKSource spec §2.8. Returns {@code null} if the JWK is
+   * not usable for signature verification under those rules; never throws on a
+   * rejected JWK.
+   *
+   * <p>Rejected when: {@code kid} is missing; {@code alg} is missing or HMAC;
+   * {@code kty} is {@code oct}; {@code use} is present and not {@code sig};
+   * {@code alg}/{@code crv} are inconsistent for EC/OKP; key material fails to
+   * parse; or verifier construction would fail.</p>
+   *
+   * @param jwk the JSON Web Key; must be non-null
+   * @return a fresh verifier bound to {@code jwk.alg()}, or {@code null}
+   */
+  public static Verifier fromJWK(JSONWebKey jwk) {
+    Objects.requireNonNull(jwk, "jwk");
+
+    if (jwk.kid() == null) return null;
+
+    Algorithm alg = jwk.alg();
+    if (alg == null) return null;
+
+    String algName = alg.name();
+    if (algName.equals("HS256") || algName.equals("HS384") || algName.equals("HS512")) {
+      return null;
+    }
+
+    KeyType kty = jwk.kty();
+    if (kty == null || kty == KeyType.OCT) return null;
+
+    String use = jwk.use();
+    if (use != null && !"sig".equals(use)) return null;
+
+    if (!algCrvConsistent(algName, kty, jwk.crv())) return null;
+
+    PublicKey publicKey;
+    try {
+      publicKey = jwk.toPublicKey();
+    } catch (RuntimeException ignored) {
+      return null;
+    }
+
+    try {
+      return forAsymmetric(alg, publicKey);
+    } catch (IllegalArgumentException ignored) {
+      return null;
+    }
+  }
+
+  // ---------------------------------------------------------------------
   // Internal
   // ---------------------------------------------------------------------
+
+  private static boolean algCrvConsistent(String algName, KeyType kty, String crv) {
+    if (kty == KeyType.EC) {
+      String expected = switch (algName) {
+        case "ES256"  -> "P-256";
+        case "ES384"  -> "P-384";
+        case "ES512"  -> "P-521";
+        case "ES256K" -> "secp256k1";
+        default       -> null;
+      };
+      return expected != null && expected.equals(crv);
+    }
+    if (kty == KeyType.OKP) {
+      if (!"Ed25519".equals(crv) && !"Ed448".equals(crv)) return false;
+      return algName.equals(crv);
+    }
+    // RSA: no crv constraint.
+    return true;
+  }
 
   private static void requireHMAC(Algorithm algorithm) {
     Objects.requireNonNull(algorithm, "algorithm");
