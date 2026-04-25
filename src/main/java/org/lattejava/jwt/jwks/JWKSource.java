@@ -164,8 +164,63 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
 
   // --- Refresh internals ---
 
+  /**
+   * Compute chosenInterval per spec §2.6. Returns the duration to use for
+   * nextDueAt; the caller still applies the minRefreshInterval floor in §2.4.
+   */
+  private Duration chosenInterval(JWKSResponse resp) {
+    if (cacheControlPolicy == CacheControlPolicy.IGNORE) return refreshInterval;
+    String cc = resp.selectedHeaders().get("Cache-Control");
+    if (cc == null) return refreshInterval;
+
+    Long maxAge = parseMaxAge(cc);
+    if (maxAge == null) {
+      if (logger.isDebugEnabled()) {
+        logger.debug("Unparseable Cache-Control header [" + cc + "]; treating as absent");
+      }
+      return refreshInterval;
+    }
+
+    long ms = Math.max(0, maxAge) * 1000L;
+    Duration desired = Duration.ofMillis(ms);
+    if (desired.compareTo(minRefreshInterval) < 0) return minRefreshInterval;
+    if (desired.compareTo(refreshInterval) > 0) return refreshInterval;
+    return desired;
+  }
+
   private static Duration maxOf(Duration a, Duration b) {
     return a.compareTo(b) >= 0 ? a : b;
+  }
+
+  /**
+   * Parses {@code max-age=N} from a Cache-Control header. Returns 0 for
+   * {@code no-store} or {@code max-age=0}. Returns {@code null} if the header
+   * is malformed (unparseable max-age, multiple conflicting max-age directives).
+   */
+  static Long parseMaxAge(String headerValue) {
+    if (headerValue == null) return null;
+    boolean noStore = false;
+    Long maxAge = null;
+    boolean multiple = false;
+    for (String tok : headerValue.split(",")) {
+      String t = tok.trim().toLowerCase(java.util.Locale.ROOT);
+      if (t.equals("no-store")) {
+        noStore = true;
+        continue;
+      }
+      if (t.startsWith("max-age=")) {
+        try {
+          long v = Long.parseLong(t.substring("max-age=".length()));
+          if (maxAge != null && maxAge != v) multiple = true;
+          maxAge = v;
+        } catch (NumberFormatException nfe) {
+          return null;
+        }
+      }
+    }
+    if (multiple) return null;
+    if (noStore) return 0L;
+    return maxAge;
   }
 
   /**
@@ -194,8 +249,8 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
         }
         return failureSnapshot(prev, now, new IllegalStateException("Empty kid map after JWK conversion"));
       }
-      Duration chosenInterval = refreshInterval;
-      Instant nextDue = now.plus(maxOf(minRefreshInterval, chosenInterval));
+      Duration chosen = chosenInterval(resp);
+      Instant nextDue = now.plus(maxOf(minRefreshInterval, chosen));
       if (logger.isInfoEnabled()) {
         logger.info("JWKS refresh succeeded; kids=" + byKid.keySet());
       }

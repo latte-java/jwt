@@ -106,6 +106,89 @@ public class JWKSourceTest extends BaseTest {
   }
 
   @Test
+  public void cacheControl_CLAMP_maxAgeWithinBounds_honored() throws Exception {
+    // Use case: max-age=300 sits within [30s, 60m] — chosenInterval = 300s.
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = RSA_JWKS_BODY)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")
+            .with(r -> r.headers = java.util.Map.of("Cache-Control", "public, max-age=300"))));
+
+    java.time.Instant fixedNow = java.time.Instant.parse("2026-04-25T12:00:00Z");
+    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+        .clock(java.time.Clock.fixed(fixedNow, java.time.ZoneOffset.UTC))
+        .build();
+    assertEquals(source.nextDueAt(), fixedNow.plusSeconds(300));
+    source.close();
+  }
+
+  @Test
+  public void cacheControl_CLAMP_maxAgeBelowMin_clampedToFloor() throws Exception {
+    // Use case: max-age=10 is below minRefreshInterval (30s) — clamp to 30s.
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = RSA_JWKS_BODY)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")
+            .with(r -> r.headers = java.util.Map.of("Cache-Control", "max-age=10"))));
+
+    java.time.Instant fixedNow = java.time.Instant.parse("2026-04-25T12:00:00Z");
+    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+        .clock(java.time.Clock.fixed(fixedNow, java.time.ZoneOffset.UTC))
+        .build();
+    assertEquals(source.nextDueAt(), fixedNow.plusSeconds(30));
+    source.close();
+  }
+
+  @Test
+  public void cacheControl_IGNORE_alwaysUsesRefreshInterval() throws Exception {
+    // Use case: server's max-age is ignored; chosenInterval = refreshInterval.
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = RSA_JWKS_BODY)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")
+            .with(r -> r.headers = java.util.Map.of("Cache-Control", "max-age=300"))));
+
+    java.time.Instant fixedNow = java.time.Instant.parse("2026-04-25T12:00:00Z");
+    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+        .clock(java.time.Clock.fixed(fixedNow, java.time.ZoneOffset.UTC))
+        .refreshInterval(Duration.ofMinutes(15))
+        .cacheControlPolicy(CacheControlPolicy.IGNORE)
+        .build();
+    assertEquals(source.nextDueAt(), fixedNow.plusSeconds(15 * 60));
+    source.close();
+  }
+
+  @Test
+  public void cacheControl_malformed_treatedAsAbsent() throws Exception {
+    // Use case: max-age=abc is unparseable → behave as if no Cache-Control set.
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = RSA_JWKS_BODY)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")
+            .with(r -> r.headers = java.util.Map.of("Cache-Control", "max-age=abc"))));
+
+    java.time.Instant fixedNow = java.time.Instant.parse("2026-04-25T12:00:00Z");
+    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+        .clock(java.time.Clock.fixed(fixedNow, java.time.ZoneOffset.UTC))
+        .refreshInterval(Duration.ofMinutes(15))
+        .build();
+    assertEquals(source.nextDueAt(), fixedNow.plusSeconds(15 * 60));
+    source.close();
+  }
+
+  @Test
   public void successfulRefresh_setsNextDueAt_atLeastMinRefreshIntervalFromNow() throws Exception {
     // Use case: even when refreshInterval > minRefreshInterval, nextDueAt = now + refreshInterval.
     startHttpServer(server -> server
