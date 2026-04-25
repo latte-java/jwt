@@ -2,11 +2,13 @@
 
 | Field | Value |
 |------|------|
-| Status | Draft |
+| Status | In Progress (PR [#3](https://github.com/latte-java/jwt/pull/3)) |
 | Revision | 3 |
 | Last updated | 2026-04-25 |
 | Owner | Daniel DeGroff |
 | Target version | 7.x (additive) |
+
+> **2026-04-25** — implementation in flight on `robotdan/jwks-source` (PR #3). Spec advanced from Draft to In Progress; spec remains authoritative — discrepancies discovered during implementation are resolved by amending this spec.
 
 ## Problem statement
 
