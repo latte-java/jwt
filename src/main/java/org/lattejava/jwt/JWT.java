@@ -382,6 +382,13 @@ public final class JWT {
    * {@code iat}) are emitted as NumericDate (epoch seconds) per RFC 7519 §2, and {@code aud} is
    * emitted as either a single string or an array to match the recorded
    * {@link AudienceSerialization} mode.
+   *
+   * @apiNote The returned map is mutable and not shared with the {@code JWT}
+   *     instance. Callers MUST NOT retain or mutate it -- the contract is that
+   *     each call returns a fresh map intended for immediate handoff to a JSON
+   *     serializer. The {@code aud} value, when present as an array, references
+   *     the JWT's internal unmodifiable list directly; the JSON serializer only
+   *     iterates it.
    */
   public Map<String, Object> toSerializableMap() {
     Map<String, Object> out = new LinkedHashMap<>();
@@ -391,7 +398,7 @@ public final class JWT {
       if (audienceSerialization == AudienceSerialization.STRING_WHEN_SINGLE && audience.size() == 1) {
         out.put("aud", audience.get(0));
       } else {
-        out.put("aud", new ArrayList<>(audience));
+        out.put("aud", audience);
       }
     }
     if (expiresAt != null) out.put("exp", expiresAt.getEpochSecond());
@@ -403,7 +410,7 @@ public final class JWT {
         out.put(e.getKey(), e.getValue());
       }
     }
-    return Collections.unmodifiableMap(out);
+    return out;
   }
 
   // ---------- Convenience ----------

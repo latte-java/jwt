@@ -35,6 +35,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNotSame;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
@@ -330,10 +331,16 @@ public class JWTTest {
   }
 
   @Test
-  public void toSerializableMap_unmodifiable() {
+  public void toSerializableMap_returns_fresh_mutable_map_per_call() {
+    // Use case: contract is a freshly allocated mutable map -- callers MUST NOT mutate it,
+    // but mutating it cannot leak back into the JWT and a second call returns a different map.
     JWT jwt = JWT.builder().subject("a").build();
-    Map<String, Object> out = jwt.toSerializableMap();
-    expectThrows(UnsupportedOperationException.class, () -> out.put("x", "y"));
+    Map<String, Object> first = jwt.toSerializableMap();
+    first.put("x", "y");
+    Map<String, Object> second = jwt.toSerializableMap();
+    assertNotSame(first, second);
+    assertNull(second.get("x"));
+    assertEquals(jwt.subject(), "a");
   }
 
   // -------------------- accessors --------------------

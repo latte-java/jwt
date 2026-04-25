@@ -122,9 +122,14 @@ public final class Header {
   }
 
   /**
-   * Return an unmodifiable map suitable for JSON serialization. {@code alg} is
+   * Return a freshly allocated map suitable for JSON serialization. {@code alg} is
    * serialized by {@link Algorithm#name()}; {@code null}-valued custom
    * parameters are omitted.
+   *
+   * @apiNote The returned map is mutable and not shared with the {@code Header}
+   *     instance. Callers MUST NOT retain or mutate it -- the contract is that
+   *     each call returns a fresh map intended for immediate handoff to a JSON
+   *     serializer.
    */
   public Map<String, Object> toSerializableMap() {
     Map<String, Object> out = new LinkedHashMap<>();
@@ -136,7 +141,7 @@ public final class Header {
         out.put(e.getKey(), e.getValue());
       }
     }
-    return Collections.unmodifiableMap(out);
+    return out;
   }
 
   // ---------- Factory ----------
