@@ -189,6 +189,73 @@ public class JWKSourceTest extends BaseTest {
     source.close();
   }
 
+  @Test
+  public void fromIssuer_happyPath() throws Exception {
+    // Use case: spec test #1 — fromIssuer composes /.well-known/openid-configuration,
+    // reads jwks_uri, and fetches the JWKS.
+    String discoveryBody = "{\"jwks_uri\":\"http://localhost:" + PORT + "/jwks.json\"}";
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/.well-known/openid-configuration")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = discoveryBody)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json"))
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = RSA_JWKS_BODY)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+
+    JWKSource source = JWKSource.fromIssuer("http://localhost:" + PORT).build();
+    assertEquals(source.currentKids(), java.util.Set.of("k1"));
+    source.close();
+  }
+
+  @Test
+  public void fromWellKnownConfiguration_nonConventionalURL() throws Exception {
+    // Use case: spec test #2 — discovery doc lives at a non-standard path.
+    String discoveryBody = "{\"jwks_uri\":\"http://localhost:" + PORT + "/keys\"}";
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/.custom-discovery")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = discoveryBody)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json"))
+        .handleURI("/keys")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = RSA_JWKS_BODY)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+
+    JWKSource source = JWKSource.fromWellKnownConfiguration(
+        "http://localhost:" + PORT + "/.custom-discovery").build();
+    assertEquals(source.currentKids(), java.util.Set.of("k1"));
+    source.close();
+  }
+
+  @Test
+  public void emptyPostConversionResult_isFailure() throws Exception {
+    // Use case: spec test #23 — JWKS publishes only oct keys → no usable verifiers
+    // → refresh treated as failure.
+    String octOnlyBody = "{\"keys\":[{\"kty\":\"oct\",\"kid\":\"k1\",\"alg\":\"HS256\",\"k\":\"AAAA\"}]}";
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = octOnlyBody)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+
+    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json").build();
+    assertNull(source.lastSuccessfulRefresh());
+    assertEquals(source.consecutiveFailures(), 1);
+    assertTrue(source.currentKids().isEmpty());
+    assertThrows(RuntimeException.class, source::refresh);
+    source.close();
+  }
+
   static final class RecordingLogger implements org.lattejava.jwt.log.Logger {
     final java.util.List<String> events = new java.util.concurrent.CopyOnWriteArrayList<>();
 
