@@ -156,6 +156,8 @@ JMH's annotation processor is auto-discovered by `javac` via `META-INF/services/
 1. `latte build` produces `META-INF/BenchmarkList` and the synthetic `<Class>_<method>_jmhTest` classes.
 2. `java -jar build/jars/latte-jwt-bench-*.jar -l` lists all expected `@Benchmark` methods.
 
+**Outcome (2026-04-26, Latte 0.1.6, JMH 1.37, Java 25.0.2):** Auto-discovery works without any fallback. Verified via `benchmarks/spike/`: `latte build` produced `META-INF/BenchmarkList` and the full suite of synthetic classes (`HelloBenchmark_addOneAndOne_jmhTest`, `HelloBenchmark_jmhType_B1/B2/B3`) in the JAR. `org.openjdk.jmh.Main -l` listed `org.lattejava.jwt.benchmarks.spike.HelloBenchmark.addOneAndOne`. A 5-second `-f 0` run completed at ~1717 ops/µs with no errors. No fallback was needed. `javac` does emit a lint note that a future release may require an explicit `-processor` flag, but it has no effect on the current build.
+
 **If the annotation processor is not auto-discovered**, the fallbacks in priority order are:
 1. Pass `-processor org.openjdk.jmh.generators.BenchmarkProcessor` via `java.settings.compilerArguments` in `project.latte`.
 2. Generate `META-INF/BenchmarkList` once with a separate Maven/Gradle scratch project, check it into the harness module, and let Latte ship it on the JAR. Less elegant but unblocks shipping.

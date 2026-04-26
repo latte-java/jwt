@@ -1,0 +1,37 @@
+/*
+ * Copyright (c) 2026, The Latte Project, All Rights Reserved
+ * License: MIT (See LICENSE file in root)
+ */
+jmhVersion = "1.37"
+
+project(group: "org.lattejava.jwt.benchmarks", name: "spike", version: "0.1.0", licenses: ["MIT"]) {
+  workflow {
+    standard()
+  }
+
+  dependencies {
+    group(name: "compile") {
+      dependency(id: "org.openjdk.jmh:jmh-core:${jmhVersion}")
+      dependency(id: "org.openjdk.jmh:jmh-generator-annprocess:${jmhVersion}")
+    }
+  }
+
+  publications {
+    standard()
+  }
+}
+
+dependency = loadPlugin(id: "org.lattejava.plugin:dependency:0.1.5")
+java = loadPlugin(id: "org.lattejava.plugin:java:0.1.7")
+idea = loadPlugin(id: "org.lattejava.plugin:idea:0.1.5")
+
+java.settings.javaVersion = "21"
+
+target(name: "clean", description: "Cleans the build directory") {
+  java.clean()
+}
+
+target(name: "build", description: "Compiles the Java source files and creates a JAR") {
+  java.compileMain()
+  java.jar()
+}
