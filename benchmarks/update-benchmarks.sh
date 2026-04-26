@@ -192,3 +192,23 @@ PREAMBLE
 fi
 
 echo "wrote ${TARGET}"
+
+# ── README.md performance section
+README="${SCRIPT_DIR}/../README.md"
+if [[ -f "${README}" ]] && grep -q 'README:PERFORMANCE:START' "${README}"; then
+  README_BODY="$(render_leaderboard "rs256_decode_verify_validate" "thrpt" "RS256 — decode + verify + validate")"
+  # write body to temp file (same pattern as the BENCHMARKS.md awk replace)
+  README_BODY_FILE="$(mktemp)"
+  echo "${README_BODY}" > "${README_BODY_FILE}"
+  awk -v body_file="${README_BODY_FILE}" '
+    BEGIN {
+      while ((getline line < body_file) > 0) body = body == "" ? line : body "\n" line
+      close(body_file)
+    }
+    /README:PERFORMANCE:START/ { print; print body; in_block=1; next }
+    /README:PERFORMANCE:END/   { in_block=0; print; next }
+    !in_block { print }
+  ' "${README}" > "${README}.tmp" && mv "${README}.tmp" "${README}"
+  rm -f "${README_BODY_FILE}"
+  echo "wrote ${README}"
+fi
