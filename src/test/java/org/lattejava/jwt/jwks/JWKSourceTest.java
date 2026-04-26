@@ -34,6 +34,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 
 public class JWKSourceTest extends BaseTest {
   private static final int PORT = 4244;
@@ -157,7 +158,8 @@ public class JWKSourceTest extends BaseTest {
     assertEquals(source.consecutiveFailures(), 0);
 
     b.responses.get("/jwks.json").status = 500;
-    assertThrows(RuntimeException.class, source::refresh);
+    JWKSRefreshException ex = expectThrows(JWKSRefreshException.class, source::refresh);
+    assertEquals(ex.reason(), JWKSRefreshException.Reason.NON_2XX);
 
     assertEquals(source.lastSuccessfulRefresh(), priorSuccess,
         "lastSuccessfulRefresh must not advance on failure");
@@ -255,7 +257,8 @@ public class JWKSourceTest extends BaseTest {
     assertNull(source.lastSuccessfulRefresh());
     assertEquals(source.consecutiveFailures(), 1);
     assertTrue(source.currentKids().isEmpty());
-    assertThrows(RuntimeException.class, source::refresh);
+    JWKSRefreshException ex = expectThrows(JWKSRefreshException.class, source::refresh);
+    assertEquals(ex.reason(), JWKSRefreshException.Reason.EMPTY_RESULT);
     source.close();
   }
 
@@ -404,7 +407,8 @@ public class JWKSourceTest extends BaseTest {
     JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json").build();
 
     httpServers.get(httpServers.size() - 1).stop(0);
-    assertThrows(RuntimeException.class, source::refresh);
+    JWKSRefreshException ex = expectThrows(JWKSRefreshException.class, source::refresh);
+    assertEquals(ex.reason(), JWKSRefreshException.Reason.NETWORK);
     assertEquals(source.consecutiveFailures(), 1);
     source.close();
   }
@@ -724,5 +728,149 @@ public class JWKSourceTest extends BaseTest {
     assertEquals(source.consecutiveFailures(), 1);
     assertTrue(source.currentKids().isEmpty());
     source.close();
+  }
+
+  @Test
+  public void duplicateKid_firstWriteWins_firstKeyVerifies() throws Exception {
+    // Use case: spec scenario #22 — a JWKS containing two valid RSA JWKs sharing the same kid
+    // must keep the first one. The functional assertion: a signature produced by the first
+    // private key verifies through the resolved Verifier. Last-wins would fail this check.
+    java.security.KeyPairGenerator kpg = java.security.KeyPairGenerator.getInstance("RSA");
+    kpg.initialize(2048);
+    java.security.KeyPair kp1 = kpg.generateKeyPair();
+    java.security.KeyPair kp2 = kpg.generateKeyPair();
+
+    byte[] payload = "first-wins-payload".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    java.security.Signature sigGen = java.security.Signature.getInstance("SHA256withRSA");
+    sigGen.initSign(kp1.getPrivate());
+    sigGen.update(payload);
+    byte[] signature = sigGen.sign();
+
+    String jwks = "{\"keys\":["
+        + rsaJWKWithKid("k1", (java.security.interfaces.RSAPublicKey) kp1.getPublic())
+        + ","
+        + rsaJWKWithKid("k1", (java.security.interfaces.RSAPublicKey) kp2.getPublic())
+        + "]}";
+
+    RecordingLogger logger = new RecordingLogger();
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = jwks)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+
+    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+        .logger(logger)
+        .build();
+    org.lattejava.jwt.Verifier v = source.resolve(org.lattejava.jwt.Header.builder()
+        .alg(org.lattejava.jwt.Algorithm.RS256).kid("k1").build());
+    assertNotNull(v);
+    v.verify(payload, signature);  // throws if last-wins (kp2 cannot verify kp1's signature)
+    assertTrue(logger.events.stream().anyMatch(e ->
+        e.startsWith("Warn ") && e.contains("duplicate kid")), logger.events.toString());
+    source.close();
+  }
+
+  @Test
+  public void close_whileRefreshInflight_lateResultIsDiscarded() throws Exception {
+    // Use case: spec §4 step 4 — after close(), the in-flight fetch's result is
+    // discarded. The snapshot must not advance even though the underlying fetch
+    // eventually succeeds.
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = RSA_JWKS_BODY)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")
+            .with(r -> r.delayMillis = 800)));
+
+    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+        .refreshTimeout(Duration.ofMillis(50))
+        .build();
+    // build() awaiter timed out at 50ms; the fetch is still running.
+    java.time.Instant priorSuccess = source.lastSuccessfulRefresh();
+    assertNull(priorSuccess);
+
+    source.close();
+    // Wait past the 800ms handler delay so the fetch definitely completed.
+    Thread.sleep(1_500);
+    // Snapshot must not have advanced.
+    assertNull(source.lastSuccessfulRefresh());
+  }
+
+  @Test
+  public void parseCacheControl_publicAlone_silentNoMaxAge() {
+    // Use case: a header with no max-age directive (e.g. "Cache-Control: public") is not
+    // malformed; it just doesn't supply a hint. parseCacheControl returns (null, false, false).
+    JWKSource.CacheControlDirectives d = JWKSource.parseCacheControl("public");
+    assertNull(d.maxAge());
+    assertEquals(d.noStore(), false);
+    assertEquals(d.malformed(), false);
+  }
+
+  @Test
+  public void parseCacheControl_noStoreAlone_returnsFloor() {
+    JWKSource.CacheControlDirectives d = JWKSource.parseCacheControl("no-store");
+    assertEquals(d.noStore(), true);
+    assertEquals(d.malformed(), false);
+  }
+
+  @Test
+  public void parseCacheControl_conflictingMaxAge_isMalformed() {
+    JWKSource.CacheControlDirectives d = JWKSource.parseCacheControl("max-age=300, max-age=600");
+    assertEquals(d.malformed(), true);
+  }
+
+  @Test
+  public void parseCacheControl_emptyMaxAgeValue_isMalformed() {
+    JWKSource.CacheControlDirectives d = JWKSource.parseCacheControl("max-age=");
+    assertEquals(d.malformed(), true);
+  }
+
+  @Test
+  public void parseCacheControl_nonNumericMaxAge_isMalformed() {
+    JWKSource.CacheControlDirectives d = JWKSource.parseCacheControl("max-age=abc");
+    assertEquals(d.malformed(), true);
+  }
+
+  @Test
+  public void parseRetryAfter_HTTPDateForm_returnsRelativeDuration() {
+    // Use case: Cloudflare and several CDNs send HTTP-date Retry-After. Parser must honor it.
+    java.time.Instant now = java.time.Instant.parse("2026-04-25T12:00:00Z");
+    Duration d = JWKSource.parseRetryAfter("Sat, 25 Apr 2026 12:01:00 GMT", now);
+    assertNotNull(d);
+    assertEquals(d, Duration.ofSeconds(60));
+  }
+
+  @Test
+  public void parseRetryAfter_HTTPDate_inPastClampsToZero() {
+    java.time.Instant now = java.time.Instant.parse("2026-04-25T12:00:00Z");
+    Duration d = JWKSource.parseRetryAfter("Sat, 25 Apr 2026 11:00:00 GMT", now);
+    assertEquals(d, Duration.ZERO);
+  }
+
+  @Test
+  public void parseRetryAfter_unparseable_returnsNull() {
+    java.time.Instant now = java.time.Instant.parse("2026-04-25T12:00:00Z");
+    assertNull(JWKSource.parseRetryAfter("not-a-time", now));
+  }
+
+  private static String rsaJWKWithKid(String kid, java.security.interfaces.RSAPublicKey pub) {
+    java.util.Base64.Encoder enc = java.util.Base64.getUrlEncoder().withoutPadding();
+    String n = enc.encodeToString(stripLeadingZero(pub.getModulus().toByteArray()));
+    String e = enc.encodeToString(stripLeadingZero(pub.getPublicExponent().toByteArray()));
+    return "{\"kty\":\"RSA\",\"kid\":\"" + kid + "\",\"alg\":\"RS256\",\"use\":\"sig\",\"n\":\"" + n + "\",\"e\":\"" + e + "\"}";
+  }
+
+  private static byte[] stripLeadingZero(byte[] bytes) {
+    if (bytes.length > 1 && bytes[0] == 0) {
+      byte[] out = new byte[bytes.length - 1];
+      System.arraycopy(bytes, 1, out, 0, out.length);
+      return out;
+    }
+    return bytes;
   }
 }

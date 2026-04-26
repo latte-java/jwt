@@ -131,9 +131,10 @@ public final class Verifiers {
   // ---------------------------------------------------------------------
 
   /**
-   * Build a {@link Verifier} from a JSON Web Key. Returns {@code null} if the
-   * JWK is not usable for signature verification; never throws on a rejected
-   * JWK.
+   * Build a {@link Verifier} from a JSON Web Key. Throws
+   * {@link InvalidJWKException} if the JWK is not usable for signature
+   * verification; the exception's {@link InvalidJWKException#reason()} carries
+   * the categorical reason so callers can route to log levels or skip lists.
    *
    * <p>Rejected when: {@code kid} is missing; {@code alg} is missing or HMAC;
    * {@code kty} is missing or {@code oct}; {@code use} is present and not
@@ -141,40 +142,62 @@ public final class Verifiers {
    * key material fails to parse; or verifier construction would fail.</p>
    *
    * @param jwk the JSON Web Key; must be non-null
-   * @return a fresh verifier bound to {@code jwk.alg()}, or {@code null}
+   * @return a fresh verifier bound to {@code jwk.alg()}
+   * @throws InvalidJWKException if the JWK is not usable for signature verification
    */
   public static Verifier fromJWK(JSONWebKey jwk) {
     Objects.requireNonNull(jwk, "jwk");
 
-    if (jwk.kid() == null) return null;
+    if (jwk.kid() == null) {
+      throw new InvalidJWKException(InvalidJWKException.Reason.MISSING_KID, "JWK is missing required member [kid]");
+    }
 
     Algorithm alg = jwk.alg();
-    if (alg == null) return null;
+    if (alg == null) {
+      throw new InvalidJWKException(InvalidJWKException.Reason.MISSING_ALG,
+          "JWK [" + jwk.kid() + "] is missing required member [alg]");
+    }
 
     String algName = alg.name();
     if (algName.equals("HS256") || algName.equals("HS384") || algName.equals("HS512")) {
-      return null;
+      throw new InvalidJWKException(InvalidJWKException.Reason.HMAC_ALG,
+          "JWK [" + jwk.kid() + "] uses HMAC alg [" + algName + "]; not usable for signature verification on a public JWKS");
     }
 
     KeyType kty = jwk.kty();
-    if (kty == null || kty == KeyType.OCT) return null;
+    if (kty == null) {
+      throw new InvalidJWKException(InvalidJWKException.Reason.PARSE_FAILURE,
+          "JWK [" + jwk.kid() + "] is missing required member [kty]");
+    }
+    if (kty == KeyType.OCT) {
+      throw new InvalidJWKException(InvalidJWKException.Reason.KTY_OCT,
+          "JWK [" + jwk.kid() + "] has [kty=oct]; symmetric secrets do not belong on a public JWKS");
+    }
 
     String use = jwk.use();
-    if (use != null && !"sig".equals(use)) return null;
+    if (use != null && !"sig".equals(use)) {
+      throw new InvalidJWKException(InvalidJWKException.Reason.USE_ENC,
+          "JWK [" + jwk.kid() + "] has [use=" + use + "]; only [sig] is usable for signature verification");
+    }
 
-    if (!algKtyCrvConsistent(algName, kty, jwk.crv())) return null;
+    if (!algKtyCrvConsistent(algName, kty, jwk.crv())) {
+      throw new InvalidJWKException(InvalidJWKException.Reason.ALG_CRV_MISMATCH,
+          "JWK [" + jwk.kid() + "] has inconsistent [alg=" + algName + "], [kty=" + kty + "], [crv=" + jwk.crv() + "]");
+    }
 
     PublicKey publicKey;
     try {
       publicKey = jwk.toPublicKey();
-    } catch (RuntimeException ignored) {
-      return null;
+    } catch (RuntimeException e) {
+      throw new InvalidJWKException(InvalidJWKException.Reason.PARSE_FAILURE,
+          "JWK [" + jwk.kid() + "] key material failed to parse", e);
     }
 
     try {
       return forAsymmetric(alg, publicKey);
-    } catch (RuntimeException ignored) {
-      return null;
+    } catch (RuntimeException e) {
+      throw new InvalidJWKException(InvalidJWKException.Reason.PARSE_FAILURE,
+          "JWK [" + jwk.kid() + "] verifier construction failed", e);
     }
   }
 
