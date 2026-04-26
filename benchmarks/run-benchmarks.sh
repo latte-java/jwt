@@ -169,6 +169,15 @@ SLF4J_API_JAR="${M2_REPO}/org/slf4j/slf4j-api/1.7.36/slf4j-api-1.7.36.jar"
 # all optional compile-scope deps (BouncyCastle, Tink) are not required at runtime here.
 NIMBUS_JAR="${M2_REPO}/com/nimbusds/nimbus-jose-jwt/10.3/nimbus-jose-jwt-10.3.jar"
 
+# JARs for the jjwt adapter.
+# jjwt is a multi-jar library: API + impl + jackson binding. jjwt-jackson 0.12.6 depends on
+# jackson-databind 2.12.7.1 (four-part version), which Latte maps to 2.12.7 via semanticVersions.
+# At runtime we use the 2.15.4 Jackson JARs already present from the auth0 adapter — they are
+# backward-compatible with the 2.12.x API surface that jjwt-jackson uses.
+JJWT_API_JAR="${M2_REPO}/io/jsonwebtoken/jjwt-api/0.12.6/jjwt-api-0.12.6.jar"
+JJWT_IMPL_JAR="${M2_REPO}/io/jsonwebtoken/jjwt-impl/0.12.6/jjwt-impl-0.12.6.jar"
+JJWT_JACKSON_JAR="${M2_REPO}/io/jsonwebtoken/jjwt-jackson/0.12.6/jjwt-jackson-0.12.6.jar"
+
 # Return the per-library JAR path. Latte names it <artifact>-<version>.jar inside build/jars/.
 # The project name (from project.latte) may differ from the directory name (e.g. latte-jwt dir
 # uses artifact "latte-jwt-bench"), so we glob for the primary (non-test, non-src) JAR.
@@ -194,6 +203,7 @@ classpath_for_library() {
   # Adapters that wrap third-party libraries need those JARs on the classpath.
   case "${lib}" in
     auth0-java-jwt)  cp="${cp}:${AUTH0_JWT_JAR}:${JACKSON_DATABIND_JAR}:${JACKSON_CORE_JAR}:${JACKSON_ANNOTATIONS_JAR}" ;;
+    jjwt)            cp="${cp}:${JJWT_API_JAR}:${JJWT_IMPL_JAR}:${JJWT_JACKSON_JAR}:${JACKSON_DATABIND_JAR}:${JACKSON_CORE_JAR}:${JACKSON_ANNOTATIONS_JAR}" ;;
     jose4j)          cp="${cp}:${JOSE4J_JAR}:${SLF4J_API_JAR}" ;;
     latte-jwt)       cp="${cp}:${LATTE_JWT_JAR}" ;;
     nimbus-jose-jwt) cp="${cp}:${NIMBUS_JAR}" ;;
@@ -213,11 +223,11 @@ main_class_for_library() {
   case "${lib}" in
     auth0-java-jwt)  echo "org.lattejava.jwt.benchmarks.auth0.Main" ;;
     baseline)        echo "org.lattejava.jwt.benchmarks.baseline.Main" ;;
+    jjwt)            echo "org.lattejava.jwt.benchmarks.jjwt.Main" ;;
     jose4j)          echo "org.lattejava.jwt.benchmarks.jose4j.Main" ;;
     latte-jwt)       echo "org.lattejava.jwt.benchmarks.lattejwt.Main" ;;
     nimbus-jose-jwt) echo "org.lattejava.jwt.benchmarks.nimbus.Main" ;;
     # Future adapters — add a case when the adapter is built:
-    # jjwt)                    echo "org.lattejava.jwt.benchmarks.jjwt.Main" ;;
     # fusionauth-jwt)          echo "org.lattejava.jwt.benchmarks.fusionauth.Main" ;;
     # vertx-auth-jwt)          echo "org.lattejava.jwt.benchmarks.vertx.Main" ;;
     # inverno-security-jose)   echo "org.lattejava.jwt.benchmarks.inverno.Main" ;;
