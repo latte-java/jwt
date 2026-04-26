@@ -375,6 +375,13 @@ public final class JSONWebKey {
   /**
    * Map suitable for JSON serialization. The Java field {@code x5tS256} is
    * emitted under the wire-form key {@code "x5t#S256"} per RFC 7517 §4.9.
+   *
+   * @apiNote The returned map is mutable and not shared with the {@code JSONWebKey}
+   *     instance. Callers MUST NOT retain or mutate it -- the contract is that
+   *     each call returns a fresh map intended for immediate handoff to a JSON
+   *     serializer. List values ({@code key_ops}, {@code x5c}) reference the
+   *     JWK's internal unmodifiable lists directly; the JSON serializer only
+   *     iterates them.
    */
   public Map<String, Object> toSerializableMap() {
     Map<String, Object> out = new LinkedHashMap<>();
@@ -403,7 +410,7 @@ public final class JSONWebKey {
         out.put(entry.getKey(), entry.getValue());
       }
     }
-    return Collections.unmodifiableMap(out);
+    return out;
   }
 
   /**
