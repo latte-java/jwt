@@ -183,6 +183,33 @@ JJWT_API_JAR="${M2_REPO}/io/jsonwebtoken/jjwt-api/0.12.6/jjwt-api-0.12.6.jar"
 JJWT_IMPL_JAR="${M2_REPO}/io/jsonwebtoken/jjwt-impl/0.12.6/jjwt-impl-0.12.6.jar"
 JJWT_JACKSON_JAR="${M2_REPO}/io/jsonwebtoken/jjwt-jackson/0.12.6/jjwt-jackson-0.12.6.jar"
 
+# JARs for the vertx-auth-jwt adapter.
+# vertx-auth-jwt 4.5.14 has heavy transitives: vertx-core pulls in a large Netty surface (13 modules)
+# plus jackson-core 2.16.1. vertx-auth-jwt itself depends on vertx-auth-common (where JWTOptions,
+# PubSecKeyOptions, and User live). vertx-auth-common is declared explicitly in the adapter's
+# project.latte so it appears as a direct compile dep and resolves to a separate JAR here.
+# jackson-databind is NOT required at runtime — vertx uses JsonObject (its own JSON layer backed
+# by jackson-core only). All Netty JARs use the .Final qualifier (mapped to plain semver in
+# project.latte via semanticVersions so Latte can resolve them, but on disk they remain .Final).
+VERTX_NETTY="4.1.118.Final"
+VERTX_AUTH_COMMON_JAR="${M2_REPO}/io/vertx/vertx-auth-common/4.5.14/vertx-auth-common-4.5.14.jar"
+VERTX_AUTH_JWT_JAR="${M2_REPO}/io/vertx/vertx-auth-jwt/4.5.14/vertx-auth-jwt-4.5.14.jar"
+VERTX_CORE_JAR="${M2_REPO}/io/vertx/vertx-core/4.5.14/vertx-core-4.5.14.jar"
+NETTY_BUFFER_JAR="${M2_REPO}/io/netty/netty-buffer/${VERTX_NETTY}/netty-buffer-${VERTX_NETTY}.jar"
+NETTY_CODEC_DNS_JAR="${M2_REPO}/io/netty/netty-codec-dns/${VERTX_NETTY}/netty-codec-dns-${VERTX_NETTY}.jar"
+NETTY_CODEC_HTTP_JAR="${M2_REPO}/io/netty/netty-codec-http/${VERTX_NETTY}/netty-codec-http-${VERTX_NETTY}.jar"
+NETTY_CODEC_HTTP2_JAR="${M2_REPO}/io/netty/netty-codec-http2/${VERTX_NETTY}/netty-codec-http2-${VERTX_NETTY}.jar"
+NETTY_CODEC_JAR="${M2_REPO}/io/netty/netty-codec/${VERTX_NETTY}/netty-codec-${VERTX_NETTY}.jar"
+NETTY_CODEC_SOCKS_JAR="${M2_REPO}/io/netty/netty-codec-socks/${VERTX_NETTY}/netty-codec-socks-${VERTX_NETTY}.jar"
+NETTY_COMMON_JAR="${M2_REPO}/io/netty/netty-common/${VERTX_NETTY}/netty-common-${VERTX_NETTY}.jar"
+NETTY_HANDLER_JAR="${M2_REPO}/io/netty/netty-handler/${VERTX_NETTY}/netty-handler-${VERTX_NETTY}.jar"
+NETTY_HANDLER_PROXY_JAR="${M2_REPO}/io/netty/netty-handler-proxy/${VERTX_NETTY}/netty-handler-proxy-${VERTX_NETTY}.jar"
+NETTY_RESOLVER_DNS_JAR="${M2_REPO}/io/netty/netty-resolver-dns/${VERTX_NETTY}/netty-resolver-dns-${VERTX_NETTY}.jar"
+NETTY_RESOLVER_JAR="${M2_REPO}/io/netty/netty-resolver/${VERTX_NETTY}/netty-resolver-${VERTX_NETTY}.jar"
+NETTY_TRANSPORT_JAR="${M2_REPO}/io/netty/netty-transport/${VERTX_NETTY}/netty-transport-${VERTX_NETTY}.jar"
+NETTY_TRANSPORT_UNIX_JAR="${M2_REPO}/io/netty/netty-transport-native-unix-common/${VERTX_NETTY}/netty-transport-native-unix-common-${VERTX_NETTY}.jar"
+VERTX_JACKSON_CORE_JAR="${M2_REPO}/com/fasterxml/jackson/core/jackson-core/2.16.1/jackson-core-2.16.1.jar"
+
 # Return the per-library JAR path. Latte names it <artifact>-<version>.jar inside build/jars/.
 # The project name (from project.latte) may differ from the directory name (e.g. latte-jwt dir
 # uses artifact "latte-jwt-bench"), so we glob for the primary (non-test, non-src) JAR.
@@ -213,6 +240,13 @@ classpath_for_library() {
     jose4j)          cp="${cp}:${JOSE4J_JAR}:${SLF4J_API_JAR}" ;;
     latte-jwt)       cp="${cp}:${LATTE_JWT_JAR}" ;;
     nimbus-jose-jwt) cp="${cp}:${NIMBUS_JAR}" ;;
+    vertx-auth-jwt)
+      cp="${cp}:${VERTX_AUTH_JWT_JAR}:${VERTX_AUTH_COMMON_JAR}:${VERTX_CORE_JAR}"
+      cp="${cp}:${NETTY_BUFFER_JAR}:${NETTY_CODEC_DNS_JAR}:${NETTY_CODEC_HTTP_JAR}:${NETTY_CODEC_HTTP2_JAR}"
+      cp="${cp}:${NETTY_CODEC_JAR}:${NETTY_CODEC_SOCKS_JAR}:${NETTY_COMMON_JAR}:${NETTY_HANDLER_JAR}"
+      cp="${cp}:${NETTY_HANDLER_PROXY_JAR}:${NETTY_RESOLVER_DNS_JAR}:${NETTY_RESOLVER_JAR}"
+      cp="${cp}:${NETTY_TRANSPORT_JAR}:${NETTY_TRANSPORT_UNIX_JAR}:${VERTX_JACKSON_CORE_JAR}"
+      ;;
   esac
 
   echo "${cp}"
@@ -234,8 +268,8 @@ main_class_for_library() {
     jose4j)          echo "org.lattejava.jwt.benchmarks.jose4j.Main" ;;
     latte-jwt)       echo "org.lattejava.jwt.benchmarks.lattejwt.Main" ;;
     nimbus-jose-jwt) echo "org.lattejava.jwt.benchmarks.nimbus.Main" ;;
+    vertx-auth-jwt)  echo "org.lattejava.jwt.benchmarks.vertx.Main" ;;
     # Future adapters — add a case when the adapter is built:
-    # vertx-auth-jwt)          echo "org.lattejava.jwt.benchmarks.vertx.Main" ;;
     # inverno-security-jose)   echo "org.lattejava.jwt.benchmarks.inverno.Main" ;;
     *) echo "unknown library: ${lib}" >&2; exit 1 ;;
   esac
