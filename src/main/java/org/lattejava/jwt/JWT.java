@@ -598,11 +598,9 @@ public final class JWT {
     if (!(value instanceof Number n)) {
       throw new InvalidJWTException("Claim [" + name + "] must be a numeric value (NumericDate)");
     }
-    // Long fast-path: skips BigInteger materialization for values that already
-    // fit in a long (LatteJSONProcessor's parseNumber returns Long for digit
-    // runs <= 18, which covers every realistic NumericDate including epoch
-    // seconds well past year 2100). Long.MIN/MAX_VALUE are still wider than
-    // Instant.MIN/MAX, so the range check is required.
+    // Long fast-path: NumericDate values that fit in a long arrive here as Long from any
+    // reasonable JSONProcessor; skip BigInteger materialization for them. Long.MIN/MAX are
+    // wider than Instant.MIN/MAX, so the range check is still required.
     if (n instanceof Long l) {
       long secs = l;
       if (secs > MAX_INSTANT_SECOND_LONG || secs < MIN_INSTANT_SECOND_LONG) {
