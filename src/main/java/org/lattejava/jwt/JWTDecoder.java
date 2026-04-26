@@ -58,7 +58,7 @@ public class JWTDecoder {
      */
     static final int DEFAULT_MAX_NUMBER_LENGTH = 1000;
 
-    private static JWTDecoder DEFAULT_INSTANCE;
+    private static final JWTDecoder DEFAULT_INSTANCE = new JWTDecoder(builderDefaults());
 
     private final JSONProcessor jsonProcessor;
     private final Clock clock;
@@ -139,15 +139,13 @@ public class JWTDecoder {
     }
 
     /**
-     * If you need to customize the JWT decoder, you will need to build one yourself.
+     * Returns the shared default {@link JWTDecoder} used by {@link JWT#decode(String, VerifierResolver)} and
+     * its overloads. Build your own with {@link #builder()} when you need non-default settings (custom
+     * {@link JSONProcessor}, {@code clockSkew}, allowed algorithms, {@code fixedTime}, etc.).
      *
-     * @return the default instance.
+     * @return the shared default instance; never {@code null}
      */
     public static JWTDecoder getDefault() {
-        if (DEFAULT_INSTANCE == null) {
-            DEFAULT_INSTANCE = new JWTDecoder(builderDefaults());
-        }
-
         return DEFAULT_INSTANCE;
     }
 

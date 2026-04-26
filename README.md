@@ -64,6 +64,8 @@ The recommended entry points are the `Signers` and `Verifiers` factories. They t
 
 JWTs are built with an immutable fluent builder and serialized by a `JWTEncoder`. Decoding is done by a `JWTDecoder`, which takes a `VerifierResolver` — use `VerifierResolver.of(verifier)` for the simple single-key case, or `VerifierResolver.byKid(Map<String, Verifier>)` for a `kid`-indexed keyring.
 
+For the happy path, `JWT.decode(encodedJWT, resolver)` (and an `(encodedJWT, resolver, validator)` overload) routes through a shared default `JWTDecoder` so you don't have to construct one. Build your own `JWTDecoder` with `JWTDecoder.builder()` when you need non-default settings — a custom `JSONProcessor`, `clockSkew`, allowed algorithms, `fixedTime`, etc. — and pass it to the `JWT.decode(encodedJWT, decoder, resolver)` overload (or call `decoder.decode(...)` directly).
+
 #### Sign and encode a JWT using HMAC
 ```java
 // Build an HMAC signer for HS256
@@ -98,7 +100,7 @@ Signer signer = HMACSigner.newSHA256Signer("too many secrets");
 Verifier verifier = Verifiers.forHMAC(Algorithm.HS256, "too many secrets");
 
 // Verify and decode the encoded string JWT to a rich object
-JWT jwt = new JWTDecoder().decode(encodedJWT, VerifierResolver.of(verifier));
+JWT jwt = JWT.decode(encodedJWT, VerifierResolver.of(verifier));
 
 // Assert the subject of the JWT is as expected
 assertEquals(jwt.subject(), "f1e33ab3-027f-47c5-bb07-8dd8ab37a2d3");
@@ -137,7 +139,7 @@ String pemPublicKey = Files.readString(Paths.get("public_key.pem"));
 Verifier verifier = Verifiers.forAsymmetric(Algorithm.RS256, pemPublicKey);
 
 // Verify and decode the encoded string JWT to a rich object
-JWT jwt = new JWTDecoder().decode(encodedJWT, VerifierResolver.of(verifier));
+JWT jwt = JWT.decode(encodedJWT, VerifierResolver.of(verifier));
 
 // Assert the subject of the JWT is as expected
 assertEquals(jwt.subject(), "f1e33ab3-027f-47c5-bb07-8dd8ab37a2d3");
@@ -175,12 +177,36 @@ Alternate: `ECSigner.newSHA256Signer(pemPrivateKey)` (and the `SHA384` / `SHA512
 String pemPublicKey = Files.readString(Paths.get("public_key.pem"));
 Verifier verifier = Verifiers.forAsymmetric(Algorithm.ES256, pemPublicKey);
 
-JWT jwt = new JWTDecoder().decode(encodedJWT, VerifierResolver.of(verifier));
+JWT jwt = JWT.decode(encodedJWT, VerifierResolver.of(verifier));
 
 assertEquals(jwt.subject(), "f1e33ab3-027f-47c5-bb07-8dd8ab37a2d3");
 ```
 
 Alternate: `ECVerifier.newVerifier(Paths.get("public_key.pem"))`.
+
+#### Build your own JWTDecoder
+
+The `JWT.decode(...)` static helpers route through a shared default decoder that uses the bundled zero-dependency `LatteJSONProcessor`. Build your own when you need a different `JSONProcessor` or any other non-default setting — `clockSkew`, `expectedAlgorithms`, `expectedType`, `criticalHeaders`, `maxInputBytes`, `fixedTime`, etc. The clock-skew and time-pinning examples below use the same builder.
+
+`JSONProcessor` is a strategy interface — `serialize(Map)` / `deserialize(byte[])` — and **the library does not bundle a Jackson, Gson, or other third-party adapter**. To use one, write a small class that implements `JSONProcessor` and delegates to your JSON library of choice. Implementations must be stateless and thread-safe; the encoder and decoder may call them concurrently.
+
+```java
+// MyJacksonJSONProcessor is YOUR class -- a thin adapter you write that implements
+// JSONProcessor and delegates to Jackson (or Gson, or any other JSON library).
+// This library does not ship one; keeping it user-supplied is what lets the core
+// stay zero-dependency at runtime.
+JSONProcessor jsonProcessor = new MyJacksonJSONProcessor();
+
+JWTDecoder decoder = JWTDecoder.builder()
+                               .jsonProcessor(jsonProcessor)
+                               .expectedAlgorithms(Set.of(Algorithm.RS256))
+                               .build();
+
+// Either pass the decoder to the JWT.decode helper:
+JWT jwt = JWT.decode(encodedJWT, decoder, VerifierResolver.of(verifier));
+
+// ...or call decoder.decode(...) directly. Both forms are equivalent.
+```
 
 #### Verify a JWT adjusting for Clock Skew
 ```java
@@ -209,7 +235,7 @@ JWKSource source = JWKSource.fromIssuer("https://idp.example.com/")
     .refreshInterval(Duration.ofMinutes(15))
     .build();
 
-JWT jwt = new JWTDecoder().decode(encodedJWT, source);
+JWT jwt = JWT.decode(encodedJWT, source);
 ```
 
 `JWKSource` implements `VerifierResolver`, performs an initial synchronous load on `build()` (bounded by `refreshTimeout`), and refreshes on `kid` cache miss (singleflight-coalesced) or on a virtual-thread scheduler tick when `scheduledRefresh(true)` is set. Honors `Cache-Control: max-age` and `Retry-After` from the JWKS endpoint. Implements `AutoCloseable`; call `close()` in shutdown hooks.

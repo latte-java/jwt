@@ -87,21 +87,19 @@ public final class JWT {
     }
 
     /**
-     * Happy path helper to decode a JWT. If you need to customize your JWTDecoder, you will need to build your own.
-     *
-     * @param encodedJWT the compact JWS string; must be non-null
-     * @param resolver   the verifier resolver; must be non-null
-     * @return the decoded {@link JWT}
+     * Returns a fresh {@link Builder} for assembling a {@link JWT} via the fluent API.
      */
-    public static JWT decode(String encodedJWT, JWTDecoder decoder, VerifierResolver resolver) {
-        return decoder.decode(encodedJWT, resolver);
+    public static Builder builder() {
+        return new Builder();
     }
 
     /**
-     * Decode a JWT, resolving the {@link Verifier} via the supplied
-     * {@link VerifierResolver}. Signature verification runs BEFORE payload
-     * deserialization so a malformed payload cannot be observed until the
-     * signature has been validated.
+     * Decodes a JWT using the shared default {@link JWTDecoder}, resolving the {@link Verifier} via the supplied
+     * {@link VerifierResolver}. Signature verification runs BEFORE payload deserialization so a malformed payload
+     * cannot be observed until the signature has been validated.
+     *
+     * <p>Build your own decoder with {@link JWTDecoder#builder()} when you need non-default settings (custom
+     * {@link JSONProcessor}, {@code clockSkew}, allowed algorithms, {@code fixedTime}, etc.).</p>
      *
      * @param encodedJWT the compact JWS string; must be non-null
      * @param resolver   the verifier resolver; must be non-null
@@ -112,23 +110,25 @@ public final class JWT {
     }
 
     /**
-     * Decode a JWT with an optional post-decode validator. The validator
-     * runs after signature verification and built-in time validation;
-     * implementations throw any {@link JWTException} subclass to reject the
-     * token.
+     * Decodes a JWT using the supplied {@link JWTDecoder} and {@link VerifierResolver}. Signature verification runs
+     * BEFORE payload deserialization so a malformed payload cannot be observed until the signature has been validated.
      *
      * @param encodedJWT the compact JWS string; must be non-null
-     * @param decoder the JWT decoder; must be non-null
+     * @param decoder    the JWT decoder; must be non-null
      * @param resolver   the verifier resolver; must be non-null
-     * @param validator  optional post-decode validator; may be null
      * @return the decoded {@link JWT}
      */
-    public static JWT decode(String encodedJWT, JWTDecoder decoder, VerifierResolver resolver, Consumer<JWT> validator) {
-        return decoder.decode(encodedJWT, resolver, validator);
+    public static JWT decode(String encodedJWT, JWTDecoder decoder, VerifierResolver resolver) {
+        return decoder.decode(encodedJWT, resolver);
     }
 
     /**
-     * Happy path helper to decode a JWT. If you need to customize your JWTDecoder, you will need to build your own.
+     * Decodes a JWT using the shared default {@link JWTDecoder}, with an optional post-decode validator. The validator
+     * runs after signature verification and built-in time validation; implementations throw any {@link JWTException}
+     * subclass to reject the token.
+     *
+     * <p>Build your own decoder with {@link JWTDecoder#builder()} when you need non-default settings (custom
+     * {@link JSONProcessor}, {@code clockSkew}, allowed algorithms, {@code fixedTime}, etc.).</p>
      *
      * @param encodedJWT the compact JWS string; must be non-null
      * @param resolver   the verifier resolver; must be non-null
@@ -139,7 +139,20 @@ public final class JWT {
         return JWTDecoder.getDefault().decode(encodedJWT, resolver, validator);
     }
 
-    // ---------- Fluent getters ----------
+    /**
+     * Decodes a JWT using the supplied {@link JWTDecoder} and {@link VerifierResolver}, with an optional post-decode
+     * validator. The validator runs after signature verification and built-in time validation; implementations throw
+     * any {@link JWTException} subclass to reject the token.
+     *
+     * @param encodedJWT the compact JWS string; must be non-null
+     * @param decoder    the JWT decoder; must be non-null
+     * @param resolver   the verifier resolver; must be non-null
+     * @param validator  optional post-decode validator; may be null
+     * @return the decoded {@link JWT}
+     */
+    public static JWT decode(String encodedJWT, JWTDecoder decoder, VerifierResolver resolver, Consumer<JWT> validator) {
+        return decoder.decode(encodedJWT, resolver, validator);
+    }
 
     /**
      * Build a {@link JWT} from a parsed JSON object map and an already-parsed
@@ -211,11 +224,6 @@ public final class JWT {
         }
 
         return b.build();
-    }
-
-    // ---------- Builder ----------
-    public static Builder builder() {
-        return new Builder();
     }
 
     private static String expectString(String name, Object value) {

@@ -22,6 +22,8 @@ import org.testng.annotations.Test;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
@@ -30,6 +32,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -551,6 +554,115 @@ public class JWTTest {
   public void isUnavailableForProcessing_true_when_nbf_after_now() {
     JWT jwt = JWT.builder().notBefore(Instant.ofEpochSecond(2_000)).build();
     assertTrue(jwt.isUnavailableForProcessing(Instant.ofEpochSecond(1_000)));
+  }
+
+  // -------------------- static decode helpers --------------------
+
+  private static final String DECODE_SECRET = "super-secret-key-that-is-at-least-32-bytes-long!!";
+
+  private static String encodeFreshJWT() {
+    JWT jwt = JWT.builder()
+                 .subject("decode-helpers")
+                 .issuedAt(Instant.now())
+                 .expiresAt(Instant.now().plusSeconds(3600))
+                 .build();
+    return new JWTEncoder().encode(jwt, Signers.forHMAC(Algorithm.HS256, DECODE_SECRET));
+  }
+
+  @Test
+  public void decode_with_default_decoder_happy_path() {
+    // Use case: JWT.decode(encodedJWT, resolver) uses the shared default decoder and returns a fully decoded JWT.
+    String encoded = encodeFreshJWT();
+    Verifier verifier = Verifiers.forHMAC(Algorithm.HS256, DECODE_SECRET);
+
+    JWT decoded = JWT.decode(encoded, VerifierResolver.of(verifier));
+    assertNotNull(decoded);
+    assertEquals(decoded.subject(), "decode-helpers");
+    assertNotNull(decoded.header());
+    assertEquals(decoded.header().alg(), Algorithm.HS256);
+  }
+
+  @Test
+  public void decode_uses_supplied_decoder() {
+    // Use case: JWT.decode(encodedJWT, decoder, resolver) routes through the supplied decoder. We confirm by
+    // pinning fixedTime far in the future and asserting the call would fail without our supplied clock skew --
+    // proving the supplied decoder (not the default) was consulted.
+    JWT jwt = JWT.builder()
+                 .subject("supplied-decoder")
+                 .expiresAt(Instant.parse("2026-04-26T12:00:00Z"))
+                 .build();
+    String encoded = new JWTEncoder().encode(jwt, Signers.forHMAC(Algorithm.HS256, DECODE_SECRET));
+
+    Instant fakeNow = Instant.parse("2026-04-26T13:00:00Z");
+    JWTDecoder decoder = JWTDecoder.builder()
+                                   .clock(Clock.fixed(fakeNow, ZoneOffset.UTC))
+                                   .clockSkew(Duration.ofHours(2))
+                                   .build();
+
+    JWT decoded = JWT.decode(encoded, decoder, VerifierResolver.of(Verifiers.forHMAC(Algorithm.HS256, DECODE_SECRET)));
+    assertEquals(decoded.subject(), "supplied-decoder");
+
+    // Default decoder (no skew, real clock) would reject the same token as expired.
+    expectThrows(JWTExpiredException.class, () ->
+        JWT.decode(encoded, VerifierResolver.of(Verifiers.forHMAC(Algorithm.HS256, DECODE_SECRET))));
+  }
+
+  @Test
+  public void decode_validator_runs_with_decoded_jwt() {
+    // Use case: a non-null validator is invoked with the verified JWT after time validation.
+    String encoded = encodeFreshJWT();
+    AtomicReference<JWT> seen = new AtomicReference<>();
+
+    JWT decoded = JWT.decode(
+        encoded,
+        VerifierResolver.of(Verifiers.forHMAC(Algorithm.HS256, DECODE_SECRET)),
+        seen::set);
+
+    assertSame(seen.get(), decoded);
+  }
+
+  @Test
+  public void decode_validator_exception_propagates() {
+    // Use case: a validator that throws a JWTException subclass rejects the token; the exception is propagated unchanged.
+    String encoded = encodeFreshJWT();
+    InvalidJWTException thrown = expectThrows(InvalidJWTException.class, () ->
+        JWT.decode(
+            encoded,
+            VerifierResolver.of(Verifiers.forHMAC(Algorithm.HS256, DECODE_SECRET)),
+            j -> { throw new InvalidJWTException("rejected by validator"); }));
+    assertEquals(thrown.getMessage(), "rejected by validator");
+  }
+
+  @Test
+  public void decode_with_supplied_decoder_and_validator() {
+    // Use case: JWT.decode(encodedJWT, decoder, resolver, validator) routes the supplied decoder and runs the validator.
+    String encoded = encodeFreshJWT();
+    JWTDecoder decoder = JWTDecoder.builder().clockSkew(Duration.ofSeconds(30)).build();
+    AtomicReference<JWT> seen = new AtomicReference<>();
+
+    JWT decoded = JWT.decode(
+        encoded,
+        decoder,
+        VerifierResolver.of(Verifiers.forHMAC(Algorithm.HS256, DECODE_SECRET)),
+        seen::set);
+
+    assertSame(seen.get(), decoded);
+  }
+
+  @Test
+  public void decode_null_validator_is_accepted() {
+    // Use case: null validator on both overloads is accepted (Javadoc states "may be null").
+    String encoded = encodeFreshJWT();
+    Verifier verifier = Verifiers.forHMAC(Algorithm.HS256, DECODE_SECRET);
+
+    assertNotNull(JWT.decode(encoded, VerifierResolver.of(verifier), null));
+    assertNotNull(JWT.decode(encoded, JWTDecoder.getDefault(), VerifierResolver.of(verifier), null));
+  }
+
+  @Test
+  public void getDefault_returns_shared_singleton() {
+    // Use case: JWTDecoder.getDefault() returns the same instance on repeated calls.
+    assertSame(JWTDecoder.getDefault(), JWTDecoder.getDefault());
   }
 
   // -------------------- helper for header injection in tests --------------------
