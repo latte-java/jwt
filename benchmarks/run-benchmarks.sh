@@ -152,6 +152,13 @@ MATH3_JAR="${M2_REPO}/org/apache/commons/commons-math3/3.6.1/commons-math3-3.6.1
 # JAR for the latte-jwt library itself (only needed by the latte-jwt adapter).
 LATTE_JWT_JAR="${LATTE_CACHE}/org/lattejava/jwt/0.1.0-{integration}/jwt-0.1.0-{integration}.jar"
 
+# JARs for the auth0/java-jwt adapter and its Jackson 2.15.4 transitives.
+# auth0/java-jwt is a Maven Central artifact; Latte resolves it into ~/.m2/repository.
+AUTH0_JWT_JAR="${M2_REPO}/com/auth0/java-jwt/4.5.0/java-jwt-4.5.0.jar"
+JACKSON_DATABIND_JAR="${M2_REPO}/com/fasterxml/jackson/core/jackson-databind/2.15.4/jackson-databind-2.15.4.jar"
+JACKSON_CORE_JAR="${M2_REPO}/com/fasterxml/jackson/core/jackson-core/2.15.4/jackson-core-2.15.4.jar"
+JACKSON_ANNOTATIONS_JAR="${M2_REPO}/com/fasterxml/jackson/core/jackson-annotations/2.15.4/jackson-annotations-2.15.4.jar"
+
 # Return the per-library JAR path. Latte names it <artifact>-<version>.jar inside build/jars/.
 # The project name (from project.latte) may differ from the directory name (e.g. latte-jwt dir
 # uses artifact "latte-jwt-bench"), so we glob for the primary (non-test, non-src) JAR.
@@ -174,9 +181,10 @@ classpath_for_library() {
 
   local cp="${lib_jar}:${HARNESS_JAR}:${JMH_CORE_JAR}:${JOPT_JAR}:${MATH3_JAR}"
 
-  # Adapters that wrap latte-jwt need the jwt implementation JAR on the classpath.
+  # Adapters that wrap third-party libraries need those JARs on the classpath.
   case "${lib}" in
-    latte-jwt) cp="${cp}:${LATTE_JWT_JAR}" ;;
+    auth0-java-jwt) cp="${cp}:${AUTH0_JWT_JAR}:${JACKSON_DATABIND_JAR}:${JACKSON_CORE_JAR}:${JACKSON_ANNOTATIONS_JAR}" ;;
+    latte-jwt)      cp="${cp}:${LATTE_JWT_JAR}" ;;
   esac
 
   echo "${cp}"
@@ -191,10 +199,10 @@ classpath_for_library() {
 main_class_for_library() {
   local lib="$1"
   case "${lib}" in
-    baseline)  echo "org.lattejava.jwt.benchmarks.baseline.Main" ;;
-    latte-jwt) echo "org.lattejava.jwt.benchmarks.lattejwt.Main" ;;
+    auth0-java-jwt) echo "org.lattejava.jwt.benchmarks.auth0.Main" ;;
+    baseline)       echo "org.lattejava.jwt.benchmarks.baseline.Main" ;;
+    latte-jwt)      echo "org.lattejava.jwt.benchmarks.lattejwt.Main" ;;
     # Future adapters — add a case when the adapter is built:
-    # auth0-java-jwt)          echo "org.lattejava.jwt.benchmarks.auth0.Main" ;;
     # jose4j)                  echo "org.lattejava.jwt.benchmarks.jose4j.Main" ;;
     # nimbus-jose-jwt)         echo "org.lattejava.jwt.benchmarks.nimbus.Main" ;;
     # jjwt)                    echo "org.lattejava.jwt.benchmarks.jjwt.Main" ;;
