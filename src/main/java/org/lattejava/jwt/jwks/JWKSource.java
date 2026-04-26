@@ -52,12 +52,12 @@ import java.util.function.Consumer;
 
 /**
  * A self-refreshing {@link VerifierResolver} backed by a remote JWKS endpoint.
- * See {@code specs/jwks-source.md} for the full specification (rev 3).
  */
 public final class JWKSource implements VerifierResolver, AutoCloseable {
   private volatile boolean closed;
   private final AtomicReference<CompletableFuture<Snapshot>> inflight = new AtomicReference<>();
   private final AtomicReference<Snapshot> ref = new AtomicReference<>();
+  private volatile Thread refreshThread;
   private final CacheControlPolicy cacheControlPolicy;
   private final Clock clock;
   private final Consumer<HttpURLConnection> httpConnectionCustomizer;
@@ -86,11 +86,10 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
     // Empty initial snapshot. nextDueAt=EPOCH so the first on-miss / scheduler
     // tick / build-time await is allowed to dispatch a refresh.
     this.ref.set(new Snapshot(Map.of(), Instant.EPOCH, Instant.EPOCH, 0, null));
-    // Dispatch initial refresh through the singleflight and await up to
-    // refreshTimeout. Per spec §2.1, build() bounds the awaiter by
-    // refreshTimeout but does not throw on a network failure — failures land
-    // in the snapshot via singleflight; timeouts leave the empty initial
-    // snapshot in place while the in-flight fetch continues.
+    // build() bounds the awaiter by refreshTimeout but does not throw on
+    // a network failure — failures land in the snapshot via singleflight;
+    // timeouts leave the empty initial snapshot in place while the in-flight
+    // fetch continues.
     CompletableFuture<Snapshot> initial = singleflightRefresh();
     try {
       initial.get(refreshTimeout.toMillis(), TimeUnit.MILLISECONDS);
@@ -102,7 +101,11 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
       // failure snapshot is already installed by singleflight's catch path
     }
     if (scheduledRefresh) {
-      this.scheduler = Executors.newSingleThreadScheduledExecutor(Thread.ofVirtual().factory());
+      this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "jwks-source-scheduler");
+        t.setDaemon(true);
+        return t;
+      });
       long tickMs = minRefreshInterval.toMillis();
       this.scheduler.scheduleAtFixedRate(this::onTick, tickMs, tickMs, TimeUnit.MILLISECONDS);
     } else {
@@ -201,6 +204,10 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
     if (in != null && !in.isDone()) {
       in.complete(null);
     }
+    Thread t = refreshThread;
+    if (t != null) {
+      t.interrupt();
+    }
     if (logger.isDebugEnabled()) logger.debug("JWKSource closed");
   }
 
@@ -228,8 +235,8 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
   // --- Refresh internals ---
 
   /**
-   * Exponential backoff per spec §2.7.2, computed in long ms to avoid integer
-   * overflow at high consecutive-failure counts. Returns
+   * Exponential backoff, computed in long ms to avoid integer overflow at
+   * high consecutive-failure counts. Returns
    * {@code min(refreshInterval, minRefreshInterval * 2^(consecutiveFailures-1))}.
    */
   static Duration backoff(int consecutiveFailures, Duration minRefreshInterval, Duration refreshInterval) {
@@ -243,8 +250,11 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
   }
 
   /**
-   * Compute chosenInterval per spec §2.6. Returns the duration to use for
-   * nextDueAt; the caller still applies the minRefreshInterval floor in §2.4.
+   * Returns the {@link Duration} to use for {@code nextDueAt}. Honors the
+   * server's {@code Cache-Control: max-age} when {@link CacheControlPolicy#CLAMP}
+   * is configured, clamped into {@code [minRefreshInterval, refreshInterval]};
+   * the caller applies the {@code minRefreshInterval} floor again as a final
+   * guard.
    */
   private Duration chosenInterval(JWKSResponse resp) {
     if (cacheControlPolicy == CacheControlPolicy.IGNORE) return refreshInterval;
@@ -271,9 +281,14 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
   }
 
   /**
-   * Parses {@code max-age=N} from a Cache-Control header. Returns 0 for
-   * {@code no-store} or {@code max-age=0}. Returns {@code null} if the header
-   * is malformed (unparseable max-age, multiple conflicting max-age directives).
+   * Parses {@code max-age=N} from a Cache-Control header. Returns {@code 0L}
+   * for {@code no-store} or {@code max-age=0}. Returns {@code null} if the
+   * header is malformed (unparseable {@code max-age}, multiple conflicting
+   * {@code max-age} directives).
+   *
+   * <p>{@code no-store} takes precedence: a header carrying both {@code no-store}
+   * and a {@code max-age} returns {@code 0L} and the {@code max-age} value is
+   * discarded.</p>
    */
   static Long parseMaxAge(String headerValue) {
     if (headerValue == null) return null;
@@ -304,7 +319,7 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
   /**
    * Returns the in-flight refresh future, dispatching a new one on a virtual
    * thread if no refresh is currently active. Order on completion: snapshot
-   * updated first, then awaiters notified, then slot cleared. See spec §3.
+   * updated first, then awaiters notified, then slot cleared.
    *
    * <p>If the refresh fails, the future completes exceptionally with the
    * underlying cause so that the operator-driven {@link #refresh()} path can
@@ -316,34 +331,43 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
 
     CompletableFuture<Snapshot> mine = new CompletableFuture<>();
     if (!inflight.compareAndSet(null, mine)) {
-      return inflight.get();
+      CompletableFuture<Snapshot> winner = inflight.get();
+      // The winner can complete and clear the slot between the failed CAS and
+      // this read; in that case the snapshot has already been installed, so
+      // hand the loser a completed future over the latest snapshot.
+      return winner != null ? winner : CompletableFuture.completedFuture(ref.get());
     }
 
     if (logger.isDebugEnabled()) {
       logger.debug("JWKS refresh dispatched");
     }
     Thread.ofVirtual().start(() -> {
-      Snapshot prev = ref.get();
-      Snapshot fresh;
-      Throwable failureCause = null;
+      refreshThread = Thread.currentThread();
       try {
-        fresh = doRefreshOrThrow(prev);
-      } catch (Throwable t) {
-        failureCause = t;
-        if (logger.isErrorEnabled()) {
-          logger.error("JWKS refresh failed", t);
+        Snapshot prev = ref.get();
+        Snapshot fresh;
+        Throwable failureCause = null;
+        try {
+          fresh = doRefreshOrThrow(prev);
+        } catch (Throwable t) {
+          failureCause = t;
+          if (logger.isErrorEnabled()) {
+            logger.error("JWKS refresh failed", t);
+          }
+          fresh = failureSnapshot(prev, Instant.now(clock), t);
         }
-        fresh = failureSnapshot(prev, Instant.now(clock), t);
+        if (!closed) {
+          ref.set(fresh);
+        }
+        if (failureCause != null) {
+          mine.completeExceptionally(failureCause);
+        } else {
+          mine.complete(fresh);
+        }
+      } finally {
+        refreshThread = null;
+        inflight.set(null);
       }
-      if (!closed) {
-        ref.set(fresh);
-      }
-      if (failureCause != null) {
-        mine.completeExceptionally(failureCause);
-      } else {
-        mine.complete(fresh);
-      }
-      inflight.set(null);
     });
 
     return mine;
@@ -371,15 +395,12 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
       byKid.put(jwk.kid(), v);
     }
     if (byKid.isEmpty()) {
-      if (logger.isErrorEnabled()) {
-        logger.error("JWKS refresh produced an empty kid map; treating as failure");
-      }
       throw new IllegalStateException("Empty kid map after JWK conversion");
     }
     Duration chosen = chosenInterval(resp);
     Instant nextDue = now.plus(maxOf(minRefreshInterval, chosen));
     if (logger.isInfoEnabled()) {
-      logger.info("JWKS refresh succeeded; kids=" + byKid.keySet());
+      logger.info("JWKS refresh succeeded; kids=[" + byKid.keySet() + "]");
     }
     return new Snapshot(Map.copyOf(byKid), now, nextDue, 0, null);
   }
@@ -392,7 +413,12 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
     };
   }
 
-  /** Failure-path Snapshot. Spec §2.7 with Retry-After floor extension. */
+  /**
+   * Build a failure-path {@link Snapshot}: carry forward the prior verifier
+   * map, increment {@code consecutiveFailures}, and compute {@code nextDueAt}
+   * as {@code now + backoff(...)}, extended to honor a {@code Retry-After}
+   * header when present and stricter than the backoff.
+   */
   private Snapshot failureSnapshot(Snapshot prev, Instant now, Throwable cause) {
     int prior = (prev == null) ? 0 : prev.consecutiveFailures();
     int next = prior + 1;
@@ -446,7 +472,7 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
 
   enum FetchSource { ISSUER, JWKS, WELL_KNOWN }
 
-  /** Immutable cache snapshot. See spec §2.1. */
+  /** Immutable cache snapshot. */
   record Snapshot(
       Map<String, Verifier> byKid,
       Instant fetchedAt,

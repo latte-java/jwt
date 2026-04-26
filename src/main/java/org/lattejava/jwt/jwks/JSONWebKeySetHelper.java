@@ -22,12 +22,14 @@ import org.lattejava.jwt.LatteJSONProcessor;
 import org.lattejava.jwt.internal.http.AbstractHTTPHelper;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.TreeMap;
 import java.util.function.Consumer;
 
 /**
@@ -308,7 +310,9 @@ public class JSONWebKeySetHelper extends AbstractHTTPHelper {
   }
 
   // -----------------------------------------------------------
-  // Package-visible richer responses for JWKSource (spec §6).
+  // Package-visible richer responses for JWKSource. Returns the parsed
+  // keys plus the HTTP status and the response headers JWKSource needs
+  // (Cache-Control, Retry-After).
   // -----------------------------------------------------------
 
   static JWKSResponse retrieveJWKSResponseFromIssuer(String issuer, Consumer<HttpURLConnection> consumer) {
@@ -350,9 +354,9 @@ public class JSONWebKeySetHelper extends AbstractHTTPHelper {
             }
             result.add(JSONWebKey.fromMap((Map<String, Object>) element));
           }
-          int status = 200;
-          try { status = conn.getResponseCode(); } catch (java.io.IOException ignored) {}
-          Map<String, String> sel = new java.util.TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+          int status = -1;
+          try { status = conn.getResponseCode(); } catch (IOException ignored) {}
+          Map<String, String> sel = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
           for (String name : new String[]{"Cache-Control", "Retry-After"}) {
             String v = conn.getHeaderField(name);
             if (v != null) sel.put(name, v);
@@ -380,7 +384,7 @@ public class JSONWebKeySetHelper extends AbstractHTTPHelper {
       return processor.deserialize(out.toByteArray());
     } catch (JSONProcessingException e) {
       throw new JSONWebKeySetException("Failed to parse JSON response", e);
-    } catch (java.io.IOException e) {
+    } catch (IOException e) {
       throw new JSONWebKeySetException("Failed to read JWKS response", e);
     }
   }

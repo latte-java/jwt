@@ -127,19 +127,18 @@ public final class Verifiers {
   }
 
   // ---------------------------------------------------------------------
-  // fromJWK -- JWKS-driven, applies the conversion rules in spec §2.8
+  // fromJWK -- JWKS-driven
   // ---------------------------------------------------------------------
 
   /**
-   * Build a {@link Verifier} from a JSON Web Key, applying the conversion rules
-   * documented in the JWKSource spec §2.8. Returns {@code null} if the JWK is
-   * not usable for signature verification under those rules; never throws on a
-   * rejected JWK.
+   * Build a {@link Verifier} from a JSON Web Key. Returns {@code null} if the
+   * JWK is not usable for signature verification; never throws on a rejected
+   * JWK.
    *
    * <p>Rejected when: {@code kid} is missing; {@code alg} is missing or HMAC;
-   * {@code kty} is {@code oct}; {@code use} is present and not {@code sig};
-   * {@code alg}/{@code crv} are inconsistent for EC/OKP; key material fails to
-   * parse; or verifier construction would fail.</p>
+   * {@code kty} is missing or {@code oct}; {@code use} is present and not
+   * {@code sig}; {@code alg}/{@code kty}/{@code crv} are mutually inconsistent;
+   * key material fails to parse; or verifier construction would fail.</p>
    *
    * @param jwk the JSON Web Key; must be non-null
    * @return a fresh verifier bound to {@code jwk.alg()}, or {@code null}
@@ -163,7 +162,7 @@ public final class Verifiers {
     String use = jwk.use();
     if (use != null && !"sig".equals(use)) return null;
 
-    if (!algCrvConsistent(algName, kty, jwk.crv())) return null;
+    if (!algKtyCrvConsistent(algName, kty, jwk.crv())) return null;
 
     PublicKey publicKey;
     try {
@@ -174,7 +173,7 @@ public final class Verifiers {
 
     try {
       return forAsymmetric(alg, publicKey);
-    } catch (IllegalArgumentException ignored) {
+    } catch (RuntimeException ignored) {
       return null;
     }
   }
@@ -183,7 +182,7 @@ public final class Verifiers {
   // Internal
   // ---------------------------------------------------------------------
 
-  private static boolean algCrvConsistent(String algName, KeyType kty, String crv) {
+  private static boolean algKtyCrvConsistent(String algName, KeyType kty, String crv) {
     if (kty == KeyType.EC) {
       String expected = switch (algName) {
         case "ES256"  -> "P-256";
@@ -198,8 +197,13 @@ public final class Verifiers {
       if (!"Ed25519".equals(crv) && !"Ed448".equals(crv)) return false;
       return algName.equals(crv);
     }
-    // RSA: no crv constraint.
-    return true;
+    if (kty == KeyType.RSA) {
+      return switch (algName) {
+        case "RS256", "RS384", "RS512", "PS256", "PS384", "PS512" -> true;
+        default -> false;
+      };
+    }
+    return false;
   }
 
   private static void requireHMAC(Algorithm algorithm) {
