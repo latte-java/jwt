@@ -16,6 +16,7 @@
 
 package org.lattejava.jwt.internal.http;
 
+import org.lattejava.jwt.HTTPResponseException;
 import org.lattejava.jwt.ResponseTooLargeException;
 import org.lattejava.jwt.TooManyRedirectsException;
 import org.lattejava.jwt.internal.MessageSanitizer;
@@ -25,8 +26,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.function.BiFunction;
-import java.util.function.Function;
 
 /**
  * Shared HTTP helper for JWKS / discovery / metadata fetches.
@@ -44,7 +47,7 @@ import java.util.function.Function;
  *
  * @author Daniel DeGroff
  */
-public abstract class AbstractHttpHelper {
+public abstract class AbstractHTTPHelper {
   /**
    * Performs a GET on the supplied connection, manually following up to
    * {@code maxRedirects} 3xx responses, capping each hop's body at
@@ -60,7 +63,7 @@ public abstract class AbstractHttpHelper {
    * @param exception        wrapper for any {@link IOException} surfaced
    * @throws IllegalArgumentException if {@code maxResponseBytes &lt;= 0}
    */
-  protected static <T> T get(HttpURLConnection urlConnection, int maxResponseBytes, int maxRedirects, Function<InputStream, T> consumer, BiFunction<String, Throwable, ? extends RuntimeException> exception) {
+  protected static <T> T get(HttpURLConnection urlConnection, int maxResponseBytes, int maxRedirects, BiFunction<HttpURLConnection, InputStream, T> consumer, BiFunction<String, Throwable, ? extends RuntimeException> exception) {
     if (maxResponseBytes <= 0) {
       throw new IllegalArgumentException("maxResponseBytes must be > 0; the response cap cannot be disabled");
     }
@@ -122,11 +125,18 @@ public abstract class AbstractHttpHelper {
       }
 
       if (status < 200 || status > 299) {
-        throw exception.apply("Failed to make a request to [" + MessageSanitizer.forMessage(endpoint) + "]: status code [" + status + "] returned", null);
+        Map<String, List<String>> headers;
+        try {
+          headers = current.getHeaderFields();
+        } catch (RuntimeException ignored) {
+          headers = Collections.emptyMap();
+        }
+        HTTPResponseException httpEx = new HTTPResponseException(status, headers);
+        throw exception.apply("Failed to make a request to [" + MessageSanitizer.forMessage(endpoint) + "]: status code [" + status + "] returned", httpEx);
       }
 
       try (InputStream is = new LimitedInputStream(new BufferedInputStream(current.getInputStream()), maxResponseBytes)) {
-        return consumer.apply(is);
+        return consumer.apply(current, is);
       } catch (IOException e) {
         // ResponseTooLargeException (IOException) flows through here; callers
         // inspect the cause chain to recover it.

@@ -449,6 +449,84 @@ public class JSONWebKeySetHelperTest extends BaseTest {
     assertEquals(keys.size(), 0);
   }
 
+  @Test
+  public void retrieveJWKSResponseFromJWKS_surfaces_status_and_CacheControl() throws Exception {
+    // Use case: JWKSource needs status + Cache-Control off the JWKS hop on success.
+    String body = "{\"keys\":[]}";
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = body)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")
+            .with(r -> r.headers = java.util.Map.of("Cache-Control", "public, max-age=300"))));
+
+    JWKSResponse resp = JSONWebKeySetHelper.retrieveJWKSResponseFromJWKS(
+        "http://localhost:" + PORT + "/jwks.json", null);
+    assertEquals(resp.statusCode(), 200);
+    assertEquals(resp.keys().size(), 0);
+    assertEquals(resp.selectedHeaders().get("Cache-Control"), "public, max-age=300");
+  }
+
+  @Test
+  public void non2xx_response_throws_with_HTTPResponseException_cause() throws Exception {
+    // Use case: a 429 with Retry-After must be reachable from the thrown exception's
+    // cause chain — JWKSource depends on this to honor Retry-After.
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = "{\"error\":\"rate-limited\"}")
+            .with(r -> r.status = 429)
+            .with(r -> r.contentType = "application/json")));
+
+    try {
+      JSONWebKeySetHelper.retrieveKeysFromJWKS("http://localhost:" + PORT + "/jwks.json");
+      fail("Expected JSONWebKeyException for 429.");
+    } catch (RuntimeException e) {
+      Throwable cause = e.getCause();
+      while (cause != null && !(cause instanceof org.lattejava.jwt.HTTPResponseException)) {
+        cause = cause.getCause();
+      }
+      assertNotNull(cause, "HTTPResponseException must appear in the cause chain");
+      org.lattejava.jwt.HTTPResponseException httpEx = (org.lattejava.jwt.HTTPResponseException) cause;
+      assertEquals(httpEx.statusCode(), 429);
+    }
+  }
+
+  @Test
+  public void customizer_is_applied_to_both_discovery_and_JWKS_hops() throws Exception {
+    // Use case: an Authorization header set via httpConnectionCustomizer must reach
+    // both the discovery hop and the JWKS hop after a discovery resolution.
+    String discoveryBody = "{\"jwks_uri\":\"http://localhost:" + PORT + "/jwks.json\"}";
+    String jwksBody = "{\"keys\":[]}";
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/.well-known/openid-configuration")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = discoveryBody)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json"))
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = jwksBody)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+
+    java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
+    java.util.function.Consumer<java.net.HttpURLConnection> customizer = c -> {
+      calls.incrementAndGet();
+      c.setRequestProperty("X-Test-Marker", "applied");
+    };
+
+    List<JSONWebKey> keys = JSONWebKeySetHelper.retrieveKeysFromWellKnownConfiguration(
+        "http://localhost:" + PORT + "/.well-known/openid-configuration", customizer);
+    assertEquals(keys.size(), 0);
+    // 2 = once on the discovery hop, once on the JWKS hop. Pre-fix, this was 1.
+    assertEquals(calls.get(), 2);
+  }
+
   private static boolean containsCause(Throwable t, Class<? extends Throwable> needle) {
     while (t != null) {
       if (needle.isInstance(t)) return true;

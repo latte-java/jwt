@@ -199,6 +199,23 @@ assertEquals(jwt.subject(), "f1e33ab3-027f-47c5-bb07-8dd8ab37a2d3");
 
 A shorter equivalent: `new JWTDecoder(Duration.ofSeconds(60))`.
 
+#### Verify tokens against a remote JWKS
+
+For OIDC issuers that publish a JWKS, use `JWKSource` to manage caching, refresh, and rotation:
+
+```java
+JWKSource source = JWKSource.fromIssuer("https://idp.example.com/")
+    .scheduledRefresh(true)
+    .refreshInterval(Duration.ofMinutes(15))
+    .build();
+
+JWT jwt = new JWTDecoder().decode(encodedJWT, source);
+```
+
+`JWKSource` implements `VerifierResolver`, performs an initial synchronous load on `build()` (bounded by `refreshTimeout`), and refreshes on `kid` cache miss (singleflight-coalesced) or on a virtual-thread scheduler tick when `scheduledRefresh(true)` is set. Honors `Cache-Control: max-age` and `Retry-After` from the JWKS endpoint. Implements `AutoCloseable`; call `close()` in shutdown hooks.
+
+For non-OIDC JWKS endpoints use `JWKSource.fromJWKS(jwksUrl)`. For non-conventional discovery URLs use `JWKSource.fromWellKnownConfiguration(url)`.
+
 #### Verify an expired JWT by going back in time
 Please only use this for testing, or if you happen to be a time traveler.
 

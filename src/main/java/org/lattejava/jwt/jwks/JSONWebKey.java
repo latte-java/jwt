@@ -513,6 +513,19 @@ public final class JSONWebKey {
     return b.build();
   }
 
+  /**
+   * Parse this JWK's public-key material into a {@link PublicKey}. Equivalent to
+   * {@code JSONWebKey.parse(this)}; provided as an instance shorthand. Each call
+   * performs a fresh KeyFactory parse — cache the result if hot.
+   *
+   * @return the public key represented by this JWK
+   * @throws JSONWebKeyParserException if the key material is malformed
+   * @throws UnsupportedOperationException if the JWK's {@code kty} is not RSA, EC, or OKP
+   */
+  public PublicKey toPublicKey() {
+    return parse(this);
+  }
+
   // ---------- Static convenience methods ----------
 
   public static JSONWebKey from(String encodedPEM) {

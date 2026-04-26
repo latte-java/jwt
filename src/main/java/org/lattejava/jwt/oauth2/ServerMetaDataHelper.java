@@ -16,7 +16,7 @@
 
 package org.lattejava.jwt.oauth2;
 
-import org.lattejava.jwt.internal.http.AbstractHttpHelper;
+import org.lattejava.jwt.internal.http.AbstractHTTPHelper;
 import org.lattejava.jwt.jwks.JSONWebKeySetHelper;
 
 import java.net.HttpURLConnection;
@@ -29,7 +29,7 @@ import java.util.Objects;
  *
  * @author Daniel DeGroff
  */
-public class ServerMetaDataHelper extends AbstractHttpHelper {
+public class ServerMetaDataHelper extends AbstractHTTPHelper {
   /** Default maximum response body size: 1 MiB. */
   private static final int DEFAULT_MAX_RESPONSE_BYTES = 1024 * 1024;
 
@@ -89,7 +89,7 @@ public class ServerMetaDataHelper extends AbstractHttpHelper {
    */
   public static AuthorizationServerMetaData retrieveFromWellKnownConfiguration(HttpURLConnection httpURLConnection) {
     return get(httpURLConnection, maxResponseSize, maxRedirects,
-        is -> AuthorizationServerMetaData.fromMap(JSONWebKeySetHelper.parseJSON(is)),
+        (conn, is) -> AuthorizationServerMetaData.fromMap(JSONWebKeySetHelper.parseJSON(is)),
         ServerMetaDataException::new);
   }
 

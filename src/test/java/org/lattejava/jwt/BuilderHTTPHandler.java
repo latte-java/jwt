@@ -59,12 +59,25 @@ public class BuilderHTTPHandler implements HttpHandler {
       return;
     }
 
+    if (expectedResult.delayMillis > 0) {
+      try {
+        Thread.sleep(expectedResult.delayMillis);
+      } catch (InterruptedException ignored) {
+        Thread.currentThread().interrupt();
+      }
+    }
+
     // Set headers BEFORE sendResponseHeaders (HttpExchange flushes once headers are committed).
     if (expectedResult.contentType != null) {
       httpExchange.getResponseHeaders().add("Content-Type", expectedResult.contentType);
     }
     if (expectedResult.redirectLocation != null) {
       httpExchange.getResponseHeaders().add("Location", expectedResult.redirectLocation);
+    }
+    if (expectedResult.headers != null) {
+      for (Map.Entry<String, String> entry : expectedResult.headers.entrySet()) {
+        httpExchange.getResponseHeaders().add(entry.getKey(), entry.getValue());
+      }
     }
 
     if (expectedResult.responseSize > 0) {

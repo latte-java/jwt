@@ -19,15 +19,17 @@ package org.lattejava.jwt.jwks;
 import org.lattejava.jwt.JSONProcessor;
 import org.lattejava.jwt.JSONProcessingException;
 import org.lattejava.jwt.LatteJSONProcessor;
-import org.lattejava.jwt.internal.http.AbstractHttpHelper;
+import org.lattejava.jwt.internal.http.AbstractHTTPHelper;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.TreeMap;
 import java.util.function.Consumer;
 
 /**
@@ -60,7 +62,7 @@ import java.util.function.Consumer;
  *
  * @author Daniel DeGroff
  */
-public class JSONWebKeySetHelper extends AbstractHttpHelper {
+public class JSONWebKeySetHelper extends AbstractHTTPHelper {
   /** Default JSON parse limits mirror {@link org.lattejava.jwt.JWTDecoder}. */
   public static final int DEFAULT_MAX_NESTING_DEPTH = 16;
 
@@ -215,20 +217,13 @@ public class JSONWebKeySetHelper extends AbstractHttpHelper {
 
   /**
    * Retrieve JSON Web Keys from an OpenID Connect well-known discovery
-   * endpoint.
+   * endpoint. The connection passed in is used for the discovery hop only;
+   * the inner JWKS hop is unauthenticated. Use the (String, Consumer) overload
+   * to apply the customizer to both hops.
    */
   public static List<JSONWebKey> retrieveKeysFromWellKnownConfiguration(HttpURLConnection httpURLConnection) {
-    return get(httpURLConnection, maxResponseSize, maxRedirects,
-        is -> {
-          Map<String, Object> response = parseJSON(is);
-          Object jwksURI = response.get("jwks_uri");
-          if (!(jwksURI instanceof String uri) || uri.isEmpty()) {
-            String endpoint = httpURLConnection.getURL().toString();
-            throw new JSONWebKeySetException("Well-known endpoint [" + endpoint + "] response is missing the [jwks_uri] property");
-          }
-          return retrieveKeysFromJWKS(uri);
-        },
-        JSONWebKeyException::new);
+    String jwksURI = retrieveJWKSURI(httpURLConnection);
+    return retrieveKeysFromJWKS(jwksURI);
   }
 
   /**
@@ -241,15 +236,30 @@ public class JSONWebKeySetHelper extends AbstractHttpHelper {
 
   /**
    * Retrieve JSON Web Keys from an OpenID Connect well-known discovery
-   * endpoint URL, with an optional connection customizer.
+   * endpoint URL, with an optional connection customizer applied to both
+   * the discovery hop and the subsequent JWKS hop.
    */
   public static List<JSONWebKey> retrieveKeysFromWellKnownConfiguration(String endpoint, Consumer<HttpURLConnection> consumer) {
     HttpURLConnection connection = buildURLConnection(endpoint, JSONWebKeyException::new);
     if (consumer != null) {
       consumer.accept(connection);
     }
+    String jwksURI = retrieveJWKSURI(connection);
+    return retrieveKeysFromJWKS(jwksURI, consumer);
+  }
 
-    return retrieveKeysFromWellKnownConfiguration(connection);
+  private static String retrieveJWKSURI(HttpURLConnection httpURLConnection) {
+    return get(httpURLConnection, maxResponseSize, maxRedirects,
+        (conn, is) -> {
+          Map<String, Object> response = parseJSON(is);
+          Object jwksURI = response.get("jwks_uri");
+          if (!(jwksURI instanceof String uri) || uri.isEmpty()) {
+            String endpoint = conn.getURL().toString();
+            throw new JSONWebKeySetException("Well-known endpoint [" + endpoint + "] response is missing the [jwks_uri] property");
+          }
+          return uri;
+        },
+        JSONWebKeyException::new);
   }
 
   /**
@@ -279,22 +289,79 @@ public class JSONWebKeySetHelper extends AbstractHttpHelper {
   @SuppressWarnings("unchecked")
   public static List<JSONWebKey> retrieveKeysFromJWKS(HttpURLConnection httpURLConnection) {
     return get(httpURLConnection, maxResponseSize, maxRedirects,
-        is -> {
+        (conn, is) -> {
           Map<String, Object> response = parseJSON(is);
           Object keys = response.get("keys");
           if (!(keys instanceof List<?> keyList)) {
-            String endpoint = httpURLConnection.getURL().toString();
+            String endpoint = conn.getURL().toString();
             throw new JSONWebKeySetException("JWKS endpoint [" + endpoint + "] response is missing the [keys] array");
           }
           List<JSONWebKey> result = new ArrayList<>();
           for (Object element : keyList) {
             if (!(element instanceof Map)) {
-              String endpoint = httpURLConnection.getURL().toString();
+              String endpoint = conn.getURL().toString();
               throw new JSONWebKeySetException("JWKS endpoint [" + endpoint + "] response contains a non-object element in [keys]");
             }
             result.add(JSONWebKey.fromMap((Map<String, Object>) element));
           }
           return result;
+        },
+        JSONWebKeyException::new);
+  }
+
+  // -----------------------------------------------------------
+  // Package-visible richer responses for JWKSource. Returns the parsed
+  // keys plus the HTTP status and the response headers JWKSource needs
+  // (Cache-Control, Retry-After).
+  // -----------------------------------------------------------
+
+  static JWKSResponse retrieveJWKSResponseFromIssuer(String issuer, Consumer<HttpURLConnection> consumer) {
+    Objects.requireNonNull(issuer);
+    if (issuer.endsWith("/")) {
+      issuer = issuer.substring(0, issuer.length() - 1);
+    }
+    return retrieveJWKSResponseFromWellKnownConfiguration(issuer + "/.well-known/openid-configuration", consumer);
+  }
+
+  static JWKSResponse retrieveJWKSResponseFromWellKnownConfiguration(String endpoint, Consumer<HttpURLConnection> consumer) {
+    HttpURLConnection connection = buildURLConnection(endpoint, JSONWebKeyException::new);
+    if (consumer != null) {
+      consumer.accept(connection);
+    }
+    String jwksURI = retrieveJWKSURI(connection);
+    return retrieveJWKSResponseFromJWKS(jwksURI, consumer);
+  }
+
+  @SuppressWarnings("unchecked")
+  static JWKSResponse retrieveJWKSResponseFromJWKS(String endpoint, Consumer<HttpURLConnection> consumer) {
+    HttpURLConnection connection = buildURLConnection(endpoint, JSONWebKeyException::new);
+    if (consumer != null) {
+      consumer.accept(connection);
+    }
+    return get(connection, maxResponseSize, maxRedirects,
+        (conn, is) -> {
+          Map<String, Object> response = parseJSON(is);
+          Object keys = response.get("keys");
+          if (!(keys instanceof List<?> keyList)) {
+            String url = conn.getURL().toString();
+            throw new JSONWebKeySetException("JWKS endpoint [" + url + "] response is missing the [keys] array");
+          }
+          List<JSONWebKey> result = new ArrayList<>();
+          for (Object element : keyList) {
+            if (!(element instanceof Map)) {
+              String url = conn.getURL().toString();
+              throw new JSONWebKeySetException("JWKS endpoint [" + url + "] response contains a non-object element in [keys]");
+            }
+            result.add(JSONWebKey.fromMap((Map<String, Object>) element));
+          }
+          int status = -1;
+          try { status = conn.getResponseCode(); } catch (IOException ignored) {}
+          Map<String, String> sel = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+          for (String name : new String[]{"Cache-Control", "Retry-After"}) {
+            String v = conn.getHeaderField(name);
+            if (v != null) sel.put(name, v);
+          }
+          return new JWKSResponse(result, status, sel);
         },
         JSONWebKeyException::new);
   }
@@ -317,7 +384,7 @@ public class JSONWebKeySetHelper extends AbstractHttpHelper {
       return processor.deserialize(out.toByteArray());
     } catch (JSONProcessingException e) {
       throw new JSONWebKeySetException("Failed to parse JSON response", e);
-    } catch (java.io.IOException e) {
+    } catch (IOException e) {
       throw new JSONWebKeySetException("Failed to read JWKS response", e);
     }
   }
