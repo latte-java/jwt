@@ -7,7 +7,6 @@ libraries:
   - jjwt
   - fusionauth-jwt
   - vertx-auth-jwt
-  - inverno-security-jose
 
 algorithms: [HS256, RS256, ES256]
 operations: [encode, decodeVerifyValidate, unsafeDecode]

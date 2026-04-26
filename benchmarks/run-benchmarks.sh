@@ -269,8 +269,6 @@ main_class_for_library() {
     latte-jwt)       echo "org.lattejava.jwt.benchmarks.lattejwt.Main" ;;
     nimbus-jose-jwt) echo "org.lattejava.jwt.benchmarks.nimbus.Main" ;;
     vertx-auth-jwt)  echo "org.lattejava.jwt.benchmarks.vertx.Main" ;;
-    # Future adapters — add a case when the adapter is built:
-    # inverno-security-jose)   echo "org.lattejava.jwt.benchmarks.inverno.Main" ;;
     *) echo "unknown library: ${lib}" >&2; exit 1 ;;
   esac
 }
