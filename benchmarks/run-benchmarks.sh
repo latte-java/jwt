@@ -159,6 +159,11 @@ JACKSON_DATABIND_JAR="${M2_REPO}/com/fasterxml/jackson/core/jackson-databind/2.1
 JACKSON_CORE_JAR="${M2_REPO}/com/fasterxml/jackson/core/jackson-core/2.15.4/jackson-core-2.15.4.jar"
 JACKSON_ANNOTATIONS_JAR="${M2_REPO}/com/fasterxml/jackson/core/jackson-annotations/2.15.4/jackson-annotations-2.15.4.jar"
 
+# JARs for the jose4j adapter and its SLF4J API transitive.
+# jose4j is a Maven Central artifact; Latte resolves it into ~/.m2/repository.
+JOSE4J_JAR="${M2_REPO}/org/bitbucket/b_c/jose4j/0.9.6/jose4j-0.9.6.jar"
+SLF4J_API_JAR="${M2_REPO}/org/slf4j/slf4j-api/1.7.36/slf4j-api-1.7.36.jar"
+
 # Return the per-library JAR path. Latte names it <artifact>-<version>.jar inside build/jars/.
 # The project name (from project.latte) may differ from the directory name (e.g. latte-jwt dir
 # uses artifact "latte-jwt-bench"), so we glob for the primary (non-test, non-src) JAR.
@@ -184,6 +189,7 @@ classpath_for_library() {
   # Adapters that wrap third-party libraries need those JARs on the classpath.
   case "${lib}" in
     auth0-java-jwt) cp="${cp}:${AUTH0_JWT_JAR}:${JACKSON_DATABIND_JAR}:${JACKSON_CORE_JAR}:${JACKSON_ANNOTATIONS_JAR}" ;;
+    jose4j)         cp="${cp}:${JOSE4J_JAR}:${SLF4J_API_JAR}" ;;
     latte-jwt)      cp="${cp}:${LATTE_JWT_JAR}" ;;
   esac
 
@@ -201,9 +207,9 @@ main_class_for_library() {
   case "${lib}" in
     auth0-java-jwt) echo "org.lattejava.jwt.benchmarks.auth0.Main" ;;
     baseline)       echo "org.lattejava.jwt.benchmarks.baseline.Main" ;;
+    jose4j)         echo "org.lattejava.jwt.benchmarks.jose4j.Main" ;;
     latte-jwt)      echo "org.lattejava.jwt.benchmarks.lattejwt.Main" ;;
     # Future adapters — add a case when the adapter is built:
-    # jose4j)                  echo "org.lattejava.jwt.benchmarks.jose4j.Main" ;;
     # nimbus-jose-jwt)         echo "org.lattejava.jwt.benchmarks.nimbus.Main" ;;
     # jjwt)                    echo "org.lattejava.jwt.benchmarks.jjwt.Main" ;;
     # fusionauth-jwt)          echo "org.lattejava.jwt.benchmarks.fusionauth.Main" ;;
