@@ -2,15 +2,17 @@
 
 | | |
 |---|---|
-| **Status** | Draft |
+| **Status** | Approved |
 | **Version / Scope** | Tooling (not part of any release) |
 | **Owner** | Daniel DeGroff |
 | **Created** | 2026-04-25 |
-| **Last updated** | 2026-04-25 |
+| **Last updated** | 2026-04-26 |
 
 ## Change log
 
 - **2026-04-25** — Initial draft.
+- **2026-04-25** — Drop `alg=none` operations; refocus `parse_only` as `unsafe_decode` (each library's public no-verify decode API; N/A where unavailable). JMH config bumped to 3 forks × 3 measurement iterations × 10s for defensible CIs. Add `Mode.AverageTime` to decode-verify-validate. Specify pre-flight parity check, DCE/Blackhole protection, hardware/JVM capture commands, `compare-results.sh` CLI, results `.gitignore` rule, license-header convention, `@Param`-not-used rationale.
+- **2026-04-26** — Status: Draft → Approved. Library version policy clarified: pin the latest stable at time of adapter authoring; bump manually thereafter.
 
 ## Problem statement
 
@@ -23,7 +25,7 @@
 
 ## Goals
 
-- **Real-world bias.** Benchmarks measure full encode and decode-verify-validate paths, not just sign/verify primitives. JSON parsing cost is exposed via a parse-only benchmark; raw crypto cost via per-algorithm sign+verify benchmarks.
+- **Real-world bias.** Benchmarks measure full encode and decode-verify-validate paths, not just sign/verify primitives. The `unsafe_decode` benchmark exposes the cost of "give me the claims, I'll verify later" — a real OAuth/OIDC pattern (read `kid`/`iss` to choose a key, verify in a second pass) — for libraries that offer it.
 - **Fair across libraries.** Identical key material, identical claims payload, identical JMH parameters. The only variable is the library's code path.
 - **Classpath-isolated per library.** Each library runs in its own JVM with only its declared dependencies on the runtime classpath, so transitive Jackson/BouncyCastle versions never collide.
 - **Reproducible.** Checked-in fixtures + checked-in latest-snapshot JSON + a single `run-benchmarks.sh` invocation reproduces the report.
@@ -43,7 +45,7 @@
 |----|---------|-------|
 | `baseline` | Hand-rolled JCA + zero-dep JSON | "Theoretical floor" reference, not a real library. Italicized in reports. |
 | `latte-jwt` | `org.lattejava:jwt` | This project. Headline column. |
-| `auth0-java-jwt` | `com.auth0:java-jwt` | Refuses `alg=none` by default → N/A in those cells. |
+| `auth0-java-jwt` | `com.auth0:java-jwt` | |
 | `jose4j` | `org.bitbucket.b_c:jose4j` | |
 | `nimbus-jose-jwt` | `com.nimbusds:nimbus-jose-jwt` | Heavyweight (full JOSE: JWE/JWS/JWK). |
 | `jjwt` | `io.jsonwebtoken:jjwt-impl` + `jjwt-api` + `jjwt-jackson` | Multi-jar; we depend on the API + Jackson runtime. |
@@ -51,7 +53,7 @@
 | `vertx-auth-jwt` | `io.vertx:vertx-auth-jwt` | Vert.x's API is async; adapter unwraps `Future`s synchronously. The adapter overhead is captured in the result and called out in `BENCHMARKS.md`. |
 | `inverno-security-jose` | `io.inverno.mod:inverno-security-jose` | Adapter uses the public synchronous API surface only — no CDI container at runtime. |
 
-Library versions are pinned in each per-library `project.latte` and bumped manually. The framework is not a continuous version-tracking tool.
+Library versions are pinned in each per-library `project.latte` at the latest stable available at the time the adapter is authored, and bumped manually thereafter. The framework is not a continuous version-tracking tool.
 
 ## Architecture overview
 
@@ -85,6 +87,17 @@ benchmarks/
 ├── vertx-auth-jwt/
 └── inverno-security-jose/
 ```
+
+All new files under `benchmarks/` use the MIT 7.0 header (`Copyright (c) 2026, The Latte Project`) per the project's licensing convention; the framework is brand-new code with no inherited Apache-2.0 fileset.
+
+The `.gitignore` rule for `benchmarks/results/` is:
+
+```
+benchmarks/results/*.json
+!benchmarks/results/latest.json
+```
+
+The orchestrator writes timestamped files (`results/<timestamp>[-<label>].json`) and updates `results/latest.json` (a copy, not a symlink — git handles copies portably across platforms) pointing at the most recent run; only `latest.json` is checked in.
 
 Each per-library directory contains:
 
@@ -125,7 +138,16 @@ public static void main(String[] args) throws Exception {
 
 The orchestrator passes JMH-native CLI args through (`-wi`, `-i`, `-w`, `-r`, `-f`, `-rff`, etc.), so JMH's standard option parser does the heavy lifting.
 
-**Runtime isolation:** Each library's JAR runs in its own JVM (one orchestrator-launched `java -jar` invocation per library). No transitive dependencies cross between libraries. JMH's `@Fork` is set to 1 — additional forks only buy variance reduction within one library, and we get cross-library JVM freshness for free from the orchestrator's per-library invocation.
+**Runtime isolation.** Each library's JAR runs in its own JVM (one orchestrator-launched `java -jar` invocation per library). No transitive dependencies cross between libraries. JMH's `@Fork` is set to **3**: within each library, the harness JVM spawns three sequential child JVMs per benchmark method. Each child has fresh class loading, fresh JIT decisions, and fresh GC tuning — that inter-JVM variance is what JMH's confidence intervals need to mean anything. The orchestrator's per-library invocation gives cross-library isolation; the three forks give cross-JVM-instance variance within a library. Both are needed.
+
+### Benchmark conventions
+
+Rules every per-library subclass of `AbstractJwtBenchmark` follows:
+
+- **Dead-code elimination.** Every `@Benchmark` method returns the adapter's result (`String` or `Object`). JMH consumes the return to suppress dead-code elimination. A future `void`-returning benchmark must take a `Blackhole` parameter and call `bh.consume(...)`.
+- **Modes.** Encode methods are throughput-only. Decode-verify-validate methods carry `@BenchmarkMode({Mode.Throughput, Mode.AverageTime})` so the report can present both ops/sec (capacity planning) and average latency (the OAuth/OIDC tail-latency view). JMH runs both modes in one trial.
+- **Why no `@Param` for the library axis.** `@Param` would let one class enumerate libraries as a parameter, but that requires every library on a single classpath — exactly the transitive-dependency collision the per-JVM model exists to avoid. Subclass-per-library + JVM-per-library is the only honest isolation.
+- **State lifecycle.** All adapter setup (key parsing, signer/verifier construction, pre-encoded tokens) lives in `prepare()`, called from `@Setup(Level.Trial)`. Adapter instances are stateless after that — `@Benchmark` methods touch only thread-safe fields stashed during `prepare()`.
 
 ### Build risk: Latte + JMH annotation processing
 
@@ -150,15 +172,14 @@ The fallback choice is recorded in `benchmarks/README.md` if it ends up needed.
 | HMAC | HS256 | 256-bit shared secret; standard for symmetric token use. |
 | RSA | RS256-2048 | Smallest recommended modulus; RS256 dominates real-world use. |
 | ECDSA | ES256-P256 | Smallest standard EC curve for JWT. |
-| none | `alg=none` | Tests JSON-parse + serialization cost without crypto. |
 
 Larger keys (RSA-3072/4096, P-384, P-521) are deliberately out of scope: they make crypto slower without changing relative library performance. Adding them later is a one-line YAML change + one new fixture pair.
 
-EdDSA (Ed25519) is also deferred — library coverage is uneven across the eight libraries and the matrix is already nine cells per library. Coverage will be audited at version-pin time, then EdDSA added in a follow-up if at least six of eight libraries support it via a stable public API.
+EdDSA (Ed25519) is also deferred — library coverage is uneven across the eight libraries and the matrix already covers three algorithm families × seven benchmark methods per library. Coverage will be audited at version-pin time, then EdDSA added in a follow-up if at least six of eight libraries support it via a stable public API.
 
 ### Operations
 
-For each library, nine `@Benchmark` methods:
+For each library, seven `@Benchmark` methods:
 
 | ID | Algorithm | What it measures |
 |----|-----------|------------------|
@@ -168,13 +189,11 @@ For each library, nine `@Benchmark` methods:
 | `rs256_decode_verify_validate` | RS256 | Parse → verify RSA → check claims. |
 | `es256_encode` | ES256 | Build claims → ECDSA sign (DER→JOSE) → base64url string. |
 | `es256_decode_verify_validate` | ES256 | Parse → verify ECDSA (JOSE→DER) → check claims. |
-| `parse_only` | (signed token) | Parse JSON of a signed token; do not verify signature. Measures pure JSON-parse cost. |
-| `none_encode` | `none` | Serialize claims with `alg=none` header; no crypto. |
-| `none_decode` | `none` | Parse a `none`-alg token; no crypto. |
+| `unsafe_decode` | (signed token) | Decode an HS256-signed token using the library's public unsafe-decode API — base64 + JSON parse, no signature verification, no claim validation. The token's `alg` is real; the adapter's code path skips crypto entirely. Measures the cost of "give me the claims, I'll verify later." |
 
-Libraries that refuse `alg=none` (auth0/java-jwt, optionally jose4j depending on version) emit `N/A` in `none_encode` and `none_decode`. The adapter signals this by throwing a sentinel `UnsupportedOperationException` from those methods; the result merger preserves N/A in the report.
+Libraries without a public unsafe-decode API emit `N/A` in `unsafe_decode`. The adapter signals this by throwing a sentinel `UnsupportedOperationException`; the result merger preserves N/A in the report. We do not benchmark `alg=none` separately — the operation rewards permissive libraries (those that accept tokens with no signature) and the JSON-parse cost it would expose is already captured by `unsafe_decode` against a real signed token.
 
-The baseline implements **seven of nine** benchmarks: the six per-algorithm encode/decode-verify-validate methods plus `parse_only`. It does not implement `none_encode` or `none_decode` — the baseline is the minimum honest crypto path, and `alg=none` skips the crypto entirely, which would defeat the comparison the baseline exists to enable. Baseline's `parse_only` uses `LatteJSONProcessor` (the project's own zero-dep parser) to keep the floor honest about JSON-parse cost; baseline reports `N/A` for the two `none` cells.
+The baseline implements all seven benchmarks. Its `unsafe_decode` uses `LatteJSONProcessor` (the project's own zero-dep parser) and skips signature verification entirely — the floor for "decode without crypto" cost.
 
 ### Adapter interface
 
@@ -182,9 +201,7 @@ The baseline implements **seven of nine** benchmarks: the six per-algorithm enco
 public interface JwtBenchmarkAdapter {
   String encode(BenchmarkAlgorithm alg);
   Object decodeVerifyValidate(BenchmarkAlgorithm alg, String token);
-  Object parseOnly(String token);
-  String noneEncode();
-  Object noneDecode(String token);
+  Object unsafeDecode(String token);
 }
 
 public enum BenchmarkAlgorithm { HS256, RS256, ES256 }
@@ -243,15 +260,15 @@ libraries:
   - vertx-auth-jwt
   - inverno-security-jose
 
-algorithms: [HS256, RS256, ES256, none]
-operations: [encode, decodeVerifyValidate, parseOnly, noneEncode, noneDecode]
+algorithms: [HS256, RS256, ES256]
+operations: [encode, decodeVerifyValidate, unsafeDecode]
 
 jmh:
-  warmup-iterations:      1
-  warmup-time:            15s
-  measurement-iterations: 1
-  measurement-time:       30s
-  forks:                  1
+  warmup-iterations:      2
+  warmup-time:            5s
+  measurement-iterations: 3
+  measurement-time:       10s
+  forks:                  3
   threads:                1
   mode:                   throughput
 
@@ -284,17 +301,30 @@ CLI flags override YAML for the duration of the invocation; they do not rewrite 
 
 1. **Parse** — load YAML, apply CLI overrides, validate.
 2. **Sanity check** — `latte` on PATH, `java -version` ≥ 21, `fixtures/` populated, every selected `benchmarks/<lib>/` directory exists.
-3. **Per library, in YAML order:**
-   - `cd benchmarks/<lib> && latte build` (skipped under `--no-build`).
+3. **Build** — for each selected library, `cd benchmarks/<lib> && latte build` (skipped under `--no-build`).
+4. **Parity check** — for each selected library, `java -jar build/jars/<lib>-bench-*.jar --parity-check`. The adapter encodes a canonical token per algorithm, decodes its own output, and asserts the round-tripped claims equal the canonical payload. For `unsafe_decode`-capable adapters, the same check verifies the unsafe-decode path returns the canonical claims. Any non-zero exit aborts the run before timing begins — a misconfigured adapter must not silently produce nonsense numbers.
+5. **Per library, in YAML order:**
    - `java -jar build/jars/<lib>-bench-*.jar <jmh-args> -rf json -rff results/<lib>-<ts>.json` — invoked from the repo root with full classpath isolation (each invocation = its own JVM).
    - Non-zero exit: log to stderr, mark library as failed, continue.
-4. **Merge** — concatenate per-library JSON arrays into `results/<timestamp>[-<label>].json`. JMH's native JSON schema is preserved; this file is what `compare-results.sh` and `update-benchmarks.sh` consume.
-5. **Update report** — if `--update`, run `update-benchmarks.sh` against the freshly merged file.
+6. **Merge** — concatenate per-library JSON arrays into `results/<timestamp>[-<label>].json`. JMH's native JSON schema is preserved; this file is what `compare-results.sh` and `update-benchmarks.sh` consume.
+7. **Update report** — if `--update`, run `update-benchmarks.sh` against the freshly merged file.
 
 ### Failure handling
 
 - A failed library does not abort the run. Subsequent libraries continue. The merged JSON contains entries for libraries that succeeded; failed libraries are reported in `BENCHMARKS.md` with an explanatory note rather than an empty row.
-- A failed sanity check (missing fixtures, wrong Java version) aborts before any benchmarks run — no half-results.
+- A failed sanity check (missing fixtures, wrong Java version) or a failed parity check aborts before any benchmarks run — no half-results, no nonsense numbers.
+
+### Run-condition capture
+
+Before launching benchmarks, the orchestrator gathers run conditions and writes them as a sidecar JSON header alongside the merged result file:
+
+- `uname -a`
+- macOS: `system_profiler SPHardwareDataType` (CPU, core count, RAM); `pmset -g therm` to detect thermal throttling — `CPU_Speed_Limit < 100` warns prominently in the report
+- Linux: `lscpu`; `cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor` if present
+- `java -XshowSettings:properties -version 2>&1 | grep -E '^\s+(java\.version|os\.|sun\.arch|java\.vm)'`
+- The full JMH command line as recorded in the JSON
+
+`benchmarks/README.md` documents operator guidance: close other applications; on macOS connect AC power and disable Low Power Mode; on Linux set the `cpufreq` governor to `performance` and consider disabling Turbo Boost for stable absolutes (`echo 1 > /sys/devices/system/cpu/intel_pstate/no_turbo`). Relative numbers between libraries remain meaningful even on a noisy machine; absolute ops/sec do not.
 
 ## Report formats
 
@@ -309,6 +339,20 @@ Reads the most recent `results/*.json` and rewrites `BENCHMARKS.md` between sent
 ```
 
 The surrounding prose (intro, methodology notes, link back to README) is hand-edited and preserved across regenerations. The generator is a Bash script using `jq` for JSON traversal and standard `printf`-based table emission — no Python, no extra runtime dependencies.
+
+### `compare-results.sh`
+
+```
+compare-results.sh <baseline.json> <candidate.json> [--threshold N] [--algorithm <hs256|rs256|es256>]
+```
+
+Reads two merged result files and emits a Markdown table per algorithm × operation:
+
+| Op | Library | Baseline ops/sec | Candidate ops/sec | Δ % | Flag |
+|----|---------|-----------------:|------------------:|----:|:----:|
+| `rs256_decode_verify_validate` | `latte-jwt` | 12 340 | 11 450 | -7.2 % | ▼ |
+
+Rows where `|Δ| ≥ threshold` (default 5 %) are flagged with ▲ (faster) or ▼ (slower). Exit code is non-zero if any candidate row is more than `threshold` slower than baseline — useful for ad-hoc regression checks outside CI. Implementation: Bash + `jq`, same toolchain as `update-benchmarks.sh`.
 
 ### `BENCHMARKS.md` shape
 
@@ -345,20 +389,14 @@ The surrounding prose (intro, methodology notes, link back to README) is hand-ed
 
 ## Supporting operations
 
-### Parse-only (no signature verification)
-(leaderboard table)
-
-### `alg=none` — encode
-(leaderboard table; libs that refuse render as N/A)
-
-### `alg=none` — decode
-(leaderboard table; libs that refuse render as N/A)
+### Unsafe decode (no signature verification)
+(leaderboard table; libs without a public unsafe-decode API render as N/A)
 
 ## Run conditions
-- Hardware: <captured>
-- JVM:      <captured>
-- Date:     <captured>
-- Config:   warmup 1×15s, measurement 1×30s, 1 fork, 1 thread
+- Hardware: <captured: CPU model + base/turbo, core count, RAM, OS>
+- JVM:      <captured: java version, vendor, GC, max heap>
+- Date:     <captured: ISO 8601, UTC>
+- Config:   warmup 2×5s, measurement 3×10s, 3 forks, 1 thread, throughput mode
 - Full JSON: results/<filename>.json
 
 <!-- BENCHMARKS:END -->
@@ -380,6 +418,8 @@ Each table is sorted by ops/sec descending. Two percentage columns:
 - `vs leader` — leaderboard standard.
 - `vs latte-jwt` — explicit project positioning.
 - `baseline` is rendered in italics, ranked separately at the bottom regardless of speed (it is a reference, not a competitor).
+
+Decode-verify-validate tables carry an additional `avg ns/op` column drawn from the `Mode.AverageTime` result for the same method — the latency view sits next to the throughput view in one table rather than being split across two.
 
 Confidence intervals from JMH (`± stdev`) are folded into the cell when the interval exceeds 5 % of the median; narrower intervals are omitted to keep the table readable. The threshold is implemented in `update-benchmarks.sh` and can be tuned via a `--ci-threshold` flag.
 
