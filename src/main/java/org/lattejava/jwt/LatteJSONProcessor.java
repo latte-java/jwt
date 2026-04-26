@@ -590,14 +590,20 @@ public class LatteJSONProcessor implements JSONProcessor {
         }
       }
 
-      String token = s.substring(start, pos);
       try {
         if (hasDecimal || hasExponent) {
-          return new BigDecimal(token);
+          return new BigDecimal(s.substring(start, pos));
         }
-        return new BigInteger(token);
+        // Long fast-path: a digit run of at most 18 chars fits in a long
+        // (Long.MAX_VALUE is 19 digits; capping at 18 sidesteps overflow checks
+        // and covers every realistic JWT claim including epoch-second timestamps).
+        // Long.parseLong on a CharSequence range avoids the substring allocation.
+        if (digitCount <= 18) {
+          return Long.parseLong(s, start, pos, 10);
+        }
+        return new BigInteger(s.substring(start, pos));
       } catch (NumberFormatException e) {
-        throw new JSONProcessingException("Invalid number [" + token + "]", e);
+        throw new JSONProcessingException("Invalid number [" + s.substring(start, pos) + "]", e);
       }
     }
   }

@@ -23,6 +23,7 @@
 
 package org.lattejava.jwt;
 
+import org.lattejava.jwt.internal.Base64URL;
 import org.lattejava.jwt.internal.HexUtils;
 import org.lattejava.jwt.internal.der.DerOutputStream;
 import org.lattejava.jwt.internal.der.DerValue;
@@ -43,7 +44,6 @@ import java.security.cert.X509Certificate;
 import java.security.spec.MGF1ParameterSpec;
 import java.security.spec.PSSParameterSpec;
 import java.time.Instant;
-import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -201,7 +201,7 @@ public final class X509 {
    * @return the equivalent uppercase hex fingerprint
    */
   public static String thumbprintToFingerprint(String thumbprint) {
-    return HexUtils.fromBytes(Base64.getUrlDecoder().decode(thumbprint.getBytes(StandardCharsets.UTF_8)));
+    return HexUtils.fromBytes(Base64URL.decode(thumbprint.getBytes(StandardCharsets.UTF_8)));
   }
 
   // ---- Internal digest helpers ----
@@ -225,7 +225,7 @@ public final class X509 {
   }
 
   private static String base64url(byte[] bytes) {
-    return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    return Base64URL.encodeToString(bytes);
   }
 
   /**

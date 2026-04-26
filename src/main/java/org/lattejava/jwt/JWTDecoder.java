@@ -16,6 +16,7 @@
 
 package org.lattejava.jwt;
 
+import org.lattejava.jwt.internal.Base64URL;
 import org.lattejava.jwt.internal.MessageSanitizer;
 
 import java.nio.charset.StandardCharsets;
@@ -23,7 +24,6 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.util.Base64;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -190,8 +190,7 @@ public class JWTDecoder {
 
     // Verify the signature BEFORE parsing the payload so that untrusted
     // payload bytes never reach the JSON parser unless authenticated.
-    String signingInput = segments.headerB64 + "." + segments.payloadB64;
-    byte[] message = signingInput.getBytes(StandardCharsets.UTF_8);
+    byte[] message = segments.signingInput.getBytes(StandardCharsets.UTF_8);
     byte[] signatureBytes = strictBase64UrlDecode(segments.signatureB64, "signature");
     verifier.verify(message, signatureBytes);
 
@@ -229,7 +228,10 @@ public class JWTDecoder {
 
   /** Parse the input into segments after enforcing size and structural defenses. */
   private Segments parseSegments(String encodedJWT, boolean requireSignature) {
-    if (encodedJWT.getBytes(StandardCharsets.UTF_8).length > maxInputBytes) {
+    // Compact JWS uses only base64url + '.', a strict ASCII subset, so the
+    // String char count equals the UTF-8 byte count. Any non-ASCII char would
+    // be rejected by the per-character base64url alphabet scan below.
+    if (encodedJWT.length() > maxInputBytes) {
       throw new InvalidJWTException(
           "Encoded JWT exceeds maxInputBytes [" + maxInputBytes + "]");
     }
@@ -276,7 +278,10 @@ public class JWTDecoder {
       // return null first -> MissingVerifierException.
     }
 
-    return new Segments(headerB64, payloadB64, signatureB64);
+    // signingInput is a contiguous prefix of the original token, so a single
+    // substring is cheaper than reconstructing headerB64 + "." + payloadB64.
+    String signingInput = encodedJWT.substring(0, secondDot);
+    return new Segments(headerB64, payloadB64, signatureB64, signingInput);
   }
 
   private Header parseHeader(String headerB64) {
@@ -354,7 +359,7 @@ public class JWTDecoder {
       }
     }
     try {
-      return Base64.getUrlDecoder().decode(segment);
+      return Base64URL.decode(segment);
     } catch (IllegalArgumentException e) {
       throw new InvalidJWTException(
           "JWT [" + name + "] segment is not valid base64url", e);
@@ -381,11 +386,14 @@ public class JWTDecoder {
     final String headerB64;
     final String payloadB64;
     final String signatureB64;
+    /** {@code headerB64.payloadB64} -- the JWS Signing Input (RFC 7515 §5.1). */
+    final String signingInput;
 
-    Segments(String h, String p, String s) {
+    Segments(String h, String p, String s, String signingInput) {
       this.headerB64 = h;
       this.payloadB64 = p;
       this.signatureB64 = s;
+      this.signingInput = signingInput;
     }
   }
 

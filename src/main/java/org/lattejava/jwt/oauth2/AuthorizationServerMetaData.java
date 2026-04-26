@@ -235,6 +235,13 @@ public class AuthorizationServerMetaData {
    * Map suitable for JSON serialization. Registered RFC 8414 fields appear
    * under their specified names; non-registered claims are emitted from
    * {@link #otherClaims()}.
+   *
+   * @apiNote The returned map is mutable and not shared with the
+   *     {@code AuthorizationServerMetaData} instance. Callers MUST NOT retain
+   *     or mutate it -- the contract is that each call returns a fresh map
+   *     intended for immediate handoff to a JSON serializer. List values
+   *     reference the metadata's internal unmodifiable lists directly; the
+   *     JSON serializer only iterates them.
    */
   public Map<String, Object> toSerializableMap() {
     Map<String, Object> out = new LinkedHashMap<>();
@@ -265,7 +272,7 @@ public class AuthorizationServerMetaData {
         out.put(e.getKey(), e.getValue());
       }
     }
-    return Collections.unmodifiableMap(out);
+    return out;
   }
 
   private static void putIfPresent(Map<String, Object> out, String key, Object value) {

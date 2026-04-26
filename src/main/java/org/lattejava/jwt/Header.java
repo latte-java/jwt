@@ -50,7 +50,9 @@ public final class Header {
     this.alg = b.alg;
     this.typ = b.typ;
     this.kid = b.kid;
-    this.customParameters = Collections.unmodifiableMap(new LinkedHashMap<>(b.customParameters));
+    this.customParameters = b.customParameters == null || b.customParameters.isEmpty()
+        ? Collections.emptyMap()
+        : Collections.unmodifiableMap(new LinkedHashMap<>(b.customParameters));
   }
 
   // ---------- Fluent getters ----------
@@ -122,9 +124,14 @@ public final class Header {
   }
 
   /**
-   * Return an unmodifiable map suitable for JSON serialization. {@code alg} is
+   * Return a freshly allocated map suitable for JSON serialization. {@code alg} is
    * serialized by {@link Algorithm#name()}; {@code null}-valued custom
    * parameters are omitted.
+   *
+   * @apiNote The returned map is mutable and not shared with the {@code Header}
+   *     instance. Callers MUST NOT retain or mutate it -- the contract is that
+   *     each call returns a fresh map intended for immediate handoff to a JSON
+   *     serializer.
    */
   public Map<String, Object> toSerializableMap() {
     Map<String, Object> out = new LinkedHashMap<>();
@@ -136,7 +143,7 @@ public final class Header {
         out.put(e.getKey(), e.getValue());
       }
     }
-    return Collections.unmodifiableMap(out);
+    return out;
   }
 
   // ---------- Factory ----------
@@ -199,7 +206,7 @@ public final class Header {
           if (!(value instanceof String)) {
             throw new InvalidJWTException("Header [" + name + "] must be a String");
           }
-          b.customParameters.put(name, value);
+          b.customParametersForWrite().put(name, value);
           break;
         case "x5c":
           if (!(value instanceof List<?> x5c)) {
@@ -210,14 +217,14 @@ public final class Header {
               throw new InvalidJWTException("Header [x5c] must be an array of strings");
             }
           }
-          b.customParameters.put(name, value);
+          b.customParametersForWrite().put(name, value);
           break;
         case "crit":
           validateCrit(value);
-          b.customParameters.put(name, value);
+          b.customParametersForWrite().put(name, value);
           break;
         default:
-          b.customParameters.put(name, value);
+          b.customParametersForWrite().put(name, value);
           break;
       }
     }
@@ -290,9 +297,16 @@ public final class Header {
 
     private String kid;
 
-    private final Map<String, Object> customParameters = new LinkedHashMap<>();
+    private Map<String, Object> customParameters;
 
     private Builder() {}
+
+    private Map<String, Object> customParametersForWrite() {
+      if (customParameters == null) {
+        customParameters = new LinkedHashMap<>();
+      }
+      return customParameters;
+    }
 
     /**
      * The signing algorithm declared in the {@code alg} header (RFC 7515 §4.1.1). Never null for
@@ -373,9 +387,12 @@ public final class Header {
         return this;
       }
       if (value == null) {
-        this.customParameters.remove(name);
+        // No need to lazy-init for a remove against a still-empty map.
+        if (this.customParameters != null) {
+          this.customParameters.remove(name);
+        }
       } else {
-        this.customParameters.put(name, value);
+        customParametersForWrite().put(name, value);
       }
       return this;
     }

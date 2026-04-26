@@ -57,7 +57,7 @@ public class LatteJSONProcessorTest {
 
     return new Object[][]{
         {"stringClaim", "hello world"},
-        {"integerClaim", BigInteger.valueOf(42)},
+        {"integerClaim", 42L},
         {"decimalClaim", new BigDecimal("3.14159")},
         {"trueClaim", Boolean.TRUE},
         {"falseClaim", Boolean.FALSE},
@@ -87,12 +87,12 @@ public class LatteJSONProcessorTest {
 
     Map<String, Object> innermost = new LinkedHashMap<>();
     innermost.put("deep", "value");
-    innermost.put("number", BigInteger.valueOf(7));
+    innermost.put("number", 7L);
 
     List<Object> middle = new ArrayList<>();
     middle.add(innermost);
     middle.add("string");
-    middle.add(BigInteger.valueOf(1));
+    middle.add(1L);
 
     Map<String, Object> outer = new LinkedHashMap<>();
     outer.put("list", middle);
@@ -268,7 +268,7 @@ public class LatteJSONProcessorTest {
     String json = "{\"a\":1,\"a\":2}";
     Map<String, Object> result = jp.deserialize(json.getBytes(StandardCharsets.UTF_8));
     // last-wins is the conventional behavior; we just require successful parse
-    assertEquals(result.get("a"), BigInteger.valueOf(2));
+    assertEquals(result.get("a"), 2L);
   }
 
   @Test
@@ -396,8 +396,8 @@ public class LatteJSONProcessorTest {
     try {
       Map<String, Object> r = jp.deserialize(json.getBytes(StandardCharsets.UTF_8));
       assertEquals(r.size(), 2);
-      assertEquals(r.get("a"), BigInteger.valueOf(2));
-      assertEquals(r.get("b"), BigInteger.valueOf(3));
+      assertEquals(r.get("a"), 2L);
+      assertEquals(r.get("b"), 3L);
     } catch (JSONProcessingException e) {
       fail("Expected duplicate-key updates to not count against the cap; threw: " + e.getMessage());
     }
@@ -575,8 +575,8 @@ public class LatteJSONProcessorTest {
     JSONProcessor jp = new LatteJSONProcessor();
     String json = "  {  \"a\"  :  1  ,  \"b\"  :  [  1  ,  2  ]  }  ";
     Map<String, Object> result = jp.deserialize(json.getBytes(StandardCharsets.UTF_8));
-    assertEquals(result.get("a"), BigInteger.ONE);
-    assertEquals(result.get("b"), Arrays.asList(BigInteger.ONE, BigInteger.valueOf(2)));
+    assertEquals(result.get("a"), 1L);
+    assertEquals(result.get("b"), Arrays.asList(1L, 2L));
   }
 
   @Test
@@ -595,7 +595,7 @@ public class LatteJSONProcessorTest {
     JSONProcessor jp = new LatteJSONProcessor();
     String json = "{\"i\":-42,\"d\":-3.14}";
     Map<String, Object> result = jp.deserialize(json.getBytes(StandardCharsets.UTF_8));
-    assertEquals(result.get("i"), BigInteger.valueOf(-42));
+    assertEquals(result.get("i"), -42L);
     assertEquals(result.get("d"), new BigDecimal("-3.14"));
   }
 
@@ -605,6 +605,6 @@ public class LatteJSONProcessorTest {
     JSONProcessor jp = new LatteJSONProcessor();
     String json = "{\"n\":0}";
     Map<String, Object> result = jp.deserialize(json.getBytes(StandardCharsets.UTF_8));
-    assertEquals(result.get("n"), BigInteger.ZERO);
+    assertEquals(result.get("n"), 0L);
   }
 }

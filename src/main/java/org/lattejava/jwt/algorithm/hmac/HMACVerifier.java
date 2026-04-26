@@ -47,15 +47,18 @@ import java.util.Objects;
  * constant-time since JDK 7u40 (JDK-8006276) -- to avoid leaking the
  * valid MAC via comparison-timing side channels.</p>
  *
- * <p>Each call to {@link #verify(byte[], byte[])} obtains a fresh
- * {@link Mac} instance ({@link Mac} is not thread-safe).</p>
+ * <p>The JCA algorithm name and {@link SecretKeySpec} are cached at
+ * construction so {@link #verify(byte[], byte[])} skips the per-call
+ * allocation and the redundant defensive copy of the secret. Each call
+ * still obtains a fresh {@link Mac} instance ({@link Mac} is not
+ * thread-safe).</p>
  *
  * @author Daniel DeGroff
  */
 public class HMACVerifier implements Verifier {
   private final Algorithm algorithm;
-
-  private final byte[] secret;
+  private final String jcaName;
+  private final SecretKeySpec keySpec;
 
   private HMACVerifier(Algorithm algorithm, byte[] secret) {
     Objects.requireNonNull(algorithm, "algorithm");
@@ -63,8 +66,9 @@ public class HMACVerifier implements Verifier {
     requireHMAC(algorithm);
     HMACFamily.assertMinimumSecretLength(algorithm, secret);
     this.algorithm = algorithm;
-    // Defensive copy so callers cannot mutate the verifier's secret after construction.
-    this.secret = secret.clone();
+    this.jcaName = HMACFamily.toJCA(algorithm);
+    // SecretKeySpec clones the secret internally, satisfying the defensive-copy contract.
+    this.keySpec = new SecretKeySpec(secret, jcaName);
   }
 
   private HMACVerifier(Algorithm algorithm, String secret) {
@@ -98,10 +102,9 @@ public class HMACVerifier implements Verifier {
     Objects.requireNonNull(message);
     Objects.requireNonNull(signature);
 
-    String jcaName = HMACFamily.toJCA(this.algorithm);
     try {
       Mac mac = Mac.getInstance(jcaName);
-      mac.init(new SecretKeySpec(secret, jcaName));
+      mac.init(keySpec);
       byte[] expected = mac.doFinal(message);
       if (!MessageDigest.isEqual(signature, expected)) {
         throw new InvalidJWTSignatureException();

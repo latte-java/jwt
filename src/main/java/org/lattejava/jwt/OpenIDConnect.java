@@ -16,13 +16,13 @@
 
 package org.lattejava.jwt;
 
+import org.lattejava.jwt.internal.Base64URL;
 import org.lattejava.jwt.internal.SHAKE256;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.Objects;
 
 /**
@@ -91,7 +91,7 @@ public class OpenIDConnect {
         throw new IllegalArgumentException("Unsupported algorithm [" + algorithm + "]");
     }
 
-    return new String(Base64.getUrlEncoder().withoutPadding().encode(leftMostBytes));
+    return Base64URL.encodeToString(leftMostBytes);
   }
 
   private static byte[] takeLeftMost(byte[] digest, int bytes) {

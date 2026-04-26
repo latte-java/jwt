@@ -44,9 +44,10 @@ public final class JWT {
       "iss", "sub", "aud", "exp", "nbf", "iat", "jti"
   ));
 
-  private static final BigInteger MAX_INSTANT_SECOND = BigInteger.valueOf(Instant.MAX.getEpochSecond());
-
-  private static final BigInteger MIN_INSTANT_SECOND = BigInteger.valueOf(Instant.MIN.getEpochSecond());
+  private static final long MAX_INSTANT_SECOND_LONG = Instant.MAX.getEpochSecond();
+  private static final long MIN_INSTANT_SECOND_LONG = Instant.MIN.getEpochSecond();
+  private static final BigInteger MAX_INSTANT_SECOND = BigInteger.valueOf(MAX_INSTANT_SECOND_LONG);
+  private static final BigInteger MIN_INSTANT_SECOND = BigInteger.valueOf(MIN_INSTANT_SECOND_LONG);
 
   private final String issuer;
 
@@ -75,6 +76,8 @@ public final class JWT {
       this.audience = Collections.emptyList();
       this.audienceSerialization = null;
     } else {
+      // Defensive copy is null-permissive (preserves any null elements) by going
+      // through ArrayList rather than List.copyOf, which rejects nulls.
       this.audience = Collections.unmodifiableList(new ArrayList<>(b.audience));
       this.audienceSerialization = b.audienceSerialization == null
           ? AudienceSerialization.ALWAYS_ARRAY
@@ -84,7 +87,9 @@ public final class JWT {
     this.notBefore = b.notBefore;
     this.issuedAt = b.issuedAt;
     this.id = b.id;
-    this.customClaims = Collections.unmodifiableMap(new LinkedHashMap<>(b.customClaims));
+    this.customClaims = b.customClaims == null || b.customClaims.isEmpty()
+        ? Collections.emptyMap()
+        : Collections.unmodifiableMap(new LinkedHashMap<>(b.customClaims));
     this.header = b.header;
   }
 
@@ -382,6 +387,13 @@ public final class JWT {
    * {@code iat}) are emitted as NumericDate (epoch seconds) per RFC 7519 §2, and {@code aud} is
    * emitted as either a single string or an array to match the recorded
    * {@link AudienceSerialization} mode.
+   *
+   * @apiNote The returned map is mutable and not shared with the {@code JWT}
+   *     instance. Callers MUST NOT retain or mutate it -- the contract is that
+   *     each call returns a fresh map intended for immediate handoff to a JSON
+   *     serializer. The {@code aud} value, when present as an array, references
+   *     the JWT's internal unmodifiable list directly; the JSON serializer only
+   *     iterates it.
    */
   public Map<String, Object> toSerializableMap() {
     Map<String, Object> out = new LinkedHashMap<>();
@@ -391,7 +403,7 @@ public final class JWT {
       if (audienceSerialization == AudienceSerialization.STRING_WHEN_SINGLE && audience.size() == 1) {
         out.put("aud", audience.get(0));
       } else {
-        out.put("aud", new ArrayList<>(audience));
+        out.put("aud", audience);
       }
     }
     if (expiresAt != null) out.put("exp", expiresAt.getEpochSecond());
@@ -403,7 +415,7 @@ public final class JWT {
         out.put(e.getKey(), e.getValue());
       }
     }
-    return Collections.unmodifiableMap(out);
+    return out;
   }
 
   // ---------- Convenience ----------
@@ -474,7 +486,7 @@ public final class JWT {
           break;
         case "aud":
           if (value instanceof String s) {
-            b.audience = new ArrayList<>(Collections.singletonList(s));
+            b.audience = List.of(s);
             b.audienceSerialization = AudienceSerialization.STRING_WHEN_SINGLE;
           } else if (value instanceof List<?> raw) {
             List<String> strs = new ArrayList<>(raw.size());
@@ -491,7 +503,7 @@ public final class JWT {
           }
           break;
         default:
-          b.customClaims.put(name, value);
+          b.customClaimsForWrite().put(name, value);
           break;
       }
     }
@@ -586,6 +598,16 @@ public final class JWT {
     if (!(value instanceof Number n)) {
       throw new InvalidJWTException("Claim [" + name + "] must be a numeric value (NumericDate)");
     }
+    // Long fast-path: NumericDate values that fit in a long arrive here as Long from any
+    // reasonable JSONProcessor; skip BigInteger materialization for them. Long.MIN/MAX are
+    // wider than Instant.MIN/MAX, so the range check is still required.
+    if (n instanceof Long l) {
+      long secs = l;
+      if (secs > MAX_INSTANT_SECOND_LONG || secs < MIN_INSTANT_SECOND_LONG) {
+        throw new InvalidJWTException("Claim [" + name + "] numeric value is outside the supported Instant range");
+      }
+      return Instant.ofEpochSecond(secs);
+    }
     BigInteger asInt;
     if (n instanceof BigInteger bi) {
       asInt = bi;
@@ -628,11 +650,18 @@ public final class JWT {
 
     private String id;
 
-    private final Map<String, Object> customClaims = new LinkedHashMap<>();
+    private Map<String, Object> customClaims;
 
     private Header header;
 
     private Builder() {}
+
+    private Map<String, Object> customClaimsForWrite() {
+      if (customClaims == null) {
+        customClaims = new LinkedHashMap<>();
+      }
+      return customClaims;
+    }
 
     /**
      * Registered Claim {@code iss} as defined by RFC 7519 §4.1.1. Use of this claim is OPTIONAL.
@@ -669,11 +698,7 @@ public final class JWT {
      * {@link AudienceSerialization#STRING_WHEN_SINGLE}.
      */
     public Builder audience(String audience) {
-      if (audience == null) {
-        this.audience = null;
-      } else {
-        this.audience = new ArrayList<>(Collections.singletonList(audience));
-      }
+      this.audience = audience == null ? null : List.of(audience);
       return this;
     }
 
@@ -843,7 +868,7 @@ public final class JWT {
             // defensive (should not happen given the switch above)
             throw new IllegalArgumentException("Registered claim [" + name + "] not handled by Builder.claim()");
           }
-          this.customClaims.put(name, value);
+          customClaimsForWrite().put(name, value);
           return this;
       }
     }

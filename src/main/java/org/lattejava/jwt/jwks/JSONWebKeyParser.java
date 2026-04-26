@@ -17,6 +17,7 @@
 package org.lattejava.jwt.jwks;
 
 import org.lattejava.jwt.KeyType;
+import org.lattejava.jwt.internal.Base64URL;
 import org.lattejava.jwt.internal.MessageSanitizer;
 import org.lattejava.jwt.internal.pem.PEMEncoder;
 import org.lattejava.jwt.internal.pem.PEM;
@@ -37,7 +38,6 @@ import java.security.spec.EdECPublicKeySpec;
 import java.security.spec.KeySpec;
 import java.security.spec.NamedParameterSpec;
 import java.security.spec.RSAPublicKeySpec;
-import java.util.Base64;
 import java.util.Objects;
 
 import static org.lattejava.jwt.jwks.JWKUtils.base64DecodeUint;
@@ -102,7 +102,7 @@ public class JSONWebKeyParser {
           throw new UnsupportedOperationException("Unsupported OKP curve [" + MessageSanitizer.forMessage(key.crv()) + "], expected [Ed25519] or [Ed448]");
         }
 
-        byte[] bytes = Base64.getUrlDecoder().decode(key.x());
+        byte[] bytes = Base64URL.decode(key.x());
         reverseArray(bytes);
 
         int lastBit = bytes[0] & 0xFF;
