@@ -1,6 +1,7 @@
 # Build outputs
 */build/
 
-# Result files — keep only the most recent committed snapshot
+# Result files — keep only the most recent committed snapshots
 results/*.json
 !results/latest.json
+!results/latest.conditions.json

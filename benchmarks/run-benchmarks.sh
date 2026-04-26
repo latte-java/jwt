@@ -36,6 +36,27 @@ Usage: run-benchmarks.sh [options]
 EOF
 }
 
+capture_run_conditions() {
+  local out="$1"
+  {
+    echo '{'
+    printf '  "uname": %s,\n' "$(uname -a | jq -Rs .)"
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+      printf '  "hardware": %s,\n' "$(system_profiler SPHardwareDataType 2>/dev/null | jq -Rs .)"
+      printf '  "thermal":  %s,\n' "$(pmset -g therm 2>/dev/null | jq -Rs .)"
+    else
+      printf '  "hardware": %s,\n' "$(lscpu 2>/dev/null | jq -Rs .)"
+      if [[ -r /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor ]]; then
+        printf '  "cpufreq_governor": %s,\n' "$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor | jq -Rs .)"
+      fi
+    fi
+    printf '  "java": %s,\n' "$(java -XshowSettings:properties -version 2>&1 | grep -E "^[[:space:]]+(java\.version|os\.|sun\.arch|java\.vm)" | jq -Rs .)"
+    printf '  "jmh_args": "%s",\n' "${JMH_ARGS[*]}"
+    printf '  "captured_at": "%s"\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo '}'
+  } > "${out}"
+}
+
 # ── arg parsing
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -249,6 +270,8 @@ shopt -u nullglob
 if [[ ${#result_files[@]} -gt 0 ]]; then
   jq -s 'add' "${result_files[@]}" > "${MERGED}"
   cp "${MERGED}" "${RESULTS_DIR}/latest.json"
+  capture_run_conditions "${MERGED%.json}.conditions.json"
+  cp "${MERGED%.json}.conditions.json" "${RESULTS_DIR}/latest.conditions.json"
 else
   echo "  no result files produced — skipping merge" >&2
 fi
