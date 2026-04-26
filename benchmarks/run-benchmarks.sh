@@ -207,5 +207,63 @@ for lib in "${LIBS_ARRAY[@]}"; do
 done
 echo "  ok"
 
-# stub: measurement phase implemented in Task 11
-echo "(measurement phase not yet implemented — run later tasks)"
+# ── measurement
+TS="$(date -u +%Y%m%dT%H%M%SZ)"
+SUFFIX=""
+[[ -n "${LABEL}" ]] && SUFFIX="-${LABEL}"
+MERGED="${RESULTS_DIR}/${TS}${SUFFIX}.json"
+TMP_DIR="$(mktemp -d)"
+trap 'rm -rf "${TMP_DIR}"' EXIT
+
+JMH_ARGS=(
+  -wi "${WARMUP_ITERS}" -w "${WARMUP_TIME}"
+  -i  "${MEASURE_ITERS}" -r  "${MEASURE_TIME}"
+  -f  "${FORKS}" -t  "${THREADS}"
+  -rf json
+)
+
+declare -a SUCCESS=()
+declare -a FAILED=()
+
+echo "→ measurement"
+for lib in "${LIBS_ARRAY[@]}"; do
+  cp="$(classpath_for_library "${lib}")"
+  main_class="$(main_class_for_library "${lib}")"
+  out="${TMP_DIR}/${lib}.json"
+  echo "  ${lib} → ${out}"
+  if BENCHMARK_FIXTURES="${FIXTURES_DIR}" java -cp "${cp}" "${main_class}" "${JMH_ARGS[@]}" -rff "${out}"; then
+    SUCCESS+=("${lib}")
+  else
+    echo "    ${lib} measurement FAILED — continuing" >&2
+    FAILED+=("${lib}")
+  fi
+done
+
+# ── merge JSON arrays
+echo "→ merge"
+# Each per-library JSON file is a top-level JSON array of JMH benchmark records.
+# `jq -s 'add'` slurps them and concatenates the arrays.
+shopt -s nullglob
+result_files=("${TMP_DIR}"/*.json)
+shopt -u nullglob
+if [[ ${#result_files[@]} -gt 0 ]]; then
+  jq -s 'add' "${result_files[@]}" > "${MERGED}"
+  cp "${MERGED}" "${RESULTS_DIR}/latest.json"
+else
+  echo "  no result files produced — skipping merge" >&2
+fi
+
+echo
+echo "  results: ${MERGED}"
+echo "  latest:  ${RESULTS_DIR}/latest.json"
+echo "  succeeded: ${SUCCESS[*]:-(none)}"
+[[ ${#FAILED[@]} -gt 0 ]] && echo "  failed:    ${FAILED[*]}"
+
+# ── update report
+if (( DO_UPDATE == 1 )); then
+  if [[ -x "${BENCH_DIR}/update-benchmarks.sh" ]]; then
+    "${BENCH_DIR}/update-benchmarks.sh" "${MERGED}"
+  else
+    echo "  --update requested but update-benchmarks.sh not found yet (built in Task 21)" >&2
+  fi
+fi
