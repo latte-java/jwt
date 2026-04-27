@@ -29,6 +29,8 @@ import org.lattejava.jwt.JSONProcessingException;
 import org.testng.annotations.Test;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
@@ -65,11 +67,21 @@ public class HardenedJSONTest extends BaseTest {
   }
 
   @Test
-  public void parse_returns_top_level_object() throws Exception {
+  public void parse_returns_top_level_object() {
     // Use case: valid JSON object is parsed and values are accessible by key.
     Map<String, Object> map = HardenedJSON.parse(stream("{\"k\":\"v\",\"n\":3}"), FetchLimits.defaults());
     assertEquals(map.get("k"), "v");
     assertEquals(((Number) map.get("n")).intValue(), 3);
+  }
+
+  @Test
+  public void parse_wraps_io_exception() {
+    // Use case: an IOException thrown by the InputStream during drain is wrapped in JSONProcessingException.
+    InputStream broken = new InputStream() {
+      @Override public int read() throws IOException { throw new IOException("simulated"); }
+      @Override public int read(byte[] b, int off, int len) throws IOException { throw new IOException("simulated"); }
+    };
+    assertThrows(JSONProcessingException.class, () -> HardenedJSON.parse(broken, FetchLimits.defaults()));
   }
 
   private ByteArrayInputStream stream(String s) {

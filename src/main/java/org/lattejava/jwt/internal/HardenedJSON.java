@@ -33,11 +33,15 @@ import java.io.InputStream;
 import java.util.Map;
 
 /**
- * Internal hardened JSON parser for JWKS and OIDC discovery responses.
- * The caller supplies an {@link InputStream} that is already wrapped with
- * the per-hop response-byte cap (see {@code AbstractHTTPHelper.LimitedInputStream});
- * this method enforces only the in-memory parse-time caps.
- * {@link JSONProcessingException} is the single failure surface.
+ * Hardened JSON parser for JWKS and OIDC discovery responses. Not part of
+ * the public API; module-system encapsulation prevents access from outside
+ * this module (the {@code org.lattejava.jwt.internal} package is not exported
+ * in {@code module-info.java}).
+ *
+ * <p>The caller supplies an {@link InputStream} that is already wrapped with
+ * the per-hop response-byte cap; this method enforces only the in-memory
+ * parse-time caps from {@link org.lattejava.jwt.FetchLimits}. {@link JSONProcessingException}
+ * is the single failure surface.</p>
  */
 public final class HardenedJSON {
   private HardenedJSON() {}

@@ -6,5 +6,4 @@ module org.lattejava.jwt {
     exports org.lattejava.jwt.algorithm.rsa;
     exports org.lattejava.jwt.jwks;
     exports org.lattejava.jwt.log;
-    exports org.lattejava.jwt.oauth2;
 }
