@@ -24,7 +24,7 @@
 package org.lattejava.jwt.jwks;
 
 /**
- * Governs how {@code JWKSource} interprets the JWKS endpoint's
+ * Governs how {@code JWKS} interprets the JWKS endpoint's
  * {@code Cache-Control} response header.
  */
 public enum CacheControlPolicy {

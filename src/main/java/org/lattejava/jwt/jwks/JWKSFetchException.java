@@ -26,7 +26,7 @@ package org.lattejava.jwt.jwks;
 import org.lattejava.jwt.JWTException;
 
 /**
- * Thrown by JWKS-endpoint fetches: {@link JWKSource#refresh()} on a
+ * Thrown by JWKS-endpoint fetches: {@link JWKS#refresh()} on a
  * remote-backed JWKS, {@code JWKS.fetchOnce(...)} (one-shot), and the
  * initial fetch performed inside {@code Builder.build()} when
  * {@code failFast == true} and the JWKS hop fails. {@link #reason()} carries

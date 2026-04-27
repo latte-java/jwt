@@ -451,7 +451,7 @@ public class JSONWebKeySetHelperTest extends BaseTest {
 
   @Test
   public void retrieveJWKSResponseFromJWKS_surfaces_status_and_CacheControl() throws Exception {
-    // Use case: JWKSource needs status + Cache-Control off the JWKS hop on success.
+    // Use case: JWKS needs status + Cache-Control off the JWKS hop on success.
     String body = "{\"keys\":[]}";
     startHttpServer(server -> server
         .listenOn(PORT)
@@ -472,7 +472,7 @@ public class JSONWebKeySetHelperTest extends BaseTest {
   @Test
   public void non2xx_response_throws_with_HTTPResponseException_cause() throws Exception {
     // Use case: a 429 with Retry-After must be reachable from the thrown exception's
-    // cause chain — JWKSource depends on this to honor Retry-After.
+    // cause chain — JWKS depends on this to honor Retry-After.
     startHttpServer(server -> server
         .listenOn(PORT)
         .handleURI("/jwks.json")

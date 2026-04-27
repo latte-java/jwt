@@ -36,7 +36,7 @@ import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
 
-public class JWKSourceTest extends BaseTest {
+public class JWKSTest extends BaseTest {
   private static final int PORT = 4244;
 
   private static final String RSA_JWKS_BODY = readResource("src/test/resources/jwks/rsa_one_key.json");
@@ -54,7 +54,7 @@ public class JWKSourceTest extends BaseTest {
   @Test
   public void builder_rejects_nonPositive_refreshInterval() {
     assertThrows(IllegalArgumentException.class,
-        () -> JWKSource.fromJWKS("http://localhost:9999/jwks.json")
+        () -> JWKS.fromJWKS("http://localhost:9999/jwks.json")
             .refreshInterval(Duration.ZERO)
             .build());
   }
@@ -62,7 +62,7 @@ public class JWKSourceTest extends BaseTest {
   @Test
   public void builder_rejects_nonPositive_minRefreshInterval() {
     assertThrows(IllegalArgumentException.class,
-        () -> JWKSource.fromJWKS("http://localhost:9999/jwks.json")
+        () -> JWKS.fromJWKS("http://localhost:9999/jwks.json")
             .minRefreshInterval(Duration.ofSeconds(-1))
             .build());
   }
@@ -70,7 +70,7 @@ public class JWKSourceTest extends BaseTest {
   @Test
   public void builder_rejects_refreshInterval_below_minRefreshInterval() {
     assertThrows(IllegalArgumentException.class,
-        () -> JWKSource.fromJWKS("http://localhost:9999/jwks.json")
+        () -> JWKS.fromJWKS("http://localhost:9999/jwks.json")
             .minRefreshInterval(Duration.ofMinutes(5))
             .refreshInterval(Duration.ofSeconds(30))
             .build());
@@ -79,15 +79,15 @@ public class JWKSourceTest extends BaseTest {
   @Test
   public void builder_rejects_nonPositive_refreshTimeout() {
     assertThrows(IllegalArgumentException.class,
-        () -> JWKSource.fromJWKS("http://localhost:9999/jwks.json")
+        () -> JWKS.fromJWKS("http://localhost:9999/jwks.json")
             .refreshTimeout(Duration.ZERO)
             .build());
   }
 
   @Test
   public void builder_rejects_null_or_empty_URL() {
-    assertThrows(IllegalArgumentException.class, () -> JWKSource.fromJWKS("").build());
-    assertThrows(NullPointerException.class, () -> JWKSource.fromJWKS(null).build());
+    assertThrows(IllegalArgumentException.class, () -> JWKS.fromJWKS("").build());
+    assertThrows(NullPointerException.class, () -> JWKS.fromJWKS(null).build());
   }
 
   @Test
@@ -102,7 +102,7 @@ public class JWKSourceTest extends BaseTest {
             .with(r -> r.status = 200)
             .with(r -> r.contentType = "application/json")));
 
-    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json").build();
+    JWKS source = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json").build();
     assertNotNull(source.lastSuccessfulRefresh());
     assertEquals(source.consecutiveFailures(), 0);
     assertEquals(source.currentKids(), java.util.Set.of("k1"));
@@ -123,7 +123,7 @@ public class JWKSourceTest extends BaseTest {
             .with(r -> r.contentType = "application/json")
             .with(r -> r.delayMillis = 800)));
 
-    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+    JWKS source = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json")
         .refreshTimeout(Duration.ofMillis(100))
         .build();
     // Initial build's load timed out on the awaiter; consecutiveFailures stays 0
@@ -148,7 +148,7 @@ public class JWKSourceTest extends BaseTest {
             .with(r -> r.contentType = "application/json"));
     startHttpServer(b);
 
-    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+    JWKS source = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json")
         .minRefreshInterval(Duration.ofMillis(100))
         .refreshInterval(Duration.ofSeconds(60))
         .build();
@@ -180,7 +180,7 @@ public class JWKSourceTest extends BaseTest {
             .with(r -> r.response = RSA_JWKS_BODY)
             .with(r -> r.status = 200)
             .with(r -> r.contentType = "application/json")));
-    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+    JWKS source = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json")
         .scheduledRefresh(true)
         .minRefreshInterval(Duration.ofMillis(100))
         .refreshInterval(Duration.ofMillis(100))
@@ -212,13 +212,13 @@ public class JWKSourceTest extends BaseTest {
             .with(r -> r.status = 200)
             .with(r -> r.contentType = "application/json")));
 
-    JWKSource source = JWKSource.fromIssuer("http://localhost:" + PORT).build();
+    JWKS source = JWKS.fromIssuer("http://localhost:" + PORT).build();
     assertEquals(source.currentKids(), java.util.Set.of("k1"));
     source.close();
   }
 
   @Test
-  public void fromWellKnownConfiguration_nonConventionalURL() throws Exception {
+  public void fromWellKnown_nonConventionalURL() throws Exception {
     // Use case: spec test #2 — discovery doc lives at a non-standard path.
     String discoveryBody = "{\"jwks_uri\":\"http://localhost:" + PORT + "/keys\"}";
     startHttpServer(server -> server
@@ -234,7 +234,7 @@ public class JWKSourceTest extends BaseTest {
             .with(r -> r.status = 200)
             .with(r -> r.contentType = "application/json")));
 
-    JWKSource source = JWKSource.fromWellKnownConfiguration(
+    JWKS source = JWKS.fromWellKnown(
         "http://localhost:" + PORT + "/.custom-discovery").build();
     assertEquals(source.currentKids(), java.util.Set.of("k1"));
     source.close();
@@ -253,7 +253,7 @@ public class JWKSourceTest extends BaseTest {
             .with(r -> r.status = 200)
             .with(r -> r.contentType = "application/json")));
 
-    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json").build();
+    JWKS source = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json").build();
     assertNull(source.lastSuccessfulRefresh());
     assertEquals(source.consecutiveFailures(), 1);
     assertTrue(source.currentKids().isEmpty());
@@ -298,7 +298,7 @@ public class JWKSourceTest extends BaseTest {
             .with(r -> r.status = 200)
             .with(r -> r.contentType = "application/json")));
     RecordingLogger logger = new RecordingLogger();
-    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+    JWKS source = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json")
         .logger(logger)
         .build();
     assertTrue(logger.events.stream().anyMatch(e ->
@@ -309,7 +309,7 @@ public class JWKSourceTest extends BaseTest {
   @Test
   public void logger_emits_refreshFailure_at_error_with_throwable() {
     RecordingLogger logger = new RecordingLogger();
-    JWKSource source = JWKSource.fromJWKS("http://127.0.0.1:1/jwks.json")
+    JWKS source = JWKS.fromJWKS("http://127.0.0.1:1/jwks.json")
         .refreshTimeout(Duration.ofMillis(500))
         .logger(logger)
         .build();
@@ -328,7 +328,7 @@ public class JWKSourceTest extends BaseTest {
             .with(r -> r.status = 200)
             .with(r -> r.contentType = "application/json")));
     RecordingLogger logger = new RecordingLogger();
-    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+    JWKS source = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json")
         .logger(logger)
         .build();
     assertTrue(logger.events.stream().anyMatch(e ->
@@ -347,7 +347,7 @@ public class JWKSourceTest extends BaseTest {
             .with(r -> r.contentType = "application/json")
             .with(r -> r.headers = java.util.Map.of("Retry-After", "600"))));
     RecordingLogger logger = new RecordingLogger();
-    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+    JWKS source = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json")
         .logger(logger)
         .build();
     assertTrue(logger.events.stream().anyMatch(e ->
@@ -367,7 +367,7 @@ public class JWKSourceTest extends BaseTest {
             .with(r -> r.status = 200)
             .with(r -> r.contentType = "application/json")));
 
-    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+    JWKS source = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json")
         .scheduledRefresh(true)
         .minRefreshInterval(Duration.ofMillis(200))
         .refreshInterval(Duration.ofMillis(200))
@@ -388,7 +388,7 @@ public class JWKSourceTest extends BaseTest {
             .with(r -> r.status = 200)
             .with(r -> r.contentType = "application/json")));
 
-    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json").build();
+    JWKS source = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json").build();
     int before = httpHandlers.get(httpHandlers.size() - 1).called;
     source.refresh();
     assertTrue(httpHandlers.get(httpHandlers.size() - 1).called > before);
@@ -404,7 +404,7 @@ public class JWKSourceTest extends BaseTest {
             .with(r -> r.response = RSA_JWKS_BODY)
             .with(r -> r.status = 200)
             .with(r -> r.contentType = "application/json")));
-    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json").build();
+    JWKS source = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json").build();
 
     httpServers.get(httpServers.size() - 1).stop(0);
     JWKSFetchException ex = expectThrows(JWKSFetchException.class, source::refresh);
@@ -426,7 +426,7 @@ public class JWKSourceTest extends BaseTest {
             .with(r -> r.headers = java.util.Map.of("Retry-After", "600"))));
 
     java.time.Instant fixedNow = java.time.Instant.parse("2026-04-25T12:00:00Z");
-    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+    JWKS source = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json")
         .clock(java.time.Clock.fixed(fixedNow, java.time.ZoneOffset.UTC))
         .build();
     assertEquals(source.consecutiveFailures(), 1);
@@ -447,7 +447,7 @@ public class JWKSourceTest extends BaseTest {
             .with(r -> r.headers = java.util.Map.of("Retry-After", "1"))));
 
     java.time.Instant fixedNow = java.time.Instant.parse("2026-04-25T12:00:00Z");
-    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+    JWKS source = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json")
         .clock(java.time.Clock.fixed(fixedNow, java.time.ZoneOffset.UTC))
         .minRefreshInterval(Duration.ofSeconds(30))
         .build();
@@ -462,7 +462,7 @@ public class JWKSourceTest extends BaseTest {
     Duration max = Duration.ofMinutes(60);
     long[] expectedSeconds = {30, 60, 120, 240, 480, 960, 1920, 3600, 3600, 3600};
     for (int i = 0; i < expectedSeconds.length; i++) {
-      Duration actual = JWKSource.backoff(i + 1, min, max);
+      Duration actual = JWKS.backoff(i + 1, min, max);
       assertEquals(actual.getSeconds(), expectedSeconds[i],
           "consecutiveFailures=" + (i + 1));
     }
@@ -481,7 +481,7 @@ public class JWKSourceTest extends BaseTest {
             .with(r -> r.headers = java.util.Map.of("Cache-Control", "public, max-age=300"))));
 
     java.time.Instant fixedNow = java.time.Instant.parse("2026-04-25T12:00:00Z");
-    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+    JWKS source = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json")
         .clock(java.time.Clock.fixed(fixedNow, java.time.ZoneOffset.UTC))
         .build();
     assertEquals(source.nextDueAt(), fixedNow.plusSeconds(300));
@@ -501,7 +501,7 @@ public class JWKSourceTest extends BaseTest {
             .with(r -> r.headers = java.util.Map.of("Cache-Control", "max-age=10"))));
 
     java.time.Instant fixedNow = java.time.Instant.parse("2026-04-25T12:00:00Z");
-    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+    JWKS source = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json")
         .clock(java.time.Clock.fixed(fixedNow, java.time.ZoneOffset.UTC))
         .build();
     assertEquals(source.nextDueAt(), fixedNow.plusSeconds(30));
@@ -521,7 +521,7 @@ public class JWKSourceTest extends BaseTest {
             .with(r -> r.headers = java.util.Map.of("Cache-Control", "max-age=300"))));
 
     java.time.Instant fixedNow = java.time.Instant.parse("2026-04-25T12:00:00Z");
-    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+    JWKS source = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json")
         .clock(java.time.Clock.fixed(fixedNow, java.time.ZoneOffset.UTC))
         .refreshInterval(Duration.ofMinutes(15))
         .cacheControlPolicy(CacheControlPolicy.IGNORE)
@@ -543,7 +543,7 @@ public class JWKSourceTest extends BaseTest {
             .with(r -> r.headers = java.util.Map.of("Cache-Control", "max-age=abc"))));
 
     java.time.Instant fixedNow = java.time.Instant.parse("2026-04-25T12:00:00Z");
-    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+    JWKS source = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json")
         .clock(java.time.Clock.fixed(fixedNow, java.time.ZoneOffset.UTC))
         .refreshInterval(Duration.ofMinutes(15))
         .build();
@@ -563,7 +563,7 @@ public class JWKSourceTest extends BaseTest {
             .with(r -> r.contentType = "application/json")));
 
     java.time.Instant fixedNow = java.time.Instant.parse("2026-04-25T12:00:00Z");
-    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+    JWKS source = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json")
         .clock(java.time.Clock.fixed(fixedNow, java.time.ZoneOffset.UTC))
         .refreshInterval(Duration.ofMinutes(15))
         .minRefreshInterval(Duration.ofSeconds(30))
@@ -583,7 +583,7 @@ public class JWKSourceTest extends BaseTest {
             .with(r -> r.status = 200)
             .with(r -> r.contentType = "application/json")));
 
-    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json").build();
+    JWKS source = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json").build();
     org.lattejava.jwt.Header h = org.lattejava.jwt.Header.builder()
         .alg(org.lattejava.jwt.Algorithm.RS256).kid("k1").build();
     org.lattejava.jwt.Verifier v = source.resolve(h);
@@ -603,7 +603,7 @@ public class JWKSourceTest extends BaseTest {
             .with(r -> r.status = 200)
             .with(r -> r.contentType = "application/json")));
 
-    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json").build();
+    JWKS source = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json").build();
     org.lattejava.jwt.Header h = org.lattejava.jwt.Header.builder()
         .alg(org.lattejava.jwt.Algorithm.RS512).kid("k1").build();
     assertNull(source.resolve(h));
@@ -621,7 +621,7 @@ public class JWKSourceTest extends BaseTest {
             .with(r -> r.status = 200)
             .with(r -> r.contentType = "application/json")));
 
-    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+    JWKS source = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json")
         .refreshOnMiss(false)
         .build();
     int callsBefore = httpHandlers.get(httpHandlers.size() - 1).called;
@@ -643,7 +643,7 @@ public class JWKSourceTest extends BaseTest {
             .with(r -> r.status = 200)
             .with(r -> r.contentType = "application/json")));
 
-    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+    JWKS source = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json")
         .minRefreshInterval(Duration.ofMillis(200))
         .refreshInterval(Duration.ofMillis(200))
         .build();
@@ -674,7 +674,7 @@ public class JWKSourceTest extends BaseTest {
             .with(r -> r.contentType = "application/json")));
 
     java.time.Instant fixedNow = java.time.Instant.parse("2026-04-25T12:00:00Z");
-    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+    JWKS source = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json")
         .clock(java.time.Clock.fixed(fixedNow, java.time.ZoneOffset.UTC))
         .minRefreshInterval(Duration.ofMinutes(5))
         .refreshInterval(Duration.ofMinutes(60))
@@ -702,7 +702,7 @@ public class JWKSourceTest extends BaseTest {
             .with(r -> r.contentType = "application/json"));
     startHttpServer(b);
 
-    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+    JWKS source = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json")
         .minRefreshInterval(Duration.ofMillis(100))
         .refreshInterval(Duration.ofMillis(100))
         .build();
@@ -721,7 +721,7 @@ public class JWKSourceTest extends BaseTest {
   public void build_initialLoad_failure_leavesSourceUsable() {
     // Use case: build() returns normally on a network failure; source has empty
     // cache, consecutiveFailures=1, lastSuccessfulRefresh()==null.
-    JWKSource source = JWKSource.fromJWKS("http://127.0.0.1:1/jwks.json")
+    JWKS source = JWKS.fromJWKS("http://127.0.0.1:1/jwks.json")
         .refreshTimeout(Duration.ofMillis(500))
         .build();
     assertNull(source.lastSuccessfulRefresh());
@@ -761,7 +761,7 @@ public class JWKSourceTest extends BaseTest {
             .with(r -> r.status = 200)
             .with(r -> r.contentType = "application/json")));
 
-    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+    JWKS source = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json")
         .logger(logger)
         .build();
     org.lattejava.jwt.Verifier v = source.resolve(org.lattejava.jwt.Header.builder()
@@ -787,7 +787,7 @@ public class JWKSourceTest extends BaseTest {
             .with(r -> r.contentType = "application/json")
             .with(r -> r.delayMillis = 800)));
 
-    JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+    JWKS source = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json")
         .refreshTimeout(Duration.ofMillis(50))
         .build();
     // build() awaiter timed out at 50ms; the fetch is still running.
@@ -805,7 +805,7 @@ public class JWKSourceTest extends BaseTest {
   public void parseCacheControl_publicAlone_silentNoMaxAge() {
     // Use case: a header with no max-age directive (e.g. "Cache-Control: public") is not
     // malformed; it just doesn't supply a hint. parseCacheControl returns (null, false, false).
-    JWKSource.CacheControlDirectives d = JWKSource.parseCacheControl("public");
+    JWKS.CacheControlDirectives d = JWKS.parseCacheControl("public");
     assertNull(d.maxAge());
     assertEquals(d.noStore(), false);
     assertEquals(d.malformed(), false);
@@ -813,26 +813,26 @@ public class JWKSourceTest extends BaseTest {
 
   @Test
   public void parseCacheControl_noStoreAlone_returnsFloor() {
-    JWKSource.CacheControlDirectives d = JWKSource.parseCacheControl("no-store");
+    JWKS.CacheControlDirectives d = JWKS.parseCacheControl("no-store");
     assertEquals(d.noStore(), true);
     assertEquals(d.malformed(), false);
   }
 
   @Test
   public void parseCacheControl_conflictingMaxAge_isMalformed() {
-    JWKSource.CacheControlDirectives d = JWKSource.parseCacheControl("max-age=300, max-age=600");
+    JWKS.CacheControlDirectives d = JWKS.parseCacheControl("max-age=300, max-age=600");
     assertEquals(d.malformed(), true);
   }
 
   @Test
   public void parseCacheControl_emptyMaxAgeValue_isMalformed() {
-    JWKSource.CacheControlDirectives d = JWKSource.parseCacheControl("max-age=");
+    JWKS.CacheControlDirectives d = JWKS.parseCacheControl("max-age=");
     assertEquals(d.malformed(), true);
   }
 
   @Test
   public void parseCacheControl_nonNumericMaxAge_isMalformed() {
-    JWKSource.CacheControlDirectives d = JWKSource.parseCacheControl("max-age=abc");
+    JWKS.CacheControlDirectives d = JWKS.parseCacheControl("max-age=abc");
     assertEquals(d.malformed(), true);
   }
 
@@ -840,7 +840,7 @@ public class JWKSourceTest extends BaseTest {
   public void parseRetryAfter_HTTPDateForm_returnsRelativeDuration() {
     // Use case: Cloudflare and several CDNs send HTTP-date Retry-After. Parser must honor it.
     java.time.Instant now = java.time.Instant.parse("2026-04-25T12:00:00Z");
-    Duration d = JWKSource.parseRetryAfter("Sat, 25 Apr 2026 12:01:00 GMT", now);
+    Duration d = JWKS.parseRetryAfter("Sat, 25 Apr 2026 12:01:00 GMT", now);
     assertNotNull(d);
     assertEquals(d, Duration.ofSeconds(60));
   }
@@ -848,14 +848,14 @@ public class JWKSourceTest extends BaseTest {
   @Test
   public void parseRetryAfter_HTTPDate_inPastClampsToZero() {
     java.time.Instant now = java.time.Instant.parse("2026-04-25T12:00:00Z");
-    Duration d = JWKSource.parseRetryAfter("Sat, 25 Apr 2026 11:00:00 GMT", now);
+    Duration d = JWKS.parseRetryAfter("Sat, 25 Apr 2026 11:00:00 GMT", now);
     assertEquals(d, Duration.ZERO);
   }
 
   @Test
   public void parseRetryAfter_unparseable_returnsNull() {
     java.time.Instant now = java.time.Instant.parse("2026-04-25T12:00:00Z");
-    assertNull(JWKSource.parseRetryAfter("not-a-time", now));
+    assertNull(JWKS.parseRetryAfter("not-a-time", now));
   }
 
   private static String rsaJWKWithKid(String kid, java.security.interfaces.RSAPublicKey pub) {

@@ -30,7 +30,7 @@ import java.util.TreeMap;
 
 /**
  * Package-visible JWKS-fetch result carrying the parsed keys, the HTTP
- * status, and the response headers JWKSource is interested in
+ * status, and the response headers JWKS is interested in
  * ({@code Cache-Control}, {@code Retry-After}).
  *
  * <p>Header lookup keys are case-insensitive.</p>

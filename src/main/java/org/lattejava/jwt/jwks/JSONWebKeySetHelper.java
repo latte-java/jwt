@@ -310,8 +310,8 @@ public class JSONWebKeySetHelper extends AbstractHTTPHelper {
   }
 
   // -----------------------------------------------------------
-  // Package-visible richer responses for JWKSource. Returns the parsed
-  // keys plus the HTTP status and the response headers JWKSource needs
+  // Package-visible richer responses for JWKS. Returns the parsed
+  // keys plus the HTTP status and the response headers JWKS needs
   // (Cache-Control, Retry-After).
   // -----------------------------------------------------------
 

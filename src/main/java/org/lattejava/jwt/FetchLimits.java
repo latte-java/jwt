@@ -25,7 +25,7 @@ package org.lattejava.jwt;
 
 /**
  * Per-instance hardening limits for HTTP fetches and JSON parsing performed
- * by {@link org.lattejava.jwt.jwks.JWKSource} and discovery operations.
+ * by {@link org.lattejava.jwt.jwks.JWKS} and discovery operations.
  *
  * <p>Instances are immutable. {@link #defaults()} returns a shared singleton.
  * Defaults match historical behavior exactly for the carried-forward fields;

@@ -61,7 +61,7 @@ import java.util.function.Consumer;
 /**
  * A self-refreshing {@link VerifierResolver} backed by a remote JWKS endpoint.
  */
-public final class JWKSource implements VerifierResolver, AutoCloseable {
+public final class JWKS implements VerifierResolver, AutoCloseable {
   private final CacheControlPolicy cacheControlPolicy;
   private final Clock clock;
   private volatile boolean closed;
@@ -79,7 +79,7 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
   private final FetchSource source;
   private final String url;
 
-  private JWKSource(Builder b) {
+  private JWKS(Builder b) {
     this.cacheControlPolicy = b.cacheControlPolicy;
     this.clock = b.clock;
     this.httpConnectionCustomizer = b.httpConnectionCustomizer;
@@ -105,7 +105,7 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
     }
     if (scheduledRefresh) {
       this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-        Thread t = new Thread(r, "jwks-source-scheduler");
+        Thread t = new Thread(r, "jwks-scheduler");
         t.setDaemon(true);
         return t;
       });
@@ -126,7 +126,7 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
     return new Builder(FetchSource.JWKS, jwksURL);
   }
 
-  public static Builder fromWellKnownConfiguration(String wellKnownURL) {
+  public static Builder fromWellKnown(String wellKnownURL) {
     return new Builder(FetchSource.WELL_KNOWN, wellKnownURL);
   }
 
@@ -236,7 +236,7 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
     if (t != null) {
       t.interrupt();
     }
-    if (logger.isDebugEnabled()) logger.debug("JWKSource closed");
+    if (logger.isDebugEnabled()) logger.debug("JWKS closed");
   }
 
   public int consecutiveFailures() {
@@ -270,7 +270,7 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
    */
   public void refresh() {
     if (closed) {
-      if (logger.isDebugEnabled()) logger.debug("refresh() called on closed JWKSource");
+      if (logger.isDebugEnabled()) logger.debug("refresh() called on closed JWKS");
       return;
     }
     CompletableFuture<Snapshot> fut = singleflightRefresh();
@@ -580,7 +580,7 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
       this.url = url;
     }
 
-    public JWKSource build() {
+    public JWKS build() {
       Objects.requireNonNull(url, "url");
       if (url.isEmpty()) {
         throw new IllegalArgumentException("url must be non-empty");
@@ -598,7 +598,7 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
       if (refreshTimeout.isZero() || refreshTimeout.isNegative()) {
         throw new IllegalArgumentException("refreshTimeout must be > 0 but found [" + refreshTimeout + "]");
       }
-      return new JWKSource(this);
+      return new JWKS(this);
     }
 
     public Builder cacheControlPolicy(CacheControlPolicy p) {

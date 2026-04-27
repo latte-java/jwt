@@ -23,11 +23,11 @@
 
 /**
  * JSON Web Key (JWK) and JSON Web Key Set (JWKS) types and the
- * {@link org.lattejava.jwt.jwks.JWKSource} self-refreshing cache.
+ * {@link org.lattejava.jwt.jwks.JWKS} self-refreshing cache.
  *
  * <h2>When to use what</h2>
  * <ul>
- *   <li>{@link org.lattejava.jwt.jwks.JWKSource} — the high-level API. A
+ *   <li>{@link org.lattejava.jwt.jwks.JWKS} — the high-level API. A
  *       self-refreshing {@code VerifierResolver} that drops directly into
  *       {@link org.lattejava.jwt.JWTDecoder}. Handles caching, refresh,
  *       singleflight coalescing, {@code Cache-Control}/{@code Retry-After}
