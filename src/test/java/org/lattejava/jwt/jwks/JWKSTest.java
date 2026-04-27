@@ -23,6 +23,7 @@
 
 package org.lattejava.jwt.jwks;
 
+import com.sun.net.httpserver.HttpServer;
 import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.BaseTest;
 import org.lattejava.jwt.ExpectedResponse;
@@ -30,12 +31,16 @@ import org.lattejava.jwt.FetchLimits;
 import org.lattejava.jwt.Header;
 import org.lattejava.jwt.KeyType;
 import org.lattejava.jwt.OpenIDConnectConfiguration;
+import org.lattejava.jwt.OpenIDConnectException;
 import org.testng.annotations.Test;
 
+import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
@@ -237,8 +242,10 @@ public class JWKSTest extends BaseTest {
   @Test
   public void fromIssuer_happyPath() throws Exception {
     // Use case: spec test #1 — fromIssuer composes /.well-known/openid-configuration,
-    // reads jwks_uri, and fetches the JWKS.
-    String discoveryBody = "{\"jwks_uri\":\"http://localhost:" + PORT + "/jwks.json\"}";
+    // reads jwks_uri, and fetches the JWKS. The discovery doc must include the issuer
+    // field so that OpenIDConnect.discover() issuer-equality validation passes.
+    String issuer = "http://localhost:" + PORT;
+    String discoveryBody = "{\"issuer\":\"" + issuer + "\",\"jwks_uri\":\"" + issuer + "/jwks.json\"}";
     startHttpServer(server -> server
         .listenOn(PORT)
         .handleURI("/.well-known/openid-configuration")
@@ -252,7 +259,7 @@ public class JWKSTest extends BaseTest {
             .with(r -> r.status = 200)
             .with(r -> r.contentType = "application/json")));
 
-    JWKS source = JWKS.fromIssuer("http://localhost:" + PORT).build();
+    JWKS source = JWKS.fromIssuer(issuer).build();
     assertEquals(source.keyIds(), java.util.Set.of("k1"));
     source.close();
   }
@@ -1083,6 +1090,214 @@ public class JWKSTest extends BaseTest {
   public void parseRetryAfter_unparseable_returnsNull() {
     java.time.Instant now = java.time.Instant.parse("2026-04-25T12:00:00Z");
     assertNull(JWKS.parseRetryAfter("not-a-time", now));
+  }
+
+  // --- Discovery lock (Task 13) tests ---
+
+  @Test
+  public void fromIssuer_first_refresh_hits_discovery_then_jwks() throws Exception {
+    // Use case: build() runs discovery exactly once and then fetches the JWKS once.
+    AtomicInteger discoveryHits = new AtomicInteger();
+    AtomicInteger jwksHits = new AtomicInteger();
+    HttpServer srv = startOIDCServer(discoveryHits, jwksHits, new AtomicReference<>(null));
+
+    try (JWKS jwks = JWKS.fromIssuer("http://localhost:" + PORT).build()) {
+      assertEquals(jwks.keyIds(), java.util.Set.of("k1"));
+      assertEquals(discoveryHits.get(), 1);
+      assertEquals(jwksHits.get(), 1);
+    } finally {
+      srv.stop(0);
+    }
+  }
+
+  @Test
+  public void fromIssuer_subsequent_refresh_skips_discovery() throws Exception {
+    // Use case: after the first successful fetch the jwks_uri is locked; subsequent
+    // refresh() calls hit the JWKS endpoint directly and never re-run discovery.
+    AtomicInteger discoveryHits = new AtomicInteger();
+    AtomicInteger jwksHits = new AtomicInteger();
+    HttpServer srv = startOIDCServer(discoveryHits, jwksHits, new AtomicReference<>(null));
+
+    try (JWKS jwks = JWKS.fromIssuer("http://localhost:" + PORT).build()) {
+      assertEquals(discoveryHits.get(), 1);
+      assertEquals(jwksHits.get(), 1);
+
+      jwks.refresh();
+
+      assertEquals(discoveryHits.get(), 1, "discovery must not be called again after the lock");
+      assertEquals(jwksHits.get(), 2);
+    } finally {
+      srv.stop(0);
+    }
+  }
+
+  @Test
+  public void fromIssuer_refresh_reattempts_discovery_until_first_success() throws Exception {
+    // Use case: discovery fails once (500) then succeeds; every attempt before the
+    // first lock re-runs discovery.
+    AtomicInteger discoveryHits = new AtomicInteger();
+    AtomicInteger jwksHits = new AtomicInteger();
+    // First call to /.well-known/openid-configuration returns 500
+    AtomicInteger discoveryFailsRemaining = new AtomicInteger(1);
+    HttpServer srv = HttpServer.create(new InetSocketAddress(PORT), 0);
+    httpServers.add(srv);
+    String jwksBody = RSA_JWKS_BODY;
+    String issuerBase = "http://localhost:" + PORT;
+    String discoveryDoc = "{\"issuer\":\"" + issuerBase + "\",\"jwks_uri\":\"" + issuerBase + "/jwks.json\"}";
+    srv.createContext("/.well-known/openid-configuration", exchange -> {
+      discoveryHits.incrementAndGet();
+      byte[] body;
+      int status;
+      if (discoveryFailsRemaining.getAndDecrement() > 0) {
+        body = "{}".getBytes();
+        status = 500;
+      } else {
+        body = discoveryDoc.getBytes();
+        status = 200;
+      }
+      exchange.getResponseHeaders().add("Content-Type", "application/json");
+      exchange.sendResponseHeaders(status, body.length);
+      exchange.getResponseBody().write(body);
+      exchange.getResponseBody().close();
+    });
+    srv.createContext("/jwks.json", exchange -> {
+      jwksHits.incrementAndGet();
+      byte[] body = jwksBody.getBytes();
+      exchange.getResponseHeaders().add("Content-Type", "application/json");
+      exchange.sendResponseHeaders(200, body.length);
+      exchange.getResponseBody().write(body);
+      exchange.getResponseBody().close();
+    });
+    srv.start();
+
+    // Initial build: discovery fails (500) -> OpenIDConnectException -> failFast=false, no throw
+    JWKS jwks = JWKS.fromIssuer(issuerBase)
+        .refreshTimeout(Duration.ofSeconds(2))
+        .build();
+    try {
+      assertEquals(discoveryHits.get(), 1, "first attempt hits discovery");
+      assertEquals(jwksHits.get(), 0, "jwks endpoint not reached when discovery failed");
+      assertNull(jwks.lockedJWKSURI, "lock must not be set when discovery failed");
+
+      // Second attempt: discovery succeeds, JWKS fetched, lock is set
+      jwks.refresh();
+
+      assertEquals(discoveryHits.get(), 2, "second attempt must re-run discovery");
+      assertEquals(jwksHits.get(), 1, "JWKS fetched after successful discovery");
+      assertNotNull(jwks.lockedJWKSURI, "lock must be set after first successful fetch");
+    } finally {
+      jwks.close();
+      srv.stop(0);
+    }
+  }
+
+  @Test
+  public void fromIssuer_refresh_throws_OpenIDConnectException_while_discovery_not_yet_succeeded() throws Exception {
+    // Use case: discovery always returns 500; calling refresh() must throw
+    // OpenIDConnectException (not JWKSFetchException).
+    HttpServer srv = HttpServer.create(new InetSocketAddress(PORT), 0);
+    httpServers.add(srv);
+    srv.createContext("/", exchange -> {
+      exchange.sendResponseHeaders(500, 0);
+      exchange.getResponseBody().close();
+    });
+    srv.start();
+
+    JWKS jwks = JWKS.fromIssuer("http://localhost:" + PORT)
+        .refreshTimeout(Duration.ofSeconds(2))
+        .build();
+    try {
+      assertNull(jwks.lockedJWKSURI, "lock must not be set when discovery always fails");
+      expectThrows(OpenIDConnectException.class, jwks::refresh);
+    } finally {
+      jwks.close();
+      srv.stop(0);
+    }
+  }
+
+  @Test
+  public void fromIssuer_refresh_throws_JWKSFetchException_after_discovery_locked() throws Exception {
+    // Use case: discovery succeeds and locks the jwks_uri; then the JWKS endpoint is
+    // broken. Subsequent refresh() must throw JWKSFetchException, not OpenIDConnectException.
+    AtomicInteger discoveryHits = new AtomicInteger();
+    AtomicInteger jwksHits = new AtomicInteger();
+    AtomicReference<String> jwksOverride = new AtomicReference<>(null);
+    HttpServer srv = startOIDCServer(discoveryHits, jwksHits, jwksOverride);
+
+    JWKS jwks = JWKS.fromIssuer("http://localhost:" + PORT).build();
+    try {
+      assertEquals(discoveryHits.get(), 1);
+      assertEquals(jwksHits.get(), 1);
+      assertNotNull(jwks.lockedJWKSURI, "lock must be set after first successful fetch");
+
+      // Break the JWKS endpoint
+      jwksOverride.set("FAIL");
+
+      JWKSFetchException ex = expectThrows(JWKSFetchException.class, jwks::refresh);
+      assertEquals(ex.reason(), JWKSFetchException.Reason.NON_2XX);
+      assertEquals(discoveryHits.get(), 1, "discovery must not be called again after the lock");
+    } finally {
+      jwks.close();
+      srv.stop(0);
+    }
+  }
+
+  @Test
+  public void fromConfiguration_does_not_perform_discovery_at_build() throws Exception {
+    // Use case: JWKS.fromConfiguration(cfg) uses FetchSource.JWKS directly; no discovery hop.
+    AtomicInteger discoveryHits = new AtomicInteger();
+    AtomicInteger jwksHits = new AtomicInteger();
+    HttpServer srv = startOIDCServer(discoveryHits, jwksHits, new AtomicReference<>(null));
+
+    OpenIDConnectConfiguration cfg = OpenIDConnectConfiguration.builder()
+        .issuer("http://localhost:" + PORT)
+        .jwksURI("http://localhost:" + PORT + "/jwks.json")
+        .build();
+    try (JWKS jwks = JWKS.fromConfiguration(cfg).build()) {
+      assertEquals(jwks.keyIds(), java.util.Set.of("k1"));
+      assertEquals(discoveryHits.get(), 0, "fromConfiguration must not perform discovery");
+      assertEquals(jwksHits.get(), 1);
+    } finally {
+      srv.stop(0);
+    }
+  }
+
+  /**
+   * Starts an inline OIDC server on {@link #PORT} serving a discovery document at
+   * {@code /.well-known/openid-configuration} and a JWKS at {@code /jwks.json}.
+   * Hit counts are tracked via the provided {@link AtomicInteger} arguments.
+   * When {@code jwksOverride} is set to {@code "FAIL"}, the JWKS endpoint returns 500.
+   */
+  private HttpServer startOIDCServer(AtomicInteger discoveryHits, AtomicInteger jwksHits,
+      AtomicReference<String> jwksOverride) throws Exception {
+    HttpServer srv = HttpServer.create(new InetSocketAddress(PORT), 0);
+    httpServers.add(srv);
+    String issuerBase = "http://localhost:" + PORT;
+    String discoveryDoc = "{\"issuer\":\"" + issuerBase + "\",\"jwks_uri\":\"" + issuerBase + "/jwks.json\"}";
+    String jwksBody = RSA_JWKS_BODY;
+    srv.createContext("/.well-known/openid-configuration", exchange -> {
+      discoveryHits.incrementAndGet();
+      byte[] body = discoveryDoc.getBytes();
+      exchange.getResponseHeaders().add("Content-Type", "application/json");
+      exchange.sendResponseHeaders(200, body.length);
+      exchange.getResponseBody().write(body);
+      exchange.getResponseBody().close();
+    });
+    srv.createContext("/jwks.json", exchange -> {
+      jwksHits.incrementAndGet();
+      if ("FAIL".equals(jwksOverride.get())) {
+        exchange.sendResponseHeaders(500, 0);
+        exchange.getResponseBody().close();
+        return;
+      }
+      byte[] body = jwksBody.getBytes();
+      exchange.getResponseHeaders().add("Content-Type", "application/json");
+      exchange.sendResponseHeaders(200, body.length);
+      exchange.getResponseBody().write(body);
+      exchange.getResponseBody().close();
+    });
+    srv.start();
+    return srv;
   }
 
   /**

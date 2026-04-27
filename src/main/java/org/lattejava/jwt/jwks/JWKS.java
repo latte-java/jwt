@@ -27,6 +27,7 @@ import org.lattejava.jwt.FetchLimits;
 import org.lattejava.jwt.HTTPResponseException;
 import org.lattejava.jwt.Header;
 import org.lattejava.jwt.InvalidJWKException;
+import org.lattejava.jwt.OpenIDConnect;
 import org.lattejava.jwt.OpenIDConnectConfiguration;
 import org.lattejava.jwt.OpenIDConnectException;
 import org.lattejava.jwt.Verifier;
@@ -80,6 +81,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
   private final AtomicReference<CompletableFuture<Snapshot>> inflight = new AtomicReference<>();
   volatile Throwable initialFetchFailure;
   private final Logger logger;
+  volatile String lockedJWKSURI = null;
   private final Duration minRefreshInterval;
   private final AtomicReference<Snapshot> ref = new AtomicReference<>();
   private final Duration refreshInterval;
@@ -463,7 +465,13 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
    * {@link JWKSFetchException#reason()} so callers can dispatch
    * programmatically without unwrapping the cause chain.
    *
-   * @throws JWKSFetchException if the refresh fails or times out
+   * <p>While discovery has not yet succeeded, this method re-attempts discovery and may throw
+   * {@link OpenIDConnectException}. After the JWKS URL has been locked from the first successful
+   * discovery, only {@link JWKSFetchException} is thrown. Both extend {@link RuntimeException},
+   * so callers catching the parent are unaffected.</p>
+   *
+   * @throws JWKSFetchException if the JWKS fetch or parse fails, or times out
+   * @throws OpenIDConnectException if discovery has not yet succeeded and the discovery attempt fails
    */
   public void refresh() {
     if (staticMode) return;
@@ -484,7 +492,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
     } catch (ExecutionException ee) {
       Throwable c = ee.getCause();
       if (c instanceof JWKSFetchException re) throw re;
-      // worker always wraps; defense-in-depth path
+      if (c instanceof OpenIDConnectException oe) throw oe;
       throw new JWKSFetchException(JWKSFetchException.Reason.PARSE,
           "JWKS refresh failed", c != null ? c : ee);
     }
@@ -682,11 +690,22 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
   }
 
   private JWKSResponse fetch() {
-    return switch (source) {
-      case ISSUER     -> JSONWebKeySetHelper.retrieveJWKSResponseFromIssuer(url, httpConnectionCustomizer);     // Task 13 inlines
-      case WELL_KNOWN -> JSONWebKeySetHelper.retrieveJWKSResponseFromWellKnownConfiguration(url, httpConnectionCustomizer);  // Task 13 inlines
-      case JWKS       -> fetchJWKSDirect(url);
-    };
+    String effectiveURL;
+    if (lockedJWKSURI != null) {
+      effectiveURL = lockedJWKSURI;
+    } else {
+      effectiveURL = switch (source) {
+        case ISSUER     -> resolveJWKSURIFromIssuer(url);
+        case WELL_KNOWN -> resolveJWKSURIFromWellKnown(url);
+        case JWKS       -> url;
+      };
+    }
+    JWKSResponse response = fetchJWKSDirect(effectiveURL);
+    // First successful JWKS fetch on a discovery-derived path -> lock the URL.
+    if (lockedJWKSURI == null && source != FetchSource.JWKS) {
+      lockedJWKSURI = effectiveURL;
+    }
+    return response;
   }
 
   private JWKSResponse fetchJWKSDirect(String jwksURL) {
@@ -718,6 +737,16 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
     if (now.isBefore(s.nextDueAt())) return;
     // Fire-and-forget: singleflightRefresh dispatches on a virtual thread; we do not await.
     singleflightRefresh();
+  }
+
+  private String resolveJWKSURIFromIssuer(String issuer) {
+    OpenIDConnectConfiguration cfg = OpenIDConnect.discover(issuer, fetchLimits, httpConnectionCustomizer);
+    return cfg.jwksURI();
+  }
+
+  private String resolveJWKSURIFromWellKnown(String wellKnownURL) {
+    OpenIDConnectConfiguration cfg = OpenIDConnect.discoverFromWellKnown(wellKnownURL, fetchLimits, httpConnectionCustomizer);
+    return cfg.jwksURI();
   }
 
   /**
@@ -760,6 +789,12 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
             logger.error("JWKS refresh failed [" + re.reason() + "]", re);
           }
           fresh = failureSnapshot(prev, Instant.now(clock), re);
+        } catch (OpenIDConnectException oe) {
+          failureCause = oe;
+          if (logger.isErrorEnabled()) {
+            logger.error("Discovery failed: " + oe.getMessage(), oe);
+          }
+          fresh = failureSnapshot(prev, Instant.now(clock), oe);
         } catch (Exception e) {
           JWKSFetchException wrapped = classifyFailure(e);
           failureCause = wrapped;
