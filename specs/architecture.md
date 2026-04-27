@@ -1,11 +1,10 @@
-# JWT Library Architecture Redesign
+# JWT Library Architecture
 
 **Date:** 2026-04-10
-**Updated:** 2026-04-22 (fold durable house rules from the exception-hygiene and builder-pattern plans into this spec -- new §11 subsections for message style, cause chaining, CCE-vs-InvalidJWTException, MessageSanitizer, semantic exceptions; new §17 for builder pattern conventions, `from(X)` naming, JWK wire-form mapping, license headers, and test comment placement)
+**Updated:** 2026-04-22 (fold durable house rules from the exception-hygiene and builder-pattern plans into this spec -- new §11 subsections for message style, cause chaining, CCE-vs-InvalidJWTException, MessageSanitizer, semantic exceptions; new §16 for builder pattern conventions, `from(X)` naming, JWK wire-form mapping, license headers, and test comment placement)
 **Updated:** 2026-04-21 (review pass 4 -- explicit ECDSA DER↔JOSE conversion contract in §6; explicit RSASSA-PSS `PSSParameterSpec` contract in §6; EC public-key on-curve validation contract in §6; Signer/Verifier thread-safety contract in §6; JDK 17+ baseline note closes CVE-2022-21449 "psychic signature" question; segment-count rule rewritten to match RFC 7519 §6.1 unsecured wire form; `maxNumberLength=1000` added to decoder config to cap parse-time BigInteger/BigDecimal DoS per Jackson 2.15+ convention; `expectedAlgorithms` internally keyed by `name()` to tolerate custom `Algorithm` implementations that don't honor the equals/hashCode contract; `claimsEquals` is now audience-wire-form insensitive; numeric `exp`/`nbf`/`iat` outside `Instant` bounds rejected with `InvalidJWTException`; `jku`/`x5u`/`jwk` never dereferenced by the library; `JSONWebKeySetHelper` gains `maxResponseBytes=1 MiB` and `maxRedirects=3` defaults; `b64` dropped as `crit` example in favor of the existing Open Banking URN)
 **Updated:** 2026-04-21 (review pass 3 -- accept empty `crit: []` to match jjwt/jose4j/nimbus/auth0; RFC 8259 §4 citation for duplicate-key rule; JDK 16 correction for secp256k1 removal; RFC 7515 §4.1.9 + RFC 2045 §5.1 citation for `typ` case-insensitivity; `maxInputBytes` / `maxNestingDepth` / `allowDuplicateJSONKeys` aligned with Jackson convention; `decodeUnsecured` pre-parsing defenses made explicit; split `Signers`/`Verifiers` factories into `forHMAC` / `forAsymmetric`; added `hasAudience(String)` helper and `claimsEquals()`; `VerifierResolver.byKid` no-kid behavior documented; clock builder javadoc strengthened)
-**Version:** 7.0.0 (major breaking change)
-**Scope:** Full library -- JWT core, JWK, OAuth2 metadata, PEM/DER enhancements. JWE (JSON Web Encryption, RFC 7516) is out of scope for 7.0.
+**Scope:** Full library -- JWT core, JWK, OAuth2 metadata, PEM/DER enhancements. JWE (JSON Web Encryption, RFC 7516) is out of scope.
 **License:** All new files use the MIT license.
 
 ## Design Goals
@@ -43,24 +42,6 @@
   │  zero-dep)      │   │  etc.)          │
   └─────────────────┘   └─────────────────┘
 ```
-
-## Breaking Changes from 6.x
-
-This is a major version bump. The following changes are intentionally breaking:
-
-| Change | 6.x | 7.0 | Impact |
-|--------|-----|-----|--------|
-| `Algorithm` | Enum | Interface with constants | `switch` on Algorithm no longer compiles; use `algorithm.name()` or `.equals()` |
-| `Algorithm.getName()` | Returns JCA string (e.g., `"SHA256withRSA"`) | `Algorithm.name()` returns JWA identifier (e.g., `"RS256"`) | Code using `getName()` for JCA lookups gets wrong values if mechanically migrated. JCA strings are now internal to Signer/Verifier implementations. |
-| `KeyType` | Enum | Interface with constants | Same as Algorithm |
-| `Signer.sign()` | `byte[] sign(String payload)` | `byte[] sign(byte[] message)` | All custom `Signer` implementations must update. The encoder now calls `getBytes(UTF_8)` before passing to `sign()`. |
-| `Signer.getAlgorithm()` | Returns `Algorithm` enum | `algorithm()` returns `Algorithm` interface | Method rename + return type change |
-| `Signer.getKid()` | Throws `UnsupportedOperationException` by default | `kid()` returns `null` by default | Behavior change: callers no longer need to catch exceptions |
-| `JWT` | Mutable POJO with setters, `ZonedDateTime` fields | Immutable, builder pattern, `Instant` fields, long English names (`subject` not `getSubject`, fluent no-prefix style) | Full rewrite of construction and access patterns |
-| `Header` | Mutable POJO with `set()` | Immutable, builder pattern, explicit `kid` field | Full rewrite |
-| `JWT.getEncoder()` / `JWT.getDecoder()` | Static factories | Removed | Use `new JWTEncoder()` / `new JWTDecoder()` directly |
-| Jackson dependency | Required (compile) | Removed | Users who need Jackson implement `JSONProcessor` |
-| `Buildable<T>` interface | Used by `JSONWebKey`, `PEM` | Removed | Replaced by `Builder` inner classes |
 
 ## 1. Algorithm (Interface)
 
@@ -382,7 +363,7 @@ When `claim(name, value)` is called with a registered claim name, the value is c
 | `iss`, `sub`, `jti` | `String` | Any other type | `IllegalArgumentException` |
 | `exp`, `nbf`, `iat` | `Instant` | `Instant` | Direct assignment |
 | `exp`, `nbf`, `iat` | `Instant` | `Number` (Long, Integer, BigInteger, BigDecimal, Double) | `Instant.ofEpochSecond(value.longValue())` |
-| `exp`, `nbf`, `iat` | `Instant` | `ZonedDateTime` | `value.toInstant()` (eases migration from 6.x) |
+| `exp`, `nbf`, `iat` | `Instant` | `ZonedDateTime` | `value.toInstant()` |
 | `exp`, `nbf`, `iat` | `Instant` | Any other type | `IllegalArgumentException` |
 | `aud` | `List<String>` | `String` | Stored as single-element `List`. Serialization defaults to `ALWAYS_ARRAY`; opt in to `STRING_WHEN_SINGLE` via `audienceSerialization(...)`. |
 | `aud` | `List<String>` | `List<String>` | Stored as `List`. Serialization defaults to `ALWAYS_ARRAY`. |
@@ -462,20 +443,6 @@ This is a shallow guarantee -- map values that are mutable objects (e.g., nested
 ### toSerializableMap() Behavior
 
 Registered claims are written first (using `LinkedHashMap` to preserve insertion order), then custom claims. Since `Builder.claim()` routes registered names to their typed fields (never to `customClaims`), no collision between registered and custom claims is possible in `toSerializableMap()`. Null-valued claims are omitted.
-
-### Key changes from current
-
-| Aspect | Current (6.x) | New (7.0) |
-|--------|---------------|-----------|
-| Fields / accessors | `subject`, `issuer`, `expiration` (with `get`/`set` prefix) | `subject()`, `issuer()`, `expiresAt()` (fluent, no prefix) |
-| Time type | `ZonedDateTime` | `Instant` (+ `long` builder overloads) |
-| Mutability | Mutable POJO with setters | Immutable, builder pattern (reusable builders) |
-| Annotations | `@JsonProperty`, `@JsonSerialize`, etc. | None |
-| Serialization | Jackson ObjectMapper directly | `toSerializableMap()` -> `JSONProcessor` |
-| Custom claims map | `otherClaims` | `customClaims` (not directly exposed) |
-| Audience | `Object` with no typed accessors | `List<String>` via `audience()`; serialization mode controlled by `AudienceSerialization` |
-| Static factories | `JWT.getEncoder()`, `JWT.getDecoder()` | Removed -- construct `new JWTEncoder()` / `new JWTDecoder()` directly |
-| `toString()` | Uses `Mapper.prettyPrint()` (Jackson) | Uses built-in `LatteJSONProcessor` always |
 
 ## 3. Header (Immutable + Builder)
 
@@ -651,7 +618,7 @@ This writer is ~40 LOC, lives under `org.lattejava.jwt.internal`, and is never e
 | boolean | `Boolean` |
 | null | `null` |
 
-The implementation is expected to be small and efficient. Since the JSON layer is not the bottleneck (crypto dominates, see §13), the priority is correctness, strict input handling (depth limit, duplicate-key rejection), and stability over raw throughput.
+The implementation is expected to be small and efficient. Since the JSON layer is not the bottleneck (crypto dominates, see §12), the priority is correctness, strict input handling (depth limit, duplicate-key rejection), and stability over raw throughput.
 
 ### User-provided Example (Jackson)
 
@@ -816,7 +783,7 @@ decoder.decode(token, VerifierResolver.of(verifier), jwt -> {
 });
 ```
 
-**Breaking change from 6.x:** the `decoder.decode(token, verifier1, verifier2, ...)` varargs form is gone. Callers use `VerifierResolver.of(...)` for a single verifier, `VerifierResolver.byKid(...)` for kid-keyed lookup over a verifier map, or `VerifierResolver.from(...)` for a custom resolver. There is no multi-verifier composite helper -- the library deliberately promotes explicit resolution over the token's `kid` (or another header parameter) rather than letting algorithm alone drive delegate selection.
+There is no varargs `decoder.decode(token, verifier1, verifier2, ...)` form. Callers use `VerifierResolver.of(...)` for a single verifier, `VerifierResolver.byKid(...)` for kid-keyed lookup over a verifier map, or `VerifierResolver.from(...)` for a custom resolver. There is no multi-verifier composite helper -- the library deliberately promotes explicit resolution over the token's `kid` (or another header parameter) rather than letting algorithm alone drive delegate selection.
 
 `JWTDecoder` and `JWTEncoder` are lightweight objects intended to be instantiated per-use. All fields are `final`. The decoder is not designed for shared/long-lived use, but its immutability means there is no thread-safety hazard if it is shared.
 
@@ -857,9 +824,7 @@ public static class Builder {
      * <p>Test use: construct a {@code Clock.fixed(...)}, {@code Clock.offset(...)},
      * or {@code Clock.tick(...)} to exercise time-dependent validation
      * ({@code exp}, {@code nbf}, clock-skew interactions) deterministically.
-     * This replaces the 6.x {@code TimeMachineJWTDecoder} subclass and composes
-     * cleanly with every other builder option (which the old subclass approach
-     * did not).</p>
+     * Composes cleanly with every other builder option.</p>
      */
     public Builder clock(Clock clock) { ... }
 
@@ -1142,28 +1107,6 @@ Failure modes with the split APIs:
 - **`forAsymmetric(RS256, nonPemString)`** -> `PEMDecoderException` at call time.
 - **`forHMAC(HS256, pemString)`** -> still accepts the string as bytes (this API is honest about treating the string as raw bytes), but the algorithm check is now redundant and the caller has clearly opted in to HMAC semantics.
 
-### Migration from 6.x varargs decode
-
-```java
-// 6.x: varargs verifiers
-decoder.decode(token, rsaVerifier, hmacVerifier);
-
-// 7.0: kid-keyed lookup (preferred -- resolution is explicit per token)
-decoder.decode(token, VerifierResolver.byKid(Map.of(
-    "rsa-key-1", rsaVerifier,
-    "hmac-key-1", hmacVerifier
-)));
-
-// 7.0: single-verifier deployment
-decoder.decode(token, VerifierResolver.of(rsaVerifier));
-
-// 7.0: custom resolution (e.g., by issuer + kid, or over a key registry)
-decoder.decode(token, VerifierResolver.from(header ->
-    myRegistry.lookup(header.kid(), header.alg())));
-```
-
-The library deliberately omits a multi-verifier composite helper. Resolvers that pick a delegate by the token's declared `alg` would let algorithm choice drive delegate selection; prefer `kid` (or another stable header parameter) so the server-side key identity is chosen by the operator, not the token.
-
 ### Key Length and Strength Enforcement
 
 All built-in `Signer` and `Verifier` implementations enforce minimum key sizes at construction time. Tokens signed or verified with undersized keys are rejected with `InvalidKeyLengthException` before any signature operation is attempted.
@@ -1269,7 +1212,7 @@ This means `JWTEncoder` and `JWTDecoder` can and should be constructed once and 
 
 All built-in signers and verifiers follow this rule. A custom `Signer`/`Verifier` that caches a JCA primitive is a latent concurrency bug; callers who want the cache optimization should use a `ThreadLocal<Mac>` or equivalent and must document the thread model.
 
-Tests (in §14):
+Tests (in §13):
 
 - `// Use case: 32 threads concurrently sign with one HMAC256Signer; all outputs verify (no shared-Mac corruption)`
 - Same across RSA, PSS, EC, Ed25519 signers -- DataProvider per algorithm family.
@@ -1377,7 +1320,7 @@ public class JSONWebKey {
      */
     public JSONWebKey toPublicJSONWebKey() { ... }
 
-    // --- Static convenience methods (preserved from 6.x) ---
+    // --- Static convenience methods ---
     /** Build a JSON Web Key from an encoded PEM. */
     public static JSONWebKey build(String encodedPEM) { ... }
     /** Build a JSON Web Key from a certificate. */
@@ -1454,14 +1397,11 @@ Currently use Jackson for JSON operations. Updated to use `JSONProcessor` via `J
 
 ### JSONWebKeySetHelper
 
-Currently uses `JsonNode` for HTTP response tree parsing. Switches to `JSONProcessor.deserialize()` returning `Map<String, Object>`, then navigates with standard map operations:
+> Superseded by `discovery-and-jwks-simplification.md` — `JSONWebKeySetHelper` is deleted; the response-hardening defaults below are preserved on `FetchLimits`.
+
+JWKS response parsing uses `JSONProcessor.deserialize()` returning `Map<String, Object>`, then navigates with standard map operations:
 
 ```java
-// Before (Jackson JsonNode)
-JsonNode response = Mapper.deserialize(is, JsonNode.class);
-JsonNode jwksUri = response.at("/jwks_uri");
-
-// After (Map)
 Map<String, Object> response = jsonProcessor.deserialize(bytes);
 String jwksUri = (String) response.get("jwks_uri");
 ```
@@ -1477,12 +1417,12 @@ String jwksUri = (String) response.get("jwks_uri");
 | `maxObjectMembers` | `1000` | Number of members accepted in any single JSON object at parse time. Mirrors the `LatteJSONProcessor` default. Bounds the wide-object fan-out cost so a malicious response cannot make the parser allocate an arbitrarily wide map. Exceeds → `JSONProcessingException` wrapped as `JSONWebKeySetException`. |
 | `maxArrayElements` | `10000` | Number of elements accepted in any single JSON array at parse time. Mirrors the `LatteJSONProcessor` default. Bounds the cost of building a wide `keys` array (and any other arrays in the response). Exceeds → `JSONProcessingException` wrapped as `JSONWebKeySetException`. |
 | `allowDuplicateJSONKeys` | `false` | Duplicate object member names raise `JSONProcessingException` at parse time. Mirrors the `JWTDecoder` default. A response cannot smuggle a second `keys`/`kid` past the parser unless the caller explicitly opts in. |
-| `connectTimeout` | carry forward from 6.x | Existing configuration retained. |
-| `readTimeout` | carry forward from 6.x | Existing configuration retained. |
+| `connectTimeout` | (existing default) | Existing configuration retained. |
+| `readTimeout` | (existing default) | Existing configuration retained. |
 
 **Scheme restriction.** None. The library accepts `http://`, `https://`, or anything else that `HttpURLConnection` understands. Restricting to `https://` would complicate local testing (mock JWKS endpoints on `http://localhost`) with no real security benefit -- the caller chose the URL.
 
-Tests (in §14):
+Tests (in §13):
 
 - `// Use case: JWKS response of exactly maxResponseBytes accepted`
 - `// Use case: JWKS response of maxResponseBytes + 1 rejected with ResponseTooLargeException (read aborted mid-stream)`
@@ -1493,7 +1433,7 @@ Tests (in §14):
 
 #### Future Work: Replace `HttpURLConnection`
 
-> **TODO (post-7.0):** revisit the HTTP client choice. `java.net.HttpURLConnection` is the zero-dependency baseline but has well-known rough edges: connection pooling is JVM-wide and opaque; timeouts are coarse; redirect handling is either "fully automatic" or "do it yourself"; modern TLS configuration (SNI, ALPN, session reuse) is at the mercy of `sun.net.www.protocol.https` internals. The JDK 11+ `java.net.http.HttpClient` is a cleaner API but has its own issues (no fine-grained DNS-resolution control, known memory-retention behavior in certain response-body paths, no built-in response-size cap that plays nicely with our `maxResponseBytes`). Adopting it would require either (a) buffering the full body and then length-checking -- unacceptable, we want to abort mid-stream -- or (b) a `BodyHandler` that wraps the `Publisher<List<ByteBuffer>>` in a length-aware subscriber, which is workable but non-trivial. The decision is deferred out of 7.0 scope. If and when this changes, the only public API surface affected is the set of exception types callers may see; the `maxResponseBytes` / `maxRedirects` / timeout fields persist across either implementation.
+> **TODO (deferred):** revisit the HTTP client choice. `java.net.HttpURLConnection` is the zero-dependency baseline but has well-known rough edges: connection pooling is JVM-wide and opaque; timeouts are coarse; redirect handling is either "fully automatic" or "do it yourself"; modern TLS configuration (SNI, ALPN, session reuse) is at the mercy of `sun.net.www.protocol.https` internals. The JDK 11+ `java.net.http.HttpClient` is a cleaner API but has its own issues (no fine-grained DNS-resolution control, known memory-retention behavior in certain response-body paths, no built-in response-size cap that plays nicely with our `maxResponseBytes`). Adopting it would require either (a) buffering the full body and then length-checking -- unacceptable, we want to abort mid-stream -- or (b) a `BodyHandler` that wraps the `Publisher<List<ByteBuffer>>` in a length-aware subscriber, which is workable but non-trivial. The decision is deferred. If and when this changes, the only public API surface affected is the set of exception types callers may see; the `maxResponseBytes` / `maxRedirects` / timeout fields persist across either implementation.
 
 ### AuthorizationServerMetaData / OpenIDConnect
 
@@ -1512,11 +1452,11 @@ Parse and generate X.509 certificates using our own DER encoder/decoder, elimina
 - `PEMEncoder` can encode certificates in PEM format.
 - `ObjectIdentifier` already defines OIDs for common algorithms (RSA, EC, EdDSA).
 
-### Prior Art: moreDerEncoding branch
+### DER infrastructure additions
 
-The `moreDerEncoding` branch on `fusionauth/fusionauth-jwt` contains incomplete but directionally correct work on this. Key pieces to carry forward:
+Pieces required to support full X.509 certificate generation:
 
-**DerValue factory methods** (partially implemented, need porting):
+**DerValue factory methods:**
 ```java
 DerValue.newBitString(byte[] bytes)        // wraps with 0x00 padding byte
 DerValue.newGeneralizedTime(Date date)     // "yyyyMMddHHmmss'Z'" format
@@ -1536,7 +1476,7 @@ Tag.Set = 17 | 0b00100000      // always constructed
 Tag.Sequence = 16 | 0b00100000 // always constructed
 ```
 
-**ObjectIdentifier.encode(String)** -- converts dot-notation OID string to DER byte array. The branch implementation handles the first two components (40*a + b encoding) and multi-byte encoding for components >= 128. Needs review for components >= 16384 (three-byte encoding).
+**ObjectIdentifier.encode(String)** -- converts dot-notation OID string to DER byte array. Handles the first two components (40*a + b encoding) and multi-byte encoding for components >= 128. Needs review for components >= 16384 (three-byte encoding).
 
 **New OIDs needed:**
 ```java
@@ -1549,9 +1489,9 @@ ObjectIdentifier.X_520_DN_COMMON_NAME = "2.5.4.3"  // CN
 // 2.5.4.11  (OU - Organizational Unit)
 ```
 
-**X.509 Certificate Generation** (from `KeyUtils.generateX509CertificateFromKey`):
+**X.509 Certificate Generation:**
 
-The branch builds TBSCertificate as a DER SEQUENCE following RFC 5280:
+Build TBSCertificate as a DER SEQUENCE following RFC 5280:
 
 ```
 Certificate ::= SEQUENCE {
@@ -1571,23 +1511,23 @@ TBSCertificate ::= SEQUENCE {
 }
 ```
 
-The branch constructs this with nested `DerOutputStream` calls. The approach is correct but incomplete:
-- Signing works (uses `java.security.Signature`) but the algorithm is hardcoded
-- Time encoding uses UTCTime for dates before 2050, GeneralizedTime after (per RFC 5280)
+Construction notes:
+- Signing uses `java.security.Signature` with the algorithm chosen via `Algorithm` argument (no hardcoding).
+- Time encoding uses UTCTime for dates before 2050, GeneralizedTime after (per RFC 5280).
 - The result is passed back through `CertificateFactory` to get an `X509Certificate` object -- this is acceptable since CertificateFactory is standard JDK, not private API. The goal is to avoid private classes for *construction*, not necessarily for the return type.
-- Missing: EC-specific algorithm identifier sequences (EC uses the curve OID alongside the algorithm OID, not NULL)
-- Missing: EdDSA support
-- Missing: Extensions (v3 certificates)
+- EC algorithm identifier sequences must include the curve OID alongside the algorithm OID (not NULL).
+- EdDSA must be supported.
+- v3 extensions are out of scope (see "Scope" below).
 
 ### Enhancements
 
-**DER Infrastructure (port from moreDerEncoding + new work):**
+**DER Infrastructure:**
 
 | Class | Enhancement |
 |-------|-------------|
-| `DerValue` | Add factory methods: `newBitString()`, `newUTCTime()`, `newGeneralizedTime()`, `newNull()`, `newASCIIString()`, `newUTF8String()`. Add `getBitStringBytes()`. Add constructor `DerValue(Tag, DerOutputStream)`. Use `Instant` instead of `Date` for time methods (align with the rest of 7.0). |
+| `DerValue` | Add factory methods: `newBitString()`, `newUTCTime()`, `newGeneralizedTime()`, `newNull()`, `newASCIIString()`, `newUTF8String()`. Add `getBitStringBytes()`. Add constructor `DerValue(Tag, DerOutputStream)`. Use `Instant` instead of `Date` for time methods. |
 | `DerOutputStream` | Add `writeValue(byte[])` for raw byte injection (needed for `PublicKey.getEncoded()` passthrough). |
-| `DerInputStream` | Handle zero-length values gracefully (the branch fixed a bug where `length == 0` caused a read failure). |
+| `DerInputStream` | Handle zero-length values gracefully -- a `length == 0` case must not cause a read failure. |
 | `Tag` | Add `GeneralizedTime = 24`, `UTFString = 12`. Verify `Set` and `Sequence` constants have the constructed bit set. |
 | `ObjectIdentifier` | Add `encode(String)` for dot-notation to DER bytes. Add `X_520_DN_COMMON_NAME` and other DN attribute OIDs. Review multi-byte encoding for large component values. |
 
@@ -1628,7 +1568,7 @@ Primary use case: extracting the public key and metadata from PEM-encoded certif
 
 ### Scope
 
-The goal is to handle the common X.509 use cases in JWT/JWK workflows -- generating self-signed certificates, extracting public keys from certificates, and `x5c` chain handling. Full PKIX path validation, CRL/OCSP checking, and v3 extensions are out of scope for 7.0 but the DER infrastructure should be extensible enough to add them later.
+The goal is to handle the common X.509 use cases in JWT/JWK workflows -- generating self-signed certificates, extracting public keys from certificates, and `x5c` chain handling. Full PKIX path validation, CRL/OCSP checking, and v3 extensions are out of scope, but the DER infrastructure should be extensible enough to add them later.
 
 ## 10. JWTUtils
 
@@ -1658,9 +1598,9 @@ RFC 7638 §3 requires a **specific canonical JSON form** for thumbprint computat
 
 This form is **incompatible with a pluggable `JSONProcessor`**: a user-supplied implementation (Jackson, Gson, a custom encoder) might reorder keys, insert whitespace, or produce a different string representation of the same logical JSON value. If two services computing the same thumbprint disagree on canonicalization, `kid` lookups break silently across the infrastructure.
 
-The 6.x implementation relies on Jackson's default behavior + `LinkedHashMap` insertion order to produce canonical JSON. This works only by accident: it requires (a) the serializer iterates the map in insertion order, (b) the serializer adds no whitespace, (c) nobody has reconfigured the `ObjectMapper` with `SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS`, (d) the `LinkedHashMap` contract is preserved. None of these are guaranteed by the `JSONProcessor` contract in 7.0.
+A naive Jackson-with-`LinkedHashMap` approach can appear to produce canonical output but only by accident: it requires (a) the serializer iterates the map in insertion order, (b) the serializer adds no whitespace, (c) nobody has reconfigured the `ObjectMapper` with `SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS`, (d) the `LinkedHashMap` contract is preserved. None of these are guaranteed by the `JSONProcessor` contract.
 
-**7.0 implementation:** `JSONWebKey.thumbprintSHA1()` and `JSONWebKey.thumbprintSHA256()` route through an internal `CanonicalJSONWriter` (not `JSONProcessor`) that produces RFC 7638-compliant output unconditionally. The writer is ~40 LOC, supports only the primitive types needed for JWK thumbprint members (strings, numbers, booleans, null), and lives under `org.lattejava.jwt.internal`. It is package-private and never exposed via public API.
+**Implementation:** `JSONWebKey.thumbprintSHA1()` and `JSONWebKey.thumbprintSHA256()` route through an internal `CanonicalJSONWriter` (not `JSONProcessor`) that produces RFC 7638-compliant output unconditionally. The writer is ~40 LOC, supports only the primitive types needed for JWK thumbprint members (strings, numbers, booleans, null), and lives under `org.lattejava.jwt.internal`. It is package-private and never exposed via public API.
 
 Required members per key type (per RFC 7638 §3.2 and RFC 8037 §2):
 
@@ -1712,15 +1652,15 @@ Required members per key type (per RFC 7638 §3.2 and RFC 8037 §2):
 
 ## 11. Exception Hierarchy
 
-The existing exception hierarchy is preserved. New exceptions added in 7.0:
+The exception hierarchy:
 
 | Exception | Parent | Purpose |
 |-----------|--------|---------|
 | `JSONProcessingException` | `JWTException` | JSON serialization/deserialization failures. Thrown by `JSONProcessor` implementations. |
-| `JSONWebKeyException` | `JWTException` | Failures producing or consuming a `JSONWebKey` (replaces the 6.x `JSONWebKeyBuilderException`, which is gone along with the now-internal builder class). |
+| `JSONWebKeyException` | `JWTException` | Failures producing or consuming a `JSONWebKey`. |
 | `TooManyRedirectsException` | `JWTException` | `JSONWebKeySetHelper` exceeded `maxRedirects` while fetching a JWKS URL. |
 
-All other exceptions remain unchanged:
+Other exceptions:
 
 - `JWTException` (base, extends `RuntimeException`)
 - `InvalidJWTException`, `InvalidJWTSignatureException`, `InvalidKeyLengthException`, `InvalidKeyTypeException`
@@ -1733,7 +1673,7 @@ All other exceptions remain unchanged:
 - `PEMDecoderException`, `PEMEncoderException`
 - `JSONWebKeyParserException`
 
-`equals`/`hashCode` on JWT and Header are verified after field/type changes. Note the behavior change in 7.0: `JWT.equals` now includes the `Header` in the comparison (6.x excluded it). Callers relying on claim-only comparison must migrate to the new `JWT.claimsEquals(JWT)` method.
+`JWT.equals` includes the `Header` in the comparison; for claim-only comparison use `JWT.claimsEquals(JWT)`.
 
 ### Exception Message House Style
 
@@ -1795,64 +1735,7 @@ This is not a secrets protection — the values sanitized (`typ`, `crit` entries
 
 `JWTExpiredException` and `JWTUnavailableForProcessingException` expose the full comparison context as typed accessors (`getExpiration()` / `getNotBefore()` / `getNow()` / `getClockSkew()`), not only as a prebaked message. Callers handling these exceptions programmatically can read the operands directly instead of parsing the message string.
 
-## 12. Migration Summary
-
-### Files to rewrite
-
-| File | Change |
-|------|--------|
-| `Algorithm.java` | Enum -> Interface + `StandardAlgorithm` |
-| `KeyType.java` | Enum -> Interface + `StandardKeyType` |
-| `JWT.java` | Remove annotations, immutable builder, `Instant` times, long English names (fluent, no `get`/`set` prefix), remove `getEncoder()`/`getDecoder()`, remove `decodeUnsecured()` |
-| `Header.java` | Remove annotations, immutable builder, `parameters()` naming |
-| `JWTUtils.java` | Move decode methods to `JWTDecoder`; remove `generateJWS_kid*` (replaced by `JSONWebKey.thumbprintSHA1()` / `thumbprintSHA256()` instance methods); remove `generateJWS_x5t` and conversion helpers (moved to X509 facade) |
-| `JWTEncoder.java` | Use `JSONProcessor` instead of `Mapper`; accept `Consumer<HeaderCustomizer>` (not `Consumer<Header.Builder>`) on header-customizing overload |
-| `JWTDecoder.java` | Use `JSONProcessor`, `Instant` for time validation, `Duration` for clock skew, `Clock` for time source (replaces `TimeMachineJWTDecoder`), constructor-based config (final fields), add `decodeUnsecured()`, accept `VerifierResolver` (replaces 3 overload shapes × ± validator = 6 overloads → 2), optional validator, `crit` header validation, `expectedType`/`expectedAlgorithms`/size/depth/dup-key config via builder |
-| `JSONWebKey.java` | Remove annotations, immutable builder, `customParameters` naming, explicit `x5t#S256` map handling, remove `Buildable<T>`, add `keyOps`/`x5u` typed fields, add `toPublicJSONWebKey()`, redact private material in `toString()` |
-| `JSONWebKeyBuilder.java` | Use `JSONProcessor` instead of `Mapper` |
-| `JSONWebKeyParser.java` | Use `JSONProcessor` instead of `Mapper` |
-| `JSONWebKeySetHelper.java` | Use `JSONProcessor` instead of `JsonNode` |
-| `AuthorizationServerMetaData.java` | Remove annotations, immutable builder |
-| `OpenIDConnect.java` | Remove annotations, update for new patterns; call `internal.SHAKE256.digest(...)` directly for the Ed448 branch of `generate_hash` instead of `MessageDigest.getInstance("SHAKE256")` |
-| `ServerMetaDataHelper.java` | Use `JSONProcessor` |
-| All Signer/Verifier classes | Use `Algorithm` interface instead of enum, `sign(byte[])` instead of `sign(String)` |
-| `PEMDecoder.java` | Add DER-based X.509 certificate parsing, reduce `CertificateFactory` dependency |
-| `PEMEncoder.java` | Add DER-based X.509 certificate generation |
-| DER classes | Enhancements for X.509 structure support (time types, context tags, etc.) |
-
-### New files
-
-| File | Purpose |
-|------|---------|
-| `JSONProcessor.java` | Strategy interface |
-| `JSONProcessingException.java` | Exception for JSON processing failures |
-| `LatteJSONProcessor.java` | Built-in JSON reader/writer (enforces `maxNestingDepth` and duplicate-key rejection) |
-| `HeaderCustomizer.java` | Restricted `Header.Builder` view for encoder consumers (no `.alg()`) |
-| `VerifierResolver.java` | Decouples verifier selection from `JWTDecoder`; factories `of()`, `byKid()`, `from()` |
-| `StandardAlgorithm.java` | Package-private `Algorithm` implementation |
-| `StandardKeyType.java` | Package-private `KeyType` implementation |
-| `Signers.java` | Dynamic signer factory for built-in algorithms |
-| `Verifiers.java` | Dynamic verifier factory for built-in algorithms (`forHMAC`, `forAsymmetric`) |
-| `X509CertificateBuilder.java` | Build X.509 certificates via DER without private JDK classes |
-| `internal/CanonicalJSONWriter.java` | Package-private, RFC 7638-compliant JSON writer for thumbprints only |
-| `internal/SHAKE256.java` | Package-private FIPS 202 SHAKE256 implementation used exclusively by `OpenIDConnect` for the Ed448 `at_hash` / `c_hash` path. Not registered as a JCA service. |
-
-### Deleted files
-
-| File | Reason |
-|------|--------|
-| `json/Mapper.java` | Replaced by `JSONProcessor` |
-| `json/JacksonModule.java` | No longer needed |
-| `json/ZonedDateTimeSerializer.java` | No longer needed |
-| `json/ZonedDateTimeDeserializer.java` | No longer needed |
-| `Buildable.java` | Replaced by `Builder` inner classes on JWT, Header, JSONWebKey |
-| `TimeMachineJWTDecoder.java` | Replaced by `JWTDecoder.Builder.clock(Clock)` -- composes with every other builder option |
-
-### Dependency changes
-
-**pom.xml:** Remove `jackson-core`, `jackson-databind`, `jackson-annotations` from compile dependencies. Jackson becomes test-only if we want to test the `JSONProcessor` integration path.
-
-## 13. Performance Considerations
+## 12. Performance Considerations
 
 - **Map intermediary overhead:** Building a `LinkedHashMap` with ~7-10 entries is cheap (hundreds of nanoseconds). The trade-off vs. Jackson's reflection-based annotation processing is likely neutral or favorable for small payloads.
 - **Built-in parser:** No reflection, no annotation processing, no module system. For JWT-sized payloads (~200-500 bytes of JSON), a hand-rolled parser can match or beat Jackson.
@@ -1860,11 +1743,11 @@ This is not a secrets protection — the values sanitized (`typ`, `crit` entries
 - **Crypto dominates:** Signature operations (RSA, EC, HMAC) are orders of magnitude slower than JSON serialization. The JSON layer is not the bottleneck.
 - **Benchmark plan:** Once implemented, benchmark against the current Jackson-based version and against other JWT libraries (JJWT, auth0, nimbus) for encode/decode throughput.
 
-## 14. Test Plan
+## 13. Test Plan
 
 All tests should include a use-case comment at the top describing the scenario: `// Use case: <description>`.
 
-**Follow existing test patterns.** The 6.x test suite uses TestNG with `@DataProvider`-fed parameterized tests for cases that vary over a dimension (algorithm family, input permutation, boundary value). All 7.0 tests should continue this pattern: a single `@Test(dataProvider = "...")` method with a `@DataProvider` method returning `Object[][]` is preferred over N copy-pasted single-case tests. The use-case bullets in this section describe the *test intent*; the implementing test class should collapse dimensional variants into a DataProvider where one exists. For cases marked "DataProvider over {X, Y, Z}" the data provider is named explicitly; other cases should still be refactored into DataProviders when the boundary condition varies predictably (e.g., malformed-input tests, algorithm-family tests).
+**Test pattern.** The test suite uses TestNG with `@DataProvider`-fed parameterized tests for cases that vary over a dimension (algorithm family, input permutation, boundary value): a single `@Test(dataProvider = "...")` method with a `@DataProvider` method returning `Object[][]` is preferred over N copy-pasted single-case tests. The use-case bullets in this section describe the *test intent*; the implementing test class should collapse dimensional variants into a DataProvider where one exists. For cases marked "DataProvider over {X, Y, Z}" the data provider is named explicitly; other cases should still be refactored into DataProviders when the boundary condition varies predictably (e.g., malformed-input tests, algorithm-family tests).
 
 ### Unit Tests
 
@@ -1927,7 +1810,7 @@ All tests should include a use-case comment at the top describing the scenario: 
 - // Use case: Builder-constructed JWT (no Header) is NOT equal to decoded JWT with same claims
 - // Use case: claimsEquals() returns true when claim fields match, regardless of Header
 - // Use case: claimsEquals() returns false when any claim field differs
-- // Use case: claimsEquals() ignores AudienceSerialization (STRING_WHEN_SINGLE vs ALWAYS_ARRAY with same audience list IS claimsEquals-equal -- serialization mode is not part of the claim-set comparison; settled question §16)
+- // Use case: claimsEquals() ignores AudienceSerialization (STRING_WHEN_SINGLE vs ALWAYS_ARRAY with same audience list IS claimsEquals-equal -- serialization mode is not part of the claim-set comparison; settled question §15)
 
 **Header.Builder:**
 - // Use case: parameter("alg", ...) or parameter("typ", ...) behavior (reject or override -- decide and test)
@@ -2004,7 +1887,7 @@ All tests should include a use-case comment at the top describing the scenario: 
 - // Use case: Map<String, Verifier> with missing kid in header -- rejected with MissingVerifierException
 - // Use case: Map<String, Verifier> with unrecognized kid -- rejected with MissingVerifierException
 
-**New decoder defenses (7.0):**
+**Decoder defenses:**
 - // Use case: expectedType set, token has matching typ -- accepted
 - // Use case: expectedType set, token has different typ -- rejected with InvalidJWTException
 - // Use case: expectedType set, token has no typ -- rejected with InvalidJWTException
@@ -2090,7 +1973,6 @@ All tests should include a use-case comment at the top describing the scenario: 
 
 ### Wire-format Compatibility Tests
 
-- // Use case: Token encoded by 6.x library decoded by 7.0 -- wire format is unchanged
 - // Use case: Tokens from other libraries (JJWT, auth0, nimbus) decode correctly
 - // Use case: RFC 7515 Appendix A test vectors verify correctly
 - // Use case: JWT re-serialized from decoded claims produces identical payload JSON
@@ -2163,7 +2045,7 @@ _Test infrastructure:_
 
 ### RFC 8725 Compliance Tests
 
-These tests are grouped in a `RFC8725ComplianceTest.java` class. Each test carries a `// RFC 8725 §X.Y - <item>` comment mapping it to the BCP item it validates. See [Section 15](#15-rfc-8725-compliance) for the full compliance matrix.
+These tests are grouped in a `RFC8725ComplianceTest.java` class. Each test carries a `// RFC 8725 §X.Y - <item>` comment mapping it to the BCP item it validates. See [Section 14](#14-rfc-8725-compliance) for the full compliance matrix.
 
 - // RFC 8725 §2.1 - "none" alg attack rejected
 - // RFC 8725 §2.1 - HMAC-with-RSA-public-key (cross-algorithm) attack rejected
@@ -2176,7 +2058,7 @@ These tests are grouped in a `RFC8725ComplianceTest.java` class. Each test carri
 - // RFC 8725 §3.11 - expectedType rejects mismatched typ
 - // RFC 8725 §3.12 - verifier per algorithm family (binding enforced via canVerify)
 
-## 15. RFC 8725 Compliance
+## 14. RFC 8725 Compliance
 
 [RFC 8725](https://www.rfc-editor.org/rfc/rfc8725) — "JSON Web Token Best Current Practices" (BCP 225) — is the IETF's consolidated guidance on avoiding the known JWT pitfalls. This library aligns with RFC 8725 as follows. Items marked "Caller responsibility" are outside the library's purview but mentioned for completeness.
 
@@ -2191,7 +2073,7 @@ These tests are grouped in a `RFC8725ComplianceTest.java` class. Each test carri
 | §3.3 | Validate all cryptographic operations | `Verifier.verify()` throws on failure and the library does not silently fall through. Signature verification runs before payload parsing, so an unauthenticated payload is never surfaced through a `JWT` object. |
 | §3.4 | Validate cryptographic inputs | Base64URL strictness rejects malformed segments. `LatteJSONProcessor` rejects duplicate keys and enforces depth limits. Token size is capped via `maxInputBytes`. `crit` structural validation rejects malformed critical-parameter lists (see [Section 3](#3-header-immutable--builder)). |
 | §3.5 | Ensure cryptographic keys have sufficient entropy | Library enforces minimum key sizes (see [Section 6](#6-signer--verifier) "Key Length and Strength Enforcement"). **Caller responsibility:** key entropy itself cannot be measured; use `JWTUtils.generate*()` helpers which use `SecureRandom`. |
-| §3.6 | Avoid compression of encryption inputs | N/A -- JWE is out of scope for 7.0. |
+| §3.6 | Avoid compression of encryption inputs | N/A -- JWE is out of scope. |
 | §3.7 | Use UTF-8 | All JSON and base64url decoding uses UTF-8 explicitly via `StandardCharsets.UTF_8`. |
 | §3.8 | Validate issuer and subject | **Caller responsibility** -- use the post-decode `Consumer<JWT> validator` parameter to check `iss`/`sub` per application policy. |
 | §3.9 | Use and validate audience | **Caller responsibility** -- `jwt.audience()` returns `List<String>`; check membership per application policy. Library always exposes `aud` as a list to eliminate the "string vs. array" branch at the call site (see [Section 2](#2-jwt-immutable--builder) "Audience Handling"). |
@@ -2214,7 +2096,7 @@ The library deliberately stops at mechanism, not policy. The following are docum
 
 These are intentionally not built in because they are application-specific. Providing them as library defaults would mean either (a) getting them wrong for most users, or (b) exposing a wide configuration surface that duplicates what a 5-line `Consumer<JWT>` does cleanly.
 
-## 16. Settled Design Questions
+## 15. Settled Design Questions
 
 The table below captures decisions that have been raised and resolved across multiple review passes of this spec. Each entry notes the research that supports the decision. **Future reviewers should treat these as closed** -- reopen only with new evidence (new RFC, new CVE, new library convention), not with re-derived arguments from the same base facts.
 
@@ -2244,7 +2126,7 @@ The table below captures decisions that have been raised and resolved across mul
 | Canonical JSON for RFC 7638 thumbprints: use `JSONProcessor`? | **No, internal `CanonicalJSONWriter`.** | RFC 7638 §3 requires deterministic member ordering and no whitespace. A user-supplied `JSONProcessor` cannot be trusted to produce this (e.g., key reordering breaks thumbprints silently). ~40 LOC package-private writer. |
 | Ship our own SHAKE256 for OIDC Ed448 `at_hash`/`c_hash`? | **Yes**, with JCE provider preference. | `SunEC` uses SHAKE256 internally for Ed448 but does not register it as a public `MessageDigest` service. Bundled implementation keeps the library zero-dependency; provider preference keeps FIPS-mode deployments (BC-FIPS) inside the validated cryptographic module. §10. |
 | Register the internal SHAKE256 as a JCA `Provider`? | **No.** | Library-registered JCA providers create global-state conflicts with application-configured providers. The bundled implementation is called directly from one internal site (`OpenIDConnect.generate_hash`). |
-| Support JWE (RFC 7516)? | **No, out of scope for 7.0.** | Explicitly called out in the Scope header. Re-evaluate for a future major version. |
+| Support JWE (RFC 7516)? | **No, out of scope.** | Explicitly called out in the Scope header. Re-evaluate for a future major version. |
 | Provide `iss` / `aud` / `sub` / `jti` / `nonce` validation built-in? | **No.** See "What this library does NOT do" above. | Application-specific policy; a 5-line `Consumer<JWT>` does the job without a wide config surface. |
 | Add explicit checks for CVE-2022-21449 "psychic signature" (ECDSA r=0, s=0)? | **No**, rely on the JDK. | Targeting JDK 17+ as the supported baseline. `SunEC` has rejected `r=0`/`s=0`/`r>=n`/`s>=n` since the CVE-2022-21449 fix (JDK-8284212). Callers running older/patched-out JDKs are explicitly unsupported. Documented in §6. |
 | Specify ECDSA DER↔JOSE concat conversion contract in spec? | **Yes**, in §6. | JOSE/DER conversion is a known CVE surface in JWT libraries (Auth0 Node 2015, historical nimbus); codifying the contract makes the implementation auditable against a written rule rather than folklore. |
@@ -2259,9 +2141,9 @@ The table below captures decisions that have been raised and resolved across mul
 | `JSONWebKeySetHelper` default `maxResponseBytes`? | **1 MiB.** | Sized for 100 RSA-2048 keys with `x5c` chains; nimbus (50 KB) is too tight for enterprise IdP deployments, Tink (500 KB) sits right at the realistic ceiling. 1 MiB gives comfortable headroom without enabling GB-sized response-body DoS. |
 | `JSONWebKeySetHelper` default `maxRedirects`? | **3.** | JWKS URLs do move (vendor rebrand, HTTP→HTTPS migration, domain consolidation); disabling redirects entirely would break legitimate deployments. 3 covers real scenarios while foreclosing redirect-chain abuse. Configurable, so paranoid deployments can drop to 0 and complex ones can raise. |
 | `JSONWebKeySetHelper` restrict to HTTPS? | **No.** | Caller-chosen URL; HTTPS restriction would complicate local testing (mock endpoints on `http://localhost`) with no real security benefit -- the caller decided the URL was trustworthy. |
-| Keep `HttpURLConnection` or migrate to `java.net.http.HttpClient`? | **Keep for 7.0**; revisit post-7.0. | `HttpClient` is a cleaner API but has no built-in `maxResponseBytes` that aborts mid-stream; a workable `BodyHandler` exists but is non-trivial and not worth gating the 7.0 release on. Future-work note in §8. |
+| Keep `HttpURLConnection` or migrate to `java.net.http.HttpClient`? | **Keep for now**; revisit later. | `HttpClient` is a cleaner API but has no built-in `maxResponseBytes` that aborts mid-stream; a workable `BodyHandler` exists but is non-trivial and not worth gating the initial release on. Future-work note in §8. |
 
-## 17. Code Conventions
+## 16. Code Conventions
 
 House rules that are not spec requirements but are enforced uniformly across the codebase. New code should match; review should flag drift. These were consolidated during the 2026-04-22 builder-pattern and exception-hygiene passes.
 
@@ -2294,7 +2176,7 @@ Static methods that convert *from* an external representation use `from(...)`, n
 - `JSONWebKey.from(PEM)` / `JSONWebKey.from(PublicKey)` / `JSONWebKey.from(PrivateKey)` / `JSONWebKey.from(Certificate)` — produce a `JSONWebKey` from existing key material.
 - `JWT.fromMap(Map)` / `Header.fromMap(Map)` — deserialization helpers (the `Map`-specific name is retained because these are called from the decoder with a non-generic input type).
 
-The internal `JSONWebKeyConverter` class (package-private) holds the conversion logic behind `JSONWebKey.from(...)`. The 6.x public `JSONWebKeyBuilder` class is gone.
+The internal `JSONWebKeyConverter` class (package-private) holds the conversion logic behind `JSONWebKey.from(...)`.
 
 ### JWK Wire Form vs Java Identifiers
 
@@ -2306,16 +2188,16 @@ JWK field names that are not valid Java identifiers are mapped to camelCase in t
 | `x5t` | `x5t` |
 | `key_ops` | `keyOps` |
 
-The Java-side `get(String)` accessor takes the **wire-form** name (`"x5t#S256"`), not the Java-identifier form. Callers never see `x5t_256` — that identifier was replaced by `x5tS256` in 7.0.
+The Java-side `get(String)` accessor takes the **wire-form** name (`"x5t#S256"`), not the Java-identifier form.
 
 ### License Headers
 
-Every new file under `src/main/java` and `src/test/java` carries the full MIT license header used by `Header.java:1-22` (Copyright year, permission grant, full warranty disclaimer, `@author` tag). Short-form headers — whether on new files or on migrations — are normalized to the full form. Moved files keep their existing header.
+Every new file under `src/main/java` and `src/test/java` carries the full MIT license header used by `Header.java:1-22` (Copyright year, permission grant, full warranty disclaimer, `@author` tag). Short-form headers are normalized to the full form. Files inherited under a different license regime keep their existing header.
 
 ### Test Conventions
 
 - **`// Use case:` comments go inside the `@Test` method body**, not above the `@Test` annotation. The comment describes the scenario the assertion proves.
-- **Parameterized tests over copy-paste.** Cases that vary over a dimension (algorithm family, input permutation, boundary value) use TestNG `@DataProvider` rather than N duplicated `@Test` methods. The use-case bullets in [Section 14](#14-test-plan) describe intent; implementing tests should collapse dimensional variants into a data provider.
+- **Parameterized tests over copy-paste.** Cases that vary over a dimension (algorithm family, input permutation, boundary value) use TestNG `@DataProvider` rather than N duplicated `@Test` methods. The use-case bullets in [Section 13](#13-test-plan) describe intent; implementing tests should collapse dimensional variants into a data provider.
 - **Comment line wrap.** Comments are not hard-wrapped at 76 characters. Lines may run to ~110–120 before wrapping.
 
 ### Spec References in Code

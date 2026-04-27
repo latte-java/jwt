@@ -6,7 +6,6 @@
 | Revision | 3 |
 | Last updated | 2026-04-26 |
 | Owner | Daniel DeGroff |
-| Target version | 7.0 (breaking) |
 
 ## Problem statement
 
@@ -40,7 +39,7 @@ A new top-level immutable POJO at `org.lattejava.jwt.OpenIDConnectConfiguration`
 
 Models the commonly-deployed subset of OpenID Connect Discovery 1.0 Provider Metadata and RFC 8414 Authorization Server Metadata. Every typed field is nullable — a pure-OAuth response will have null OIDC-specific fields, and an OIDC response without RFC 8414 extras will have null introspection / revocation fields.
 
-The typed surface is deliberately a subset, not a superset, of the full metadata. Promoting an `otherClaims()` key to a typed accessor in a future 7.x release is a non-breaking addition (it adds a method); demoting a typed accessor is breaking. The 7.0 cut therefore reserves typed accessors for fields the library or its callers actually consume during JWT verification or routine OIDC client work, and lets everything else live in `otherClaims()`.
+The typed surface is deliberately a subset, not a superset, of the full metadata. Promoting an `otherClaims()` key to a typed accessor in a future minor release is a non-breaking addition (it adds a method); demoting a typed accessor is breaking. The current cut therefore reserves typed accessors for fields the library or its callers actually consume during JWT verification or routine OIDC client work, and lets everything else live in `otherClaims()`.
 
 Typed accessors:
 
@@ -51,7 +50,7 @@ Typed accessors:
 | Routinely deployed | `grantTypesSupported`, `responseModesSupported`, `acrValuesSupported`, `codeChallengeMethodsSupported`, `tokenEndpointAuthMethodsSupported`, `tokenEndpointAuthSigningAlgValuesSupported`, `requestParameterSupported`, `requestURIParameterSupported`, `requireRequestURIRegistration` |
 | OIDC extensions / RFC 8414 | `endSessionEndpoint` (RP-Initiated Logout 1.0), `introspectionEndpoint`, `revocationEndpoint` |
 
-Everything else lands in `otherClaims() : Map<String, Object>` and is preserved through round-trip serialization. Notably **not** typed in 7.0:
+Everything else lands in `otherClaims() : Map<String, Object>` and is preserved through round-trip serialization. Notably **not** typed:
 
 - All ID token / userinfo / request object encryption fields (`id_token_encryption_*`, `userinfo_encryption_*`, `request_object_encryption_*`, plus the `*_signing_alg_values_supported` siblings for userinfo and request objects). These are extension territory and almost never consumed by JWT-verification code.
 - The i18n / UX fields: `display_values_supported`, `claim_types_supported`, `claims_locales_supported`, `ui_locales_supported`, `claims_parameter_supported`.
@@ -59,7 +58,7 @@ Everything else lands in `otherClaims() : Map<String, Object>` and is preserved 
 - Session Management 1.0 (`check_session_iframe`) and Front-/Back-Channel Logout (`frontchannel_logout_*`, `backchannel_logout_*`). Deployed unevenly; users who need them read from `otherClaims()`.
 - The RFC 8414 introspection / revocation auth-method and signing-alg sublists (`introspection_endpoint_auth_methods_supported` and friends). Resource-server territory, not verification territory.
 
-Acronym casing follows the project rule: `jwksURI()`, `requestURIParameterSupported()`, `requireRequestURIRegistration()`. (The existing `AuthorizationServerMetaData` had `jwksUri()` / `opPolicyUri()` / `opTosUri()`, which violated the rule; the new POJO fixes this for the typed fields it carries forward.)
+Acronym casing follows the project rule: `jwksURI()`, `requestURIParameterSupported()`, `requireRequestURIRegistration()`.
 
 ### 1.2 Construction and serialization
 
@@ -337,13 +336,13 @@ The helper class is deleted entirely. Its current responsibilities split as foll
 | `JWKSource.Builder#fromWellKnownConfiguration(url)` | `JWKS#fromWellKnown(url)` |
 | `org.lattejava.jwt.jwks.JWKSRefreshException` | `org.lattejava.jwt.jwks.JWKSFetchException` |
 
-## 6. 7.0 changelog
+## 6. Changelog
 
 Recommended changelog entry text:
 
 > **Discovery + JWKS surface** (breaking)
 >
-> - **New** `org.lattejava.jwt.OpenIDConnectConfiguration` POJO models a typed subset of OIDC Discovery 1.0 Provider Metadata and RFC 8414 Authorization Server Metadata. Fields outside the typed surface land in `otherClaims()` and round-trip through serialization. The typed cut is a deliberate subset; promoting an `otherClaims` key in a future 7.x release is non-breaking.
+> - **New** `org.lattejava.jwt.OpenIDConnectConfiguration` POJO models a typed subset of OIDC Discovery 1.0 Provider Metadata and RFC 8414 Authorization Server Metadata. Fields outside the typed surface land in `otherClaims()` and round-trip through serialization. The typed cut is a deliberate subset; promoting an `otherClaims` key in a future minor release is non-breaking.
 > - **New** `OpenIDConnect.discover(issuer)` and `OpenIDConnect.discoverFromWellKnown(url)` are the entry points for fetching the configuration. Both also accept an optional `FetchLimits` and `Consumer<HttpURLConnection>` customizer. `discover(issuer)` enforces OIDC Discovery 1.0 §4.3 issuer-equality validation (with a single-trailing-slash normalization on both sides); `discoverFromWellKnown(url)` does not (it has no expected issuer to compare against) and is documented as a security downgrade relative to `discover(issuer)`.
 > - **New** `org.lattejava.jwt.FetchLimits` carries hardening limits (response size, redirects, JSON parser caps, cross-origin redirect opt-in) per-instance / per-call. Replaces the volatile static config on `JSONWebKeySetHelper` and `ServerMetaDataHelper`.
 > - **Hardening:** redirects are now confined to the same origin (scheme + host + port) by default on both the discovery and JWKS hops. Cross-origin redirects are rejected unless `FetchLimits.allowCrossOriginRedirects(true)` is set. (Previously: redirects followed up to `maxRedirects` regardless of origin.)
@@ -355,9 +354,9 @@ Recommended changelog entry text:
 
 ## 7. Out of scope / future work
 
-- **Automatic re-discovery after a successful first discovery.** If a server rotates `jwks_uri` after the URL has been locked (per §3.4), `JWKS` will not detect this — it will keep refreshing against the cached URL and (eventually) fail. The caller must rebuild the `JWKS`. A future spec may add an opt-in re-discovery trigger (e.g., re-discover on N consecutive `NON_2XX` failures, or on an explicit signal). Not in 7.0.
+- **Automatic re-discovery after a successful first discovery.** If a server rotates `jwks_uri` after the URL has been locked (per §3.4), `JWKS` will not detect this — it will keep refreshing against the cached URL and (eventually) fail. The caller must rebuild the `JWKS`. A future spec may add an opt-in re-discovery trigger (e.g., re-discover on N consecutive `NON_2XX` failures, or on an explicit signal). Not currently included.
 - **Async / non-blocking discovery.** `OpenIDConnect.discover(...)` is synchronous and blocking. A future overload returning `CompletableFuture<OpenIDConnectConfiguration>` may be added if a use case emerges.
 - **Streaming fetch hooks.** `JWKS.fetch` returns a fully-materialized list. There is no streaming variant.
 - **`OpenIDConnectConfiguration.discover()` instance method.** Discovery is a static operation that *returns* the configuration; chaining a method off the type that does not yet exist is an awkward shape. The static entry points on `OpenIDConnect` are the supported front door.
-- **Promoting `otherClaims` keys to typed accessors.** §1.1 deliberately ships a typed subset. Fields routinely consumed by callers can be promoted to typed accessors in a 7.x release as demand surfaces; the change is non-breaking.
-- **Migrate to `java.net.http.HttpClient`.** The library uses `HttpURLConnection` for both discovery and JWKS hops, and the customizer hook is typed against it. Switching to the modern client changes timeout, redirect, proxy, and exception semantics, and is large enough to warrant its own spec. Deferred from 7.0.
+- **Promoting `otherClaims` keys to typed accessors.** §1.1 deliberately ships a typed subset. Fields routinely consumed by callers can be promoted to typed accessors in a future minor release as demand surfaces; the change is non-breaking.
+- **Migrate to `java.net.http.HttpClient`.** The library uses `HttpURLConnection` for both discovery and JWKS hops, and the customizer hook is typed against it. Switching to the modern client changes timeout, redirect, proxy, and exception semantics, and is large enough to warrant its own spec. Deferred.
