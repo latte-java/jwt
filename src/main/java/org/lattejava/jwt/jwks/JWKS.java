@@ -23,9 +23,11 @@
 
 package org.lattejava.jwt.jwks;
 
+import org.lattejava.jwt.FetchLimits;
 import org.lattejava.jwt.HTTPResponseException;
 import org.lattejava.jwt.Header;
 import org.lattejava.jwt.InvalidJWKException;
+import org.lattejava.jwt.OpenIDConnectConfiguration;
 import org.lattejava.jwt.Verifier;
 import org.lattejava.jwt.VerifierResolver;
 import org.lattejava.jwt.Verifiers;
@@ -41,6 +43,7 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -66,6 +69,8 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
   private final CacheControlPolicy cacheControlPolicy;
   private final Clock clock;
   private volatile boolean closed;
+  private final boolean failFast;
+  private final FetchLimits fetchLimits;
   private final Consumer<HttpURLConnection> httpConnectionCustomizer;
   private final AtomicReference<CompletableFuture<Snapshot>> inflight = new AtomicReference<>();
   private final Logger logger;
@@ -78,11 +83,14 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
   private final boolean scheduledRefresh;
   private final ScheduledExecutorService scheduler;
   private final FetchSource source;
+  private final boolean staticMode;
   private final String url;
 
   private JWKS(Builder b) {
     this.cacheControlPolicy = b.cacheControlPolicy;
     this.clock = b.clock;
+    this.failFast = b.failFast;
+    this.fetchLimits = b.fetchLimits;
     this.httpConnectionCustomizer = b.httpConnectionCustomizer;
     this.logger = b.logger;
     this.minRefreshInterval = b.minRefreshInterval;
@@ -91,6 +99,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
     this.refreshTimeout = b.refreshTimeout;
     this.scheduledRefresh = b.scheduledRefresh;
     this.source = b.source;
+    this.staticMode = false;
     this.url = b.url();
     this.ref.set(new Snapshot(List.of(), Map.of(), Map.of(), Instant.EPOCH, Instant.EPOCH, 0, null));
     CompletableFuture<Snapshot> initial = singleflightRefresh();
@@ -117,7 +126,62 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
     }
   }
 
+  private JWKS(List<JSONWebKey> staticKeys) {
+    this.cacheControlPolicy = CacheControlPolicy.IGNORE;
+    this.clock = Clock.systemUTC();
+    this.failFast = false;
+    this.fetchLimits = FetchLimits.defaults();
+    this.httpConnectionCustomizer = null;
+    this.logger = NoOpLogger.INSTANCE;
+    this.minRefreshInterval = Duration.ofMinutes(60);
+    this.refreshInterval = Duration.ofMinutes(60);
+    this.refreshOnMiss = false;
+    this.refreshTimeout = Duration.ofSeconds(2);
+    this.scheduledRefresh = false;
+    this.scheduler = null;
+    this.source = FetchSource.JWKS;
+    this.staticMode = true;
+    this.url = null;
+
+    List<JSONWebKey> allKeys = new ArrayList<>();
+    Map<String, Verifier> byKid = new LinkedHashMap<>();
+    Map<String, JSONWebKey> jwkByKid = new LinkedHashMap<>();
+    for (JSONWebKey jwk : staticKeys) {
+      Verifier v;
+      try {
+        v = Verifiers.fromJWK(jwk);
+      } catch (InvalidJWKException reject) {
+        if (reject.reason() == InvalidJWKException.Reason.MISSING_KID) {
+          allKeys.add(jwk);
+        }
+        continue;
+      }
+      String kid = jwk.kid();
+      if (kid != null && byKid.containsKey(kid)) {
+        continue;
+      }
+      allKeys.add(jwk);
+      if (kid != null) {
+        byKid.put(kid, v);
+        jwkByKid.put(kid, jwk);
+      }
+    }
+    this.ref.set(new Snapshot(
+        Collections.unmodifiableList(new ArrayList<>(allKeys)),
+        Collections.unmodifiableMap(new LinkedHashMap<>(byKid)),
+        Collections.unmodifiableMap(new LinkedHashMap<>(jwkByKid)),
+        Instant.EPOCH,
+        Instant.EPOCH,
+        0,
+        null));
+  }
+
   // --- Public static methods ---
+
+  public static Builder fromConfiguration(OpenIDConnectConfiguration cfg) {
+    Objects.requireNonNull(cfg, "cfg");
+    return new Builder(FetchSource.JWKS, cfg.jwksURI(), cfg);
+  }
 
   public static Builder fromIssuer(String issuer) {
     return new Builder(FetchSource.ISSUER, issuer);
@@ -129,6 +193,15 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
 
   public static Builder fromWellKnown(String wellKnownURL) {
     return new Builder(FetchSource.WELL_KNOWN, wellKnownURL);
+  }
+
+  public static JWKS of(JSONWebKey... keys) {
+    return new JWKS(keys == null ? List.of() : Arrays.asList(keys));
+  }
+
+  public static JWKS of(List<JSONWebKey> keys) {
+    Objects.requireNonNull(keys, "keys");
+    return new JWKS(keys);
   }
 
   // --- Package-private static methods (test-visible) ---
@@ -224,6 +297,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
 
   @Override
   public void close() {
+    if (staticMode) return;
     if (closed) return;
     closed = true;
     if (scheduler != null) {
@@ -241,6 +315,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
   }
 
   public int consecutiveFailures() {
+    if (staticMode) return 0;
     return ref.get().consecutiveFailures();
   }
 
@@ -258,15 +333,18 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
   }
 
   public Instant lastFailedRefresh() {
+    if (staticMode) return null;
     return ref.get().lastFailedRefresh();
   }
 
   public Instant lastSuccessfulRefresh() {
+    if (staticMode) return null;
     Snapshot s = ref.get();
     return s.fetchedAt().equals(Instant.EPOCH) ? null : s.fetchedAt();
   }
 
   public Instant nextDueAt() {
+    if (staticMode) return null;
     return ref.get().nextDueAt();
   }
 
@@ -279,6 +357,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
    * @throws JWKSFetchException if the refresh fails or times out
    */
   public void refresh() {
+    if (staticMode) return;
     if (closed) {
       if (logger.isDebugEnabled()) logger.debug("refresh() called on closed JWKS");
       return;
@@ -579,7 +658,10 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
 
   public static final class Builder {
     private CacheControlPolicy cacheControlPolicy = CacheControlPolicy.CLAMP;
+    private final OpenIDConnectConfiguration cfg;
     private Clock clock = Clock.systemUTC();
+    private boolean failFast = false;
+    private FetchLimits fetchLimits = FetchLimits.defaults();
     private Consumer<HttpURLConnection> httpConnectionCustomizer;
     private Logger logger = NoOpLogger.INSTANCE;
     private Duration minRefreshInterval = Duration.ofSeconds(30);
@@ -591,11 +673,21 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
     private final String url;
 
     Builder(FetchSource source, String url) {
+      this(source, url, null);
+    }
+
+    Builder(FetchSource source, String url, OpenIDConnectConfiguration cfg) {
       this.source = source;
       this.url = url;
+      this.cfg = cfg;
     }
 
     public JWKS build() {
+      if (cfg != null) {
+        if (cfg.jwksURI() == null || cfg.jwksURI().isEmpty()) {
+          throw new IllegalArgumentException("Cannot build a JWKS from a configuration with a null or empty jwksURI");
+        }
+      }
       Objects.requireNonNull(url, "url");
       if (url.isEmpty()) {
         throw new IllegalArgumentException("url must be non-empty");

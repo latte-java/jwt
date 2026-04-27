@@ -23,15 +23,22 @@
 
 package org.lattejava.jwt.jwks;
 
+import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.BaseTest;
 import org.lattejava.jwt.ExpectedResponse;
+import org.lattejava.jwt.Header;
+import org.lattejava.jwt.KeyType;
+import org.lattejava.jwt.OpenIDConnectConfiguration;
 import org.testng.annotations.Test;
 
 import java.time.Duration;
+import java.util.LinkedHashSet;
+import java.util.List;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
@@ -192,6 +199,36 @@ public class JWKSTest extends BaseTest {
         .alg(org.lattejava.jwt.Algorithm.RS256).kid("k1").build()));
     source.refresh();
     source.close();
+  }
+
+  @Test
+  public void fromConfiguration_throws_IllegalArgumentException_when_jwks_uri_is_empty() {
+    OpenIDConnectConfiguration cfg = OpenIDConnectConfiguration.builder().issuer("x").jwksURI("").build();
+    assertThrows(IllegalArgumentException.class, () -> JWKS.fromConfiguration(cfg).build());
+  }
+
+  @Test
+  public void fromConfiguration_throws_IllegalArgumentException_when_jwks_uri_is_null() {
+    OpenIDConnectConfiguration cfg = OpenIDConnectConfiguration.builder().issuer("x").build();
+    assertThrows(IllegalArgumentException.class, () -> JWKS.fromConfiguration(cfg).build());
+  }
+
+  @Test
+  public void fromConfiguration_with_jwks_uri_builds_remote_backed_jwks() throws Exception {
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = RSA_JWKS_BODY)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+    OpenIDConnectConfiguration cfg = OpenIDConnectConfiguration.builder()
+        .issuer("ignored")
+        .jwksURI("http://localhost:" + PORT + "/jwks.json")
+        .build();
+    try (JWKS jwks = JWKS.fromConfiguration(cfg).build()) {
+      assertNotNull(jwks.get("k1"));
+    }
   }
 
   @Test
@@ -939,6 +976,56 @@ public class JWKSTest extends BaseTest {
   }
 
   @Test
+  public void of_first_write_wins_on_duplicate_kid() {
+    // Use case: two JSONWebKeys with the same kid — static of() keeps the first, drops the second.
+    JSONWebKey first = rsaJWK("shared-kid");
+    JSONWebKey second = rsaJWK("shared-kid");
+    JWKS jwks = JWKS.of(first, second);
+    assertEquals(jwks.keys().size(), 1);
+    assertSame(jwks.get("shared-kid"), first);
+  }
+
+  @Test
+  public void of_no_args_is_permitted() {
+    JWKS jwks = JWKS.of();
+    assertNotNull(jwks);
+    assertTrue(jwks.keys().isEmpty());
+  }
+
+  @Test
+  public void of_static_refresh_is_noop() {
+    JWKS jwks = JWKS.of(rsaJWK("kid-A"));
+    jwks.refresh();
+    assertEquals(jwks.consecutiveFailures(), 0);
+    assertNull(jwks.lastFailedRefresh());
+    assertNull(jwks.lastSuccessfulRefresh());
+    assertNull(jwks.nextDueAt());
+    jwks.close();  // no-op
+  }
+
+  @Test
+  public void of_with_empty_list_is_permitted_and_returns_null_from_resolve() {
+    JWKS jwks = JWKS.of(List.of());
+    assertNotNull(jwks);
+    assertTrue(jwks.keys().isEmpty());
+    assertTrue(jwks.keyIds().isEmpty());
+    assertNull(jwks.get("anything"));
+    Header h = Header.builder().alg(Algorithm.HS256).kid("anything").build();
+    assertNull(jwks.resolve(h));
+  }
+
+  @Test
+  public void of_with_keys_returns_resolvable_static_set() {
+    JSONWebKey k1 = rsaJWK("kid-A");
+    JSONWebKey k2 = rsaJWK("kid-B");
+    JWKS jwks = JWKS.of(k1, k2);
+    assertEquals(jwks.keys().size(), 2);
+    assertEquals(jwks.keyIds(), new LinkedHashSet<>(List.of("kid-A", "kid-B")));
+    assertNotNull(jwks.get("kid-A"));
+    assertNull(jwks.get("nope"));
+  }
+
+  @Test
   public void parseCacheControl_publicAlone_silentNoMaxAge() {
     // Use case: a header with no max-age directive (e.g. "Cache-Control: public") is not
     // malformed; it just doesn't supply a hint. parseCacheControl returns (null, false, false).
@@ -993,6 +1080,21 @@ public class JWKSTest extends BaseTest {
   public void parseRetryAfter_unparseable_returnsNull() {
     java.time.Instant now = java.time.Instant.parse("2026-04-25T12:00:00Z");
     assertNull(JWKS.parseRetryAfter("not-a-time", now));
+  }
+
+  /**
+   * Returns a valid RSA JWK (RS256) with the given kid, using the fixed test modulus and exponent.
+   */
+  private static JSONWebKey rsaJWK(String kid) {
+    String n = "sXch9_uEVyZw4d4XNjUMl7-DnbBwfXz9V_DwiHCNL5KNg6oHEcF7T7zJDSsBmWxAOKtc6vK4Ek5oN_R5kxdovfBdRRiClNxrRwmExZGMC8oBROHFEJiOFdDmqNJZbJ-w_e8KE2j_yWctgxX9LowhOWy0VEArLjr5tLqhwAtFm6gK_DfXXyZjU2DBBL_3Iaiu0YQz-jRR4lA1IAKVLA98m_4cP3pUvP6m9Eds3qpf0CzrI4DT9byOPQQX-FQOPaWTBcOJG6L9_kg7XYmbgrUKf6JhPYiTEVNvSXpHlxF6PoJiLvCNpyhGzFtOZf3GkmwNRbAdyOJ2HyjgNtuKnHcPlw";
+    return JSONWebKey.builder()
+        .kty(KeyType.RSA)
+        .alg(Algorithm.RS256)
+        .kid(kid)
+        .use("sig")
+        .n(n)
+        .e("AQAB")
+        .build();
   }
 
   private static String rsaJWKWithKid(String kid, java.security.interfaces.RSAPublicKey pub) {
