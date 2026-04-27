@@ -66,7 +66,7 @@ public class OpenIDConnectProviderTest extends BaseTest {
 
   // Ordered snapshot of providers (and their positions) at the start of each
   // test. We restore the JCA provider list to this exact state in
-  // {@code @AfterMethod} so other test classes (notably JWTUtilsTest, which
+  // {@code @AfterMethod} so other test classes (notably KeyPairsTest, which
   // depends on BC-FIPS sitting at position 1 in FIPS runs to provide the
   // "Ed25519"/"Ed448" algorithm names) see a pristine environment.
   private List<Provider> baselineProviders;

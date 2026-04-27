@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2025, FusionAuth, All Rights Reserved
+ * Copyright (c) 2016-2026, FusionAuth, All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,20 +16,15 @@
 
 package org.lattejava.jwt;
 
-import org.lattejava.jwt.jwks.JSONWebKey;
-import org.lattejava.jwt.algorithm.hmac.HMACSigner;
 import org.lattejava.jwt.internal.pem.PEM;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import java.nio.charset.StandardCharsets;
 import java.security.interfaces.ECPrivateKey;
 import java.security.interfaces.ECPublicKey;
 import java.security.interfaces.EdECPrivateKey;
 import java.security.interfaces.EdECPublicKey;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
-import java.util.Base64;
 
 import static org.lattejava.jwt.internal.pem.PEM.PKCS_8_PRIVATE_KEY_PREFIX;
 import static org.lattejava.jwt.internal.pem.PEM.PKCS_8_PRIVATE_KEY_SUFFIX;
@@ -41,23 +36,11 @@ import static org.testng.Assert.assertTrue;
 /**
  * @author Daniel DeGroff
  */
-public class JWTUtilsTest extends BaseTest {
-  // decodeHeader/decodePayload moved to JWTDecoder.decodeUnsecured().
-  @Test
-  public void decodePayload() {
-    JWT jwt = JWT.builder().subject("123456789").build();
-
-    // HMAC signed
-    String encodedJWT = new org.lattejava.jwt.JWTEncoder().encode(jwt, HMACSigner.newSHA512Signer("super-secret-key-1-that-is-at-least-64-bytes-long-for-sha512-algorithm-compat-req!!"));
-    JWT decoded = new JWTDecoder().decodeUnsecured(encodedJWT);
-    assertEquals(decoded.subject(), "123456789");
-    Assert.assertEquals(decoded.header().alg(), Algorithm.HS512);
-  }
-
+public class KeyPairsTest extends BaseTest {
   @Test
   public void generateECKey() {
     // 256-bit key
-    KeyPair keyPair256 = JWTUtils.generate256_ECKeyPair();
+    KeyPair keyPair256 = KeyPairs.generateEC_256();
     ECPrivateKey privateKey256 = PEM.decode(keyPair256.privateKey).getPrivateKey();
     ECPublicKey publicKey256 = PEM.decode(keyPair256.publicKey).getPublicKey();
 
@@ -83,7 +66,7 @@ public class JWTUtilsTest extends BaseTest {
     assertEquals(actualPublicKey256, keyPair256.publicKey);
 
     // 384-bit key
-    KeyPair keyPair384 = JWTUtils.generate384_ECKeyPair();
+    KeyPair keyPair384 = KeyPairs.generateEC_384();
     ECPrivateKey privateKey384 = PEM.decode(keyPair384.privateKey).getPrivateKey();
     ECPublicKey publicKey384 = PEM.decode(keyPair384.publicKey).getPublicKey();
 
@@ -109,7 +92,7 @@ public class JWTUtilsTest extends BaseTest {
     assertEquals(actualPublicKey384, keyPair384.publicKey);
 
     // 521-bit key
-    KeyPair keyPair521 = JWTUtils.generate521_ECKeyPair();
+    KeyPair keyPair521 = KeyPairs.generateEC_521();
     ECPrivateKey privateKey521 = PEM.decode(keyPair521.privateKey).getPrivateKey();
     ECPublicKey publicKey521 = PEM.decode(keyPair521.publicKey).getPublicKey();
 
@@ -136,8 +119,8 @@ public class JWTUtilsTest extends BaseTest {
   }
 
   @Test
-  public void generate_ed25519_EdDSAKeyPair() {
-    KeyPair keyPair = JWTUtils.generate_ed25519_EdDSAKeyPair();
+  public void generateEd25519() {
+    KeyPair keyPair = KeyPairs.generateEd25519();
     EdECPrivateKey privateKey = PEM.decode(keyPair.privateKey).getPrivateKey();
     EdECPublicKey publicKey = PEM.decode(keyPair.publicKey).getPublicKey();
 
@@ -151,8 +134,8 @@ public class JWTUtilsTest extends BaseTest {
   }
 
   @Test
-  public void generate_ed448_EdDSAKeyPair() {
-    KeyPair keyPair = JWTUtils.generate_ed448_EdDSAKeyPair();
+  public void generateEd448() {
+    KeyPair keyPair = KeyPairs.generateEd448();
     EdECPrivateKey privateKey = PEM.decode(keyPair.privateKey).getPrivateKey();
     EdECPublicKey publicKey = PEM.decode(keyPair.publicKey).getPublicKey();
 
@@ -166,84 +149,9 @@ public class JWTUtilsTest extends BaseTest {
   }
 
   @Test
-  public void generateRSAPSS_key() {
-    // 2048-bit key
-    KeyPair keyPair2048 = JWTUtils.generate2048_RSAPSSKeyPair();
-    RSAPrivateKey privateKey2048 = PEM.decode(keyPair2048.privateKey).getPrivateKey();
-    RSAPublicKey publicKey2048 = PEM.decode(keyPair2048.publicKey).getPublicKey();
-
-    assertEquals(privateKey2048.getModulus().bitLength(), 2048);
-    assertEquals(privateKey2048.getAlgorithm(), "RSASSA-PSS");
-    assertEquals(privateKey2048.getFormat(), "PKCS#8");
-
-    assertEquals(publicKey2048.getModulus().bitLength(), 2048);
-    assertEquals(publicKey2048.getAlgorithm(), "RSASSA-PSS");
-    assertEquals(publicKey2048.getFormat(), "X.509");
-
-    assertPrefix(keyPair2048.privateKey, PKCS_8_PRIVATE_KEY_PREFIX);
-    assertSuffix(keyPair2048.privateKey, PKCS_8_PRIVATE_KEY_SUFFIX);
-    assertPrefix(keyPair2048.publicKey, X509_PUBLIC_KEY_PREFIX);
-    assertSuffix(keyPair2048.publicKey, X509_PUBLIC_KEY_SUFFIX);
-
-    // Now go backwards from the key to a PEM and assert they come out the same.
-    String actualPrivateKey2048 = PEM.encode(privateKey2048);
-    String actualPublicKey2048 = PEM.encode(publicKey2048);
-    assertEquals(actualPrivateKey2048, keyPair2048.privateKey);
-    assertEquals(actualPublicKey2048, keyPair2048.publicKey);
-
-    // 3072-bit key
-    KeyPair keyPair3072 = JWTUtils.generate3072_RSAPSSKeyPair();
-    RSAPrivateKey privateKey3072 = PEM.decode(keyPair3072.privateKey).getPrivateKey();
-    RSAPublicKey publicKey3072 = PEM.decode(keyPair3072.publicKey).getPublicKey();
-
-    assertEquals(privateKey3072.getModulus().bitLength(), 3072);
-    assertEquals(privateKey3072.getAlgorithm(), "RSASSA-PSS");
-    assertEquals(privateKey3072.getFormat(), "PKCS#8");
-
-    assertEquals(publicKey3072.getModulus().bitLength(), 3072);
-    assertEquals(publicKey3072.getAlgorithm(), "RSASSA-PSS");
-    assertEquals(publicKey3072.getFormat(), "X.509");
-
-    assertPrefix(keyPair3072.privateKey, PKCS_8_PRIVATE_KEY_PREFIX);
-    assertSuffix(keyPair3072.privateKey, PKCS_8_PRIVATE_KEY_SUFFIX);
-    assertPrefix(keyPair3072.publicKey, X509_PUBLIC_KEY_PREFIX);
-    assertSuffix(keyPair3072.publicKey, X509_PUBLIC_KEY_SUFFIX);
-
-    // Now go backwards from the key to a PEM and assert they come out the same.
-    String actualPrivateKey3072 = PEM.encode(privateKey3072);
-    String actualPublicKey3072 = PEM.encode(publicKey3072);
-    assertEquals(actualPrivateKey3072, keyPair3072.privateKey);
-    assertEquals(actualPublicKey3072, keyPair3072.publicKey);
-
-    // 4096-bit key
-    KeyPair keyPair4096 = JWTUtils.generate4096_RSAPSSKeyPair();
-    RSAPrivateKey privateKey4096 = PEM.decode(keyPair4096.privateKey).getPrivateKey();
-    RSAPublicKey publicKey4096 = PEM.decode(keyPair4096.publicKey).getPublicKey();
-
-    assertEquals(privateKey4096.getModulus().bitLength(), 4096);
-    assertEquals(privateKey4096.getAlgorithm(), "RSASSA-PSS");
-    assertEquals(privateKey4096.getFormat(), "PKCS#8");
-
-    assertEquals(publicKey4096.getModulus().bitLength(), 4096);
-    assertEquals(publicKey4096.getAlgorithm(), "RSASSA-PSS");
-    assertEquals(publicKey4096.getFormat(), "X.509");
-
-    assertPrefix(keyPair4096.privateKey, PKCS_8_PRIVATE_KEY_PREFIX);
-    assertSuffix(keyPair4096.privateKey, PKCS_8_PRIVATE_KEY_SUFFIX);
-    assertPrefix(keyPair4096.publicKey, X509_PUBLIC_KEY_PREFIX);
-    assertSuffix(keyPair4096.publicKey, X509_PUBLIC_KEY_SUFFIX);
-
-    // Now go backwards from the key to a PEM and assert they come out the same.
-    String actualPrivateKey4096 = PEM.encode(privateKey4096);
-    String actualPublicKey4096 = PEM.encode(publicKey4096);
-    assertEquals(actualPrivateKey4096, keyPair4096.privateKey);
-    assertEquals(actualPublicKey4096, keyPair4096.publicKey);
-  }
-
-  @Test
   public void generateRSAKey() {
     // 2048-bit key
-    KeyPair keyPair2048 = JWTUtils.generate2048_RSAKeyPair();
+    KeyPair keyPair2048 = KeyPairs.generateRSA_2048();
     RSAPrivateKey privateKey2048 = PEM.decode(keyPair2048.privateKey).getPrivateKey();
     RSAPublicKey publicKey2048 = PEM.decode(keyPair2048.publicKey).getPublicKey();
 
@@ -267,7 +175,7 @@ public class JWTUtilsTest extends BaseTest {
     assertEquals(actualPublicKey2048, keyPair2048.publicKey);
 
     // 3072-bit key
-    KeyPair keyPair3072 = JWTUtils.generate3072_RSAKeyPair();
+    KeyPair keyPair3072 = KeyPairs.generateRSA_3072();
     RSAPrivateKey privateKey3072 = PEM.decode(keyPair3072.privateKey).getPrivateKey();
     RSAPublicKey publicKey3072 = PEM.decode(keyPair3072.publicKey).getPublicKey();
 
@@ -291,7 +199,7 @@ public class JWTUtilsTest extends BaseTest {
     assertEquals(actualPublicKey3072, keyPair3072.publicKey);
 
     // 4096-bit key
-    KeyPair keyPair4096 = JWTUtils.generate4096_RSAKeyPair();
+    KeyPair keyPair4096 = KeyPairs.generateRSA_4096();
     RSAPrivateKey privateKey4096 = PEM.decode(keyPair4096.privateKey).getPrivateKey();
     RSAPublicKey publicKey4096 = PEM.decode(keyPair4096.publicKey).getPublicKey();
 
@@ -316,68 +224,78 @@ public class JWTUtilsTest extends BaseTest {
   }
 
   @Test
-  public void hmacSecretLengths() {
-    String hmac256 = JWTUtils.generateSHA256_HMACSecret();
-    assertEquals(hmac256.length(), 44);
-    assertEquals(Base64.getDecoder().decode(hmac256.getBytes(StandardCharsets.UTF_8)).length, 32);
+  public void generateRSAPSSKey() {
+    // 2048-bit key
+    KeyPair keyPair2048 = KeyPairs.generateRSAPSS_2048();
+    RSAPrivateKey privateKey2048 = PEM.decode(keyPair2048.privateKey).getPrivateKey();
+    RSAPublicKey publicKey2048 = PEM.decode(keyPair2048.publicKey).getPublicKey();
 
-    String hmac384 = JWTUtils.generateSHA384_HMACSecret();
-    assertEquals(hmac384.length(), 64);
-    assertEquals(Base64.getDecoder().decode(hmac384.getBytes(StandardCharsets.UTF_8)).length, 48);
+    assertEquals(privateKey2048.getModulus().bitLength(), 2048);
+    assertEquals(privateKey2048.getAlgorithm(), "RSASSA-PSS");
+    assertEquals(privateKey2048.getFormat(), "PKCS#8");
 
-    String hmac512 = JWTUtils.generateSHA512_HMACSecret();
-    assertEquals(hmac512.length(), 88);
-    assertEquals(Base64.getDecoder().decode(hmac512.getBytes(StandardCharsets.UTF_8)).length, 64);
-  }
+    assertEquals(publicKey2048.getModulus().bitLength(), 2048);
+    assertEquals(publicKey2048.getAlgorithm(), "RSASSA-PSS");
+    assertEquals(publicKey2048.getFormat(), "X.509");
 
-  @Test
-  public void jws_kid_rsaControl() {
-    // Control example from RFC 7638
-    // https://tools.ietf.org/html/rfc7638#section-3.1
-    JSONWebKey rsaKey = JSONWebKey.builder()
-        .kty(KeyType.RSA)
-        .n("0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw")
-        .e("AQAB")
-        .build();
+    assertPrefix(keyPair2048.privateKey, PKCS_8_PRIVATE_KEY_PREFIX);
+    assertSuffix(keyPair2048.privateKey, PKCS_8_PRIVATE_KEY_SUFFIX);
+    assertPrefix(keyPair2048.publicKey, X509_PUBLIC_KEY_PREFIX);
+    assertSuffix(keyPair2048.publicKey, X509_PUBLIC_KEY_SUFFIX);
 
-    // SHA-1
-    assertEquals(rsaKey.thumbprintSHA1(), "nMGlFRw9Y5POaSOaIaRBc9P2nfA");
+    // Now go backwards from the key to a PEM and assert they come out the same.
+    String actualPrivateKey2048 = PEM.encode(privateKey2048);
+    String actualPublicKey2048 = PEM.encode(publicKey2048);
+    assertEquals(actualPrivateKey2048, keyPair2048.privateKey);
+    assertEquals(actualPublicKey2048, keyPair2048.publicKey);
 
-    // SHA-256
-    assertEquals(rsaKey.thumbprintSHA256(), "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs");
-  }
+    // 3072-bit key
+    KeyPair keyPair3072 = KeyPairs.generateRSAPSS_3072();
+    RSAPrivateKey privateKey3072 = PEM.decode(keyPair3072.privateKey).getPrivateKey();
+    RSAPublicKey publicKey3072 = PEM.decode(keyPair3072.publicKey).getPublicKey();
 
-  @Test
-  public void jws_kid_ec() {
-    JSONWebKey ecKey = JSONWebKey.builder()
-        .kty(KeyType.EC)
-        .crv("P-256")
-        .x("MKBCTNIcKUSDii11ySs3526iDZ8AiTo7Tu6KPAqv7D4")
-        .y("4Etl6SRW2YiLUrN5vfvVHuhp7x8PxltmWWlbbM4IFyM")
-        .build();
+    assertEquals(privateKey3072.getModulus().bitLength(), 3072);
+    assertEquals(privateKey3072.getAlgorithm(), "RSASSA-PSS");
+    assertEquals(privateKey3072.getFormat(), "PKCS#8");
 
-    // SHA-1
-    assertEquals(ecKey.thumbprintSHA1(), "VHriznG7vJAFpXMXRmGgAkA5sEE");
+    assertEquals(publicKey3072.getModulus().bitLength(), 3072);
+    assertEquals(publicKey3072.getAlgorithm(), "RSASSA-PSS");
+    assertEquals(publicKey3072.getFormat(), "X.509");
 
-    // SHA-256
-    assertEquals(ecKey.thumbprintSHA256(), "cn-I_WNMClehiVp51i_0VpOENW1upEerA8sEam5hn-s");
-  }
+    assertPrefix(keyPair3072.privateKey, PKCS_8_PRIVATE_KEY_PREFIX);
+    assertSuffix(keyPair3072.privateKey, PKCS_8_PRIVATE_KEY_SUFFIX);
+    assertPrefix(keyPair3072.publicKey, X509_PUBLIC_KEY_PREFIX);
+    assertSuffix(keyPair3072.publicKey, X509_PUBLIC_KEY_SUFFIX);
 
-  @Test
-  public void jws_kid_eddsa() {
-    // Control example from RFC 8037 (the SHA-256 thumbprint)
-    // https://www.rfc-editor.org/rfc/rfc8037.html#appendix-A.3
-    JSONWebKey eddsaKey = JSONWebKey.builder()
-        .kty(KeyType.OKP)
-        .crv("Ed25519")
-        .x("11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo")
-        .build();
+    // Now go backwards from the key to a PEM and assert they come out the same.
+    String actualPrivateKey3072 = PEM.encode(privateKey3072);
+    String actualPublicKey3072 = PEM.encode(publicKey3072);
+    assertEquals(actualPrivateKey3072, keyPair3072.privateKey);
+    assertEquals(actualPublicKey3072, keyPair3072.publicKey);
 
-    // SHA-1
-    assertEquals(eddsaKey.thumbprintSHA1(), "VmxEWEmFxGLRPOX30HXyts0yJOE");
+    // 4096-bit key
+    KeyPair keyPair4096 = KeyPairs.generateRSAPSS_4096();
+    RSAPrivateKey privateKey4096 = PEM.decode(keyPair4096.privateKey).getPrivateKey();
+    RSAPublicKey publicKey4096 = PEM.decode(keyPair4096.publicKey).getPublicKey();
 
-    // SHA-256
-    assertEquals(eddsaKey.thumbprintSHA256(), "kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k");
+    assertEquals(privateKey4096.getModulus().bitLength(), 4096);
+    assertEquals(privateKey4096.getAlgorithm(), "RSASSA-PSS");
+    assertEquals(privateKey4096.getFormat(), "PKCS#8");
+
+    assertEquals(publicKey4096.getModulus().bitLength(), 4096);
+    assertEquals(publicKey4096.getAlgorithm(), "RSASSA-PSS");
+    assertEquals(publicKey4096.getFormat(), "X.509");
+
+    assertPrefix(keyPair4096.privateKey, PKCS_8_PRIVATE_KEY_PREFIX);
+    assertSuffix(keyPair4096.privateKey, PKCS_8_PRIVATE_KEY_SUFFIX);
+    assertPrefix(keyPair4096.publicKey, X509_PUBLIC_KEY_PREFIX);
+    assertSuffix(keyPair4096.publicKey, X509_PUBLIC_KEY_SUFFIX);
+
+    // Now go backwards from the key to a PEM and assert they come out the same.
+    String actualPrivateKey4096 = PEM.encode(privateKey4096);
+    String actualPublicKey4096 = PEM.encode(publicKey4096);
+    assertEquals(actualPrivateKey4096, keyPair4096.privateKey);
+    assertEquals(actualPublicKey4096, keyPair4096.publicKey);
   }
 
   private void assertPrefix(String key, String prefix) {

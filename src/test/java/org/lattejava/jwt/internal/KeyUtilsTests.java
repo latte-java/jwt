@@ -16,7 +16,7 @@
 
 package org.lattejava.jwt.internal;
 
-import org.lattejava.jwt.JWTUtils;
+import org.lattejava.jwt.KeyPairs;
 import org.lattejava.jwt.internal.pem.PEM;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -128,7 +128,7 @@ public class KeyUtilsTests {
     assertEquals(KeyUtils.getKeyLength(keyPair.getPrivate()), 32);
     assertEquals(KeyUtils.getKeyLength(keyPair.getPublic()), 32);
 
-    org.lattejava.jwt.KeyPair keyPair2 = JWTUtils.generate_ed25519_EdDSAKeyPair();
+    org.lattejava.jwt.KeyPair keyPair2 = KeyPairs.generateEd25519();
     PEM pem = PEM.decode(keyPair2.privateKey);
     assertEquals(KeyUtils.getKeyLength(pem.privateKey), 32);
     assertEquals(KeyUtils.getKeyLength(pem.publicKey), 32);
@@ -142,7 +142,7 @@ public class KeyUtilsTests {
     assertEquals(KeyUtils.getKeyLength(keyPair.getPrivate()), 57);
     assertEquals(KeyUtils.getKeyLength(keyPair.getPublic()), 57);
 
-    org.lattejava.jwt.KeyPair keyPair2 = JWTUtils.generate_ed448_EdDSAKeyPair();
+    org.lattejava.jwt.KeyPair keyPair2 = KeyPairs.generateEd448();
     PEM pem = PEM.decode(keyPair2.privateKey);
     assertEquals(KeyUtils.getKeyLength(pem.privateKey), 57);
     assertEquals(KeyUtils.getKeyLength(pem.publicKey), 57);

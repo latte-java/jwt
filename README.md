@@ -68,8 +68,11 @@ For the happy path, `JWT.decode(encodedJWT, verifier)` (and an `(encodedJWT, ver
 
 #### Sign and encode a JWT using HMAC
 ```java
+// Generate and persist a secret; the verifier needs the same value.
+String secret = HMACSecrets.generateSHA256();
+
 // Build an HMAC signer for HS256
-Signer signer = Signers.forHMAC(Algorithm.HS256, "too many secrets");
+Signer signer = Signers.forHMAC(Algorithm.HS256, secret);
 
 // Build a JWT with issuer (iss), issued-at (iat), subject (sub) and expiration (exp)
 JWT jwt = JWT.builder()
@@ -83,21 +86,21 @@ JWT jwt = JWT.builder()
 String encodedJWT = new JWTEncoder().encode(jwt, signer);
 ```
 
-A higher-strength hash can be used by passing a different algorithm. The encoding and decoding steps are unchanged.
+A higher-strength hash can be used by passing a different algorithm. Use the matching generator so the secret matches the digest size. The encoding and decoding steps are unchanged.
 ```java
-Signer signer384 = Signers.forHMAC(Algorithm.HS384, "too many secrets");
-Signer signer512 = Signers.forHMAC(Algorithm.HS512, "too many secrets");
+String secret384 = HMACSecrets.generateSHA384();
+Signer signer384 = Signers.forHMAC(Algorithm.HS384, secret384);
+
+String secret512 = HMACSecrets.generateSHA512();
+Signer signer512 = Signers.forHMAC(Algorithm.HS512, secret512);
 ```
 
-Alternate: the family-specific static factories are still available if you prefer them.
-```java
-Signer signer = HMACSigner.newSHA256Signer("too many secrets");
-```
+Alternate: `HMACSigner.newSHA256Signer(secret)` is the family-specific static factory.
 
 #### Verify and decode a JWT using HMAC
 ```java
 // Build an HMAC verifier using the same secret that was used to sign the JWT
-Verifier verifier = Verifiers.forHMAC(Algorithm.HS256, "too many secrets");
+Verifier verifier = Verifiers.forHMAC(Algorithm.HS256, secret);
 
 // Verify and decode the encoded string JWT to a rich object
 JWT jwt = JWT.decode(encodedJWT, verifier);
@@ -108,7 +111,7 @@ assertEquals(jwt.subject(), "f1e33ab3-027f-47c5-bb07-8dd8ab37a2d3");
 
 For a `kid`-indexed keyring or any other multi-key arrangement, pass a `VerifierResolver` instead — `JWT.decode(encodedJWT, VerifierResolver.byKid(Map<String, Verifier>))`.
 
-Alternate: `HMACVerifier.newVerifier("too many secrets")` produces the same verifier.
+Alternate: `HMACVerifier.newVerifier(secret)` produces the same verifier.
 
 #### Sign and encode a JWT using RSA
 ```java
@@ -503,7 +506,7 @@ Supported signature algorithms: `RS256`/`RS384`/`RS512`, `PS256`/`PS384`/`PS512`
 
 ```java
 // A self-signed EC certificate, valid for one year.
-KeyPair keyPair = JWTUtils.generate256_ECKeyPair();
+KeyPair keyPair = KeyPairs.generateEC_256();
 
 X509Certificate cert = X509.builder()
                            .serialNumber(BigInteger.valueOf(System.currentTimeMillis()))

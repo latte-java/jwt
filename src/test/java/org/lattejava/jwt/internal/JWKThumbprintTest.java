@@ -45,6 +45,18 @@ import static org.testng.Assert.assertNotEquals;
  */
 public class JWKThumbprintTest {
 
+  // EC P-256 JWK example (x/y from RFC 7515 §A.3). Pinned SHA-256 base64url
+  // thumbprint is "cn-I_WNMClehiVp51i_0VpOENW1upEerA8sEam5hn-s"; pinned
+  // SHA-1 base64url thumbprint is "VHriznG7vJAFpXMXRmGgAkA5sEE".
+  private static JSONWebKey ecP256() {
+    return JSONWebKey.builder()
+        .kty(KeyType.EC)
+        .crv("P-256")
+        .x("MKBCTNIcKUSDii11ySs3526iDZ8AiTo7Tu6KPAqv7D4")
+        .y("4Etl6SRW2YiLUrN5vfvVHuhp7x8PxltmWWlbbM4IFyM")
+        .build();
+  }
+
   // RFC 7638 §3.1 — the canonical RSA JWK example. The published SHA-256
   // base64url thumbprint is "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs".
   private static JSONWebKey rfc7638Rsa() {
@@ -83,15 +95,8 @@ public class JWKThumbprintTest {
   public void ecP256_S256() {
     // Use case: EC P-256 thumbprint is pinned (compute reference via the
     // canonical "{\"crv\":\"P-256\",\"kty\":\"EC\",\"x\":...,\"y\":...}").
-    JSONWebKey k = JSONWebKey.builder()
-        .kty(KeyType.EC)
-        .crv("P-256")
-        .x("MKBCTNIcKUSDii11ySs3526iDZ8AiTo7Tu6KPAqv7D4")
-        .y("4Etl6SRW2YiLUrN5vfvVHuhp7x8PxltmWWlbbM4IFyM")
-        .build();
-    // Pinned: this matches both the existing JWTUtilsTest vector AND the
-    // canonical RFC 7638 §3.2 EC member set {crv,kty,x,y} in lex order.
-    assertEquals(k.thumbprintSHA256(),
+    // Pinned to the canonical RFC 7638 §3.2 EC member set {crv,kty,x,y} in lex order.
+    assertEquals(ecP256().thumbprintSHA256(),
         "cn-I_WNMClehiVp51i_0VpOENW1upEerA8sEam5hn-s");
   }
 
@@ -149,13 +154,13 @@ public class JWKThumbprintTest {
 
   @Test
   public void sha1Thumbprints() {
-    // Use case: SHA-1 thumbprint differs from SHA-256 and is stable.
-    // Pinned from the existing JWTUtilsTest vectors.
-    JSONWebKey k = rfc7638Rsa();
-    String s1 = k.thumbprintSHA1();
-    String s256 = k.thumbprintSHA256();
-    assertNotEquals(s1, s256);
-    assertEquals(s1, "nMGlFRw9Y5POaSOaIaRBc9P2nfA");
+    // Use case: SHA-1 thumbprints are pinned across RSA, EC, and OKP key types
+    // and differ from the corresponding SHA-256 thumbprint.
+    JSONWebKey rsa = rfc7638Rsa();
+    assertNotEquals(rsa.thumbprintSHA1(), rsa.thumbprintSHA256());
+    assertEquals(rsa.thumbprintSHA1(), "nMGlFRw9Y5POaSOaIaRBc9P2nfA");
+    assertEquals(ecP256().thumbprintSHA1(), "VHriznG7vJAFpXMXRmGgAkA5sEE");
+    assertEquals(rfc8037Ed25519().thumbprintSHA1(), "VmxEWEmFxGLRPOX30HXyts0yJOE");
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
