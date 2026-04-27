@@ -40,9 +40,11 @@ import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -89,7 +91,7 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
     this.scheduledRefresh = b.scheduledRefresh;
     this.source = b.source;
     this.url = b.url();
-    this.ref.set(new Snapshot(Map.of(), Instant.EPOCH, Instant.EPOCH, 0, null));
+    this.ref.set(new Snapshot(List.of(), Map.of(), Map.of(), Instant.EPOCH, Instant.EPOCH, 0, null));
     CompletableFuture<Snapshot> initial = singleflightRefresh();
     try {
       initial.get(refreshTimeout.toMillis(), TimeUnit.MILLISECONDS);
@@ -394,7 +396,9 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
   private Snapshot doRefreshOrThrow(Snapshot prev) {
     Instant now = Instant.now(clock);
     JWKSResponse resp = fetch();
+    List<JSONWebKey> allKeys = new ArrayList<>();
     Map<String, Verifier> byKid = new LinkedHashMap<>();
+    Map<String, JSONWebKey> jwkByKid = new LinkedHashMap<>();
     for (JSONWebKey jwk : resp.keys()) {
       Verifier v;
       try {
@@ -409,15 +413,20 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
         }
         continue;
       }
-      if (byKid.containsKey(jwk.kid())) {
+      String kid = jwk.kid();
+      if (kid != null && byKid.containsKey(kid)) {
         if (logger.isWarnEnabled()) {
-          logger.warn("JWKS contains duplicate kid [" + jwk.kid() + "]; first-write-wins");
+          logger.warn("JWKS contains duplicate kid [" + kid + "]; first-write-wins");
         }
         continue;
       }
-      byKid.put(jwk.kid(), v);
+      allKeys.add(jwk);
+      if (kid != null) {
+        byKid.put(kid, v);
+        jwkByKid.put(kid, jwk);
+      }
     }
-    if (byKid.isEmpty()) {
+    if (allKeys.isEmpty()) {
       throw new JWKSFetchException(JWKSFetchException.Reason.EMPTY_RESULT,
           "JWKS refresh produced no usable keys after JWK conversion");
     }
@@ -426,8 +435,10 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
     if (logger.isInfoEnabled()) {
       logger.info("JWKS refresh succeeded; kids=[" + byKid.keySet() + "]");
     }
-    Map<String, Verifier> snapshotMap = Collections.unmodifiableMap(new LinkedHashMap<>(byKid));
-    return new Snapshot(snapshotMap, now, nextDue, 0, null);
+    List<JSONWebKey> allKeysSnapshot = Collections.unmodifiableList(new ArrayList<>(allKeys));
+    Map<String, Verifier> byKidSnapshot = Collections.unmodifiableMap(new LinkedHashMap<>(byKid));
+    Map<String, JSONWebKey> jwkByKidSnapshot = Collections.unmodifiableMap(new LinkedHashMap<>(jwkByKid));
+    return new Snapshot(allKeysSnapshot, byKidSnapshot, jwkByKidSnapshot, now, nextDue, 0, null);
   }
 
   /**
@@ -439,7 +450,9 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
   private Snapshot failureSnapshot(Snapshot prev, Instant now, Throwable cause) {
     int prior = (prev == null) ? 0 : prev.consecutiveFailures();
     int next = prior + 1;
+    List<JSONWebKey> allKeys = (prev == null) ? List.of() : prev.allKeys();
     Map<String, Verifier> byKid = (prev == null) ? Map.of() : prev.byKid();
+    Map<String, JSONWebKey> jwkByKid = (prev == null) ? Map.of() : prev.jwkByKid();
     Instant fetchedAt = (prev == null) ? Instant.EPOCH : prev.fetchedAt();
     Duration off = backoff(next, minRefreshInterval, refreshInterval);
     Instant nextDue = now.plus(off);
@@ -462,7 +475,7 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
         }
       }
     }
-    return new Snapshot(byKid, fetchedAt, nextDue, next, now);
+    return new Snapshot(allKeys, byKid, jwkByKid, fetchedAt, nextDue, next, now);
   }
 
   private JWKSResponse fetch() {
@@ -647,7 +660,9 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
 
   /** Immutable cache snapshot. */
   record Snapshot(
+      List<JSONWebKey> allKeys,
       Map<String, Verifier> byKid,
+      Map<String, JSONWebKey> jwkByKid,
       Instant fetchedAt,
       Instant nextDueAt,
       int consecutiveFailures,
