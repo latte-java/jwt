@@ -227,20 +227,66 @@ A shorter equivalent: `new JWTDecoder(Duration.ofSeconds(60))`.
 
 #### Verify tokens against a remote JWKS
 
-For OIDC issuers that publish a JWKS, use `JWKSource` to manage caching, refresh, and rotation:
+For OIDC issuers that publish a JWKS, use `JWKS` to manage caching, refresh, and rotation:
 
 ```java
-JWKSource source = JWKSource.fromIssuer("https://idp.example.com/")
-    .scheduledRefresh(true)
-    .refreshInterval(Duration.ofMinutes(15))
-    .build();
-
-JWT jwt = JWT.decode(encodedJWT, source);
+try (JWKS jwks = JWKS.fromIssuer("https://idp.example.com/").build()) {
+    JWT jwt = JWT.decode(encodedJWT, jwks);
+}
 ```
 
-`JWKSource` implements `VerifierResolver`, performs an initial synchronous load on `build()` (bounded by `refreshTimeout`), and refreshes on `kid` cache miss (singleflight-coalesced) or on a virtual-thread scheduler tick when `scheduledRefresh(true)` is set. Honors `Cache-Control: max-age` and `Retry-After` from the JWKS endpoint. Implements `AutoCloseable`; call `close()` in shutdown hooks.
+`JWKS` implements `VerifierResolver`, performs an initial synchronous load on `build()` (bounded by `refreshTimeout`), and refreshes on `kid` cache miss (singleflight-coalesced) or on a virtual-thread scheduler tick when `scheduledRefresh(true)` is set. Honors `Cache-Control: max-age` and `Retry-After` from the JWKS endpoint. Implements `AutoCloseable`; call `close()` in shutdown hooks or use try-with-resources.
 
-For non-OIDC JWKS endpoints use `JWKSource.fromJWKS(jwksUrl)`. For non-conventional discovery URLs use `JWKSource.fromWellKnownConfiguration(url)`.
+Other entry points:
+- `JWKS.fromWellKnown(url)` — fully-qualified discovery URL (e.g. `/.well-known/openid-configuration`).
+- `JWKS.fromJWKS(url)` — direct JWKS endpoint, no discovery.
+- `JWKS.fromConfiguration(cfg)` — use a pre-fetched `OpenIDConnectConfiguration`.
+- `JWKS.of(jwk1, jwk2, ...)` — static in-memory keys (no HTTP, no scheduler).
+- `JWKS.fetchOnce(url)` — one-shot `List<JSONWebKey>` from a JWKS URL.
+
+#### OIDC discovery
+
+`OpenIDConnect.discover(issuer)` fetches the OpenID Connect Provider Metadata for a given issuer and returns a typed `OpenIDConnectConfiguration`:
+
+```java
+OpenIDConnectConfiguration cfg = OpenIDConnect.discover("https://accounts.google.com");
+String jwksURI      = cfg.jwksURI();
+String tokenEndpoint = cfg.tokenEndpoint();
+List<String> sigAlgs = cfg.idTokenSigningAlgValuesSupported();
+// cfg.otherClaims() holds any non-standard fields the provider returned
+```
+
+`discover(issuer)` enforces OIDC Discovery 1.0 §4.3 issuer-equality validation: the response's `issuer` field must match the input issuer (after single-trailing-slash normalization). If the issuers don't match, `OpenIDConnectException` is thrown.
+
+For RFC 8414 OAuth-only servers — or when you already have the full well-known URL — use `OpenIDConnect.discoverFromWellKnown(wellKnownURL)`. Note that this overload does not perform issuer-equality validation, which is a security downgrade relative to `discover(issuer)`.
+
+#### Per-instance hardening with FetchLimits
+
+By default, `JWKS` and `OpenIDConnect.discover` apply conservative limits on response size, redirect count, and JSON parsing. You can tighten them per instance with `FetchLimits`:
+
+```java
+FetchLimits tight = FetchLimits.builder()
+    .maxResponseBytes(64 * 1024)
+    .maxRedirects(1)
+    .build();
+
+try (JWKS jwks = JWKS.fromIssuer("https://idp.example.com/").fetchLimits(tight).build()) {
+    JWT jwt = JWT.decode(encodedJWT, jwks);
+}
+```
+
+By default, redirects are confined to the same origin (scheme + host + port). Cross-origin redirects are rejected unless `FetchLimits.builder().allowCrossOriginRedirects(true)` is set — that opt-in is a deliberate security trade-off.
+
+#### Fail-fast at boot
+
+If you want the application to fail at startup when the initial JWKS fetch cannot complete, use `failFast(true)`:
+
+```java
+// Throws OpenIDConnectException (discovery failure) or JWKSFetchException (JWKS fetch failure) if the initial fetch fails.
+JWKS jwks = JWKS.fromIssuer("https://idp.example.com/").failFast(true).build();
+```
+
+Without `failFast`, a failed initial fetch is silently tolerated and the `JWKS` starts with an empty key set, retrying on the next refresh tick or `kid` miss.
 
 #### Verify an expired JWT by going back in time
 Please only use this for testing, or if you happen to be a time traveler.
@@ -300,18 +346,18 @@ If you need to interoperate with a producer that still emits `alg: EdDSA`, you c
 
 ### Retrieve JSON Web Keys from a JWKS endpoint
 
+For a one-shot fetch (no caching, no refresh), use `JWKS.fetchOnce`:
+
 ```java
-// Retrieve JSON Web Keys using a known JWKS endpoint
-// - You may optionally provide a HttpURLConnection to this method instead of a string if you want to build your own connection.
-List<JSONWebKey> keys = JSONWebKeySetHelper.retrieveKeysFromJWKS("https://www.googleapis.com/oauth2/v3/certs");
+// One-shot fetch from a known JWKS endpoint
+List<JSONWebKey> keys = JWKS.fetchOnce("https://www.googleapis.com/oauth2/v3/certs");
 
-// Retrieve JSON Web Keys using a well known OpenID Connect configuration endpoint
-// - You may optionally provide a HttpURLConnection to this method instead of a string if you want to build your own connection.
-List<JSONWebKey> keys = JSONWebKeySetHelper.retrieveKeysFromWellKnownConfiguration("https://accounts.google.com/.well-known/openid-configuration");
-
-// Retrieve JSON Web Keys using an OpenID Connect issuer endpoint
-List<JSONWebKey> keys = JSONWebKeySetHelper.retrieveKeysFromIssuer("https://accounts.google.com");
+// One-shot fetch via OIDC Discovery — discover the JWKS URI, then fetch
+OpenIDConnectConfiguration cfg = OpenIDConnect.discover("https://accounts.google.com");
+List<JSONWebKey> discoveredKeys = JWKS.fetchOnce(cfg.jwksURI());
 ```
+
+For self-refreshing key management, use the `JWKS` builder API described above.
 
 ### Convert a Public Key to JWK
 
