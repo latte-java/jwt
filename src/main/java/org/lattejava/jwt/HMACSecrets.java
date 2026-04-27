@@ -55,6 +55,6 @@ public class HMACSecrets {
   private static String generateSecureRandom(int bytes) {
     byte[] buffer = new byte[bytes];
     new SecureRandom().nextBytes(buffer);
-    return Base64.getEncoder().encodeToString(buffer);
+    return Base64.getUrlEncoder().withoutPadding().encodeToString(buffer);
   }
 }

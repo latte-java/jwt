@@ -30,15 +30,15 @@ public class HMACSecretsTest extends BaseTest {
   @Test
   public void hmacSecretLengths() {
     String hmac256 = HMACSecrets.generateSHA256();
-    assertEquals(hmac256.length(), 44);
-    assertEquals(Base64.getDecoder().decode(hmac256.getBytes(StandardCharsets.UTF_8)).length, 32);
+    assertEquals(hmac256.length(), 43);
+    assertEquals(Base64.getUrlDecoder().decode(hmac256.getBytes(StandardCharsets.UTF_8)).length, 32);
 
     String hmac384 = HMACSecrets.generateSHA384();
     assertEquals(hmac384.length(), 64);
-    assertEquals(Base64.getDecoder().decode(hmac384.getBytes(StandardCharsets.UTF_8)).length, 48);
+    assertEquals(Base64.getUrlDecoder().decode(hmac384.getBytes(StandardCharsets.UTF_8)).length, 48);
 
     String hmac512 = HMACSecrets.generateSHA512();
-    assertEquals(hmac512.length(), 88);
-    assertEquals(Base64.getDecoder().decode(hmac512.getBytes(StandardCharsets.UTF_8)).length, 64);
+    assertEquals(hmac512.length(), 86);
+    assertEquals(Base64.getUrlDecoder().decode(hmac512.getBytes(StandardCharsets.UTF_8)).length, 64);
   }
 }
