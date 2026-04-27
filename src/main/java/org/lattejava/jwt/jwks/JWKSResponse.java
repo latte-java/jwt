@@ -23,15 +23,11 @@
 
 package org.lattejava.jwt.jwks;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.*;
 
 /**
- * Package-visible JWKS-fetch result carrying the parsed keys, the HTTP
- * status, and the response headers JWKS is interested in
- * ({@code Cache-Control}, {@code Retry-After}).
+ * Package-visible JWKS-fetch result carrying the parsed keys, the HTTP status, and the response headers JWKS is
+ * interested in ({@code Cache-Control}, {@code Retry-After}).
  *
  * <p>Header lookup keys are case-insensitive.</p>
  */

@@ -16,32 +16,9 @@
 
 package org.lattejava.jwt;
 
-import java.util.Objects;
-
 /**
  * @author Daniel DeGroff
  */
-public class KeyPair {
-  public final String privateKey;
+public record KeyPair(String privateKey, String publicKey) {
 
-  public final String publicKey;
-
-  public KeyPair(String privateKey, String publicKey) {
-    this.privateKey = privateKey;
-    this.publicKey = publicKey;
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (this == o) return true;
-    if (o == null || getClass() != o.getClass()) return false;
-    KeyPair that = (KeyPair) o;
-    return Objects.equals(privateKey, that.privateKey) &&
-        Objects.equals(publicKey, that.publicKey);
-  }
-
-  @Override
-  public int hashCode() {
-    return Objects.hash(privateKey, publicKey);
-  }
 }

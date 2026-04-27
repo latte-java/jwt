@@ -16,19 +16,10 @@
 
 package org.lattejava.jwt.algorithm.hmac;
 
-import org.lattejava.jwt.BaseJWTTest;
-import org.lattejava.jwt.InvalidJWTSignatureException;
-import org.lattejava.jwt.Signer;
-import org.lattejava.jwt.Verifier;
-import org.lattejava.jwt.VerifierResolver;
-import org.lattejava.jwt.Algorithm;
-import org.lattejava.jwt.JWT;
-import org.lattejava.jwt.JWTDecoder;
-import org.lattejava.jwt.JWTEncoder;
-import org.testng.annotations.Test;
+import org.lattejava.jwt.*;
+import org.testng.annotations.*;
 
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 /**
  * @author Daniel DeGroff
@@ -71,31 +62,6 @@ public class HMACVerifierTest extends BaseJWTTest {
   }
 
   @Test
-  public void test_wrongSecret() {
-    JWT jwt = JWT.builder().subject("123456789").build();
-    Signer signer = HMACSigner.newSHA256Signer("super-secret-key-that-is-at-least-32-bytes-long!!");
-    String encodedJWT = new JWTEncoder().encode(jwt, signer);
-
-    expectException(InvalidJWTSignatureException.class, () ->
-        new JWTDecoder().decode(encodedJWT, VerifierResolver.of(HMACVerifier.newVerifier(Algorithm.HS256, "wrong-secret-key-that-is-at-least-32-bytes-long!!"))));
-  }
-
-  @Test
-  public void test_tamperedSignature() {
-    JWT jwt = JWT.builder().subject("123456789").build();
-    Signer signer = HMACSigner.newSHA256Signer("super-secret-key-that-is-at-least-32-bytes-long!!");
-    String encodedJWT = new JWTEncoder().encode(jwt, signer);
-
-    // Flip the last character of the signature
-    char lastChar = encodedJWT.charAt(encodedJWT.length() - 1);
-    char flipped = lastChar == 'A' ? 'B' : 'A';
-    String tampered = encodedJWT.substring(0, encodedJWT.length() - 1) + flipped;
-
-    expectException(InvalidJWTSignatureException.class, () ->
-        new JWTDecoder().decode(tampered, VerifierResolver.of(HMACVerifier.newVerifier(Algorithm.HS256, "super-secret-key-that-is-at-least-32-bytes-long!!"))));
-  }
-
-  @Test
   public void test_secretIsDefensivelyCopied() {
     // Use case: mutating the original secret array after constructing a verifier must not
     // affect the verifier's behavior -- a post-construction scribble cannot silently change
@@ -114,5 +80,30 @@ public class HMACVerifierTest extends BaseJWTTest {
 
     // Verifier must still validate against the original secret.
     new JWTDecoder().decode(encoded, VerifierResolver.of(verifier));
+  }
+
+  @Test
+  public void test_tamperedSignature() {
+    JWT jwt = JWT.builder().subject("123456789").build();
+    Signer signer = HMACSigner.newSHA256Signer("super-secret-key-that-is-at-least-32-bytes-long!!");
+    String encodedJWT = new JWTEncoder().encode(jwt, signer);
+
+    // Flip the last character of the signature
+    char lastChar = encodedJWT.charAt(encodedJWT.length() - 1);
+    char flipped = lastChar == 'A' ? 'B' : 'A';
+    String tampered = encodedJWT.substring(0, encodedJWT.length() - 1) + flipped;
+
+    expectException(InvalidJWTSignatureException.class, () ->
+        new JWTDecoder().decode(tampered, VerifierResolver.of(HMACVerifier.newVerifier(Algorithm.HS256, "super-secret-key-that-is-at-least-32-bytes-long!!"))));
+  }
+
+  @Test
+  public void test_wrongSecret() {
+    JWT jwt = JWT.builder().subject("123456789").build();
+    Signer signer = HMACSigner.newSHA256Signer("super-secret-key-that-is-at-least-32-bytes-long!!");
+    String encodedJWT = new JWTEncoder().encode(jwt, signer);
+
+    expectException(InvalidJWTSignatureException.class, () ->
+        new JWTDecoder().decode(encodedJWT, VerifierResolver.of(HMACVerifier.newVerifier(Algorithm.HS256, "wrong-secret-key-that-is-at-least-32-bytes-long!!"))));
   }
 }

@@ -16,7 +16,7 @@
 
 package org.lattejava.jwt;
 
-import java.io.IOException;
+import java.io.*;
 
 /**
  * Thrown when an HTTP response exceeds the configured maximum response size.

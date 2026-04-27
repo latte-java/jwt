@@ -24,8 +24,8 @@
 package org.lattejava.jwt.log;
 
 /**
- * Severity levels for {@link Logger} events. Constants are ordered from
- * most-verbose to least-verbose: {@code Trace < Debug < Info < Warn < Error}.
+ * Severity levels for {@link Logger} events. Constants are ordered from most-verbose to least-verbose:
+ * {@code Trace < Debug < Info < Warn < Error}.
  */
 public enum Level {
   Trace, Debug, Info, Warn, Error

@@ -16,20 +16,14 @@
 
 package org.lattejava.jwt;
 
-import org.lattejava.jwt.internal.Base64URL;
-import org.lattejava.jwt.internal.HardenedJSON;
-import org.lattejava.jwt.internal.MessageSanitizer;
-import org.lattejava.jwt.internal.SHAKE256;
-import org.lattejava.jwt.internal.http.AbstractHTTPHelper;
+import java.net.*;
+import java.nio.charset.*;
+import java.security.*;
+import java.util.*;
+import java.util.function.*;
 
-import java.net.HttpURLConnection;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
-import java.util.Map;
-import java.util.Objects;
-import java.util.function.Consumer;
+import org.lattejava.jwt.internal.*;
+import org.lattejava.jwt.internal.http.*;
 
 /**
  * Helpers for OpenID Connect.
@@ -39,7 +33,8 @@ import java.util.function.Consumer;
 public class OpenIDConnect {
 
   /**
-   * Generate the hash of the Access Token specified by the OpenID Connect Core spec for the <code>at_hash</code> claim.
+   * Generate the hash of the Access Token specified by the OpenID Connect Core spec for the <code>at_hash</code>
+   * claim.
    *
    * @param accessToken the ASCII form of the access token
    * @param algorithm   the algorithm to be used when encoding the Id Token
@@ -50,7 +45,8 @@ public class OpenIDConnect {
   }
 
   /**
-   * Generate the hash of the Authorization Code as specified by the OpenID Connect Core spec for the <code>c_hash</code> claim.
+   * Generate the hash of the Authorization Code as specified by the OpenID Connect Core spec for the
+   * <code>c_hash</code> claim.
    *
    * @param authorizationCode the ASCII form of the authorization code
    * @param algorithm         the algorithm to be used when encoding the Id Token
@@ -62,11 +58,11 @@ public class OpenIDConnect {
 
   /**
    * Fetches the OpenID Connect Provider Metadata for the given issuer. Appends
-   * {@code /.well-known/openid-configuration} to the issuer (after trimming a trailing slash).
-   * Enforces OIDC Discovery 1.0 §4.3 issuer-equality validation: the response's {@code issuer}
-   * field must equal the input issuer (after single-trailing-slash normalization on both sides).
-   * Throws {@link OpenIDConnectException} on any failure (network, non-2xx, parse error, missing
-   * required field, mismatched issuer, cross-origin redirect rejection, oversize response).
+   * {@code /.well-known/openid-configuration} to the issuer (after trimming a trailing slash). Enforces OIDC Discovery
+   * 1.0 §4.3 issuer-equality validation: the response's {@code issuer} field must equal the input issuer (after
+   * single-trailing-slash normalization on both sides). Throws {@link OpenIDConnectException} on any failure (network,
+   * non-2xx, parse error, missing required field, mismatched issuer, cross-origin redirect rejection, oversize
+   * response).
    *
    * @param issuer the OIDC issuer URL
    * @return the parsed {@link OpenIDConnectConfiguration}
@@ -78,14 +74,15 @@ public class OpenIDConnect {
 
   /**
    * Fetches the OpenID Connect Provider Metadata for the given issuer. Appends
-   * {@code /.well-known/openid-configuration} to the issuer (after trimming a trailing slash).
-   * Enforces OIDC Discovery 1.0 §4.3 issuer-equality validation: the response's {@code issuer}
-   * field must equal the input issuer (after single-trailing-slash normalization on both sides).
-   * Throws {@link OpenIDConnectException} on any failure (network, non-2xx, parse error, missing
-   * required field, mismatched issuer, cross-origin redirect rejection, oversize response).
+   * {@code /.well-known/openid-configuration} to the issuer (after trimming a trailing slash). Enforces OIDC Discovery
+   * 1.0 §4.3 issuer-equality validation: the response's {@code issuer} field must equal the input issuer (after
+   * single-trailing-slash normalization on both sides). Throws {@link OpenIDConnectException} on any failure (network,
+   * non-2xx, parse error, missing required field, mismatched issuer, cross-origin redirect rejection, oversize
+   * response).
    *
    * @param issuer     the OIDC issuer URL
-   * @param customizer an optional {@link Consumer} to configure the {@link HttpURLConnection} before the request is sent; may be {@code null}
+   * @param customizer an optional {@link Consumer} to configure the {@link HttpURLConnection} before the request is
+   *                   sent; may be {@code null}
    * @return the parsed {@link OpenIDConnectConfiguration}
    * @throws OpenIDConnectException on any failure
    */
@@ -95,11 +92,11 @@ public class OpenIDConnect {
 
   /**
    * Fetches the OpenID Connect Provider Metadata for the given issuer. Appends
-   * {@code /.well-known/openid-configuration} to the issuer (after trimming a trailing slash).
-   * Enforces OIDC Discovery 1.0 §4.3 issuer-equality validation: the response's {@code issuer}
-   * field must equal the input issuer (after single-trailing-slash normalization on both sides).
-   * Throws {@link OpenIDConnectException} on any failure (network, non-2xx, parse error, missing
-   * required field, mismatched issuer, cross-origin redirect rejection, oversize response).
+   * {@code /.well-known/openid-configuration} to the issuer (after trimming a trailing slash). Enforces OIDC Discovery
+   * 1.0 §4.3 issuer-equality validation: the response's {@code issuer} field must equal the input issuer (after
+   * single-trailing-slash normalization on both sides). Throws {@link OpenIDConnectException} on any failure (network,
+   * non-2xx, parse error, missing required field, mismatched issuer, cross-origin redirect rejection, oversize
+   * response).
    *
    * @param issuer the OIDC issuer URL
    * @param limits the fetch and parse hardening limits to apply
@@ -112,15 +109,16 @@ public class OpenIDConnect {
 
   /**
    * Fetches the OpenID Connect Provider Metadata for the given issuer. Appends
-   * {@code /.well-known/openid-configuration} to the issuer (after trimming a trailing slash).
-   * Enforces OIDC Discovery 1.0 §4.3 issuer-equality validation: the response's {@code issuer}
-   * field must equal the input issuer (after single-trailing-slash normalization on both sides).
-   * Throws {@link OpenIDConnectException} on any failure (network, non-2xx, parse error, missing
-   * required field, mismatched issuer, cross-origin redirect rejection, oversize response).
+   * {@code /.well-known/openid-configuration} to the issuer (after trimming a trailing slash). Enforces OIDC Discovery
+   * 1.0 §4.3 issuer-equality validation: the response's {@code issuer} field must equal the input issuer (after
+   * single-trailing-slash normalization on both sides). Throws {@link OpenIDConnectException} on any failure (network,
+   * non-2xx, parse error, missing required field, mismatched issuer, cross-origin redirect rejection, oversize
+   * response).
    *
    * @param issuer     the OIDC issuer URL
    * @param limits     the fetch and parse hardening limits to apply
-   * @param customizer an optional {@link Consumer} to configure the {@link HttpURLConnection} before the request is sent; may be {@code null}
+   * @param customizer an optional {@link Consumer} to configure the {@link HttpURLConnection} before the request is
+   *                   sent; may be {@code null}
    * @return the parsed {@link OpenIDConnectConfiguration}
    * @throws OpenIDConnectException on any failure
    */
@@ -135,9 +133,9 @@ public class OpenIDConnect {
   /**
    * Fetches the OpenID Connect Provider Metadata from a fully-qualified well-known URL.
    * <strong>Does not</strong> perform issuer-equality validation — no expected issuer is supplied.
-   * This is a security downgrade relative to {@link #discover(String)}; callers with an OIDC issuer
-   * should prefer {@link #discover(String)}. This overload is also the right entry point for an
-   * RFC 8414 server's {@code /.well-known/oauth-authorization-server} URL.
+   * This is a security downgrade relative to {@link #discover(String)}; callers with an OIDC issuer should prefer
+   * {@link #discover(String)}. This overload is also the right entry point for an RFC 8414 server's
+   * {@code /.well-known/oauth-authorization-server} URL.
    *
    * @param wellKnownURL the full well-known URL of the discovery document
    * @return the parsed {@link OpenIDConnectConfiguration}
@@ -150,12 +148,13 @@ public class OpenIDConnect {
   /**
    * Fetches the OpenID Connect Provider Metadata from a fully-qualified well-known URL.
    * <strong>Does not</strong> perform issuer-equality validation — no expected issuer is supplied.
-   * This is a security downgrade relative to {@link #discover(String)}; callers with an OIDC issuer
-   * should prefer {@link #discover(String)}. This overload is also the right entry point for an
-   * RFC 8414 server's {@code /.well-known/oauth-authorization-server} URL.
+   * This is a security downgrade relative to {@link #discover(String)}; callers with an OIDC issuer should prefer
+   * {@link #discover(String)}. This overload is also the right entry point for an RFC 8414 server's
+   * {@code /.well-known/oauth-authorization-server} URL.
    *
    * @param wellKnownURL the full well-known URL of the discovery document
-   * @param customizer   an optional {@link Consumer} to configure the {@link HttpURLConnection} before the request is sent; may be {@code null}
+   * @param customizer   an optional {@link Consumer} to configure the {@link HttpURLConnection} before the request is
+   *                     sent; may be {@code null}
    * @return the parsed {@link OpenIDConnectConfiguration}
    * @throws OpenIDConnectException on any failure
    */
@@ -166,9 +165,9 @@ public class OpenIDConnect {
   /**
    * Fetches the OpenID Connect Provider Metadata from a fully-qualified well-known URL.
    * <strong>Does not</strong> perform issuer-equality validation — no expected issuer is supplied.
-   * This is a security downgrade relative to {@link #discover(String)}; callers with an OIDC issuer
-   * should prefer {@link #discover(String)}. This overload is also the right entry point for an
-   * RFC 8414 server's {@code /.well-known/oauth-authorization-server} URL.
+   * This is a security downgrade relative to {@link #discover(String)}; callers with an OIDC issuer should prefer
+   * {@link #discover(String)}. This overload is also the right entry point for an RFC 8414 server's
+   * {@code /.well-known/oauth-authorization-server} URL.
    *
    * @param wellKnownURL the full well-known URL of the discovery document
    * @param limits       the fetch and parse hardening limits to apply
@@ -182,13 +181,14 @@ public class OpenIDConnect {
   /**
    * Fetches the OpenID Connect Provider Metadata from a fully-qualified well-known URL.
    * <strong>Does not</strong> perform issuer-equality validation — no expected issuer is supplied.
-   * This is a security downgrade relative to {@link #discover(String)}; callers with an OIDC issuer
-   * should prefer {@link #discover(String)}. This overload is also the right entry point for an
-   * RFC 8414 server's {@code /.well-known/oauth-authorization-server} URL.
+   * This is a security downgrade relative to {@link #discover(String)}; callers with an OIDC issuer should prefer
+   * {@link #discover(String)}. This overload is also the right entry point for an RFC 8414 server's
+   * {@code /.well-known/oauth-authorization-server} URL.
    *
    * @param wellKnownURL the full well-known URL of the discovery document
    * @param limits       the fetch and parse hardening limits to apply
-   * @param customizer   an optional {@link Consumer} to configure the {@link HttpURLConnection} before the request is sent; may be {@code null}
+   * @param customizer   an optional {@link Consumer} to configure the {@link HttpURLConnection} before the request is
+   *                     sent; may be {@code null}
    * @return the parsed {@link OpenIDConnectConfiguration}
    * @throws OpenIDConnectException on any failure
    */
@@ -199,7 +199,7 @@ public class OpenIDConnect {
   }
 
   private static OpenIDConnectConfiguration doDiscover(String url, String expectedIssuer,
-      FetchLimits limits, Consumer<HttpURLConnection> customizer) {
+                                                       FetchLimits limits, Consumer<HttpURLConnection> customizer) {
     HttpURLConnection connection = AbstractHTTPHelper.buildURLConnection(url, OpenIDConnectException::new);
     if (customizer != null) {
       customizer.accept(connection);
@@ -284,16 +284,16 @@ public class OpenIDConnect {
     return Base64URL.encodeToString(leftMostBytes);
   }
 
-  private static byte[] takeLeftMost(byte[] digest, int bytes) {
-    int toIndex = Math.min(digest.length, bytes);
-    return Arrays.copyOfRange(digest, 0, toIndex);
-  }
-
   private static MessageDigest getDigest(String digest) {
     try {
       return MessageDigest.getInstance(digest);
     } catch (NoSuchAlgorithmException e) {
       throw new JWTSigningException("Required message digest algorithm [" + digest + "] is not registered with this JVM", e);
     }
+  }
+
+  private static byte[] takeLeftMost(byte[] digest, int bytes) {
+    int toIndex = Math.min(digest.length, bytes);
+    return Arrays.copyOfRange(digest, 0, toIndex);
   }
 }

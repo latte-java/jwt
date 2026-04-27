@@ -16,8 +16,8 @@
 
 package org.lattejava.jwt;
 
-import java.security.SecureRandom;
-import java.util.Base64;
+import java.security.*;
+import java.util.*;
 
 /**
  * Static factories for generating HMAC secrets sized for the SHA-256, SHA-384, and SHA-512 hash functions.

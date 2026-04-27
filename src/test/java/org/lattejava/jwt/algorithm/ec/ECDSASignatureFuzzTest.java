@@ -23,44 +23,31 @@
 
 package org.lattejava.jwt.algorithm.ec;
 
-import org.lattejava.jwt.BaseJWTTest;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
-
+import java.security.*;
 import java.security.KeyPair;
-import java.security.SecureRandom;
+
+import org.lattejava.jwt.*;
+import org.testng.annotations.*;
 
 /**
- * Sign-then-verify fuzz for each supported ECDSA curve. These rapidly
- * exercise r/s integers with random high-bit patterns and small values so
- * that the DER↔JOSE conversion is repeatedly round-tripped against the JCE
- * implementation. Catches regressions in
- * {@link org.lattejava.jwt.internal.JOSEConverter} that unit tests would
- * miss (e.g., off-by-one padding).
+ * Sign-then-verify fuzz for each supported ECDSA curve. These rapidly exercise r/s integers with random high-bit
+ * patterns and small values so that the DER↔JOSE conversion is repeatedly round-tripped against the JCE implementation.
+ * Catches regressions in {@link org.lattejava.jwt.internal.JOSEConverter} that unit tests would miss (e.g., off-by-one
+ * padding).
  *
  * @author Daniel DeGroff
  */
 public class ECDSASignatureFuzzTest extends BaseJWTTest {
   private static final SecureRandom RNG = new SecureRandom();
-
+  private String openssl521Pem;
   private KeyPair p256;
-
   private KeyPair p384;
-
   private KeyPair p521;
 
-  private String openssl521Pem;
-
-  @BeforeClass
-  public void setupKeys() throws Exception {
-    p256 = generate("secp256r1");
-    p384 = generate("secp384r1");
-    p521 = generate("secp521r1");
-    // OpenSSL-generated P-521 PEM that carries both the private key and an
-    // encoded public key (see PEMDecoder behavior). Using one file for both
-    // signer and verifier guarantees the public/private match and stresses
-    // the 66-byte curve-int path with a non-JCE-generated key.
-    openssl521Pem = readFile("ec_private_secp521r1_p_512_openssl_pkcs8.pem");
+  private static KeyPair generate(String curve) throws Exception {
+    java.security.KeyPairGenerator kpg = java.security.KeyPairGenerator.getInstance("EC");
+    kpg.initialize(new java.security.spec.ECGenParameterSpec(curve));
+    return kpg.generateKeyPair();
   }
 
   @Test(invocationCount = 2_000)
@@ -78,17 +65,29 @@ public class ECDSASignatureFuzzTest extends BaseJWTTest {
   }
 
   @Test(invocationCount = 2_000)
+  public void fuzz_ES512_OpensslKey() throws Exception {
+    ECSigner signer = ECSigner.newSHA512Signer(openssl521Pem);
+    ECVerifier verifier = ECVerifier.newVerifier(openssl521Pem);
+    signThenVerify(signer, verifier);
+  }
+
+  @Test(invocationCount = 2_000)
   public void fuzz_ES512_P521() throws Exception {
     ECSigner signer = ECSigner.newSHA512Signer(p521.getPrivate());
     ECVerifier verifier = ECVerifier.newVerifier(p521.getPublic());
     signThenVerify(signer, verifier);
   }
 
-  @Test(invocationCount = 2_000)
-  public void fuzz_ES512_OpensslKey() throws Exception {
-    ECSigner signer = ECSigner.newSHA512Signer(openssl521Pem);
-    ECVerifier verifier = ECVerifier.newVerifier(openssl521Pem);
-    signThenVerify(signer, verifier);
+  @BeforeClass
+  public void setupKeys() throws Exception {
+    p256 = generate("secp256r1");
+    p384 = generate("secp384r1");
+    p521 = generate("secp521r1");
+    // OpenSSL-generated P-521 PEM that carries both the private key and an
+    // encoded public key (see PEMDecoder behavior). Using one file for both
+    // signer and verifier guarantees the public/private match and stresses
+    // the 66-byte curve-int path with a non-JCE-generated key.
+    openssl521Pem = readFile("ec_private_secp521r1_p_512_openssl_pkcs8.pem");
   }
 
   private void signThenVerify(ECSigner signer, ECVerifier verifier) {
@@ -96,11 +95,5 @@ public class ECDSASignatureFuzzTest extends BaseJWTTest {
     RNG.nextBytes(message);
     byte[] signature = signer.sign(message);
     verifier.verify(message, signature);
-  }
-
-  private static KeyPair generate(String curve) throws Exception {
-    java.security.KeyPairGenerator kpg = java.security.KeyPairGenerator.getInstance("EC");
-    kpg.initialize(new java.security.spec.ECGenParameterSpec(curve));
-    return kpg.generateKeyPair();
   }
 }

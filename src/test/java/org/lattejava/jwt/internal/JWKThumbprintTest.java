@@ -23,16 +23,15 @@
 
 package org.lattejava.jwt.internal;
 
-import org.lattejava.jwt.KeyType;
-import org.lattejava.jwt.jwks.JSONWebKey;
-import org.testng.annotations.Test;
+import org.lattejava.jwt.*;
+import org.lattejava.jwt.jwks.*;
+import org.testng.annotations.*;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotEquals;
+import static org.testng.Assert.*;
 
 /**
- * Tests for {@link JSONWebKey#thumbprintSHA256()} / {@link JSONWebKey#thumbprintSHA1()}
- * thumbprints computed via {@link CanonicalJSONWriter}.
+ * Tests for {@link JSONWebKey#thumbprintSHA256()} / {@link JSONWebKey#thumbprintSHA1()} thumbprints computed via
+ * {@link CanonicalJSONWriter}.
  *
  * <p>Vectors:
  * <ul>
@@ -50,45 +49,31 @@ public class JWKThumbprintTest {
   // SHA-1 base64url thumbprint is "VHriznG7vJAFpXMXRmGgAkA5sEE".
   private static JSONWebKey ecP256() {
     return JSONWebKey.builder()
-        .kty(KeyType.EC)
-        .crv("P-256")
-        .x("MKBCTNIcKUSDii11ySs3526iDZ8AiTo7Tu6KPAqv7D4")
-        .y("4Etl6SRW2YiLUrN5vfvVHuhp7x8PxltmWWlbbM4IFyM")
-        .build();
+                     .kty(KeyType.EC)
+                     .crv("P-256")
+                     .x("MKBCTNIcKUSDii11ySs3526iDZ8AiTo7Tu6KPAqv7D4")
+                     .y("4Etl6SRW2YiLUrN5vfvVHuhp7x8PxltmWWlbbM4IFyM")
+                     .build();
   }
 
   // RFC 7638 §3.1 — the canonical RSA JWK example. The published SHA-256
   // base64url thumbprint is "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs".
   private static JSONWebKey rfc7638Rsa() {
     return JSONWebKey.builder()
-        .kty(KeyType.RSA)
-        .n("0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw")
-        .e("AQAB")
-        .build();
+                     .kty(KeyType.RSA)
+                     .n("0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw")
+                     .e("AQAB")
+                     .build();
   }
 
   // RFC 8037 §A.3 — Ed25519 OKP JWK example. Documented SHA-256 thumbprint
   // is "kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k".
   private static JSONWebKey rfc8037Ed25519() {
     return JSONWebKey.builder()
-        .kty(KeyType.OKP)
-        .crv("Ed25519")
-        .x("11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo")
-        .build();
-  }
-
-  @Test
-  public void rfc7638RSA_S256() {
-    // Use case: RFC 7638 §3.1 RSA SHA-256 thumbprint matches the documented bytes.
-    String thumbprint = rfc7638Rsa().thumbprintSHA256();
-    assertEquals(thumbprint, "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs");
-  }
-
-  @Test
-  public void rfc8037Ed25519_S256() {
-    // Use case: RFC 8037 §A.3 Ed25519 OKP SHA-256 thumbprint matches RFC.
-    String thumbprint = rfc8037Ed25519().thumbprintSHA256();
-    assertEquals(thumbprint, "kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k");
+                     .kty(KeyType.OKP)
+                     .crv("Ed25519")
+                     .x("11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo")
+                     .build();
   }
 
   @Test
@@ -104,11 +89,11 @@ public class JWKThumbprintTest {
   public void ecP384_S256_deterministic() {
     // Use case: EC P-384 thumbprint is deterministic and stable.
     JSONWebKey k = JSONWebKey.builder()
-        .kty(KeyType.EC)
-        .crv("P-384")
-        .x("lInTxl8fjLKp_UCrxI0WDkldCpkVRbEOEuiBkpNkWAxgM5XvtFeBHPXkN3xWwe-X")
-        .y("y6N1IC-2mXxHreETBW7K3mBcw0qGr3CWHCs-yl09yCQRLcyfGv7XhqAngHOu51Zv")
-        .build();
+                             .kty(KeyType.EC)
+                             .crv("P-384")
+                             .x("lInTxl8fjLKp_UCrxI0WDkldCpkVRbEOEuiBkpNkWAxgM5XvtFeBHPXkN3xWwe-X")
+                             .y("y6N1IC-2mXxHreETBW7K3mBcw0qGr3CWHCs-yl09yCQRLcyfGv7XhqAngHOu51Zv")
+                             .build();
     String t1 = k.thumbprintSHA256();
     String t2 = k.thumbprintSHA256();
     assertEquals(t1, t2);
@@ -118,11 +103,11 @@ public class JWKThumbprintTest {
   public void ecP521_S256_deterministic() {
     // Use case: EC P-521 thumbprint is deterministic and stable.
     JSONWebKey k = JSONWebKey.builder()
-        .kty(KeyType.EC)
-        .crv("P-521")
-        .x("AHKZLLOsCOzz5cY97ewNUajB957y-C-U88c3v13nmGZx6sYl_oJXu9A5RkTKqjqvjyekWF-7ytDyRXYgCF5cj0Kt")
-        .y("AdymlHvOiLxXkEhayXQnNCvDX4h9htZaCJN34kfmC6pV5OhQHiraVySsUdaQkAgDPrwQrJmbnX9cwlGfP-HqHZR1")
-        .build();
+                             .kty(KeyType.EC)
+                             .crv("P-521")
+                             .x("AHKZLLOsCOzz5cY97ewNUajB957y-C-U88c3v13nmGZx6sYl_oJXu9A5RkTKqjqvjyekWF-7ytDyRXYgCF5cj0Kt")
+                             .y("AdymlHvOiLxXkEhayXQnNCvDX4h9htZaCJN34kfmC6pV5OhQHiraVySsUdaQkAgDPrwQrJmbnX9cwlGfP-HqHZR1")
+                             .build();
     String t1 = k.thumbprintSHA256();
     String t2 = k.thumbprintSHA256();
     assertEquals(t1, t2);
@@ -144,12 +129,26 @@ public class JWKThumbprintTest {
     // Different field-construction order should not affect the thumbprint
     // (the canonical writer sorts keys lex regardless of insertion order).
     JSONWebKey k2 = JSONWebKey.builder()
-        .e("AQAB")
-        .n(k1.n())
-        .kty(KeyType.RSA)
-        .build();
+                              .e("AQAB")
+                              .n(k1.n())
+                              .kty(KeyType.RSA)
+                              .build();
     String t2 = k2.thumbprintSHA256();
     assertEquals(t2, t1, "thumbprint must be insensitive to JSONWebKey field-set order");
+  }
+
+  @Test
+  public void rfc7638RSA_S256() {
+    // Use case: RFC 7638 §3.1 RSA SHA-256 thumbprint matches the documented bytes.
+    String thumbprint = rfc7638Rsa().thumbprintSHA256();
+    assertEquals(thumbprint, "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs");
+  }
+
+  @Test
+  public void rfc8037Ed25519_S256() {
+    // Use case: RFC 8037 §A.3 Ed25519 OKP SHA-256 thumbprint matches RFC.
+    String thumbprint = rfc8037Ed25519().thumbprintSHA256();
+    assertEquals(thumbprint, "kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k");
   }
 
   @Test

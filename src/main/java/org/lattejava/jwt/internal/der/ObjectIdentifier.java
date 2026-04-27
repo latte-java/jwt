@@ -16,106 +16,94 @@
 
 package org.lattejava.jwt.internal.der;
 
-import java.io.ByteArrayOutputStream;
-import java.util.Arrays;
-import java.util.Objects;
+import java.io.*;
+import java.util.*;
 
 /**
  * @author Daniel DeGroff
  */
 @SuppressWarnings("unused")
 public class ObjectIdentifier {
-  /** X.520 country (C) — DN attribute type. */
-  public static final String X_520_DN_COUNTRY = "2.5.4.6";
-
-  /** X.520 commonName (CN) — DN attribute type. */
-  public static final String X_520_DN_COMMON_NAME = "2.5.4.3";
-
-  /** X.520 localityName (L) — DN attribute type. */
-  public static final String X_520_DN_LOCALITY = "2.5.4.7";
-
-  /** X.520 stateOrProvinceName (ST) — DN attribute type. */
-  public static final String X_520_DN_STATE = "2.5.4.8";
-
-  /** X.520 organizationName (O) — DN attribute type. */
-  public static final String X_520_DN_ORGANIZATION = "2.5.4.10";
-
-  /** X.520 organizationalUnitName (OU) — DN attribute type. */
-  public static final String X_520_DN_ORGANIZATIONAL_UNIT = "2.5.4.11";
-
   /**
-   * Elliptic curve / 256 bit / secp256r1 / prime256v1
-   * X9.62/SECG curve over a 256 bit prime field
+   * Elliptic curve / 256 bit / secp256r1 / prime256v1 X9.62/SECG curve over a 256 bit prime field
    */
   public static final String ECDSA_P256 = "1.2.840.10045.3.1.7";
-
   /**
-   * Elliptic curve / 384 bit / secp384r1 / prime384v1
-   * NIST/SECG curve over a 384 bit prime field
+   * Elliptic curve / 384 bit / secp384r1 / prime384v1 NIST/SECG curve over a 384 bit prime field
    */
   public static final String ECDSA_P384 = "1.3.132.0.34";
-
   /**
-   * Elliptic curve / 512 bit / secp521r1 / prime521v1
-   * NIST/SECG curve over a 521 bit prime field
+   * Elliptic curve / 512 bit / secp521r1 / prime521v1 NIST/SECG curve over a 521 bit prime field
    */
   public static final String ECDSA_P521 = "1.3.132.0.35";
-
   /**
    * Elliptic Curve Public Key cryptography
    */
   public static final String EC_ENCRYPTION = "1.2.840.10045.2.1";
-
   /**
    * Edwards-curve Digital Signature Algorithm (EdDSA) Ed25519
    */
   public static final String EdDSA_25519 = "1.3.101.112";
-
   /**
    * Edwards-curve Digital Signature Algorithm (EdDSA) Ed448
    */
   public static final String EdDSA_448 = "1.3.101.113";
-
-  /**
-   * RSA Public Key cryptography
-   */
-  public static final String RSA_ENCRYPTION = "1.2.840.113549.1.1.1";
-
   /**
    * RSA Public Key cryptography Signature Scheme with Appendix - Probabilistic Signature Scheme
    */
   public static final String RSASSA_PSS_ENCRYPTION = "1.2.840.113549.1.1.10";
-
+  /**
+   * RSA Public Key cryptography
+   */
+  public static final String RSA_ENCRYPTION = "1.2.840.113549.1.1.1";
   /**
    * RSA Encryption / SHA-256 / SHA256withRSA
    */
   public static final String RSA_SHA256 = "1.2.840.113549.1.1.11";
-
   /**
    * RSA Encryption / SHA-384 / SHA384withRSA
    */
   public static final String RSA_SHA384 = "1.2.840.113549.1.1.12";
-
   /**
    * RSA Encryption / SHA-512 / SHA512withRSA
    */
   public static final String RSA_SHA512 = "1.2.840.113549.1.1.13";
-
   /**
    * Secure Hash Algorithm that uses a 256-bit key (SHA256)
    */
   public static final String SHA256 = "2.16.840.1.101.3.4.2.1";
-
   /**
    * Secure Hash Algorithm that uses a 384-bit key (SHA384)
    */
   public static final String SHA384 = "2.16.840.1.101.3.4.2.2";
-
   /**
    * Secure Hash Algorithm that uses a 512-bit key (SHA512)
    */
   public static final String SHA512 = "2.16.840.1.101.3.4.2.3";
-
+  /**
+   * X.520 commonName (CN) — DN attribute type.
+   */
+  public static final String X_520_DN_COMMON_NAME = "2.5.4.3";
+  /**
+   * X.520 country (C) — DN attribute type.
+   */
+  public static final String X_520_DN_COUNTRY = "2.5.4.6";
+  /**
+   * X.520 localityName (L) — DN attribute type.
+   */
+  public static final String X_520_DN_LOCALITY = "2.5.4.7";
+  /**
+   * X.520 organizationName (O) — DN attribute type.
+   */
+  public static final String X_520_DN_ORGANIZATION = "2.5.4.10";
+  /**
+   * X.520 organizationalUnitName (OU) — DN attribute type.
+   */
+  public static final String X_520_DN_ORGANIZATIONAL_UNIT = "2.5.4.11";
+  /**
+   * X.520 stateOrProvinceName (ST) — DN attribute type.
+   */
+  public static final String X_520_DN_STATE = "2.5.4.8";
   /**
    * The raw byte array of this Object Identifier.
    */
@@ -131,13 +119,12 @@ public class ObjectIdentifier {
   }
 
   /**
-   * Encode a dot-notation OID string (e.g. {@code "1.2.840.113549.1.1.11"}) to its DER
-   * value bytes (without the surrounding tag/length).
+   * Encode a dot-notation OID string (e.g. {@code "1.2.840.113549.1.1.11"}) to its DER value bytes (without the
+   * surrounding tag/length).
    *
    * <p>Encoding rules per X.690 §8.19: the first two arcs are combined as
-   * {@code 40*a + b}; subsequent arcs are encoded base-128 with the high bit set on
-   * every byte except the last (variable length, including the three-byte case for
-   * arcs &gt;= 16384).</p>
+   * {@code 40*a + b}; subsequent arcs are encoded base-128 with the high bit set on every byte except the last
+   * (variable length, including the three-byte case for arcs &gt;= 16384).</p>
    *
    * @param oid the dot-notation OID string
    * @return the DER value bytes (caller wraps with the OID tag and length)
@@ -182,10 +169,9 @@ public class ObjectIdentifier {
   }
 
   /**
-   * Write a single arc value as base-128 with the continuation bit (0x80) set on every
-   * byte except the last (least-significant). Single-byte values 0..127 emit a single
-   * byte with the high bit cleared. Two-byte values 128..16383 emit two bytes; three-byte
-   * values 16384..2097151 emit three bytes; etc.
+   * Write a single arc value as base-128 with the continuation bit (0x80) set on every byte except the last
+   * (least-significant). Single-byte values 0..127 emit a single byte with the high bit cleared. Two-byte values
+   * 128..16383 emit two bytes; three-byte values 16384..2097151 emit three bytes; etc.
    */
   private static void writeBase128(ByteArrayOutputStream out, long value) {
     if (value < 0x80L) {
@@ -281,11 +267,11 @@ public class ObjectIdentifier {
       if (index == 0) {
         if (node < 0x50) {
           sb.append(node / 40)
-              .append('.')
-              .append(node % 40);
+            .append('.')
+            .append(node % 40);
         } else {
           sb.append("2.")
-              .append(node - 80);
+            .append(node - 80);
         }
       } else {
         sb.append(node);

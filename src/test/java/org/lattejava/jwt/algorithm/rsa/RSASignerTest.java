@@ -16,15 +16,11 @@
 
 package org.lattejava.jwt.algorithm.rsa;
 
-import org.lattejava.jwt.BaseJWTTest;
-import org.lattejava.jwt.InvalidKeyTypeException;
-import org.lattejava.jwt.internal.pem.PEM;
-import org.testng.annotations.Test;
+import org.lattejava.jwt.*;
+import org.lattejava.jwt.internal.pem.*;
+import org.testng.annotations.*;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
+import static org.testng.Assert.*;
 
 /**
  * @author Daniel DeGroff

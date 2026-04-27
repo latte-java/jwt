@@ -16,28 +16,26 @@
 
 package org.lattejava.jwt.internal;
 
-import org.lattejava.jwt.KeyPairs;
-import org.lattejava.jwt.internal.pem.PEM;
-import org.testng.annotations.DataProvider;
-import org.testng.annotations.Test;
-
+import java.security.*;
 import java.security.KeyPair;
-import java.security.KeyPairGenerator;
-import java.security.PublicKey;
-import java.util.Base64;
+import java.util.*;
 
-import static org.testng.Assert.assertEquals;
+import org.lattejava.jwt.*;
+import org.lattejava.jwt.internal.pem.*;
+import org.testng.annotations.*;
+
+import static org.testng.Assert.*;
 
 /**
  * Note that the higher invocationCount parameters are helpful to indentify incorrect assumptions in key parsing.
  * <p>
- * Key lengths can differ, and when encoding larger integers in DER encode sequences, or parsing them in and out of
- * JWK formats, we want to be certain we are not making incorrect assumptions. During development, you may wish to
- * run some of these with 5-10k invocation counts to ensure these types of anomalies are un-covered and addressed.
+ * Key lengths can differ, and when encoding larger integers in DER encode sequences, or parsing them in and out of JWK
+ * formats, we want to be certain we are not making incorrect assumptions. During development, you may wish to run some
+ * of these with 5-10k invocation counts to ensure these types of anomalies are un-covered and addressed.
  * <p>
- * It may be reasonable to reduce the invocation counts if tests take too long to run - once we know that the tests
- * will pass with a high number of invocations. However, the time is not yet that significant, and there is value to
- * ensuring that the same result can be expected regardless of the number of times we run the same test.
+ * It may be reasonable to reduce the invocation counts if tests take too long to run - once we know that the tests will
+ * pass with a high number of invocations. However, the time is not yet that significant, and there is value to ensuring
+ * that the same result can be expected regardless of the number of times we run the same test.
  *
  * @author Daniel DeGroff
  */
@@ -49,24 +47,6 @@ public class KeyUtilsTests {
         {"EC", 384, 384, 384},
         {"EC", 521, 521, 521}
     };
-  }
-
-  @DataProvider(name = "rsaKeyLengths")
-  public Object[][] rsaKeyLengths() {
-    return new Object[][]{
-        {"RSA", 2048, 2048, 2048},
-        {"RSA", 3072, 3072, 3072},
-        {"RSA", 4096, 4096, 4096}
-    };
-  }
-
-  @Test
-  public void problematicKey() {
-    // Fixing a problematic EC key length which is not a multiple of 8 bytes.
-    PublicKey key = PEM.decode(
-        "-----BEGIN PUBLIC KEY-----\nMHYwEAYHKoZIzj0CAQYFK4EEACIDYgAEABGGbHRp5Rv+sm86OfuPqnkYCmUzuUDW\nfJPXIgZUeqo7JY5mTALqdMYYi93rh0xpkLzFrwZGSYv8gGwR9t5d3901L0CZuX6X\nHob0RbKzwdAEdykcBPxpar7k8jVGCo8m\n-----END PUBLIC KEY-----")
-        .publicKey;
-    assertEquals(KeyUtils.getKeyLength(key), 384);
   }
 
   // Running 1_000 times to ensure consistency. EC public-key X/Y coordinates have a ~1/256 chance per byte of starting
@@ -98,28 +78,6 @@ public class KeyUtilsTests {
     assertEquals(length(Base64.getDecoder().decode("bqVtyl7NwwmUkAk0GCHeQCFhiF4m7rzfYrkIp5BDPECwOMkJjgbAbBrJkqZwXA==")), 384);
   }
 
-  // Copy of the logic from getKeyLength for testing
-  private int length(byte[] bytes) {
-    int length = bytes.length;
-    int mod = length % 8;
-    if (mod >= 2) {
-      length = length + (8 - mod);
-    }
-
-    return ((length / 8) * 8) * 8;
-  }
-
-  // Only run this test once, the RSA key lengths are predictable based upon the size of the modulus.
-  @Test(dataProvider = "rsaKeyLengths")
-  public void rsa_getKeyLength(String algorithm, int keySize, int privateKeySize, int publicKeySize) throws Exception {
-    KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance(algorithm);
-    keyPairGenerator.initialize(keySize);
-    KeyPair keyPair = keyPairGenerator.generateKeyPair();
-
-    assertEquals(KeyUtils.getKeyLength(keyPair.getPrivate()), privateKeySize);
-    assertEquals(KeyUtils.getKeyLength(keyPair.getPublic()), publicKeySize);
-  }
-
   @Test
   public void eddsa_25519_keyLength() throws Exception {
     KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("Ed25519");
@@ -129,7 +87,7 @@ public class KeyUtilsTests {
     assertEquals(KeyUtils.getKeyLength(keyPair.getPublic()), 32);
 
     org.lattejava.jwt.KeyPair keyPair2 = KeyPairs.generateEd25519();
-    PEM pem = PEM.decode(keyPair2.privateKey);
+    PEM pem = PEM.decode(keyPair2.privateKey());
     assertEquals(KeyUtils.getKeyLength(pem.privateKey), 32);
     assertEquals(KeyUtils.getKeyLength(pem.publicKey), 32);
   }
@@ -143,8 +101,48 @@ public class KeyUtilsTests {
     assertEquals(KeyUtils.getKeyLength(keyPair.getPublic()), 57);
 
     org.lattejava.jwt.KeyPair keyPair2 = KeyPairs.generateEd448();
-    PEM pem = PEM.decode(keyPair2.privateKey);
+    PEM pem = PEM.decode(keyPair2.privateKey());
     assertEquals(KeyUtils.getKeyLength(pem.privateKey), 57);
     assertEquals(KeyUtils.getKeyLength(pem.publicKey), 57);
+  }
+
+  @Test
+  public void problematicKey() {
+    // Fixing a problematic EC key length which is not a multiple of 8 bytes.
+    PublicKey key = PEM.decode(
+        "-----BEGIN PUBLIC KEY-----\nMHYwEAYHKoZIzj0CAQYFK4EEACIDYgAEABGGbHRp5Rv+sm86OfuPqnkYCmUzuUDW\nfJPXIgZUeqo7JY5mTALqdMYYi93rh0xpkLzFrwZGSYv8gGwR9t5d3901L0CZuX6X\nHob0RbKzwdAEdykcBPxpar7k8jVGCo8m\n-----END PUBLIC KEY-----")
+        .publicKey;
+    assertEquals(KeyUtils.getKeyLength(key), 384);
+  }
+
+  @DataProvider(name = "rsaKeyLengths")
+  public Object[][] rsaKeyLengths() {
+    return new Object[][]{
+        {"RSA", 2048, 2048, 2048},
+        {"RSA", 3072, 3072, 3072},
+        {"RSA", 4096, 4096, 4096}
+    };
+  }
+
+  // Only run this test once, the RSA key lengths are predictable based upon the size of the modulus.
+  @Test(dataProvider = "rsaKeyLengths")
+  public void rsa_getKeyLength(String algorithm, int keySize, int privateKeySize, int publicKeySize) throws Exception {
+    KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance(algorithm);
+    keyPairGenerator.initialize(keySize);
+    KeyPair keyPair = keyPairGenerator.generateKeyPair();
+
+    assertEquals(KeyUtils.getKeyLength(keyPair.getPrivate()), privateKeySize);
+    assertEquals(KeyUtils.getKeyLength(keyPair.getPublic()), publicKeySize);
+  }
+
+  // Copy of the logic from getKeyLength for testing
+  private int length(byte[] bytes) {
+    int length = bytes.length;
+    int mod = length % 8;
+    if (mod >= 2) {
+      length = length + (8 - mod);
+    }
+
+    return ((length / 8) * 8) * 8;
   }
 }

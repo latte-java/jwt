@@ -23,10 +23,9 @@
 
 package org.lattejava.jwt.log;
 
-import org.testng.annotations.Test;
+import org.testng.annotations.*;
 
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.*;
 
 public class NoOpLoggerTest {
   @Test

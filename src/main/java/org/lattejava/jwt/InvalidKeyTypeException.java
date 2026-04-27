@@ -17,8 +17,8 @@
 package org.lattejava.jwt;
 
 /**
- * The key is not compatible with the corresponding signer or verifier. Generally this will mean that you provided
- * an RSA key when an EC was expected or vice versa.
+ * The key is not compatible with the corresponding signer or verifier. Generally this will mean that you provided an
+ * RSA key when an EC was expected or vice versa.
  *
  * @author Daniel DeGroff
  */

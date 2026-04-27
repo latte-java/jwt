@@ -23,54 +23,37 @@
 
 package org.lattejava.jwt;
 
-import org.lattejava.jwt.algorithm.hmac.HMACSigner;
-import org.lattejava.jwt.algorithm.hmac.HMACVerifier;
-import org.lattejava.jwt.jacksontest.JacksonJSONProcessor;
-import org.testng.annotations.DataProvider;
-import org.testng.annotations.Test;
+import java.math.*;
+import java.time.*;
+import java.util.*;
 
-import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.time.Instant;
-import java.util.Arrays;
+import org.lattejava.jwt.algorithm.hmac.*;
+import org.lattejava.jwt.jacksontest.*;
+import org.testng.annotations.*;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 /**
- * Cross-processor compatibility: encode with one JSONProcessor, decode with
- * another, in both directions. Custom claims with BigInteger and BigDecimal
- * must survive the round trip without numeric narrowing.
+ * Cross-processor compatibility: encode with one JSONProcessor, decode with another, in both directions. Custom claims
+ * with BigInteger and BigDecimal must survive the round trip without numeric narrowing.
  *
  * @author Daniel DeGroff
  */
 public class CrossProcessorTest extends BaseJWTTest {
   private static final String SECRET = "super-secret-key-that-is-at-least-32-bytes-long!!";
 
-  @DataProvider(name = "processorPairs")
-  public Object[][] processorPairs() {
-    LatteJSONProcessor latte = new LatteJSONProcessor();
-    JacksonJSONProcessor jackson = new JacksonJSONProcessor();
-    return new Object[][] {
-        {"Latte->Jackson", latte, jackson},
-        {"Jackson->Latte", jackson, latte},
-        {"Latte->Latte", latte, latte},
-        {"Jackson->Jackson", jackson, jackson},
-    };
-  }
-
   @Test(dataProvider = "processorPairs")
   public void crossProcessorRoundTrip(String label, JSONProcessor encodeProc, JSONProcessor decodeProc) {
     // Use case: encode with one processor, decode with another -- claims match.
     Instant exp = Instant.ofEpochSecond(Instant.now().getEpochSecond() + 3600);
     JWT jwt = JWT.builder()
-        .subject("abc")
-        .issuer("https://issuer.example")
-        .audience(Arrays.asList("svc-a", "svc-b"))
-        .expiresAt(exp)
-        .claim("custom", "value")
-        .claim("count", 42)
-        .build();
+                 .subject("abc")
+                 .issuer("https://issuer.example")
+                 .audience(Arrays.asList("svc-a", "svc-b"))
+                 .expiresAt(exp)
+                 .claim("custom", "value")
+                 .claim("count", 42)
+                 .build();
     String token = new JWTEncoder(encodeProc).encode(jwt, HMACSigner.newSHA256Signer(SECRET));
     JWT decoded = new JWTDecoder(decodeProc).decode(token,
         VerifierResolver.of(HMACVerifier.newVerifier(Algorithm.HS256, SECRET)));
@@ -82,6 +65,22 @@ public class CrossProcessorTest extends BaseJWTTest {
     // count may surface as Integer / BigInteger depending on processor; both are valid.
     Number countN = (Number) decoded.getObject("count");
     assertEquals(countN.longValue(), 42L, label);
+  }
+
+  @Test(dataProvider = "processorPairs")
+  public void crossProcessor_bigDecimalHighPrecision(String label, JSONProcessor encodeProc, JSONProcessor decodeProc) {
+    // Use case: BigDecimal with high precision survives round-trip across processors.
+    BigDecimal precise = new BigDecimal("3.14159265358979323846264338327950288419716939937510");
+    JWT jwt = JWT.builder().subject("abc").claim("pi", precise).build();
+    String token = new JWTEncoder(encodeProc).encode(jwt, HMACSigner.newSHA256Signer(SECRET));
+    JWT decoded = new JWTDecoder(decodeProc).decode(token,
+        VerifierResolver.of(HMACVerifier.newVerifier(Algorithm.HS256, SECRET)));
+    Number n = (Number) decoded.getObject("pi");
+    BigDecimal asBigDec = (n instanceof BigDecimal)
+        ? (BigDecimal) n
+        : new BigDecimal(n.toString());
+    // Compare via compareTo to ignore scale -- the digits must match.
+    assertEquals(asBigDec.compareTo(precise), 0, label + ": expected " + precise + " got " + asBigDec);
   }
 
   @Test(dataProvider = "processorPairs")
@@ -99,20 +98,15 @@ public class CrossProcessorTest extends BaseJWTTest {
     assertEquals(asBigInt, huge, label);
   }
 
-  @Test(dataProvider = "processorPairs")
-  public void crossProcessor_bigDecimalHighPrecision(String label, JSONProcessor encodeProc, JSONProcessor decodeProc) {
-    // Use case: BigDecimal with high precision survives round-trip across processors.
-    BigDecimal precise = new BigDecimal("3.14159265358979323846264338327950288419716939937510");
-    JWT jwt = JWT.builder().subject("abc").claim("pi", precise).build();
-    String token = new JWTEncoder(encodeProc).encode(jwt, HMACSigner.newSHA256Signer(SECRET));
-    JWT decoded = new JWTDecoder(decodeProc).decode(token,
-        VerifierResolver.of(HMACVerifier.newVerifier(Algorithm.HS256, SECRET)));
-    Number n = (Number) decoded.getObject("pi");
-    BigDecimal asBigDec = (n instanceof BigDecimal)
-        ? (BigDecimal) n
-        : new BigDecimal(n.toString());
-    // Compare via compareTo to ignore scale -- the digits must match.
-    assertTrue(asBigDec.compareTo(precise) == 0,
-        label + ": expected " + precise + " got " + asBigDec);
+  @DataProvider(name = "processorPairs")
+  public Object[][] processorPairs() {
+    LatteJSONProcessor latte = new LatteJSONProcessor();
+    JacksonJSONProcessor jackson = new JacksonJSONProcessor();
+    return new Object[][]{
+        {"Latte->Jackson", latte, jackson},
+        {"Jackson->Latte", jackson, latte},
+        {"Latte->Latte", latte, latte},
+        {"Jackson->Jackson", jackson, jackson},
+    };
   }
 }

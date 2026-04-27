@@ -23,54 +23,58 @@
 
 package org.lattejava.jwt;
 
-import org.lattejava.jwt.algorithm.ec.ECVerifier;
-import org.lattejava.jwt.algorithm.hmac.HMACVerifier;
-import org.lattejava.jwt.algorithm.rsa.RSAVerifier;
-import org.testng.annotations.Test;
+import java.math.*;
+import java.security.*;
+import java.security.spec.*;
+import java.util.*;
 
-import java.math.BigInteger;
-import java.security.KeyFactory;
-import java.security.PublicKey;
-import java.security.spec.ECPoint;
-import java.security.spec.ECPublicKeySpec;
-import java.security.spec.RSAPublicKeySpec;
-import java.util.Base64;
+import org.lattejava.jwt.algorithm.ec.*;
+import org.lattejava.jwt.algorithm.hmac.*;
+import org.lattejava.jwt.algorithm.rsa.*;
+import org.testng.annotations.*;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.*;
 
 /**
- * Wire-format compatibility: RFC 7515 Appendix A test vectors verify
- * correctly. Each vector is the canonical published example from RFC 7515.
+ * Wire-format compatibility: RFC 7515 Appendix A test vectors verify correctly. Each vector is the canonical published
+ * example from RFC 7515.
  *
  * <p>For ES256 and ES512 only verification is exercised (per RFC 7515
- * Appendix A.3 / A.4 the signing operation is randomized, so the
- * library cannot reproduce the published signature byte-for-byte; but
- * verifying the published signature with the published key is the
- * contract exercised here).</p>
+ * Appendix A.3 / A.4 the signing operation is randomized, so the library cannot reproduce the published signature
+ * byte-for-byte; but verifying the published signature with the published key is the contract exercised here).</p>
  *
  * @author Daniel DeGroff
  */
 public class RFC7515VectorsTest extends BaseJWTTest {
-  private static byte[] b64u(String in) {
-    return Base64.getUrlDecoder().decode(in);
-  }
-
-  private static BigInteger b64uPositive(String in) {
-    return new BigInteger(1, b64u(in));
-  }
-
-  // RFC 7515 Appendix A.1 -- HS256 -- published shared key (256 bits) is the
-  // JWK octet sequence given in §A.1.1.
-  private static final byte[] HS256_KEY = b64u(
-      "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow");
-
+  private static final String ES256_JWS =
+      "eyJhbGciOiJFUzI1NiJ9"
+          + ".eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ"
+          + ".DtEhU3ljbEg8L38VWAfUAqOyKAM6-Xx-F4GawxaepmXFCgfTjDxw5djxLa8ISlSApmWQxfKTUJqPP3-Kg6NU1Q";
+  // RFC 7515 §A.3 published EC P-256 public key.
+  private static final BigInteger ES256_X = b64uPositive("f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU");
+  private static final BigInteger ES256_Y = b64uPositive("x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0");
+  private static final String ES512_JWS =
+      "eyJhbGciOiJFUzUxMiJ9"
+          + ".UGF5bG9hZA"
+          + ".AdwMgeerwtHoh-l192l60hp9wAHZFVJbLfD_UxMi70cwnZOYaRI1bKPWROc-mZZqwqT2SI-KGDKB34XO0aw_7XdtAG8GaSwFKdCAPZgoXD2YBJZCPEX3xKpRwcdOO8KpEHwJjyqOgzDO7iKvU8vcnwNrmxYbSW9ERBXukOXolLzeO_Jn";
+  // RFC 7515 §A.4 published EC P-521 public key.
+  private static final BigInteger ES512_X = b64uPositive("AekpBQ8ST8a8VcfVOTNl353vSrDCLLJXmPk06wTjxrrjcBpXp5EOnYG_NjFZ6OvLFV1jSfS9tsz4qUxcWceqwQGk");
+  private static final BigInteger ES512_Y = b64uPositive("ADSmRA43Z1DSNx_RvcLI87cdL07l6jQyyBXMoxVg_l2Th-x3S1WDhjDly79ajL4Kkd0AZMaZmh9ubmf63e3kyMj2");
   // RFC 7515 §A.1 published JWS Compact Serialization (the entire token).
   private static final String HS256_JWS =
       "eyJ0eXAiOiJKV1QiLA0KICJhbGciOiJIUzI1NiJ9"
           + ".eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ"
           + ".dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
-
+  // RFC 7515 Appendix A.1 -- HS256 -- published shared key (256 bits) is the
+  // JWK octet sequence given in §A.1.1.
+  private static final byte[] HS256_KEY = b64u(
+      "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow");
+  private static final BigInteger RS256_E = b64uPositive("AQAB");
+  // RFC 7515 §A.2 published JWS for HS-style claims; signature is deterministic for RSASSA-PKCS1-v1_5.
+  private static final String RS256_JWS =
+      "eyJhbGciOiJSUzI1NiJ9"
+          + ".eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ"
+          + ".cC4hiUPoj9Eetdgtv3hF80EGrhuB__dzERat0XF9g2VtQgr9PJbu3XOiZj5RZmh7AAuHIm4Bh-0Qc_lF5YKt_O8W2Fp5jujGbds9uJdbF9CUAr7t1dnZcAcQjbKBYNX4BAynRFdiuB--f_nZLgrnbyTyWzO75vRK5h6xBArLIARNPvkSjtQBMHlb1L07Qe7K0GarZRmB_eSN9383LcOLn6_dO--xi12jzDwusC-eOkHWEsqtFZESc6BfI7noOPqvhJ1phCnvWh6IeYI2w9QOYEUipUTI8np6LbgGY9Fs98rqVt5AXLIhWkWywlVmtVrBp0igcN_IoypGlUPQGe77Rw";
   // RFC 7515 §A.2 published RSA public key (n, e). 2048-bit.
   private static final BigInteger RS256_N = b64uPositive(
       "ofgWCuLjybRlzo0tZWJjNiuSfb4p4fAkd_wWJcyQoTbji9k0l8W26mPddxHmfHQp-Vaw"
@@ -78,40 +82,12 @@ public class RFC7515VectorsTest extends BaseJWTTest {
           + "-bSf63kpaSHSXndS5z5rexMdbBYUsLA9e-KXBdQOS-UTo7WTBEMa2R2CapHg665xsmtdVMTBQY4uDZlxvb3qCo5ZwKh9kG4"
           + "LT6_I5IhlJH7aGhyxXFvUK-DWNmoudF8NAco9_h9iaGNj8q2ethFkMLs91kzk2PAcDTW9gb54h4FRWyuXpoQ");
 
-  private static final BigInteger RS256_E = b64uPositive("AQAB");
+  private static byte[] b64u(String in) {
+    return Base64.getUrlDecoder().decode(in);
+  }
 
-  // RFC 7515 §A.2 published JWS for HS-style claims; signature is deterministic for RSASSA-PKCS1-v1_5.
-  private static final String RS256_JWS =
-      "eyJhbGciOiJSUzI1NiJ9"
-          + ".eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ"
-          + ".cC4hiUPoj9Eetdgtv3hF80EGrhuB__dzERat0XF9g2VtQgr9PJbu3XOiZj5RZmh7AAuHIm4Bh-0Qc_lF5YKt_O8W2Fp5jujGbds9uJdbF9CUAr7t1dnZcAcQjbKBYNX4BAynRFdiuB--f_nZLgrnbyTyWzO75vRK5h6xBArLIARNPvkSjtQBMHlb1L07Qe7K0GarZRmB_eSN9383LcOLn6_dO--xi12jzDwusC-eOkHWEsqtFZESc6BfI7noOPqvhJ1phCnvWh6IeYI2w9QOYEUipUTI8np6LbgGY9Fs98rqVt5AXLIhWkWywlVmtVrBp0igcN_IoypGlUPQGe77Rw";
-
-  // RFC 7515 §A.3 published EC P-256 public key.
-  private static final BigInteger ES256_X = b64uPositive("f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU");
-
-  private static final BigInteger ES256_Y = b64uPositive("x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0");
-
-  private static final String ES256_JWS =
-      "eyJhbGciOiJFUzI1NiJ9"
-          + ".eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ"
-          + ".DtEhU3ljbEg8L38VWAfUAqOyKAM6-Xx-F4GawxaepmXFCgfTjDxw5djxLa8ISlSApmWQxfKTUJqPP3-Kg6NU1Q";
-
-  // RFC 7515 §A.4 published EC P-521 public key.
-  private static final BigInteger ES512_X = b64uPositive("AekpBQ8ST8a8VcfVOTNl353vSrDCLLJXmPk06wTjxrrjcBpXp5EOnYG_NjFZ6OvLFV1jSfS9tsz4qUxcWceqwQGk");
-
-  private static final BigInteger ES512_Y = b64uPositive("ADSmRA43Z1DSNx_RvcLI87cdL07l6jQyyBXMoxVg_l2Th-x3S1WDhjDly79ajL4Kkd0AZMaZmh9ubmf63e3kyMj2");
-
-  private static final String ES512_JWS =
-      "eyJhbGciOiJFUzUxMiJ9"
-          + ".UGF5bG9hZA"
-          + ".AdwMgeerwtHoh-l192l60hp9wAHZFVJbLfD_UxMi70cwnZOYaRI1bKPWROc-mZZqwqT2SI-KGDKB34XO0aw_7XdtAG8GaSwFKdCAPZgoXD2YBJZCPEX3xKpRwcdOO8KpEHwJjyqOgzDO7iKvU8vcnwNrmxYbSW9ERBXukOXolLzeO_Jn";
-
-  private static PublicKey rsaPublic(BigInteger n, BigInteger e) {
-    try {
-      return KeyFactory.getInstance("RSA").generatePublic(new RSAPublicKeySpec(n, e));
-    } catch (Exception ex) {
-      throw new RuntimeException(ex);
-    }
+  private static BigInteger b64uPositive(String in) {
+    return new BigInteger(1, b64u(in));
   }
 
   private static PublicKey ecPublic(String curveName, BigInteger x, BigInteger y) {
@@ -125,16 +101,22 @@ public class RFC7515VectorsTest extends BaseJWTTest {
     }
   }
 
+  private static PublicKey rsaPublic(BigInteger n, BigInteger e) {
+    try {
+      return KeyFactory.getInstance("RSA").generatePublic(new RSAPublicKeySpec(n, e));
+    } catch (Exception ex) {
+      throw new RuntimeException(ex);
+    }
+  }
+
   /**
-   * The published RFC 7515 vectors have {@code exp:1300819380} (March 2011),
-   * which is in the past. Decoding with a real clock would raise
-   * {@link JWTExpiredException}; we pin the clock to a moment before the
-   * vector's {@code exp}.
+   * The published RFC 7515 vectors have {@code exp:1300819380} (March 2011), which is in the past. Decoding with a real
+   * clock would raise {@link JWTExpiredException}; we pin the clock to a moment before the vector's {@code exp}.
    */
   private static JWTDecoder vectorClockDecoder() {
     return JWTDecoder.builder()
-        .fixedTime(java.time.Instant.ofEpochSecond(1300819300L))
-        .build();
+                     .fixedTime(java.time.Instant.ofEpochSecond(1300819300L))
+                     .build();
   }
 
   @Test

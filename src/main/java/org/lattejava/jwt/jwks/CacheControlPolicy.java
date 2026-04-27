@@ -24,12 +24,15 @@
 package org.lattejava.jwt.jwks;
 
 /**
- * Governs how {@code JWKS} interprets the JWKS endpoint's
- * {@code Cache-Control} response header.
+ * Governs how {@code JWKS} interprets the JWKS endpoint's {@code Cache-Control} response header.
  */
 public enum CacheControlPolicy {
-  /** Clamp the server's {@code max-age} into {@code [minRefreshInterval, refreshInterval]}. */
+  /**
+   * Clamp the server's {@code max-age} into {@code [minRefreshInterval, refreshInterval]}.
+   */
   CLAMP,
-  /** Ignore the server's {@code max-age}; always refresh on the configured interval. */
+  /**
+   * Ignore the server's {@code max-age}; always refresh on the configured interval.
+   */
   IGNORE
 }

@@ -23,20 +23,24 @@
 
 package org.lattejava.jwt.internal.http;
 
-import com.sun.net.httpserver.HttpServer;
-import org.lattejava.jwt.BaseTest;
-import org.testng.annotations.Test;
+import java.io.*;
+import java.net.*;
 
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.InetSocketAddress;
-import java.net.URL;
+import com.sun.net.httpserver.*;
+import org.lattejava.jwt.*;
+import org.testng.annotations.*;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
+import static org.testng.Assert.*;
 
 public class AbstractHTTPHelperTest extends BaseTest {
+  private static String readAll(InputStream is) {
+    try {
+      return new String(is.readAllBytes());
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   @Test
   public void get_with_same_origin_only_allows_same_origin_redirects() throws Exception {
     HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
@@ -149,14 +153,6 @@ public class AbstractHTTPHelperTest extends BaseTest {
     } finally {
       src.stop(0);
       dst.stop(0);
-    }
-  }
-
-  private static String readAll(InputStream is) {
-    try {
-      return new String(is.readAllBytes());
-    } catch (Exception e) {
-      throw new RuntimeException(e);
     }
   }
 }

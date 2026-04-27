@@ -23,109 +23,49 @@
 
 package org.lattejava.jwt.internal;
 
-import org.bouncycastle.jcajce.provider.BouncyCastleFipsProvider;
-import org.testng.annotations.DataProvider;
-import org.testng.annotations.Test;
+import java.nio.charset.*;
+import java.security.*;
+import java.util.*;
+import java.util.concurrent.atomic.*;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.Provider;
-import java.security.ProviderException;
-import java.security.Security;
-import java.util.HexFormat;
-import java.util.Random;
-import java.util.concurrent.atomic.AtomicInteger;
+import org.bouncycastle.jcajce.provider.*;
+import org.testng.annotations.*;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 /**
  * Tests for {@link SHAKE256}.
  *
  * <p>NIST CAVP SHAKE256 KAT vectors plus cross-validation against
- * BouncyCastle's {@code SHAKEDigest(256)} (test-scope only) and
- * provider-preference fall-back semantics.</p>
+ * BouncyCastle's {@code SHAKEDigest(256)} (test-scope only) and provider-preference fall-back semantics.</p>
  *
  * @author Daniel DeGroff
  */
 public class SHAKE256Test {
 
-  private static final HexFormat HEX = HexFormat.of();
-
-  // NIST SHAKE-256 KAT (well-known): empty input, first 64 output bytes
-  private static final String EMPTY_KAT_64 =
-      "46b9dd2b0ba88d13233b3feb743eeb243fcd52ea62b81b82b50c27646ed5762f"
-          + "d75dc4ddd8c0f200cb05019d67b592f6fc821c49479ab48640292eacb3b7c4be";
-
   // NIST SHAKE-256 KAT: input "abc", first 64 output bytes
   private static final String ABC_KAT_64 =
       "483366601360a8771c6863080cc4114d8db44530f8f1e1ee4f94ea37e78b5739"
           + "d5a15bef186a5386c75744c0527e1faa9f8726e462a12a4feb06bd8801e751e4";
+  private static final Provider BC_FIPS = new BouncyCastleFipsProvider();
+  // NIST SHAKE-256 KAT (well-known): empty input, first 64 output bytes
+  private static final String EMPTY_KAT_64 =
+      "46b9dd2b0ba88d13233b3feb743eeb243fcd52ea62b81b82b50c27646ed5762f"
+          + "d75dc4ddd8c0f200cb05019d67b592f6fc821c49479ab48640292eacb3b7c4be";
+  private static final HexFormat HEX = HexFormat.of();
 
-  @DataProvider(name = "katVectors")
-  public Object[][] katVectors() {
-    return new Object[][] {
-        {"empty 64", new byte[0], 64, EMPTY_KAT_64},
-        {"abc 64", "abc".getBytes(StandardCharsets.US_ASCII), 64, ABC_KAT_64},
-        // 32 / 57 / 64 / 128 byte slices for the same input — all derived from
-        // the empty-input squeeze stream above (variable output length is the
-        // same byte stream truncated/extended).
-        {"empty 32", new byte[0], 32, EMPTY_KAT_64.substring(0, 64)},
-        {"empty 57", new byte[0], 57, EMPTY_KAT_64.substring(0, 114)}
-    };
-  }
-
-  @Test(dataProvider = "katVectors")
-  public void katVector(String name, byte[] input, int outputBytes, String expectedHex) {
-    // Use case: NIST CAVP KAT vectors match for empty / abc / variable lengths.
-    byte[] actual = SHAKE256.digest(input, outputBytes);
-    assertEquals(actual.length, outputBytes, name + " length");
-    assertEquals(HEX.formatHex(actual), expectedHex, name);
-  }
-
-  @Test
-  public void variableLength_128() {
-    // Use case: 128-byte squeeze (extends past first sponge block) is internally
-    // consistent: re-running the bundled implementation produces identical bytes
-    // and the prefix matches the 64-byte output (SHAKE is a stream cipher of
-    // sorts; the first N bytes of any longer squeeze equal the squeeze of N).
-    byte[] long128 = SHAKE256.digest(new byte[0], 128);
-    byte[] short64 = SHAKE256.digest(new byte[0], 64);
-    byte[] prefix = new byte[64];
-    System.arraycopy(long128, 0, prefix, 0, 64);
-    assertEquals(prefix, short64, "first 64 bytes of 128-byte squeeze must equal 64-byte squeeze");
-    // Confirm against the documented NIST vector for empty input.
-    assertEquals(HEX.formatHex(short64), EMPTY_KAT_64);
-  }
-
-  @Test
-  public void crossValidationAgainstBouncyCastle() {
-    // Use case: bundled implementation matches BouncyCastle's JCE-registered
-    // SHAKE256 (which produces a fixed 64-byte output) for both empty and
-    // randomized inputs (cross-validation).
-    Random r = new Random(0xCAFEBABEL);
-    for (int trial = 0; trial < 64; trial++) {
-      int inLen = r.nextInt(300);
-      byte[] input = new byte[inLen];
-      r.nextBytes(input);
-      byte[] expected = bcShake64(input);
-      byte[] actual = SHAKE256.digest(input, 64);
-      assertEquals(actual, expected, "trial=" + trial + " inLen=" + inLen);
+  /**
+   * BouncyCastle FIPS exposes SHAKE256 via JCE as a fixed 64-byte digest; the variable-length API is not surfaced. For
+   * cross-validation we read the full 64 bytes and slice as needed.
+   */
+  private static byte[] bcShake64(byte[] input) {
+    try {
+      MessageDigest md = MessageDigest.getInstance("SHAKE256", BC_FIPS);
+      md.update(input);
+      return md.digest();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
     }
-  }
-
-  @Test
-  public void shake256_57Bytes() {
-    // Use case: 57-byte output (used by Ed448 at_hash/c_hash) — verified against
-    // the 64-byte BC reference (truncated to 57).
-    byte[] input = "openid-connect-at-hash-input".getBytes(StandardCharsets.UTF_8);
-    byte[] expected64 = bcShake64(input);
-    byte[] actual = SHAKE256.digest(input, 57);
-    assertEquals(actual.length, 57);
-    byte[] expected57 = new byte[57];
-    System.arraycopy(expected64, 0, expected57, 0, 57);
-    assertEquals(actual, expected57);
   }
 
   @Test
@@ -160,6 +100,43 @@ public class SHAKE256Test {
   }
 
   @Test
+  public void crossValidationAgainstBouncyCastle() {
+    // Use case: bundled implementation matches BouncyCastle's JCE-registered
+    // SHAKE256 (which produces a fixed 64-byte output) for both empty and
+    // randomized inputs (cross-validation).
+    Random r = new Random(0xCAFEBABEL);
+    for (int trial = 0; trial < 64; trial++) {
+      int inLen = r.nextInt(300);
+      byte[] input = new byte[inLen];
+      r.nextBytes(input);
+      byte[] expected = bcShake64(input);
+      byte[] actual = SHAKE256.digest(input, 64);
+      assertEquals(actual, expected, "trial=" + trial + " inLen=" + inLen);
+    }
+  }
+
+  @Test(dataProvider = "katVectors")
+  public void katVector(String name, byte[] input, int outputBytes, String expectedHex) {
+    // Use case: NIST CAVP KAT vectors match for empty / abc / variable lengths.
+    byte[] actual = SHAKE256.digest(input, outputBytes);
+    assertEquals(actual.length, outputBytes, name + " length");
+    assertEquals(HEX.formatHex(actual), expectedHex, name);
+  }
+
+  @DataProvider(name = "katVectors")
+  public Object[][] katVectors() {
+    return new Object[][]{
+        {"empty 64", new byte[0], 64, EMPTY_KAT_64},
+        {"abc 64", "abc".getBytes(StandardCharsets.US_ASCII), 64, ABC_KAT_64},
+        // 32 / 57 / 64 / 128 byte slices for the same input — all derived from
+        // the empty-input squeeze stream above (variable output length is the
+        // same byte stream truncated/extended).
+        {"empty 32", new byte[0], 32, EMPTY_KAT_64.substring(0, 64)},
+        {"empty 57", new byte[0], 57, EMPTY_KAT_64.substring(0, 114)}
+    };
+  }
+
+  @Test
   public void noProviderUsesBundled() {
     // Use case: When no SHAKE256 provider is registered (stock JDK), the
     // bundled implementation is used and produces correct output.
@@ -185,51 +162,41 @@ public class SHAKE256Test {
     SHAKE256.digest(null, 32);
   }
 
-  private static final Provider BC_FIPS = new BouncyCastleFipsProvider();
+  @Test
+  public void shake256_57Bytes() {
+    // Use case: 57-byte output (used by Ed448 at_hash/c_hash) — verified against
+    // the 64-byte BC reference (truncated to 57).
+    byte[] input = "openid-connect-at-hash-input".getBytes(StandardCharsets.UTF_8);
+    byte[] expected64 = bcShake64(input);
+    byte[] actual = SHAKE256.digest(input, 57);
+    assertEquals(actual.length, 57);
+    byte[] expected57 = new byte[57];
+    System.arraycopy(expected64, 0, expected57, 0, 57);
+    assertEquals(actual, expected57);
+  }
 
-  /**
-   * BouncyCastle FIPS exposes SHAKE256 via JCE as a fixed 64-byte digest;
-   * the variable-length API is not surfaced. For cross-validation we read
-   * the full 64 bytes and slice as needed.
-   */
-  private static byte[] bcShake64(byte[] input) {
-    try {
-      MessageDigest md = MessageDigest.getInstance("SHAKE256", BC_FIPS);
-      md.update(input);
-      return md.digest();
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+  @Test
+  public void variableLength_128() {
+    // Use case: 128-byte squeeze (extends past first sponge block) is internally
+    // consistent: re-running the bundled implementation produces identical bytes
+    // and the prefix matches the 64-byte output (SHAKE is a stream cipher of
+    // sorts; the first N bytes of any longer squeeze equal the squeeze of N).
+    byte[] long128 = SHAKE256.digest(new byte[0], 128);
+    byte[] short64 = SHAKE256.digest(new byte[0], 64);
+    byte[] prefix = new byte[64];
+    System.arraycopy(long128, 0, prefix, 0, 64);
+    assertEquals(prefix, short64, "first 64 bytes of 128-byte squeeze must equal 64-byte squeeze");
+    // Confirm against the documented NIST vector for empty input.
+    assertEquals(HEX.formatHex(short64), EMPTY_KAT_64);
   }
 
   /**
-   * Broken Provider used to validate the probe self-test path.
-   *
-   * <p>Registers via {@code putService(...)} with an overridden
-   * {@link Service#newInstance(Object)} rather than the legacy class-name
-   * form. The legacy form requires JCA ({@code java.base}) to reflectively
-   * instantiate the impl class — which fails with {@code IllegalAccessException}
-   * because {@code org.lattejava.jwt.internal} is not opened to {@code java.base}
-   * in this module. When that happens, JCA silently falls through to the next
-   * provider offering SHAKE256 (e.g. BC-FIPS under {@code test.fips=true}),
-   * which defeats the purpose of this test.
+   * Always returns all-zeros; will fail the KAT self-test.
    */
-  private static final class BrokenShakeProvider extends Provider {
-    BrokenShakeProvider() {
-      super("BrokenShake", "1.0", "Test-only broken SHAKE256 provider");
-      putService(new Service(this, "MessageDigest", "SHAKE256",
-          BrokenShakeMessageDigest.class.getName(), null, null) {
-        @Override
-        public Object newInstance(Object constructorParameter) {
-          return new BrokenShakeMessageDigest();
-        }
-      });
-    }
-  }
-
-  /** Always returns all-zeros; will fail the KAT self-test. */
   public static final class BrokenShakeMessageDigest extends MessageDigest {
-    /** Counts instantiations so tests can assert the service was actually consulted. */
+    /**
+     * Counts instantiations so tests can assert the service was actually consulted.
+     */
     static final AtomicInteger INSTANTIATIONS = new AtomicInteger();
 
     private int outLen = 32;
@@ -237,14 +204,6 @@ public class SHAKE256Test {
     public BrokenShakeMessageDigest() {
       super("SHAKE256");
       INSTANTIATIONS.incrementAndGet();
-    }
-
-    @Override
-    protected void engineUpdate(byte input) {
-    }
-
-    @Override
-    protected void engineUpdate(byte[] input, int offset, int len) {
     }
 
     @Override
@@ -265,12 +224,43 @@ public class SHAKE256Test {
     }
 
     @Override
+    protected int engineGetDigestLength() {
+      return 0; // SHAKE is variable-length
+    }
+
+    @Override
     protected void engineReset() {
     }
 
     @Override
-    protected int engineGetDigestLength() {
-      return 0; // SHAKE is variable-length
+    protected void engineUpdate(byte input) {
+    }
+
+    @Override
+    protected void engineUpdate(byte[] input, int offset, int len) {
+    }
+  }
+
+  /**
+   * Broken Provider used to validate the probe self-test path.
+   *
+   * <p>Registers via {@code putService(...)} with an overridden
+   * {@link Service#newInstance(Object)} rather than the legacy class-name form. The legacy form requires JCA
+   * ({@code java.base}) to reflectively instantiate the impl class — which fails with {@code IllegalAccessException}
+   * because {@code org.lattejava.jwt.internal} is not opened to {@code java.base} in this module. When that happens,
+   * JCA silently falls through to the next provider offering SHAKE256 (e.g. BC-FIPS under {@code test.fips=true}),
+   * which defeats the purpose of this test.
+   */
+  private static final class BrokenShakeProvider extends Provider {
+    BrokenShakeProvider() {
+      super("BrokenShake", "1.0", "Test-only broken SHAKE256 provider");
+      putService(new Service(this, "MessageDigest", "SHAKE256",
+          BrokenShakeMessageDigest.class.getName(), null, null) {
+        @Override
+        public Object newInstance(Object constructorParameter) {
+          return new BrokenShakeMessageDigest();
+        }
+      });
     }
   }
 }

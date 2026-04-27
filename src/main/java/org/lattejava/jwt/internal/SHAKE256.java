@@ -23,36 +23,53 @@
 
 package org.lattejava.jwt.internal;
 
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.Provider;
-import java.util.Objects;
+import java.security.*;
+import java.util.*;
 
 /**
- * Internal FIPS 202 SHAKE256 implementation used exclusively by
- * {@code OpenIDConnect} for the Ed448 {@code at_hash} / {@code c_hash} path.
+ * Internal FIPS 202 SHAKE256 implementation used exclusively by {@code OpenIDConnect} for the Ed448 {@code at_hash} /
+ * {@code c_hash} path.
  *
  * <p>Self-contained Keccak-f[1600] sponge (rate=1088 bits, capacity=512 bits,
- * domain separator {@code 0x1F}) per FIPS 202 §3 / §6.2. Not registered as a
- * JCA service. Not part of the public API; serves exactly one internal caller.
+ * domain separator {@code 0x1F}) per FIPS 202 §3 / §6.2. Not registered as a JCA service. Not part of the public API;
+ * serves exactly one internal caller.
  *
  * <p><b>Provider preference (FIPS-aware).</b> The first call to
- * {@link #digest(byte[], int)} probes for a JCA-registered {@code SHAKE256}
- * provider. The probe runs a one-shot KAT against a known input/output pair
- * and only caches the provider on a successful self-test (this protects
- * against partial or broken provider registrations). On any failure (no
- * provider, getInstance error, KAT mismatch, exception) the bundled
- * implementation is used and the result of the probe is cached for the
- * lifetime of the VM.
+ * {@link #digest(byte[], int)} probes for a JCA-registered {@code SHAKE256} provider. The probe runs a one-shot KAT
+ * against a known input/output pair and only caches the provider on a successful self-test (this protects against
+ * partial or broken provider registrations). On any failure (no provider, getInstance error, KAT mismatch, exception)
+ * the bundled implementation is used and the result of the probe is cached for the lifetime of the VM.
  *
  * <p><b>Provenance.</b> The bundled implementation is derived from the public
- * domain Keccak / FIPS 202 reference (XKCP / tiny_sha3 style). It is
- * deterministically equivalent to any FIPS 202 conformant implementation.
+ * domain Keccak / FIPS 202 reference (XKCP / tiny_sha3 style). It is deterministically equivalent to any FIPS 202
+ * conformant implementation.
  *
  * @author Daniel DeGroff
  */
 public final class SHAKE256 {
 
+  private static final byte[] KAT_EXPECTED = hexToBytes(
+      "46b9dd2b0ba88d13233b3feb743eeb243fcd52ea62b81b82b50c27646ed5762f"
+          + "d75dc4ddd8c0f200cb05019d67b592f6fc821c49479ab48640292eacb3b7c4be");
+  // KAT: empty input → first 64 SHAKE256 output bytes. Used by the probe
+  // self-test. This is a NIST CAVP-equivalent vector. We use 64 because some
+  // JCE providers (notably BC-FIPS) expose SHAKE256 only via the fixed-output
+  // MessageDigest.digest() API (returning 64 bytes); the variable-length
+  // digest(buf, off, len) is not surfaced through JCA.
+  private static final byte[] KAT_INPUT = new byte[0];
+  private static final int KAT_OUT_LEN = 64;
+  private static final Object PROBE_LOCK = new Object();
+  // FIPS 202 §3.2.2 rho rotation offsets, indexed by lane index 0..24
+  // (row-major: i = x + 5*y).
+  private static final int[] R = {
+      0, 1, 62, 28, 27,
+      36, 44, 6, 55, 20,
+      3, 10, 43, 25, 39,
+      41, 45, 15, 21, 8,
+      18, 2, 61, 56, 14
+  };
+  // SHAKE256 sponge: rate r = 1088 bits = 136 bytes; capacity c = 512 bits.
+  private static final int RATE_BYTES = 136;
   // FIPS 202 §3.2.5 round constants for Keccak-f[1600].
   private static final long[] RC = {
       0x0000000000000001L, 0x0000000000008082L, 0x800000000000808aL,
@@ -64,47 +81,28 @@ public final class SHAKE256 {
       0x000000000000800aL, 0x800000008000000aL, 0x8000000080008081L,
       0x8000000000008080L, 0x0000000080000001L, 0x8000000080008008L
   };
-
-  // FIPS 202 §3.2.2 rho rotation offsets, indexed by lane index 0..24
-  // (row-major: i = x + 5*y).
-  private static final int[] R = {
-      0,  1,  62, 28, 27,
-      36, 44, 6,  55, 20,
-      3,  10, 43, 25, 39,
-      41, 45, 15, 21,  8,
-      18,  2, 61, 56, 14
-  };
-
-  // SHAKE256 sponge: rate r = 1088 bits = 136 bytes; capacity c = 512 bits.
-  private static final int RATE_BYTES = 136;
-
-  // KAT: empty input → first 64 SHAKE256 output bytes. Used by the probe
-  // self-test. This is a NIST CAVP-equivalent vector. We use 64 because some
-  // JCE providers (notably BC-FIPS) expose SHAKE256 only via the fixed-output
-  // MessageDigest.digest() API (returning 64 bytes); the variable-length
-  // digest(buf, off, len) is not surfaced through JCA.
-  private static final byte[] KAT_INPUT = new byte[0];
-  private static final int KAT_OUT_LEN = 64;
-  private static final byte[] KAT_EXPECTED = hexToBytes(
-      "46b9dd2b0ba88d13233b3feb743eeb243fcd52ea62b81b82b50c27646ed5762f"
-          + "d75dc4ddd8c0f200cb05019d67b592f6fc821c49479ab48640292eacb3b7c4be");
-
+  private static volatile Provider cachedProvider = null;
   // Provider cache. `probed` becomes true after the first probe attempt;
   // `cachedProvider` is non-null only on a successful KAT self-test.
   private static volatile boolean probed = false;
-  private static volatile Provider cachedProvider = null;
-  private static final Object PROBE_LOCK = new Object();
 
   private SHAKE256() {
+  }
+
+  /**
+   * Test-only hook returning the cached provider name (or null).
+   */
+  public static String cachedProviderNameForTesting() {
+    Provider p = cachedProvider;
+    return p == null ? null : p.getName();
   }
 
   /**
    * Returns {@code outputBytes} of SHAKE256 output for {@code input}.
    *
    * <p>Prefers a JCE-registered {@code SHAKE256} provider that passes an
-   * internal KAT self-test; otherwise falls back to the bundled FIPS 202
-   * implementation. The provider/bundled decision is cached for the VM
-   * lifetime after the first call.
+   * internal KAT self-test; otherwise falls back to the bundled FIPS 202 implementation. The provider/bundled decision
+   * is cached for the VM lifetime after the first call.
    *
    * @param input       the message to hash; must be non-null
    * @param outputBytes the desired output length in bytes; must be > 0
@@ -134,92 +132,23 @@ public final class SHAKE256 {
   }
 
   /**
-   * Attempts to compute SHAKE256({@code input}) of {@code outputBytes} via
-   * the given provider. Returns {@code null} if the provider cannot satisfy
-   * the request (e.g., its JCA service exposes only a fixed-length output
-   * shorter than {@code outputBytes}, or any other failure).
+   * Test-only hook reporting whether a provider is currently cached.
    */
-  private static byte[] tryProvider(Provider p, byte[] input, int outputBytes) {
-    try {
-      MessageDigest md = MessageDigest.getInstance("SHAKE256", p);
-      md.update(input);
-      // Try the variable-length API first; some providers support it.
-      try {
-        byte[] out = new byte[outputBytes];
-        int written = md.digest(out, 0, outputBytes);
-        if (written == outputBytes) {
-          return out;
-        }
-      } catch (Exception ignore) {
-        // API-variant probe: not every provider implements the variable-length digest(buf, off, len) API
-        // for SHAKE256. Any failure (UnsupportedOperationException, DigestException, provider-specific
-        // RuntimeExceptions) means this API path isn't available and we fall through to the fixed-length
-        // digest() below. md is now in an indeterminate state after a partial digest attempt; rebuild.
-        md = MessageDigest.getInstance("SHAKE256", p);
-        md.update(input);
-      }
-      // Try the fixed-length API. Useful for providers that expose SHAKE256
-      // only as a fixed 64-byte output (e.g., BC-FIPS via JCA).
-      byte[] full = md.digest();
-      if (full.length >= outputBytes) {
-        if (full.length == outputBytes) {
-          return full;
-        }
-        byte[] sliced = new byte[outputBytes];
-        System.arraycopy(full, 0, sliced, 0, outputBytes);
-        return sliced;
-      }
-      return null;
-    } catch (Exception e) {
-      return null;
-    }
-  }
-
-  private static Provider resolveProvider() {
-    if (probed) {
-      return cachedProvider;
-    }
-    synchronized (PROBE_LOCK) {
-      if (probed) {
-        return cachedProvider;
-      }
-      Provider candidate = null;
-      try {
-        // Discover the highest-priority provider for SHAKE256, then run an
-        // end-to-end KAT against it via the same code path the runtime uses.
-        MessageDigest probe = MessageDigest.getInstance("SHAKE256");
-        Provider probeProvider = probe.getProvider();
-        byte[] result = tryProvider(probeProvider, KAT_INPUT, KAT_OUT_LEN);
-        if (result != null && MessageDigest.isEqual(result, KAT_EXPECTED)) {
-          candidate = probeProvider;
-        }
-      } catch (NoSuchAlgorithmException e) {
-        // No provider; bundled path
-      } catch (Exception e) {
-        // Any other failure; bundled path
-      }
-      cachedProvider = candidate;
-      probed = true;
-      return candidate;
-    }
+  public static boolean hasCachedProviderForTesting() {
+    return cachedProvider != null;
   }
 
   /**
-   * Returns the JCA provider name SHAKE256 will use, or {@code null} if the
-   * bundled FIPS 202 implementation is in effect. Useful for FIPS
-   * observability: callers running under a FIPS-approved JCE can confirm
-   * that the provider's SHAKE256 service was discovered and passed the
-   * internal KAT self-test (returns the provider name) versus silently
-   * falling back to the bundled implementation (returns {@code null},
-   * which is NOT a FIPS-approved code path).
+   * Returns the JCA provider name SHAKE256 will use, or {@code null} if the bundled FIPS 202 implementation is in
+   * effect. Useful for FIPS observability: callers running under a FIPS-approved JCE can confirm that the provider's
+   * SHAKE256 service was discovered and passed the internal KAT self-test (returns the provider name) versus silently
+   * falling back to the bundled implementation (returns {@code null}, which is NOT a FIPS-approved code path).
    *
    * <p>This call triggers the one-time probe on first invocation (the same
-   * probe used by {@link #digest(byte[], int)}), so subsequent calls and
-   * subsequent {@code digest(...)} invocations observe a stable result for
-   * the lifetime of the VM.
+   * probe used by {@link #digest(byte[], int)}), so subsequent calls and subsequent {@code digest(...)} invocations
+   * observe a stable result for the lifetime of the VM.
    *
-   * @return the resolved JCA provider name, or {@code null} if the bundled
-   *         implementation is in use
+   * @return the resolved JCA provider name, or {@code null} if the bundled implementation is in use
    */
   public static String providerName() {
     Provider p = resolveProvider();
@@ -227,9 +156,8 @@ public final class SHAKE256 {
   }
 
   /**
-   * Test-only hook to clear the cached provider state so a subsequent call
-   * re-runs the probe. Public for cross-package test access; not part of the
-   * supported public API.
+   * Test-only hook to clear the cached provider state so a subsequent call re-runs the probe. Public for cross-package
+   * test access; not part of the supported public API.
    */
   public static void resetProviderCacheForTesting() {
     synchronized (PROBE_LOCK) {
@@ -237,21 +165,6 @@ public final class SHAKE256 {
       cachedProvider = null;
     }
   }
-
-  /** Test-only hook reporting whether a provider is currently cached. */
-  public static boolean hasCachedProviderForTesting() {
-    return cachedProvider != null;
-  }
-
-  /** Test-only hook returning the cached provider name (or null). */
-  public static String cachedProviderNameForTesting() {
-    Provider p = cachedProvider;
-    return p == null ? null : p.getName();
-  }
-
-  // ---------------------------------------------------------------------
-  // Bundled FIPS 202 SHAKE256 implementation
-  // ---------------------------------------------------------------------
 
   private static byte[] bundledShake256(byte[] input, int outputBytes) {
     long[] state = new long[25];
@@ -289,13 +202,6 @@ public final class SHAKE256 {
     return out;
   }
 
-  private static void xorBlockIntoState(long[] state, byte[] in, int off) {
-    // RATE_BYTES = 136 = 17 lanes (8 bytes each).
-    for (int i = 0; i < 17; i++) {
-      state[i] ^= readLane(in, off + i * 8);
-    }
-  }
-
   private static void extractBlockFromState(long[] state, byte[] out, int off, int len) {
     int laneCount = len / 8;
     for (int i = 0; i < laneCount; i++) {
@@ -310,31 +216,23 @@ public final class SHAKE256 {
     }
   }
 
-  private static long readLane(byte[] in, int off) {
-    return ((long) (in[off] & 0xFF))
-        | ((long) (in[off + 1] & 0xFF)) << 8
-        | ((long) (in[off + 2] & 0xFF)) << 16
-        | ((long) (in[off + 3] & 0xFF)) << 24
-        | ((long) (in[off + 4] & 0xFF)) << 32
-        | ((long) (in[off + 5] & 0xFF)) << 40
-        | ((long) (in[off + 6] & 0xFF)) << 48
-        | ((long) (in[off + 7] & 0xFF)) << 56;
-  }
+  // ---------------------------------------------------------------------
+  // Bundled FIPS 202 SHAKE256 implementation
+  // ---------------------------------------------------------------------
 
-  private static void writeLane(long lane, byte[] out, int off) {
-    out[off]     = (byte) (lane);
-    out[off + 1] = (byte) (lane >>> 8);
-    out[off + 2] = (byte) (lane >>> 16);
-    out[off + 3] = (byte) (lane >>> 24);
-    out[off + 4] = (byte) (lane >>> 32);
-    out[off + 5] = (byte) (lane >>> 40);
-    out[off + 6] = (byte) (lane >>> 48);
-    out[off + 7] = (byte) (lane >>> 56);
+  private static byte[] hexToBytes(String hex) {
+    int n = hex.length();
+    byte[] out = new byte[n / 2];
+    for (int i = 0; i < n; i += 2) {
+      out[i / 2] = (byte) ((Character.digit(hex.charAt(i), 16) << 4)
+          | Character.digit(hex.charAt(i + 1), 16));
+    }
+    return out;
   }
 
   /**
-   * Keccak-f[1600] permutation per FIPS 202 §3.2. State is 25 lanes
-   * organized as a 5x5 matrix (column-major: lane(x,y) = state[x + 5*y]).
+   * Keccak-f[1600] permutation per FIPS 202 §3.2. State is 25 lanes organized as a 5x5 matrix (column-major: lane(x,y)
+   * = state[x + 5*y]).
    */
   private static void keccakF1600(long[] s) {
     long[] C = new long[5];
@@ -366,7 +264,7 @@ public final class SHAKE256 {
         long b2 = B[y + 2];
         long b3 = B[y + 3];
         long b4 = B[y + 4];
-        s[y]     = b0 ^ ((~b1) & b2);
+        s[y] = b0 ^ ((~b1) & b2);
         s[y + 1] = b1 ^ ((~b2) & b3);
         s[y + 2] = b2 ^ ((~b3) & b4);
         s[y + 3] = b3 ^ ((~b4) & b0);
@@ -377,13 +275,102 @@ public final class SHAKE256 {
     }
   }
 
-  private static byte[] hexToBytes(String hex) {
-    int n = hex.length();
-    byte[] out = new byte[n / 2];
-    for (int i = 0; i < n; i += 2) {
-      out[i / 2] = (byte) ((Character.digit(hex.charAt(i), 16) << 4)
-          | Character.digit(hex.charAt(i + 1), 16));
+  private static long readLane(byte[] in, int off) {
+    return ((long) (in[off] & 0xFF))
+        | ((long) (in[off + 1] & 0xFF)) << 8
+        | ((long) (in[off + 2] & 0xFF)) << 16
+        | ((long) (in[off + 3] & 0xFF)) << 24
+        | ((long) (in[off + 4] & 0xFF)) << 32
+        | ((long) (in[off + 5] & 0xFF)) << 40
+        | ((long) (in[off + 6] & 0xFF)) << 48
+        | ((long) (in[off + 7] & 0xFF)) << 56;
+  }
+
+  private static Provider resolveProvider() {
+    if (probed) {
+      return cachedProvider;
     }
-    return out;
+    synchronized (PROBE_LOCK) {
+      if (probed) {
+        return cachedProvider;
+      }
+      Provider candidate = null;
+      try {
+        // Discover the highest-priority provider for SHAKE256, then run an
+        // end-to-end KAT against it via the same code path the runtime uses.
+        MessageDigest probe = MessageDigest.getInstance("SHAKE256");
+        Provider probeProvider = probe.getProvider();
+        byte[] result = tryProvider(probeProvider, KAT_INPUT, KAT_OUT_LEN);
+        if (result != null && MessageDigest.isEqual(result, KAT_EXPECTED)) {
+          candidate = probeProvider;
+        }
+      } catch (NoSuchAlgorithmException e) {
+        // No provider; bundled path
+      } catch (Exception e) {
+        // Any other failure; bundled path
+      }
+      cachedProvider = candidate;
+      probed = true;
+      return candidate;
+    }
+  }
+
+  /**
+   * Attempts to compute SHAKE256({@code input}) of {@code outputBytes} via the given provider. Returns {@code null} if
+   * the provider cannot satisfy the request (e.g., its JCA service exposes only a fixed-length output shorter than
+   * {@code outputBytes}, or any other failure).
+   */
+  private static byte[] tryProvider(Provider p, byte[] input, int outputBytes) {
+    try {
+      MessageDigest md = MessageDigest.getInstance("SHAKE256", p);
+      md.update(input);
+      // Try the variable-length API first; some providers support it.
+      try {
+        byte[] out = new byte[outputBytes];
+        int written = md.digest(out, 0, outputBytes);
+        if (written == outputBytes) {
+          return out;
+        }
+      } catch (Exception ignore) {
+        // API-variant probe: not every provider implements the variable-length digest(buf, off, len) API
+        // for SHAKE256. Any failure (UnsupportedOperationException, DigestException, provider-specific
+        // RuntimeExceptions) means this API path isn't available and we fall through to the fixed-length
+        // digest() below. md is now in an indeterminate state after a partial digest attempt; rebuild.
+        md = MessageDigest.getInstance("SHAKE256", p);
+        md.update(input);
+      }
+      // Try the fixed-length API. Useful for providers that expose SHAKE256
+      // only as a fixed 64-byte output (e.g., BC-FIPS via JCA).
+      byte[] full = md.digest();
+      if (full.length >= outputBytes) {
+        if (full.length == outputBytes) {
+          return full;
+        }
+        byte[] sliced = new byte[outputBytes];
+        System.arraycopy(full, 0, sliced, 0, outputBytes);
+        return sliced;
+      }
+      return null;
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  private static void writeLane(long lane, byte[] out, int off) {
+    out[off] = (byte) (lane);
+    out[off + 1] = (byte) (lane >>> 8);
+    out[off + 2] = (byte) (lane >>> 16);
+    out[off + 3] = (byte) (lane >>> 24);
+    out[off + 4] = (byte) (lane >>> 32);
+    out[off + 5] = (byte) (lane >>> 40);
+    out[off + 6] = (byte) (lane >>> 48);
+    out[off + 7] = (byte) (lane >>> 56);
+  }
+
+  private static void xorBlockIntoState(long[] state, byte[] in, int off) {
+    // RATE_BYTES = 136 = 17 lanes (8 bytes each).
+    for (int i = 0; i < 17; i++) {
+      state[i] ^= readLane(in, off + i * 8);
+    }
   }
 }

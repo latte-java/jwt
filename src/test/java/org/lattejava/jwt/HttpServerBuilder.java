@@ -16,12 +16,11 @@
 
 package org.lattejava.jwt;
 
-import com.sun.net.httpserver.HttpServer;
+import java.net.*;
+import java.nio.file.*;
+import java.util.*;
 
-import java.net.InetSocketAddress;
-import java.nio.file.Files;
-import java.util.HashMap;
-import java.util.Map;
+import com.sun.net.httpserver.*;
 
 /**
  * @author Daniel DeGroff

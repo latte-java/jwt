@@ -23,27 +23,24 @@
 
 package org.lattejava.jwt;
 
-import org.lattejava.jwt.algorithm.ec.ECVerifier;
-import org.lattejava.jwt.algorithm.ed.EdDSAVerifier;
-import org.lattejava.jwt.algorithm.hmac.HMACVerifier;
-import org.lattejava.jwt.algorithm.rsa.RSAPSSVerifier;
-import org.lattejava.jwt.algorithm.rsa.RSAVerifier;
-import org.lattejava.jwt.jwks.JSONWebKey;
+import java.security.*;
+import java.util.*;
 
-import java.security.PublicKey;
-import java.util.Objects;
+import org.lattejava.jwt.algorithm.ec.*;
+import org.lattejava.jwt.algorithm.ed.*;
+import org.lattejava.jwt.algorithm.hmac.*;
+import org.lattejava.jwt.algorithm.rsa.*;
+import org.lattejava.jwt.jwks.*;
 
 /**
- * Static factories for {@link Verifier} instances. The split between
- * {@link #forHMAC(Algorithm, byte[])} and {@link #forAsymmetric(Algorithm, PublicKey)}
- * is deliberate: passing a public key to {@code forHMAC} (or a shared secret to
- * {@code forAsymmetric}) is rejected with {@link IllegalArgumentException} so a
- * misplaced key cannot be silently coerced into the wrong algorithm family.
+ * Static factories for {@link Verifier} instances. The split between {@link #forHMAC(Algorithm, byte[])} and
+ * {@link #forAsymmetric(Algorithm, PublicKey)} is deliberate: passing a public key to {@code forHMAC} (or a shared
+ * secret to {@code forAsymmetric}) is rejected with {@link IllegalArgumentException} so a misplaced key cannot be
+ * silently coerced into the wrong algorithm family.
  *
  * <p>Multi-verifier dispatch is not provided here. Callers that need to pick a
- * {@link Verifier} per token should use {@link VerifierResolver#byKid} (kid-keyed
- * map) or {@link VerifierResolver#from} (arbitrary function over the header),
- * which make the resolution strategy explicit at the resolver layer.</p>
+ * {@link Verifier} per token should use {@link VerifierResolver#byKid} (kid-keyed map) or {@link VerifierResolver#from}
+ * (arbitrary function over the header), which make the resolution strategy explicit at the resolver layer.</p>
  *
  * @author Daniel DeGroff
  */
@@ -56,40 +53,9 @@ public final class Verifiers {
   // ---------------------------------------------------------------------
 
   /**
-   * Build an HMAC {@link Verifier} for the given algorithm using the supplied
-   * shared secret bytes.
-   *
-   * @param algorithm one of {@code HS256}, {@code HS384}, {@code HS512}
-   * @param secret the shared secret bytes
-   * @return a fresh {@code Verifier}
-   * @throws IllegalArgumentException if {@code algorithm} is not an HMAC algorithm
-   */
-  public static Verifier forHMAC(Algorithm algorithm, byte[] secret) {
-    requireHMAC(algorithm);
-    return HMACVerifier.newVerifier(algorithm, secret);
-  }
-
-  /**
-   * Build an HMAC {@link Verifier} from a UTF-8 secret string.
-   *
-   * @param algorithm one of {@code HS256}, {@code HS384}, {@code HS512}
-   * @param secret the shared secret as a UTF-8 string
-   * @return a fresh {@code Verifier}
-   * @throws IllegalArgumentException if {@code algorithm} is not an HMAC algorithm
-   */
-  public static Verifier forHMAC(Algorithm algorithm, String secret) {
-    requireHMAC(algorithm);
-    return HMACVerifier.newVerifier(algorithm, secret);
-  }
-
-  // ---------------------------------------------------------------------
-  // forAsymmetric -- RSA, RSA-PSS, ECDSA, EdDSA
-  // ---------------------------------------------------------------------
-
-  /**
    * Build an asymmetric {@link Verifier} from a PEM-encoded public key.
    *
-   * @param algorithm any RS*, PS*, ES*, Ed*, or ES256K algorithm
+   * @param algorithm    any RS*, PS*, ES*, Ed*, or ES256K algorithm
    * @param pemPublicKey the PEM-encoded public key
    * @return a fresh {@code Verifier}
    * @throws IllegalArgumentException if {@code algorithm} is an HMAC algorithm
@@ -127,19 +93,48 @@ public final class Verifiers {
   }
 
   // ---------------------------------------------------------------------
+  // forAsymmetric -- RSA, RSA-PSS, ECDSA, EdDSA
+  // ---------------------------------------------------------------------
+
+  /**
+   * Build an HMAC {@link Verifier} for the given algorithm using the supplied shared secret bytes.
+   *
+   * @param algorithm one of {@code HS256}, {@code HS384}, {@code HS512}
+   * @param secret    the shared secret bytes
+   * @return a fresh {@code Verifier}
+   * @throws IllegalArgumentException if {@code algorithm} is not an HMAC algorithm
+   */
+  public static Verifier forHMAC(Algorithm algorithm, byte[] secret) {
+    requireHMAC(algorithm);
+    return HMACVerifier.newVerifier(algorithm, secret);
+  }
+
+  /**
+   * Build an HMAC {@link Verifier} from a UTF-8 secret string.
+   *
+   * @param algorithm one of {@code HS256}, {@code HS384}, {@code HS512}
+   * @param secret    the shared secret as a UTF-8 string
+   * @return a fresh {@code Verifier}
+   * @throws IllegalArgumentException if {@code algorithm} is not an HMAC algorithm
+   */
+  public static Verifier forHMAC(Algorithm algorithm, String secret) {
+    requireHMAC(algorithm);
+    return HMACVerifier.newVerifier(algorithm, secret);
+  }
+
+  // ---------------------------------------------------------------------
   // fromJWK -- JWKS-driven
   // ---------------------------------------------------------------------
 
   /**
-   * Build a {@link Verifier} from a JSON Web Key. Throws
-   * {@link InvalidJWKException} if the JWK is not usable for signature
-   * verification; the exception's {@link InvalidJWKException#reason()} carries
-   * the categorical reason so callers can route to log levels or skip lists.
+   * Build a {@link Verifier} from a JSON Web Key. Throws {@link InvalidJWKException} if the JWK is not usable for
+   * signature verification; the exception's {@link InvalidJWKException#reason()} carries the categorical reason so
+   * callers can route to log levels or skip lists.
    *
    * <p>Rejected when: {@code kid} is missing; {@code alg} is missing or HMAC;
-   * {@code kty} is missing or {@code oct}; {@code use} is present and not
-   * {@code sig}; {@code alg}/{@code kty}/{@code crv} are mutually inconsistent;
-   * key material fails to parse; or verifier construction would fail.</p>
+   * {@code kty} is missing or {@code oct}; {@code use} is present and not {@code sig};
+   * {@code alg}/{@code kty}/{@code crv} are mutually inconsistent; key material fails to parse; or verifier
+   * construction would fail.</p>
    *
    * @param jwk the JSON Web Key; must be non-null
    * @return a fresh verifier bound to {@code jwk.alg()}
@@ -208,11 +203,11 @@ public final class Verifiers {
   private static boolean algKtyCrvConsistent(String algName, KeyType kty, String crv) {
     if (kty == KeyType.EC) {
       String expected = switch (algName) {
-        case "ES256"  -> "P-256";
-        case "ES384"  -> "P-384";
-        case "ES512"  -> "P-521";
+        case "ES256" -> "P-256";
+        case "ES384" -> "P-384";
+        case "ES512" -> "P-521";
         case "ES256K" -> "secp256k1";
-        default       -> null;
+        default -> null;
       };
       return expected != null && expected.equals(crv);
     }

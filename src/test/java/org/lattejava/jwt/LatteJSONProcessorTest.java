@@ -23,23 +23,13 @@
 
 package org.lattejava.jwt;
 
-import org.testng.annotations.DataProvider;
-import org.testng.annotations.Test;
+import java.math.*;
+import java.nio.charset.*;
+import java.util.*;
 
-import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import org.testng.annotations.*;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.expectThrows;
-import static org.testng.Assert.fail;
+import static org.testng.Assert.*;
 
 /**
  * Tests for {@link LatteJSONProcessor}.
@@ -48,124 +38,84 @@ import static org.testng.Assert.fail;
  */
 public class LatteJSONProcessorTest {
 
-  @DataProvider(name = "jsonTypes")
-  public Object[][] jsonTypes() {
-    // Use case: Round-trip serialization of every JSON type (string, integer, decimal,
-    // boolean true/false, null, nested object, nested array)
-    Map<String, Object> nestedObj = new LinkedHashMap<>();
-    nestedObj.put("inner", "value");
-
-    return new Object[][]{
-        {"stringClaim", "hello world"},
-        {"integerClaim", 42L},
-        {"decimalClaim", new BigDecimal("3.14159")},
-        {"trueClaim", Boolean.TRUE},
-        {"falseClaim", Boolean.FALSE},
-        {"nullClaim", null},
-        {"objectClaim", nestedObj},
-        {"arrayClaim", Arrays.asList("a", "b", "c")},
-    };
+  /**
+   * Builds a JSON number token whose digit-run length (digits only, sign chars excluded) is exactly len.
+   */
+  private static String buildNumberToken(int len, String form) {
+    switch (form) {
+      case "integer": {
+        // len digits, leading "1" then zeros to avoid leading-zero ambiguity
+        StringBuilder sb = new StringBuilder(len);
+        sb.append('1');
+        for (int i = 1; i < len; i++) sb.append('0');
+        return sb.toString();
+      }
+      case "decimal": {
+        // integer part 1 digit + "." + (len-1) decimal digits = len digits total
+        if (len < 2) return "1." + repeat('0', Math.max(0, len - 1));
+        StringBuilder sb = new StringBuilder(len + 1);
+        sb.append('1').append('.');
+        for (int i = 1; i < len; i++) sb.append('0');
+        return sb.toString();
+      }
+      case "exponent": {
+        // (len-1) integer digits + "e" + 1 exponent digit = len digit chars
+        StringBuilder sb = new StringBuilder(len + 1);
+        sb.append('1');
+        for (int i = 1; i < len - 1; i++) sb.append('0');
+        sb.append('e').append('5');
+        return sb.toString();
+      }
+      default:
+        throw new IllegalArgumentException("unknown form: " + form);
+    }
   }
 
-  @Test(dataProvider = "jsonTypes")
-  public void roundTripJsonType(String key, Object value) throws Exception {
-    JSONProcessor jp = new LatteJSONProcessor();
-    Map<String, Object> input = new LinkedHashMap<>();
-    input.put(key, value);
-
-    byte[] bytes = jp.serialize(input);
-    Map<String, Object> result = jp.deserialize(bytes);
-
-    assertEquals(result.get(key), value);
-    assertTrue(result.containsKey(key));
-  }
-
-  @Test
-  public void nestedStructures() throws Exception {
-    // Use case: Nested structures (objects within arrays within objects)
-    JSONProcessor jp = new LatteJSONProcessor();
-
-    Map<String, Object> innermost = new LinkedHashMap<>();
-    innermost.put("deep", "value");
-    innermost.put("number", 7L);
-
-    List<Object> middle = new ArrayList<>();
-    middle.add(innermost);
-    middle.add("string");
-    middle.add(1L);
-
-    Map<String, Object> outer = new LinkedHashMap<>();
-    outer.put("list", middle);
-    outer.put("flag", Boolean.TRUE);
-
-    byte[] bytes = jp.serialize(outer);
-    Map<String, Object> result = jp.deserialize(bytes);
-
-    assertEquals(result, outer);
-  }
-
-  @DataProvider(name = "unicodeStrings")
-  public Object[][] unicodeStrings() {
-    // Use case: Unicode string escaping (multi-byte characters, control characters,
-    // surrogate pairs, named escapes)
-    return new Object[][]{
-        {"ascii", "plain text"},
-        {"backslash", "back\\slash"},
-        {"quote", "with\"quote"},
-        {"newline", "line1\nline2"},
-        {"tab", "col1\tcol2"},
-        {"cr", "a\rb"},
-        {"backspace", "a\bb"},
-        {"formfeed", "a\fb"},
-        {"controlChar", "x\u0001y"},
-        {"controlChar1F", "x\u001Fy"},
-        {"unicodeBMP", "caf\u00e9"},
-        {"japanese", "\u65e5\u672c\u8a9e"},
-        {"emojiSurrogatePair", "\uD83D\uDE00"},
-        {"slash", "http://example.com/path"},
-    };
-  }
-
-  @Test(dataProvider = "unicodeStrings")
-  public void unicodeStringRoundTrip(String label, String value) throws Exception {
-    JSONProcessor jp = new LatteJSONProcessor();
-    Map<String, Object> input = new LinkedHashMap<>();
-    input.put("k", value);
-
-    byte[] bytes = jp.serialize(input);
-    Map<String, Object> result = jp.deserialize(bytes);
-
-    assertEquals(result.get("k"), value, "label=" + label);
+  private static String repeat(char c, int n) {
+    StringBuilder sb = new StringBuilder(n);
+    for (int i = 0; i < n; i++) sb.append(c);
+    return sb.toString();
   }
 
   @Test
-  public void emptyObject() throws Exception {
-    // Use case: Empty objects and arrays
+  public void arrayDepthCounts() {
+    // Use case: depth boundary with arrays counts toward the same nesting limit
     JSONProcessor jp = new LatteJSONProcessor();
-    Map<String, Object> empty = new LinkedHashMap<>();
-    byte[] bytes = jp.serialize(empty);
-    assertEquals(new String(bytes, StandardCharsets.UTF_8), "{}");
-    assertEquals(jp.deserialize(bytes), empty);
+    // Build {"a":[[[...1...]]]} -- 1 object + N arrays = N+1 nesting levels
+    int arrays = 16; // total depth = 17 -> rejected
+    StringBuilder sb = new StringBuilder("{\"a\":");
+    for (int i = 0; i < arrays; i++) sb.append("[");
+    sb.append("1");
+    for (int i = 0; i < arrays; i++) sb.append("]");
+    sb.append("}");
+    expectThrows(JSONProcessingException.class,
+        () -> jp.deserialize(sb.toString().getBytes(StandardCharsets.UTF_8)));
   }
 
   @Test
-  public void emptyNestedArray() throws Exception {
-    JSONProcessor jp = new LatteJSONProcessor();
-    Map<String, Object> input = new LinkedHashMap<>();
-    input.put("arr", new ArrayList<>());
-    byte[] bytes = jp.serialize(input);
-    Map<String, Object> result = jp.deserialize(bytes);
-    assertEquals(result.get("arr"), new ArrayList<>());
+  public void arrayElementsBoundaryRespected() {
+    // Use case: an array with exactly maxArrayElements entries is accepted; one more is rejected.
+    JSONProcessor accept = new LatteJSONProcessor(16, 1000, 1000, 5, false);
+    String ok = "{\"a\":[1,2,3,4,5]}";
+    try {
+      accept.deserialize(ok.getBytes(StandardCharsets.UTF_8));
+    } catch (JSONProcessingException e) {
+      fail("Expected 5 elements to be accepted; threw: " + e.getMessage());
+    }
+    String over = "{\"a\":[1,2,3,4,5,6]}";
+    expectThrows(JSONProcessingException.class,
+        () -> accept.deserialize(over.getBytes(StandardCharsets.UTF_8)));
   }
 
   @Test
-  public void emptyNestedObject() throws Exception {
+  public void bigDecimalHighPrecision() throws Exception {
     JSONProcessor jp = new LatteJSONProcessor();
+    BigDecimal precise = new BigDecimal("3.141592653589793238462643383279502884197169399375");
     Map<String, Object> input = new LinkedHashMap<>();
-    input.put("obj", new LinkedHashMap<>());
-    byte[] bytes = jp.serialize(input);
-    Map<String, Object> result = jp.deserialize(bytes);
-    assertEquals(result.get("obj"), new LinkedHashMap<>());
+    input.put("pi", precise);
+    Map<String, Object> result = jp.deserialize(jp.serialize(input));
+    assertEquals(result.get("pi"), precise);
+    assertTrue(result.get("pi") instanceof BigDecimal);
   }
 
   @Test
@@ -181,94 +131,30 @@ public class LatteJSONProcessorTest {
   }
 
   @Test
-  public void bigDecimalHighPrecision() throws Exception {
-    JSONProcessor jp = new LatteJSONProcessor();
-    BigDecimal precise = new BigDecimal("3.141592653589793238462643383279502884197169399375");
-    Map<String, Object> input = new LinkedHashMap<>();
-    input.put("pi", precise);
-    Map<String, Object> result = jp.deserialize(jp.serialize(input));
-    assertEquals(result.get("pi"), precise);
-    assertTrue(result.get("pi") instanceof BigDecimal);
-  }
-
-  @DataProvider(name = "topLevelNonObject")
-  public Object[][] topLevelNonObject() {
-    // Use case: Top-level non-object input throws JSONProcessingException (per JSONProcessor javadoc)
-    return new Object[][]{
-        {"[1,2,3]"},
-        {"\"hello\""},
-        {"42"},
-        {"true"},
-        {"false"},
-        {"null"},
-    };
-  }
-
-  @Test(dataProvider = "topLevelNonObject")
-  public void topLevelNonObjectRejected(String json) {
-    JSONProcessor jp = new LatteJSONProcessor();
-    expectThrows(JSONProcessingException.class,
-        () -> jp.deserialize(json.getBytes(StandardCharsets.UTF_8)));
-  }
-
-  @DataProvider(name = "malformedJson")
-  public Object[][] malformedJson() {
-    // Use case: Malformed JSON input -- DataProvider over variants
-    return new Object[][]{
-        {"unterminatedString", "{\"a\":\"foo"},
-        {"unterminatedObject", "{\"a\":1"},
-        {"unterminatedArray", "{\"a\":[1,2"},
-        {"trailingCommaObject", "{\"a\":1,}"},
-        {"trailingCommaArray", "{\"a\":[1,2,]}"},
-        {"invalidEscape", "{\"a\":\"\\q\"}"},
-        {"truncated", "{"},
-        {"truncatedKey", "{\"a"},
-        {"missingColon", "{\"a\" 1}"},
-        {"missingValue", "{\"a\":}"},
-        {"unquotedKey", "{a:1}"},
-        {"singleQuoteKey", "{'a':1}"},
-        {"badLiteral", "{\"a\":tru}"},
-        {"empty", ""},
-        {"justWhitespace", "   "},
-        {"trailingGarbage", "{}garbage"},
-        {"badUnicodeEscape", "{\"a\":\"\\uXYZ1\"}"},
-        {"shortUnicodeEscape", "{\"a\":\"\\u12\"}"},
-        {"loneHighSurrogate", "{\"a\":\"\\uD83D\"}"},
-        {"loneLowSurrogate", "{\"a\":\"\\uDE00\"}"},
-        {"badNumberMultipleDots", "{\"a\":1.2.3}"},
-        {"badNumberLeadingPlus", "{\"a\":+1}"},
-        {"controlInString", "{\"a\":\"\u0001\"}"}, // raw control char in string per RFC 8259
-    };
-  }
-
-  @Test(dataProvider = "malformedJson")
-  public void malformedJsonRejected(String label, String json) {
-    JSONProcessor jp = new LatteJSONProcessor();
-    try {
-      Map<String, Object> result = jp.deserialize(json.getBytes(StandardCharsets.UTF_8));
-      fail("Expected JSONProcessingException for " + label + "; got: " + result);
-    } catch (JSONProcessingException expected) {
-      // pass
-    }
+  public void constructorRejectsNonPositiveArrayElements() {
+    // Use case: zero/negative caps would silently disable the wide-array defense
+    expectThrows(IllegalArgumentException.class, () -> new LatteJSONProcessor(16, 1000, 1000, 0, false));
+    expectThrows(IllegalArgumentException.class, () -> new LatteJSONProcessor(16, 1000, 1000, -1, false));
   }
 
   @Test
-  public void duplicateKeysRejectedByDefault() {
-    // Use case: Duplicate JSON key in payload rejected by default
-    JSONProcessor jp = new LatteJSONProcessor();
-    String json = "{\"a\":1,\"a\":2}";
-    expectThrows(JSONProcessingException.class,
-        () -> jp.deserialize(json.getBytes(StandardCharsets.UTF_8)));
+  public void constructorRejectsNonPositiveDepth() {
+    // Use case: Constructor validates parameters
+    expectThrows(IllegalArgumentException.class,
+        () -> new LatteJSONProcessor(0, 1000, false));
   }
 
   @Test
-  public void duplicateKeysAcceptedWhenAllowed() throws Exception {
-    // Use case: Duplicate JSON key accepted when allowDuplicateJSONKeys=true
-    JSONProcessor jp = new LatteJSONProcessor(16, 1000, true);
-    String json = "{\"a\":1,\"a\":2}";
-    Map<String, Object> result = jp.deserialize(json.getBytes(StandardCharsets.UTF_8));
-    // last-wins is the conventional behavior; we just require successful parse
-    assertEquals(result.get("a"), 2L);
+  public void constructorRejectsNonPositiveNumberLength() {
+    expectThrows(IllegalArgumentException.class,
+        () -> new LatteJSONProcessor(16, 0, false));
+  }
+
+  @Test
+  public void constructorRejectsNonPositiveObjectMembers() {
+    // Use case: zero/negative caps would silently disable the wide-object defense
+    expectThrows(IllegalArgumentException.class, () -> new LatteJSONProcessor(16, 1000, 0, 10000, false));
+    expectThrows(IllegalArgumentException.class, () -> new LatteJSONProcessor(16, 1000, -1, 10000, false));
   }
 
   @Test
@@ -318,73 +204,14 @@ public class LatteJSONProcessorTest {
   }
 
   @Test
-  public void arrayDepthCounts() {
-    // Use case: depth boundary with arrays counts toward the same nesting limit
+  public void deserializedObjectIsLinkedHashMap() throws Exception {
+    // Use case: deserialized objects use LinkedHashMap (preserves insertion order)
     JSONProcessor jp = new LatteJSONProcessor();
-    // Build {"a":[[[...1...]]]} -- 1 object + N arrays = N+1 nesting levels
-    int arrays = 16; // total depth = 17 -> rejected
-    StringBuilder sb = new StringBuilder("{\"a\":");
-    for (int i = 0; i < arrays; i++) sb.append("[");
-    sb.append("1");
-    for (int i = 0; i < arrays; i++) sb.append("]");
-    sb.append("}");
-    expectThrows(JSONProcessingException.class,
-        () -> jp.deserialize(sb.toString().getBytes(StandardCharsets.UTF_8)));
-  }
-
-  @Test
-  public void constructorRejectsNonPositiveObjectMembers() {
-    // Use case: zero/negative caps would silently disable the wide-object defense
-    expectThrows(IllegalArgumentException.class, () -> new LatteJSONProcessor(16, 1000, 0, 10000, false));
-    expectThrows(IllegalArgumentException.class, () -> new LatteJSONProcessor(16, 1000, -1, 10000, false));
-  }
-
-  @Test
-  public void constructorRejectsNonPositiveArrayElements() {
-    // Use case: zero/negative caps would silently disable the wide-array defense
-    expectThrows(IllegalArgumentException.class, () -> new LatteJSONProcessor(16, 1000, 1000, 0, false));
-    expectThrows(IllegalArgumentException.class, () -> new LatteJSONProcessor(16, 1000, 1000, -1, false));
-  }
-
-  @Test
-  public void objectMembersBoundaryRespected() {
-    // Use case: an object with exactly maxObjectMembers entries is accepted; one more is rejected.
-    JSONProcessor accept = new LatteJSONProcessor(16, 1000, 5, 10000, false);
-    StringBuilder sb = new StringBuilder("{");
-    for (int i = 0; i < 5; i++) {
-      if (i > 0) sb.append(',');
-      sb.append("\"k").append(i).append("\":").append(i);
-    }
-    sb.append('}');
-    try {
-      accept.deserialize(sb.toString().getBytes(StandardCharsets.UTF_8));
-    } catch (JSONProcessingException e) {
-      fail("Expected 5 members to be accepted; threw: " + e.getMessage());
-    }
-
-    StringBuilder over = new StringBuilder("{");
-    for (int i = 0; i < 6; i++) {
-      if (i > 0) over.append(',');
-      over.append("\"k").append(i).append("\":").append(i);
-    }
-    over.append('}');
-    expectThrows(JSONProcessingException.class,
-        () -> accept.deserialize(over.toString().getBytes(StandardCharsets.UTF_8)));
-  }
-
-  @Test
-  public void arrayElementsBoundaryRespected() {
-    // Use case: an array with exactly maxArrayElements entries is accepted; one more is rejected.
-    JSONProcessor accept = new LatteJSONProcessor(16, 1000, 1000, 5, false);
-    String ok = "{\"a\":[1,2,3,4,5]}";
-    try {
-      accept.deserialize(ok.getBytes(StandardCharsets.UTF_8));
-    } catch (JSONProcessingException e) {
-      fail("Expected 5 elements to be accepted; threw: " + e.getMessage());
-    }
-    String over = "{\"a\":[1,2,3,4,5,6]}";
-    expectThrows(JSONProcessingException.class,
-        () -> accept.deserialize(over.getBytes(StandardCharsets.UTF_8)));
+    String json = "{\"z\":1,\"a\":2,\"m\":3}";
+    Map<String, Object> result = jp.deserialize(json.getBytes(StandardCharsets.UTF_8));
+    assertTrue(result instanceof LinkedHashMap);
+    List<String> keys = new ArrayList<>(result.keySet());
+    assertEquals(keys, Arrays.asList("z", "a", "m"));
   }
 
   @Test
@@ -401,6 +228,159 @@ public class LatteJSONProcessorTest {
     } catch (JSONProcessingException e) {
       fail("Expected duplicate-key updates to not count against the cap; threw: " + e.getMessage());
     }
+  }
+
+  @Test
+  public void duplicateKeysAcceptedWhenAllowed() throws Exception {
+    // Use case: Duplicate JSON key accepted when allowDuplicateJSONKeys=true
+    JSONProcessor jp = new LatteJSONProcessor(16, 1000, true);
+    String json = "{\"a\":1,\"a\":2}";
+    Map<String, Object> result = jp.deserialize(json.getBytes(StandardCharsets.UTF_8));
+    // last-wins is the conventional behavior; we just require successful parse
+    assertEquals(result.get("a"), 2L);
+  }
+
+  @Test
+  public void duplicateKeysRejectedByDefault() {
+    // Use case: Duplicate JSON key in payload rejected by default
+    JSONProcessor jp = new LatteJSONProcessor();
+    String json = "{\"a\":1,\"a\":2}";
+    expectThrows(JSONProcessingException.class,
+        () -> jp.deserialize(json.getBytes(StandardCharsets.UTF_8)));
+  }
+
+  @Test
+  public void emptyNestedArray() throws Exception {
+    JSONProcessor jp = new LatteJSONProcessor();
+    Map<String, Object> input = new LinkedHashMap<>();
+    input.put("arr", new ArrayList<>());
+    byte[] bytes = jp.serialize(input);
+    Map<String, Object> result = jp.deserialize(bytes);
+    assertEquals(result.get("arr"), new ArrayList<>());
+  }
+
+  @Test
+  public void emptyNestedObject() throws Exception {
+    JSONProcessor jp = new LatteJSONProcessor();
+    Map<String, Object> input = new LinkedHashMap<>();
+    input.put("obj", new LinkedHashMap<>());
+    byte[] bytes = jp.serialize(input);
+    Map<String, Object> result = jp.deserialize(bytes);
+    assertEquals(result.get("obj"), new LinkedHashMap<>());
+  }
+
+  @Test
+  public void emptyObject() throws Exception {
+    // Use case: Empty objects and arrays
+    JSONProcessor jp = new LatteJSONProcessor();
+    Map<String, Object> empty = new LinkedHashMap<>();
+    byte[] bytes = jp.serialize(empty);
+    assertEquals(new String(bytes, StandardCharsets.UTF_8), "{}");
+    assertEquals(jp.deserialize(bytes), empty);
+  }
+
+  @Test
+  public void integerWithExponentParsesAsDecimal() throws Exception {
+    // Use case: Integer with positive exponent without decimal point parses as decimal
+    JSONProcessor jp = new LatteJSONProcessor();
+    String json = "{\"n\":1e3}";
+    Map<String, Object> result = jp.deserialize(json.getBytes(StandardCharsets.UTF_8));
+    assertTrue(result.get("n") instanceof BigDecimal,
+        "expected BigDecimal, got " + result.get("n").getClass());
+  }
+
+  @DataProvider(name = "jsonTypes")
+  public Object[][] jsonTypes() {
+    // Use case: Round-trip serialization of every JSON type (string, integer, decimal,
+    // boolean true/false, null, nested object, nested array)
+    Map<String, Object> nestedObj = new LinkedHashMap<>();
+    nestedObj.put("inner", "value");
+
+    return new Object[][]{
+        {"stringClaim", "hello world"},
+        {"integerClaim", 42L},
+        {"decimalClaim", new BigDecimal("3.14159")},
+        {"trueClaim", Boolean.TRUE},
+        {"falseClaim", Boolean.FALSE},
+        {"nullClaim", null},
+        {"objectClaim", nestedObj},
+        {"arrayClaim", Arrays.asList("a", "b", "c")},
+    };
+  }
+
+  @DataProvider(name = "malformedJson")
+  public Object[][] malformedJson() {
+    // Use case: Malformed JSON input -- DataProvider over variants
+    return new Object[][]{
+        {"unterminatedString", "{\"a\":\"foo"},
+        {"unterminatedObject", "{\"a\":1"},
+        {"unterminatedArray", "{\"a\":[1,2"},
+        {"trailingCommaObject", "{\"a\":1,}"},
+        {"trailingCommaArray", "{\"a\":[1,2,]}"},
+        {"invalidEscape", "{\"a\":\"\\q\"}"},
+        {"truncated", "{"},
+        {"truncatedKey", "{\"a"},
+        {"missingColon", "{\"a\" 1}"},
+        {"missingValue", "{\"a\":}"},
+        {"unquotedKey", "{a:1}"},
+        {"singleQuoteKey", "{'a':1}"},
+        {"badLiteral", "{\"a\":tru}"},
+        {"empty", ""},
+        {"justWhitespace", "   "},
+        {"trailingGarbage", "{}garbage"},
+        {"badUnicodeEscape", "{\"a\":\"\\uXYZ1\"}"},
+        {"shortUnicodeEscape", "{\"a\":\"\\u12\"}"},
+        {"loneHighSurrogate", "{\"a\":\"\\uD83D\"}"},
+        {"loneLowSurrogate", "{\"a\":\"\\uDE00\"}"},
+        {"badNumberMultipleDots", "{\"a\":1.2.3}"},
+        {"badNumberLeadingPlus", "{\"a\":+1}"},
+        {"controlInString", "{\"a\":\"\u0001\"}"}, // raw control char in string per RFC 8259
+    };
+  }
+
+  @Test(dataProvider = "malformedJson")
+  public void malformedJsonRejected(String label, String json) {
+    JSONProcessor jp = new LatteJSONProcessor();
+    try {
+      Map<String, Object> result = jp.deserialize(json.getBytes(StandardCharsets.UTF_8));
+      fail("Expected JSONProcessingException for " + label + "; got: " + result);
+    } catch (JSONProcessingException expected) {
+      // pass
+    }
+  }
+
+  @Test
+  public void negativeNumbers() throws Exception {
+    // Use case: Negative numbers parse correctly
+    JSONProcessor jp = new LatteJSONProcessor();
+    String json = "{\"i\":-42,\"d\":-3.14}";
+    Map<String, Object> result = jp.deserialize(json.getBytes(StandardCharsets.UTF_8));
+    assertEquals(result.get("i"), -42L);
+    assertEquals(result.get("d"), new BigDecimal("-3.14"));
+  }
+
+  @Test
+  public void nestedStructures() throws Exception {
+    // Use case: Nested structures (objects within arrays within objects)
+    JSONProcessor jp = new LatteJSONProcessor();
+
+    Map<String, Object> innermost = new LinkedHashMap<>();
+    innermost.put("deep", "value");
+    innermost.put("number", 7L);
+
+    List<Object> middle = new ArrayList<>();
+    middle.add(innermost);
+    middle.add("string");
+    middle.add(1L);
+
+    Map<String, Object> outer = new LinkedHashMap<>();
+    outer.put("list", middle);
+    outer.put("flag", Boolean.TRUE);
+
+    byte[] bytes = jp.serialize(outer);
+    Map<String, Object> result = jp.deserialize(bytes);
+
+    assertEquals(result, outer);
   }
 
   @DataProvider(name = "numberLengthBoundary")
@@ -443,7 +423,7 @@ public class LatteJSONProcessorTest {
     if (expectedAccepted) {
       try {
         Map<String, Object> result = jp.deserialize(json.getBytes(StandardCharsets.UTF_8));
-        assertTrue(result != null, "label=" + label);
+        assertNotNull(result, "label=" + label);
       } catch (JSONProcessingException e) {
         fail("Expected " + label + " to be accepted; threw: " + e.getMessage());
       }
@@ -451,43 +431,6 @@ public class LatteJSONProcessorTest {
       expectThrows(JSONProcessingException.class,
           () -> jp.deserialize(json.getBytes(StandardCharsets.UTF_8)));
     }
-  }
-
-  /** Builds a JSON number token whose digit-run length (digits only, sign chars excluded) is exactly len. */
-  private static String buildNumberToken(int len, String form) {
-    switch (form) {
-      case "integer": {
-        // len digits, leading "1" then zeros to avoid leading-zero ambiguity
-        StringBuilder sb = new StringBuilder(len);
-        sb.append('1');
-        for (int i = 1; i < len; i++) sb.append('0');
-        return sb.toString();
-      }
-      case "decimal": {
-        // integer part 1 digit + "." + (len-1) decimal digits = len digits total
-        if (len < 2) return "1." + repeat('0', Math.max(0, len - 1));
-        StringBuilder sb = new StringBuilder(len + 1);
-        sb.append('1').append('.');
-        for (int i = 1; i < len; i++) sb.append('0');
-        return sb.toString();
-      }
-      case "exponent": {
-        // (len-1) integer digits + "e" + 1 exponent digit = len digit chars
-        StringBuilder sb = new StringBuilder(len + 1);
-        sb.append('1');
-        for (int i = 1; i < len - 1; i++) sb.append('0');
-        sb.append('e').append('5');
-        return sb.toString();
-      }
-      default:
-        throw new IllegalArgumentException("unknown form: " + form);
-    }
-  }
-
-  private static String repeat(char c, int n) {
-    StringBuilder sb = new StringBuilder(n);
-    for (int i = 0; i < n; i++) sb.append(c);
-    return sb.toString();
   }
 
   @Test
@@ -503,6 +446,45 @@ public class LatteJSONProcessorTest {
     String json = "{\"n\":" + token + "}";
     Map<String, Object> result = jp.deserialize(json.getBytes(StandardCharsets.UTF_8));
     assertTrue(result.containsKey("n"));
+  }
+
+  @Test
+  public void objectMembersBoundaryRespected() {
+    // Use case: an object with exactly maxObjectMembers entries is accepted; one more is rejected.
+    JSONProcessor accept = new LatteJSONProcessor(16, 1000, 5, 10000, false);
+    StringBuilder sb = new StringBuilder("{");
+    for (int i = 0; i < 5; i++) {
+      if (i > 0) sb.append(',');
+      sb.append("\"k").append(i).append("\":").append(i);
+    }
+    sb.append('}');
+    try {
+      accept.deserialize(sb.toString().getBytes(StandardCharsets.UTF_8));
+    } catch (JSONProcessingException e) {
+      fail("Expected 5 members to be accepted; threw: " + e.getMessage());
+    }
+
+    StringBuilder over = new StringBuilder("{");
+    for (int i = 0; i < 6; i++) {
+      if (i > 0) over.append(',');
+      over.append("\"k").append(i).append("\":").append(i);
+    }
+    over.append('}');
+    expectThrows(JSONProcessingException.class,
+        () -> accept.deserialize(over.toString().getBytes(StandardCharsets.UTF_8)));
+  }
+
+  @Test(dataProvider = "jsonTypes")
+  public void roundTripJsonType(String key, Object value) throws Exception {
+    JSONProcessor jp = new LatteJSONProcessor();
+    Map<String, Object> input = new LinkedHashMap<>();
+    input.put(key, value);
+
+    byte[] bytes = jp.serialize(input);
+    Map<String, Object> result = jp.deserialize(bytes);
+
+    assertEquals(result.get(key), value);
+    assertTrue(result.containsKey(key));
   }
 
   @Test
@@ -545,28 +527,58 @@ public class LatteJSONProcessorTest {
     expectThrows(JSONProcessingException.class, () -> jp.serialize(input));
   }
 
-  @Test
-  public void deserializedObjectIsLinkedHashMap() throws Exception {
-    // Use case: deserialized objects use LinkedHashMap (preserves insertion order)
+  @DataProvider(name = "topLevelNonObject")
+  public Object[][] topLevelNonObject() {
+    // Use case: Top-level non-object input throws JSONProcessingException (per JSONProcessor javadoc)
+    return new Object[][]{
+        {"[1,2,3]"},
+        {"\"hello\""},
+        {"42"},
+        {"true"},
+        {"false"},
+        {"null"},
+    };
+  }
+
+  @Test(dataProvider = "topLevelNonObject")
+  public void topLevelNonObjectRejected(String json) {
     JSONProcessor jp = new LatteJSONProcessor();
-    String json = "{\"z\":1,\"a\":2,\"m\":3}";
-    Map<String, Object> result = jp.deserialize(json.getBytes(StandardCharsets.UTF_8));
-    assertTrue(result instanceof LinkedHashMap);
-    List<String> keys = new ArrayList<>(result.keySet());
-    assertEquals(keys, Arrays.asList("z", "a", "m"));
+    expectThrows(JSONProcessingException.class,
+        () -> jp.deserialize(json.getBytes(StandardCharsets.UTF_8)));
   }
 
-  @Test
-  public void constructorRejectsNonPositiveDepth() {
-    // Use case: Constructor validates parameters
-    expectThrows(IllegalArgumentException.class,
-        () -> new LatteJSONProcessor(0, 1000, false));
+  @Test(dataProvider = "unicodeStrings")
+  public void unicodeStringRoundTrip(String label, String value) throws Exception {
+    JSONProcessor jp = new LatteJSONProcessor();
+    Map<String, Object> input = new LinkedHashMap<>();
+    input.put("k", value);
+
+    byte[] bytes = jp.serialize(input);
+    Map<String, Object> result = jp.deserialize(bytes);
+
+    assertEquals(result.get("k"), value, "label=" + label);
   }
 
-  @Test
-  public void constructorRejectsNonPositiveNumberLength() {
-    expectThrows(IllegalArgumentException.class,
-        () -> new LatteJSONProcessor(16, 0, false));
+  @DataProvider(name = "unicodeStrings")
+  public Object[][] unicodeStrings() {
+    // Use case: Unicode string escaping (multi-byte characters, control characters,
+    // surrogate pairs, named escapes)
+    return new Object[][]{
+        {"ascii", "plain text"},
+        {"backslash", "back\\slash"},
+        {"quote", "with\"quote"},
+        {"newline", "line1\nline2"},
+        {"tab", "col1\tcol2"},
+        {"cr", "a\rb"},
+        {"backspace", "a\bb"},
+        {"formfeed", "a\fb"},
+        {"controlChar", "x\u0001y"},
+        {"controlChar1F", "x\u001Fy"},
+        {"unicodeBMP", "caf\u00e9"},
+        {"japanese", "\u65e5\u672c\u8a9e"},
+        {"emojiSurrogatePair", "\uD83D\uDE00"},
+        {"slash", "http://example.com/path"},
+    };
   }
 
   @Test
@@ -577,26 +589,6 @@ public class LatteJSONProcessorTest {
     Map<String, Object> result = jp.deserialize(json.getBytes(StandardCharsets.UTF_8));
     assertEquals(result.get("a"), 1L);
     assertEquals(result.get("b"), Arrays.asList(1L, 2L));
-  }
-
-  @Test
-  public void integerWithExponentParsesAsDecimal() throws Exception {
-    // Use case: Integer with positive exponent without decimal point parses as decimal
-    JSONProcessor jp = new LatteJSONProcessor();
-    String json = "{\"n\":1e3}";
-    Map<String, Object> result = jp.deserialize(json.getBytes(StandardCharsets.UTF_8));
-    assertTrue(result.get("n") instanceof BigDecimal,
-        "expected BigDecimal, got " + result.get("n").getClass());
-  }
-
-  @Test
-  public void negativeNumbers() throws Exception {
-    // Use case: Negative numbers parse correctly
-    JSONProcessor jp = new LatteJSONProcessor();
-    String json = "{\"i\":-42,\"d\":-3.14}";
-    Map<String, Object> result = jp.deserialize(json.getBytes(StandardCharsets.UTF_8));
-    assertEquals(result.get("i"), -42L);
-    assertEquals(result.get("d"), new BigDecimal("-3.14"));
   }
 
   @Test

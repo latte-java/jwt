@@ -16,39 +16,27 @@
 
 package org.lattejava.jwt.algorithm.rsa;
 
-import org.lattejava.jwt.Algorithm;
-import org.lattejava.jwt.InvalidJWTSignatureException;
-import org.lattejava.jwt.JWTVerifierException;
-import org.lattejava.jwt.Verifier;
-import org.lattejava.jwt.internal.KeyCoercion;
+import java.io.*;
+import java.nio.charset.*;
+import java.nio.file.*;
+import java.security.*;
+import java.security.interfaces.*;
+import java.util.*;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.security.InvalidAlgorithmParameterException;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
-import java.security.PublicKey;
-import java.security.Signature;
-import java.security.SignatureException;
-import java.security.interfaces.RSAPublicKey;
-import java.util.Objects;
+import org.lattejava.jwt.*;
+import org.lattejava.jwt.internal.*;
 
 /**
- * RSASSA-PSS {@link Verifier} for the {@code PS256} / {@code PS384}
- * / {@code PS512} JWA algorithms (RFC 7518 §3.5).
+ * RSASSA-PSS {@link Verifier} for the {@code PS256} / {@code PS384} / {@code PS512} JWA algorithms (RFC 7518 §3.5).
  *
  * <p>Each instance is bound to a single JWA algorithm at construction time;
- * {@link #canVerify(Algorithm)} returns true only for that exact algorithm.
- * Binding at construction prevents algorithm-confusion attacks where a
- * tampered header {@code alg} could coax a family-accepting verifier into
- * using a weaker hash than the caller intended (RFC 8725 §3.1).</p>
+ * {@link #canVerify(Algorithm)} returns true only for that exact algorithm. Binding at construction prevents
+ * algorithm-confusion attacks where a tampered header {@code alg} could coax a family-accepting verifier into using a
+ * weaker hash than the caller intended (RFC 8725 §3.1).</p>
  *
  * <p>Each call to {@link #verify(byte[], byte[])} obtains a fresh
- * {@link Signature} instance and configures it with an explicit
- * {@code PSSParameterSpec} so the parameters are not inherited from the
- * JCA provider's defaults.</p>
+ * {@link Signature} instance and configures it with an explicit {@code PSSParameterSpec} so the parameters are not
+ * inherited from the JCA provider's defaults.</p>
  *
  * @author Daniel DeGroff
  */
@@ -99,6 +87,15 @@ public class RSAPSSVerifier implements Verifier {
     }
   }
 
+  private static void requirePSS(Algorithm algorithm) {
+    switch (algorithm.name()) {
+      case "PS256", "PS384", "PS512" -> {
+      }
+      default -> throw new IllegalArgumentException(
+          "Expected RSASSA-PSS algorithm but found [" + algorithm.name() + "]");
+    }
+  }
+
   @Override
   public boolean canVerify(Algorithm algorithm) {
     return algorithm != null && this.algorithm.name().equals(algorithm.name());
@@ -125,15 +122,6 @@ public class RSAPSSVerifier implements Verifier {
     } catch (InvalidKeyException | NoSuchAlgorithmException | SignatureException
              | InvalidAlgorithmParameterException | SecurityException e) {
       throw new JWTVerifierException("An unexpected exception occurred when attempting to verify the JWT", e);
-    }
-  }
-
-  private static void requirePSS(Algorithm algorithm) {
-    switch (algorithm.name()) {
-      case "PS256", "PS384", "PS512" -> {
-      }
-      default -> throw new IllegalArgumentException(
-          "Expected RSASSA-PSS algorithm but found [" + algorithm.name() + "]");
     }
   }
 }

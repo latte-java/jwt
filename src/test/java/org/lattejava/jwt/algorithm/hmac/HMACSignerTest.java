@@ -16,15 +16,12 @@
 
 package org.lattejava.jwt.algorithm.hmac;
 
-import org.lattejava.jwt.Algorithm;
-import org.lattejava.jwt.BaseJWTTest;
-import org.lattejava.jwt.InvalidKeyLengthException;
-import org.testng.annotations.Test;
+import java.nio.charset.*;
 
-import java.nio.charset.StandardCharsets;
+import org.lattejava.jwt.*;
+import org.testng.annotations.*;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.*;
 
 /**
  * @author Daniel DeGroff
@@ -46,20 +43,6 @@ public class HMACSignerTest extends BaseJWTTest {
   }
 
   @Test
-  public void test_stringConstructorFactories_produceSigner() {
-    assertNotNull(HMACSigner.newSHA256Signer(SECRET_32));
-    assertNotNull(HMACSigner.newSHA384Signer(SECRET_48));
-    assertNotNull(HMACSigner.newSHA512Signer(SECRET_64));
-  }
-
-  @Test
-  public void test_byteConstructorFactories_produceSigner() {
-    assertNotNull(HMACSigner.newSHA256Signer(SECRET_32.getBytes(StandardCharsets.UTF_8)));
-    assertNotNull(HMACSigner.newSHA384Signer(SECRET_48.getBytes(StandardCharsets.UTF_8)));
-    assertNotNull(HMACSigner.newSHA512Signer(SECRET_64.getBytes(StandardCharsets.UTF_8)));
-  }
-
-  @Test
   public void test_byteAndStringOverloadsProduceIdenticalSignatures() {
     byte[] message = "a.b".getBytes(StandardCharsets.UTF_8);
 
@@ -77,12 +60,54 @@ public class HMACSignerTest extends BaseJWTTest {
   }
 
   @Test
-  public void test_signatureIsDeterministic() {
-    byte[] message = "the quick brown fox jumps over the lazy dog".getBytes(StandardCharsets.UTF_8);
+  public void test_byteConstructorFactories_produceSigner() {
+    assertNotNull(HMACSigner.newSHA256Signer(SECRET_32.getBytes(StandardCharsets.UTF_8)));
+    assertNotNull(HMACSigner.newSHA384Signer(SECRET_48.getBytes(StandardCharsets.UTF_8)));
+    assertNotNull(HMACSigner.newSHA512Signer(SECRET_64.getBytes(StandardCharsets.UTF_8)));
+  }
 
-    byte[] first = HMACSigner.newSHA256Signer(SECRET_32).sign(message);
-    byte[] second = HMACSigner.newSHA256Signer(SECRET_32).sign(message);
-    assertEquals(second, first);
+  @Test
+  public void test_exactlyMinimumLengthIsAccepted() {
+    // Use case: RFC 7518 §3.2 requires a key at least the size of the hash output — exactly the minimum (32/48/64 bytes) must be accepted, not rejected as a boundary off-by-one.
+    byte[] hs256Min = new byte[32];
+    byte[] hs384Min = new byte[48];
+    byte[] hs512Min = new byte[64];
+    assertNotNull(HMACSigner.newSHA256Signer(hs256Min));
+    assertNotNull(HMACSigner.newSHA384Signer(hs384Min));
+    assertNotNull(HMACSigner.newSHA512Signer(hs512Min));
+  }
+
+  @Test(expectedExceptions = NullPointerException.class)
+  public void test_nullByteSecret_throwsNpe() {
+    HMACSigner.newSHA256Signer((byte[]) null);
+  }
+
+  @Test(expectedExceptions = NullPointerException.class)
+  public void test_nullMessage_throwsNpe() {
+    HMACSigner.newSHA256Signer(SECRET_32).sign(null);
+  }
+
+  @Test(expectedExceptions = NullPointerException.class)
+  public void test_nullStringSecret_throwsNpe() {
+    HMACSigner.newSHA256Signer((String) null);
+  }
+
+  @Test
+  public void test_secretIsDefensivelyCopied() {
+    // Use case: mutating the original secret array after constructing a signer must not
+    // affect the signer's behavior -- the signer retains its own copy of the secret.
+    byte[] original = SECRET_32.getBytes(StandardCharsets.UTF_8);
+    HMACSigner signer = HMACSigner.newSHA256Signer(original);
+    byte[] message = "m".getBytes(StandardCharsets.UTF_8);
+    byte[] before = signer.sign(message);
+
+    // Scribble over every byte of the original
+    for (int i = 0; i < original.length; i++) {
+      original[i] = 0;
+    }
+
+    byte[] after = signer.sign(message);
+    assertEquals(after, before);
   }
 
   @Test
@@ -108,46 +133,18 @@ public class HMACSignerTest extends BaseJWTTest {
   }
 
   @Test
-  public void test_exactlyMinimumLengthIsAccepted() {
-    // Use case: RFC 7518 §3.2 requires a key at least the size of the hash output — exactly the minimum (32/48/64 bytes) must be accepted, not rejected as a boundary off-by-one.
-    byte[] hs256Min = new byte[32];
-    byte[] hs384Min = new byte[48];
-    byte[] hs512Min = new byte[64];
-    assertNotNull(HMACSigner.newSHA256Signer(hs256Min));
-    assertNotNull(HMACSigner.newSHA384Signer(hs384Min));
-    assertNotNull(HMACSigner.newSHA512Signer(hs512Min));
-  }
+  public void test_signatureIsDeterministic() {
+    byte[] message = "the quick brown fox jumps over the lazy dog".getBytes(StandardCharsets.UTF_8);
 
-  @Test(expectedExceptions = NullPointerException.class)
-  public void test_nullByteSecret_throwsNpe() {
-    HMACSigner.newSHA256Signer((byte[]) null);
-  }
-
-  @Test(expectedExceptions = NullPointerException.class)
-  public void test_nullStringSecret_throwsNpe() {
-    HMACSigner.newSHA256Signer((String) null);
-  }
-
-  @Test(expectedExceptions = NullPointerException.class)
-  public void test_nullMessage_throwsNpe() {
-    HMACSigner.newSHA256Signer(SECRET_32).sign(null);
+    byte[] first = HMACSigner.newSHA256Signer(SECRET_32).sign(message);
+    byte[] second = HMACSigner.newSHA256Signer(SECRET_32).sign(message);
+    assertEquals(second, first);
   }
 
   @Test
-  public void test_secretIsDefensivelyCopied() {
-    // Use case: mutating the original secret array after constructing a signer must not
-    // affect the signer's behavior -- the signer retains its own copy of the secret.
-    byte[] original = SECRET_32.getBytes(StandardCharsets.UTF_8);
-    HMACSigner signer = HMACSigner.newSHA256Signer(original);
-    byte[] message = "m".getBytes(StandardCharsets.UTF_8);
-    byte[] before = signer.sign(message);
-
-    // Scribble over every byte of the original
-    for (int i = 0; i < original.length; i++) {
-      original[i] = 0;
-    }
-
-    byte[] after = signer.sign(message);
-    assertEquals(after, before);
+  public void test_stringConstructorFactories_produceSigner() {
+    assertNotNull(HMACSigner.newSHA256Signer(SECRET_32));
+    assertNotNull(HMACSigner.newSHA384Signer(SECRET_48));
+    assertNotNull(HMACSigner.newSHA512Signer(SECRET_64));
   }
 }

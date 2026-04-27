@@ -23,17 +23,16 @@
 
 package org.lattejava.jwt.internal;
 
-import org.lattejava.jwt.InvalidJWTSignatureException;
+import org.lattejava.jwt.*;
 
 /**
- * Conversion between ECDSA signatures in JOSE concatenation form
- * ({@code R || S}, fixed-length curve-order-length big-endian unsigned
- * integers) and ASN.1 DER {@code SEQUENCE { INTEGER r, INTEGER s }} as
- * produced and consumed by {@code java.security.Signature}.
+ * Conversion between ECDSA signatures in JOSE concatenation form ({@code R || S}, fixed-length curve-order-length
+ * big-endian unsigned integers) and ASN.1 DER {@code SEQUENCE { INTEGER r, INTEGER s }} as produced and consumed by
+ * {@code java.security.Signature}.
  *
  * <p>This conversion is a known CVE surface in JWT libraries (Auth0 Node 2015,
- * historical nimbus). The implementation here exists in one place so it can be
- * audited against a single contract and tested directly.</p>
+ * historical nimbus). The implementation here exists in one place so it can be audited against a single contract and
+ * tested directly.</p>
  *
  * @author Daniel DeGroff
  */
@@ -42,20 +41,16 @@ public final class JOSEConverter {
   }
 
   /**
-   * Convert a DER-encoded {@code SEQUENCE { INTEGER r, INTEGER s }} (as
-   * produced by {@code java.security.Signature.sign()} for an ECDSA
-   * signer) into JOSE concatenation form: {@code R || S}, each integer
-   * left-zero-padded to {@code curveIntLength} bytes.
+   * Convert a DER-encoded {@code SEQUENCE { INTEGER r, INTEGER s }} (as produced by
+   * {@code java.security.Signature.sign()} for an ECDSA signer) into JOSE concatenation form: {@code R || S}, each
+   * integer left-zero-padded to {@code curveIntLength} bytes.
    *
    * @param der            the DER-encoded ECDSA signature
-   * @param curveIntLength the curve-order length in bytes (32 / 48 / 66 / 32
-   *                       for P-256 / P-384 / P-521 / secp256k1)
+   * @param curveIntLength the curve-order length in bytes (32 / 48 / 66 / 32 for P-256 / P-384 / P-521 / secp256k1)
    * @return the {@code 2 * curveIntLength}-byte JOSE-format signature
-   * @throws IllegalStateException if {@code der} is not a well-formed DER
-   *                               ECDSA signature, or if either integer
-   *                               exceeds {@code curveIntLength} bytes.
-   *                               This indicates a library or provider
-   *                               bug — callers should not catch this.
+   * @throws IllegalStateException if {@code der} is not a well-formed DER ECDSA signature, or if either integer exceeds
+   *                               {@code curveIntLength} bytes. This indicates a library or provider bug — callers
+   *                               should not catch this.
    */
   public static byte[] derToJose(byte[] der, int curveIntLength) {
     if (der == null) {
@@ -109,12 +104,10 @@ public final class JOSEConverter {
   }
 
   /**
-   * Convert a JOSE-format ECDSA signature ({@code R || S}, each
-   * {@code curveIntLength} bytes) into DER {@code SEQUENCE { INTEGER r,
-   * INTEGER s }} as consumed by {@code java.security.Signature.verify()}.
+   * Convert a JOSE-format ECDSA signature ({@code R || S}, each {@code curveIntLength} bytes) into DER
+   * {@code SEQUENCE { INTEGER r, INTEGER s }} as consumed by {@code java.security.Signature.verify()}.
    *
-   * @param jose           the JOSE-format signature, exactly
-   *                       {@code 2 * curveIntLength} bytes
+   * @param jose           the JOSE-format signature, exactly {@code 2 * curveIntLength} bytes
    * @param curveIntLength the curve-order length in bytes
    * @return the DER-encoded signature
    * @throws InvalidJWTSignatureException if {@code jose.length != 2 * curveIntLength}
@@ -147,10 +140,33 @@ public final class JOSEConverter {
   }
 
   /**
-   * Read a DER {@code INTEGER} from {@code der} starting at
-   * {@code cursor[0]}, advance the cursor past the value, return the raw
-   * content bytes (which may include a single DER leading-zero pad byte
-   * for the sign bit).
+   * Encode {@code value} (interpreted as a big-endian unsigned integer) as a DER {@code INTEGER}. Strips redundant
+   * leading zero bytes and prepends a single 0x00 byte if the high bit of the first content byte is set (DER requires
+   * non-negative INTEGER encoding).
+   */
+  private static byte[] encodeUnsignedInteger(byte[] value) {
+    int start = 0;
+    while (start < value.length - 1 && value[start] == 0x00) {
+      start++;
+    }
+    byte[] content = new byte[value.length - start];
+    System.arraycopy(value, start, content, 0, content.length);
+    boolean prependZero = (content[0] & 0x80) != 0;
+    int contentLen = content.length + (prependZero ? 1 : 0);
+    byte[] out = new byte[2 + contentLen];
+    out[0] = 0x02;
+    out[1] = (byte) contentLen;
+    int off = 2;
+    if (prependZero) {
+      out[off++] = 0x00;
+    }
+    System.arraycopy(content, 0, out, off, content.length);
+    return out;
+  }
+
+  /**
+   * Read a DER {@code INTEGER} from {@code der} starting at {@code cursor[0]}, advance the cursor past the value,
+   * return the raw content bytes (which may include a single DER leading-zero pad byte for the sign bit).
    *
    * <p>Enforces canonical DER for ECDSA signature integers:
    * <ul>
@@ -194,9 +210,8 @@ public final class JOSEConverter {
   }
 
   /**
-   * Strip any leading zero bytes used in DER to keep the INTEGER
-   * non-negative. Returns the raw unsigned magnitude. Returns a
-   * 1-byte {@code 0x00} array if the original value was all zeros.
+   * Strip any leading zero bytes used in DER to keep the INTEGER non-negative. Returns the raw unsigned magnitude.
+   * Returns a 1-byte {@code 0x00} array if the original value was all zeros.
    */
   private static byte[] stripLeadingZerosForUnsigned(byte[] value) {
     int start = 0;
@@ -208,32 +223,6 @@ public final class JOSEConverter {
     }
     byte[] out = new byte[value.length - start];
     System.arraycopy(value, start, out, 0, out.length);
-    return out;
-  }
-
-  /**
-   * Encode {@code value} (interpreted as a big-endian unsigned integer)
-   * as a DER {@code INTEGER}. Strips redundant leading zero bytes and
-   * prepends a single 0x00 byte if the high bit of the first content
-   * byte is set (DER requires non-negative INTEGER encoding).
-   */
-  private static byte[] encodeUnsignedInteger(byte[] value) {
-    int start = 0;
-    while (start < value.length - 1 && value[start] == 0x00) {
-      start++;
-    }
-    byte[] content = new byte[value.length - start];
-    System.arraycopy(value, start, content, 0, content.length);
-    boolean prependZero = (content[0] & 0x80) != 0;
-    int contentLen = content.length + (prependZero ? 1 : 0);
-    byte[] out = new byte[2 + contentLen];
-    out[0] = 0x02;
-    out[1] = (byte) contentLen;
-    int off = 2;
-    if (prependZero) {
-      out[off++] = 0x00;
-    }
-    System.arraycopy(content, 0, out, off, content.length);
     return out;
   }
 }

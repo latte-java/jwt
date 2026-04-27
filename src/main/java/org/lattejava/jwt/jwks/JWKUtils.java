@@ -16,10 +16,10 @@
 
 package org.lattejava.jwt.jwks;
 
-import org.lattejava.jwt.internal.Base64URL;
+import java.math.*;
+import java.util.*;
 
-import java.math.BigInteger;
-import java.util.Arrays;
+import org.lattejava.jwt.internal.*;
 
 /**
  * @author Daniel DeGroff

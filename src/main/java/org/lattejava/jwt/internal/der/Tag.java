@@ -16,7 +16,7 @@
 
 package org.lattejava.jwt.internal.der;
 
-import java.util.Objects;
+import java.util.*;
 
 /**
  * This object models a ASN.1 DER Tag.
@@ -28,35 +28,29 @@ public class Tag {
    * Bit String Tag
    */
   public static final int BitString = 3;
-
+  /**
+   * GeneralizedTime Tag
+   * <p>
+   * 24 decimal, 0x18 hex. Used by RFC 5280 §4.1.2.5 for dates &gt;= 2050-01-01.
+   * </p>
+   */
+  public static final int GeneralizedTime = 24;
   /**
    * Integer Tag
    */
   public static final int Integer = 2;
-
   /**
    * Null Tag
    */
   public static final int Null = 5;
-
   /**
    * Object Identifier Tag
    */
   public static final int ObjectIdentifier = 6;
-
   /**
    * Octet String Tag
    */
   public static final int OctetString = 4;
-
-  /**
-   * UTF-8 String Tag
-   * <p>
-   * 12 decimal, 0x0C hex.
-   * </p>
-   */
-  public static final int UTFString = 12;
-
   /**
    * PrintableString Tag
    * <p>
@@ -70,8 +64,9 @@ public class Tag {
    * <p>
    * 16 decimal, 0x10 hex, 0b00010000 binary
    * </p>
-   * Because the Sequence tag is always in a constructed form (not primitive), the tag will present as <code>0x30</code> because
-   * the 6th bit is a <code>1</code> indicating a constructed form. So the raw sequence of <code>0b00010000</code> becomes
+   * Because the Sequence tag is always in a constructed form (not primitive), the tag will present as <code>0x30</code>
+   * because the 6th bit is a <code>1</code> indicating a constructed form. So the raw sequence of
+   * <code>0b00010000</code> becomes
    * <code>0b00110000</code> which is <code>48</code> decimal.
    */
   public static final int Sequence = 48;
@@ -79,8 +74,8 @@ public class Tag {
   /**
    * Set and Set of
    * <p>
-   * 17 decimal (universal tag number), 0x11 hex. Set is always constructed per ASN.1 / DER, so the
-   * encoded raw byte presents as <code>0x31</code> (49 decimal) — bit 6 (constructed) is set.
+   * 17 decimal (universal tag number), 0x11 hex. Set is always constructed per ASN.1 / DER, so the encoded raw byte
+   * presents as <code>0x31</code> (49 decimal) — bit 6 (constructed) is set.
    * </p>
    */
   public static final int Set = 49;
@@ -92,15 +87,13 @@ public class Tag {
    * </p>
    */
   public static final int UTCTime = 23;
-
   /**
-   * GeneralizedTime Tag
+   * UTF-8 String Tag
    * <p>
-   * 24 decimal, 0x18 hex. Used by RFC 5280 §4.1.2.5 for dates &gt;= 2050-01-01.
+   * 12 decimal, 0x0C hex.
    * </p>
    */
-  public static final int GeneralizedTime = 24;
-
+  public static final int UTFString = 12;
   /**
    * True if this Tag is primitive. False if this Tag is constructed.
    */
@@ -120,8 +113,10 @@ public class Tag {
    * The tag value in decimal. This value will only represent the decimal value of bits 5 to 1.
    *
    * <p>
-   * For example, if this is a sequence tag, this value will be <code>16</code> and you should expect <code>primitive</code>
-   * to be false. If you want the raw byte which will be <code>48</code> or <code>0x30</code> you can read <code>rawByte</code>.
+   * For example, if this is a sequence tag, this value will be <code>16</code> and you should expect
+   * <code>primitive</code> to be false. If you want the raw byte which will be <code>48</code> or <code>0x30</code>
+   * you
+   * can read <code>rawByte</code>.
    * </p>
    */
   public final int value;
@@ -218,6 +213,10 @@ public class Tag {
     return value + " [" + getName() + ", " + hexString() + "]";
   }
 
+  String hexString() {
+    return "0x" + String.format("%02x", value).toUpperCase();
+  }
+
   private TagClass setTagClass(int value) {
     TagClass tagClass = null;
     for (TagClass tc : TagClass.values()) {
@@ -232,9 +231,5 @@ public class Tag {
     }
 
     return tagClass;
-  }
-
-  String hexString() {
-    return "0x" + String.format("%02x", value).toUpperCase();
   }
 }

@@ -23,22 +23,19 @@
 
 package org.lattejava.jwt.internal;
 
-import org.lattejava.jwt.KeyType;
-import org.lattejava.jwt.jwks.JSONWebKey;
+import java.security.*;
+import java.util.*;
 
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import org.lattejava.jwt.*;
+import org.lattejava.jwt.jwks.*;
 
 /**
- * RFC 7638 / RFC 8037 JWK Thumbprint computation routed through the internal
- * {@link CanonicalJSONWriter} (NOT the user-pluggable {@code JSONProcessor}).
+ * RFC 7638 / RFC 8037 JWK Thumbprint computation routed through the internal {@link CanonicalJSONWriter} (NOT the
+ * user-pluggable {@code JSONProcessor}).
  *
  * <p>Internal entry point used by {@link JSONWebKey#thumbprintSHA256()} and
- * {@link JSONWebKey#thumbprintSHA1()}. {@link CanonicalJSONWriter} itself
- * remains package-private so no user-pluggable JSON serializer can
- * influence thumbprint bytes.
+ * {@link JSONWebKey#thumbprintSHA1()}. {@link CanonicalJSONWriter} itself remains package-private so no user-pluggable
+ * JSON serializer can influence thumbprint bytes.
  *
  * @author Daniel DeGroff
  */
@@ -48,16 +45,13 @@ public final class JWKThumbprint {
   }
 
   /**
-   * Returns the base64url-encoded JWK thumbprint of {@code key} using the
-   * given JCA digest algorithm name (e.g. {@code "SHA-1"} or
-   * {@code "SHA-256"}).
+   * Returns the base64url-encoded JWK thumbprint of {@code key} using the given JCA digest algorithm name (e.g.
+   * {@code "SHA-1"} or {@code "SHA-256"}).
    *
    * @param algorithm the JCA digest algorithm name; non-null
    * @param key       the JWK; non-null and {@code key.kty} must be set
    * @return the base64url-encoded thumbprint without padding
-   * @throws IllegalArgumentException if {@code key.kty} is null or
-   *                                  unsupported, or if {@code algorithm} is
-   *                                  unknown
+   * @throws IllegalArgumentException if {@code key.kty} is null or unsupported, or if {@code algorithm} is unknown
    */
   public static String compute(String algorithm, JSONWebKey key) {
     if (algorithm == null) {
@@ -83,10 +77,8 @@ public final class JWKThumbprint {
   }
 
   /**
-   * Builds the RFC 7638 §3.2 / RFC 8037 §2 required member subset for the
-   * given key, in lex order. Insertion order matches lex order so a
-   * downstream sort is a no-op (defensive: {@link CanonicalJSONWriter}
-   * sorts regardless).
+   * Builds the RFC 7638 §3.2 / RFC 8037 §2 required member subset for the given key, in lex order. Insertion order
+   * matches lex order so a downstream sort is a no-op (defensive: {@link CanonicalJSONWriter} sorts regardless).
    */
   private static Map<String, Object> canonicalMembers(JSONWebKey key) {
     Map<String, Object> m = new LinkedHashMap<>(4);

@@ -23,12 +23,9 @@
 
 package org.lattejava.jwt;
 
-import org.testng.annotations.Test;
+import org.testng.annotations.*;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertSame;
-import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.*;
 
 public class FetchLimitsTest extends BaseTest {
   @Test
@@ -50,17 +47,17 @@ public class FetchLimitsTest extends BaseTest {
   @Test
   public void builder_overrides_each_field() {
     FetchLimits limits = FetchLimits.builder()
-        .allowCrossOriginRedirects(true)
-        .allowDuplicateJSONKeys(true)
-        .maxArrayElements(100)
-        .maxNestingDepth(8)
-        .maxNumberLength(500)
-        .maxObjectMembers(50)
-        .maxRedirects(7)
-        .maxResponseBytes(2048)
-        .build();
-    assertEquals(limits.allowCrossOriginRedirects(), true);
-    assertEquals(limits.allowDuplicateJSONKeys(), true);
+                                    .allowCrossOriginRedirects(true)
+                                    .allowDuplicateJSONKeys(true)
+                                    .maxArrayElements(100)
+                                    .maxNestingDepth(8)
+                                    .maxNumberLength(500)
+                                    .maxObjectMembers(50)
+                                    .maxRedirects(7)
+                                    .maxResponseBytes(2048)
+                                    .build();
+    assertTrue(limits.allowCrossOriginRedirects());
+    assertTrue(limits.allowDuplicateJSONKeys());
     assertEquals(limits.maxArrayElements(), 100);
     assertEquals(limits.maxNestingDepth(), 8);
     assertEquals(limits.maxNumberLength(), 500);

@@ -16,33 +16,24 @@
 
 package org.lattejava.jwt.algorithm.rsa;
 
-import org.lattejava.jwt.Algorithm;
-import org.lattejava.jwt.InvalidJWTSignatureException;
-import org.lattejava.jwt.JWTVerifierException;
-import org.lattejava.jwt.Verifier;
-import org.lattejava.jwt.internal.KeyCoercion;
+import java.io.*;
+import java.nio.charset.*;
+import java.nio.file.*;
+import java.security.*;
+import java.security.interfaces.*;
+import java.util.*;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
-import java.security.PublicKey;
-import java.security.Signature;
-import java.security.SignatureException;
-import java.security.interfaces.RSAPublicKey;
-import java.util.Objects;
+import org.lattejava.jwt.*;
+import org.lattejava.jwt.internal.*;
 
 /**
- * RSASSA-PKCS1-v1_5 {@link Verifier} for the {@code RS256} / {@code RS384}
- * / {@code RS512} JWA algorithms (RFC 7518 §3.3).
+ * RSASSA-PKCS1-v1_5 {@link Verifier} for the {@code RS256} / {@code RS384} / {@code RS512} JWA algorithms (RFC 7518
+ * §3.3).
  *
  * <p>Each instance is bound to a single JWA algorithm at construction time;
- * {@link #canVerify(Algorithm)} returns true only for that exact algorithm.
- * Binding at construction prevents algorithm-confusion attacks where a
- * tampered header {@code alg} could coax a family-accepting verifier into
- * using a weaker hash than the caller intended (RFC 8725 §3.1).</p>
+ * {@link #canVerify(Algorithm)} returns true only for that exact algorithm. Binding at construction prevents
+ * algorithm-confusion attacks where a tampered header {@code alg} could coax a family-accepting verifier into using a
+ * weaker hash than the caller intended (RFC 8725 §3.1).</p>
  *
  * <p>Each call to {@link #verify(byte[], byte[])} obtains a fresh
  * {@link Signature} instance ({@link Signature} is not thread-safe).</p>
@@ -96,6 +87,16 @@ public class RSAVerifier implements Verifier {
     }
   }
 
+  private static void requireRSA(Algorithm algorithm) {
+    switch (algorithm.name()) {
+      case "RS256", "RS384", "RS512" -> {
+      }
+
+      default -> throw new IllegalArgumentException(
+          "Expected RSASSA-PKCS1-v1_5 algorithm but found [" + algorithm.name() + "]");
+    }
+  }
+
   @Override
   public boolean canVerify(Algorithm algorithm) {
     return algorithm != null && this.algorithm.name().equals(algorithm.name());
@@ -120,16 +121,6 @@ public class RSAVerifier implements Verifier {
       }
     } catch (InvalidKeyException | NoSuchAlgorithmException | SignatureException | SecurityException e) {
       throw new JWTVerifierException("An unexpected exception occurred when attempting to verify the JWT", e);
-    }
-  }
-
-  private static void requireRSA(Algorithm algorithm) {
-    switch (algorithm.name()) {
-      case "RS256", "RS384", "RS512" -> {
-      }
-
-      default -> throw new IllegalArgumentException(
-          "Expected RSASSA-PKCS1-v1_5 algorithm but found [" + algorithm.name() + "]");
     }
   }
 }

@@ -23,24 +23,13 @@
 
 package org.lattejava.jwt.jwks;
 
-import org.lattejava.jwt.Algorithm;
-import org.lattejava.jwt.KeyType;
-import org.lattejava.jwt.LatteJSONProcessor;
-import org.testng.annotations.DataProvider;
-import org.testng.annotations.Test;
+import java.util.*;
 
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import org.lattejava.jwt.*;
+import org.testng.*;
+import org.testng.annotations.*;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
+import static org.testng.Assert.*;
 
 /**
  * Direct contract tests for {@link JSONWebKey}:
@@ -62,195 +51,133 @@ import static org.testng.Assert.fail;
 public class JSONWebKeyTest {
   // ---------- toString redaction ----------
 
-  @Test
-  public void toString_redacts_populated_private_fields() {
-    // Use case: toString redacts populated private fields to "***"
-    JSONWebKey k = JSONWebKey.builder()
-        .kty(KeyType.RSA)
-        .kid("rsa-1")
-        .n("AQAB")
-        .e("AQAB")
-        .d("SECRET-D")
-        .dp("SECRET-DP")
-        .dq("SECRET-DQ")
-        .p("SECRET-P")
-        .q("SECRET-Q")
-        .qi("SECRET-QI")
-        .build();
-
-    String s = k.toString();
-    for (String secret : new String[] {"SECRET-D", "SECRET-DP", "SECRET-DQ", "SECRET-P", "SECRET-Q", "SECRET-QI"}) {
-      assertFalse(s.contains(secret), "toString leaked private material: " + secret + " in: " + s);
-    }
-    // Each redacted field must appear as "***" in the rendered map.
-    assertTrue(s.contains("\"d\":\"***\""), s);
-    assertTrue(s.contains("\"dp\":\"***\""), s);
-    assertTrue(s.contains("\"dq\":\"***\""), s);
-    assertTrue(s.contains("\"p\":\"***\""), s);
-    assertTrue(s.contains("\"q\":\"***\""), s);
-    assertTrue(s.contains("\"qi\":\"***\""), s);
-    // Public fields are still present verbatim.
-    assertTrue(s.contains("\"n\":\"AQAB\""), s);
-    assertTrue(s.contains("\"e\":\"AQAB\""), s);
-    assertTrue(s.contains("\"kid\":\"rsa-1\""), s);
+  private static void assertNotSame(Object a, Object b) {
+    Assert.assertNotSame(a, b, "expected distinct instances");
   }
 
   @Test
-  public void toString_does_not_materialize_absent_private_fields() {
-    // Use case: toString only redacts private fields that are actually present;
-    // absent private fields stay absent rather than appearing as "***".
-    JSONWebKey k = JSONWebKey.builder()
-        .kty(KeyType.RSA)
-        .n("AQAB")
-        .e("AQAB")
-        .build();
-    // d, dp, dq, p, q, qi all null
-
-    String s = k.toString();
-    assertFalse(s.contains("\"d\""), s);
-    assertFalse(s.contains("\"dp\""), s);
-    assertFalse(s.contains("\"dq\""), s);
-    assertFalse(s.contains("\"p\""), s);
-    assertFalse(s.contains("\"q\""), s);
-    assertFalse(s.contains("\"qi\""), s);
-    assertFalse(s.contains("***"), s);
+  public void builder_build_returns_distinct_instance_each_call() {
+    // Use case: builder().build() returns a distinct instance each call
+    JSONWebKey.Builder b = JSONWebKey.builder().kty(KeyType.RSA).n("AQAB").e("AQAB");
+    JSONWebKey a = b.build();
+    JSONWebKey c = b.build();
+    assertNotSame(a, c);
+    assertEquals(a, c);
   }
 
   @Test
-  public void toJSON_does_not_redact_private_fields() {
-    // Use case: toJSON returns the full content (no redaction)
+  public void builder_parameter_accepts_custom_parameter_and_round_trips() {
+    // Use case: Builder.parameter() accepts a non-registered parameter; round-trips through toJSON
     JSONWebKey k = JSONWebKey.builder()
-        .kty(KeyType.RSA)
-        .n("AQAB")
-        .e("AQAB")
-        .d("PRIVATE-D")
-        .p("PRIVATE-P")
-        .build();
+                             .kty(KeyType.RSA)
+                             .n("AQAB")
+                             .e("AQAB")
+                             .parameter("custom_field", "custom-value")
+                             .build();
 
+    assertEquals(k.get("custom_field"), "custom-value");
     String j = k.toJSON();
-    assertTrue(j.contains("\"d\":\"PRIVATE-D\""), j);
-    assertTrue(j.contains("\"p\":\"PRIVATE-P\""), j);
-    assertFalse(j.contains("***"), j);
+    assertTrue(j.contains("\"custom_field\":\"custom-value\""), j);
+
+    Map<String, Object> back = new LatteJSONProcessor().deserialize(j.getBytes());
+    JSONWebKey k2 = JSONWebKey.fromMap(back);
+    assertEquals(k2.get("custom_field"), "custom-value");
   }
 
   // ---------- toPublicJSONWebKey ----------
 
-  @Test
-  public void toPublicJSONWebKey_rsa_strips_private_material() {
-    // Use case: toPublicJSONWebKey for RSA strips d, dp, dq, p, q, qi
-    JSONWebKey k = JSONWebKey.builder()
-        .kty(KeyType.RSA)
-        .alg(Algorithm.RS256)
-        .kid("rsa-1")
-        .use("sig")
-        .n("AQAB")
-        .e("AQAB")
-        .d("D")
-        .dp("DP")
-        .dq("DQ")
-        .p("P")
-        .q("Q")
-        .qi("QI")
-        .build();
-
-    JSONWebKey pub = k.toPublicJSONWebKey();
-    assertNotSame(pub, k);
-    assertNull(pub.d());
-    assertNull(pub.dp());
-    assertNull(pub.dq());
-    assertNull(pub.p());
-    assertNull(pub.q());
-    assertNull(pub.qi());
-    // Public material preserved.
-    assertEquals(pub.kty(), KeyType.RSA);
-    assertEquals(pub.alg(), Algorithm.RS256);
-    assertEquals(pub.kid(), "rsa-1");
-    assertEquals(pub.use(), "sig");
-    assertEquals(pub.n(), "AQAB");
-    assertEquals(pub.e(), "AQAB");
-
-    // Source unchanged.
-    assertEquals(k.d(), "D");
-    assertEquals(k.p(), "P");
+  @Test(dataProvider = "registeredParamNames")
+  public void builder_parameter_rejects_registered_parameter_name(String name) {
+    try {
+      JSONWebKey.builder().parameter(name, "value");
+      fail("Expected JSONWebKeyException for registered name [" + name + "].");
+    } catch (JSONWebKeyException expected) {
+      assertTrue(expected.getMessage().contains(name));
+    }
   }
 
   @Test
-  public void toPublicJSONWebKey_ec_strips_d_keeps_xy() {
-    // Use case: toPublicJSONWebKey for EC strips d but keeps x, y, crv
+  public void builder_produces_new_instance_with_fields() {
+    // Use case: builder produces a new instance with the configured fields
     JSONWebKey k = JSONWebKey.builder()
-        .kty(KeyType.EC)
-        .alg(Algorithm.ES256)
-        .crv("P-256")
-        .x("X-COORD")
-        .y("Y-COORD")
-        .d("EC-PRIVATE")
-        .build();
+                             .kty(KeyType.EC)
+                             .alg(Algorithm.ES256)
+                             .crv("P-256")
+                             .x("X")
+                             .y("Y")
+                             .kid("ec-1")
+                             .x5tS256("thumb")
+                             .build();
 
-    JSONWebKey pub = k.toPublicJSONWebKey();
-    assertNull(pub.d());
-    assertEquals(pub.x(), "X-COORD");
-    assertEquals(pub.y(), "Y-COORD");
-    assertEquals(pub.crv(), "P-256");
-    assertEquals(pub.kty(), KeyType.EC);
+    assertEquals(k.kty(), KeyType.EC);
+    assertEquals(k.alg(), Algorithm.ES256);
+    assertEquals(k.crv(), "P-256");
+    assertEquals(k.x(), "X");
+    assertEquals(k.y(), "Y");
+    assertEquals(k.kid(), "ec-1");
+    assertEquals(k.x5tS256(), "thumb");
   }
 
   @Test
-  public void toPublicJSONWebKey_okp_strips_d_keeps_x() {
-    // Use case: toPublicJSONWebKey for OKP (Ed25519) strips d keeps x, crv
-    JSONWebKey k = JSONWebKey.builder()
-        .kty(KeyType.OKP)
-        .alg(Algorithm.Ed25519)
-        .crv("Ed25519")
-        .x("OKP-X")
-        .d("OKP-PRIVATE")
-        .build();
+  public void equals_compares_alg_and_kty_by_name() {
+    // Use case: equals compares typed enums by name (Algorithm.RS256 vs RS256)
+    JSONWebKey a = JSONWebKey.builder()
+                             .kty(KeyType.RSA)
+                             .alg(Algorithm.RS256)
+                             .build();
 
-    JSONWebKey pub = k.toPublicJSONWebKey();
-    assertNull(pub.d());
-    assertEquals(pub.x(), "OKP-X");
-    assertEquals(pub.crv(), "Ed25519");
-    assertEquals(pub.kty(), KeyType.OKP);
+    JSONWebKey b = JSONWebKey.builder()
+                             .kty(KeyType.RSA)
+                             .alg(Algorithm.RS256)
+                             .build();
+
+    assertEquals(a, b);
+    assertEquals(a.hashCode(), b.hashCode());
   }
 
   @Test
-  public void toPublicJSONWebKey_public_only_returns_distinct_copy() {
-    // Use case: toPublicJSONWebKey on an already-public key is a no-op (still returns a new instance)
-    JSONWebKey k = JSONWebKey.builder()
-        .kty(KeyType.RSA)
-        .n("AQAB")
-        .e("AQAB")
-        .build();
+  public void equals_distinguishes_on_private_field_diff() {
+    // Use case: differing private material breaks equality
+    JSONWebKey a = JSONWebKey.builder()
+                             .kty(KeyType.RSA)
+                             .d("AAA")
+                             .build();
 
-    JSONWebKey pub = k.toPublicJSONWebKey();
-    assertNotSame(pub, k);
-    assertEquals(pub, k);
+    JSONWebKey b = JSONWebKey.builder()
+                             .kty(KeyType.RSA)
+                             .d("BBB")
+                             .build();
+
+    assertNotEquals(a, b);
   }
 
   @Test
-  public void toPublicJSONWebKey_preserves_metadata_fields() {
-    // Use case: toPublicJSONWebKey carries x5c, x5t, x5t#S256, x5u, key_ops, use
-    JSONWebKey k = JSONWebKey.builder()
-        .kty(KeyType.RSA)
-        .n("AQAB")
-        .e("AQAB")
-        .use("sig")
-        .keyOps(Arrays.asList("verify"))
-        .x5u("https://example.test/cert")
-        .x5c(Arrays.asList("MIIB..."))
-        .x5t("thumb-sha1")
-        .x5tS256("thumb-sha256")
-        .build();
+  public void fromMap_parses_key_ops_as_typed_list() {
+    // Use case: fromMap parses key_ops as a List<String> on the typed field
+    Map<String, Object> wire = new LinkedHashMap<>();
+    wire.put("kty", "RSA");
+    wire.put("n", "AQAB");
+    wire.put("e", "AQAB");
+    wire.put("key_ops", Arrays.asList("sign", "verify"));
 
-    JSONWebKey pub = k.toPublicJSONWebKey();
-    assertEquals(pub.use(), "sig");
-    assertEquals(pub.key_ops(), Arrays.asList("verify"));
-    assertEquals(pub.x5u(), "https://example.test/cert");
-    assertEquals(pub.x5c(), Arrays.asList("MIIB..."));
-    assertEquals(pub.x5t(), "thumb-sha1");
-    assertEquals(pub.x5tS256(), "thumb-sha256");
+    JSONWebKey k = JSONWebKey.fromMap(wire);
+    assertEquals(k.key_ops(), Arrays.asList("sign", "verify"));
+    assertFalse(k.other().containsKey("key_ops"));
   }
 
   // ---------- x5t#S256 wire-form mapping ----------
+
+  @Test
+  public void fromMap_parses_x5u_as_typed_field() {
+    // Use case: fromMap parses x5u as a typed String field
+    Map<String, Object> wire = new LinkedHashMap<>();
+    wire.put("kty", "RSA");
+    wire.put("x5u", "https://example.test/keys");
+
+    JSONWebKey k = JSONWebKey.fromMap(wire);
+    assertEquals(k.x5u(), "https://example.test/keys");
+    assertFalse(k.other().containsKey("x5u"));
+  }
 
   @Test
   public void fromMap_reads_x5t_S256_wire_key() {
@@ -268,49 +195,6 @@ public class JSONWebKeyTest {
   }
 
   @Test
-  public void toJSON_emits_x5t_S256_wire_key() {
-    // Use case: toJSON emits x5tS256 under the wire-form "x5t#S256" key
-    JSONWebKey k = JSONWebKey.builder()
-        .kty(KeyType.RSA)
-        .n("AQAB")
-        .e("AQAB")
-        .x5tS256("thumb")
-        .build();
-
-    String j = k.toJSON();
-    assertTrue(j.contains("\"x5t#S256\":\"thumb\""), j);
-    // Must not also emit the Java-form "x5tS256".
-    assertFalse(j.contains("x5tS256"), j);
-  }
-
-  @Test
-  public void x5t_S256_round_trips() {
-    // Use case: fromMap → toJSON round-trip preserves x5t#S256 key form
-    String json = "{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"X\",\"y\":\"Y\",\"x5t#S256\":\"thumb\"}";
-    Map<String, Object> map = new LatteJSONProcessor().deserialize(json.getBytes());
-    JSONWebKey k = JSONWebKey.fromMap(map);
-    assertEquals(k.x5tS256(), "thumb");
-    String back = k.toJSON();
-    assertTrue(back.contains("\"x5t#S256\":\"thumb\""), back);
-  }
-
-  // ---------- key_ops / x5u typed parsing ----------
-
-  @Test
-  public void fromMap_parses_key_ops_as_typed_list() {
-    // Use case: fromMap parses key_ops as a List<String> on the typed field
-    Map<String, Object> wire = new LinkedHashMap<>();
-    wire.put("kty", "RSA");
-    wire.put("n", "AQAB");
-    wire.put("e", "AQAB");
-    wire.put("key_ops", Arrays.asList("sign", "verify"));
-
-    JSONWebKey k = JSONWebKey.fromMap(wire);
-    assertEquals(k.key_ops(), Arrays.asList("sign", "verify"));
-    assertFalse(k.other().containsKey("key_ops"));
-  }
-
-  @Test
   public void fromMap_rejects_non_array_key_ops() {
     // Use case: fromMap rejects key_ops when not a List
     Map<String, Object> wire = new LinkedHashMap<>();
@@ -324,94 +208,7 @@ public class JSONWebKeyTest {
     }
   }
 
-  @Test
-  public void fromMap_parses_x5u_as_typed_field() {
-    // Use case: fromMap parses x5u as a typed String field
-    Map<String, Object> wire = new LinkedHashMap<>();
-    wire.put("kty", "RSA");
-    wire.put("x5u", "https://example.test/keys");
-
-    JSONWebKey k = JSONWebKey.fromMap(wire);
-    assertEquals(k.x5u(), "https://example.test/keys");
-    assertFalse(k.other().containsKey("x5u"));
-  }
-
-  // ---------- Custom parameter handling ----------
-
-  @DataProvider(name = "registeredParamNames")
-  public Object[][] registeredParamNames() {
-    // Use case: Builder.parameter() rejects registered parameter names
-    return new Object[][] {
-        {"alg"}, {"crv"}, {"kid"}, {"kty"}, {"use"}, {"key_ops"}, {"x5u"},
-        {"d"}, {"dp"}, {"dq"}, {"e"}, {"n"}, {"p"}, {"q"}, {"qi"},
-        {"x"}, {"y"}, {"x5c"}, {"x5t"}, {"x5t#S256"}
-    };
-  }
-
-  @Test(dataProvider = "registeredParamNames")
-  public void builder_parameter_rejects_registered_parameter_name(String name) {
-    try {
-      JSONWebKey.builder().parameter(name, "value");
-      fail("Expected JSONWebKeyException for registered name [" + name + "].");
-    } catch (JSONWebKeyException expected) {
-      assertTrue(expected.getMessage().contains(name));
-    }
-  }
-
-  @Test
-  public void builder_parameter_accepts_custom_parameter_and_round_trips() {
-    // Use case: Builder.parameter() accepts a non-registered parameter; round-trips through toJSON
-    JSONWebKey k = JSONWebKey.builder()
-        .kty(KeyType.RSA)
-        .n("AQAB")
-        .e("AQAB")
-        .parameter("custom_field", "custom-value")
-        .build();
-
-    assertEquals(k.get("custom_field"), "custom-value");
-    String j = k.toJSON();
-    assertTrue(j.contains("\"custom_field\":\"custom-value\""), j);
-
-    Map<String, Object> back = new LatteJSONProcessor().deserialize(j.getBytes());
-    JSONWebKey k2 = JSONWebKey.fromMap(back);
-    assertEquals(k2.get("custom_field"), "custom-value");
-  }
-
-  // ---------- Builder ----------
-
-  @Test
-  public void builder_produces_new_instance_with_fields() {
-    // Use case: builder produces a new instance with the configured fields
-    JSONWebKey k = JSONWebKey.builder()
-        .kty(KeyType.EC)
-        .alg(Algorithm.ES256)
-        .crv("P-256")
-        .x("X")
-        .y("Y")
-        .kid("ec-1")
-        .x5tS256("thumb")
-        .build();
-
-    assertEquals(k.kty(), KeyType.EC);
-    assertEquals(k.alg(), Algorithm.ES256);
-    assertEquals(k.crv(), "P-256");
-    assertEquals(k.x(), "X");
-    assertEquals(k.y(), "Y");
-    assertEquals(k.kid(), "ec-1");
-    assertEquals(k.x5tS256(), "thumb");
-  }
-
-  @Test
-  public void builder_build_returns_distinct_instance_each_call() {
-    // Use case: builder().build() returns a distinct instance each call
-    JSONWebKey.Builder b = JSONWebKey.builder().kty(KeyType.RSA).n("AQAB").e("AQAB");
-    JSONWebKey a = b.build();
-    JSONWebKey c = b.build();
-    assertNotSame(a, c);
-    assertEquals(a, c);
-  }
-
-  // ---------- JWKS-style mixed-type list ----------
+  // ---------- key_ops / x5u typed parsing ----------
 
   @Test
   @SuppressWarnings("unchecked")
@@ -450,44 +247,236 @@ public class JSONWebKeyTest {
     assertEquals(oct.get("k"), "SOMEKEY");
   }
 
-  // ---------- equals / hashCode ----------
-
-  @Test
-  public void equals_compares_alg_and_kty_by_name() {
-    // Use case: equals compares typed enums by name (Algorithm.RS256 vs RS256)
-    JSONWebKey a = JSONWebKey.builder()
-        .kty(KeyType.RSA)
-        .alg(Algorithm.RS256)
-        .build();
-
-    JSONWebKey b = JSONWebKey.builder()
-        .kty(KeyType.RSA)
-        .alg(Algorithm.RS256)
-        .build();
-
-    assertEquals(a, b);
-    assertEquals(a.hashCode(), b.hashCode());
+  @DataProvider(name = "registeredParamNames")
+  public Object[][] registeredParamNames() {
+    // Use case: Builder.parameter() rejects registered parameter names
+    return new Object[][]{
+        {"alg"}, {"crv"}, {"kid"}, {"kty"}, {"use"}, {"key_ops"}, {"x5u"},
+        {"d"}, {"dp"}, {"dq"}, {"e"}, {"n"}, {"p"}, {"q"}, {"qi"},
+        {"x"}, {"y"}, {"x5c"}, {"x5t"}, {"x5t#S256"}
+    };
   }
 
   @Test
-  public void equals_distinguishes_on_private_field_diff() {
-    // Use case: differing private material breaks equality
-    JSONWebKey a = JSONWebKey.builder()
-        .kty(KeyType.RSA)
-        .d("AAA")
-        .build();
+  public void toJSON_does_not_redact_private_fields() {
+    // Use case: toJSON returns the full content (no redaction)
+    JSONWebKey k = JSONWebKey.builder()
+                             .kty(KeyType.RSA)
+                             .n("AQAB")
+                             .e("AQAB")
+                             .d("PRIVATE-D")
+                             .p("PRIVATE-P")
+                             .build();
 
-    JSONWebKey b = JSONWebKey.builder()
-        .kty(KeyType.RSA)
-        .d("BBB")
-        .build();
+    String j = k.toJSON();
+    assertTrue(j.contains("\"d\":\"PRIVATE-D\""), j);
+    assertTrue(j.contains("\"p\":\"PRIVATE-P\""), j);
+    assertFalse(j.contains("***"), j);
+  }
 
-    assertNotEquals(a, b);
+  // ---------- Custom parameter handling ----------
+
+  @Test
+  public void toJSON_emits_x5t_S256_wire_key() {
+    // Use case: toJSON emits x5tS256 under the wire-form "x5t#S256" key
+    JSONWebKey k = JSONWebKey.builder()
+                             .kty(KeyType.RSA)
+                             .n("AQAB")
+                             .e("AQAB")
+                             .x5tS256("thumb")
+                             .build();
+
+    String j = k.toJSON();
+    assertTrue(j.contains("\"x5t#S256\":\"thumb\""), j);
+    // Must not also emit the Java-form "x5tS256".
+    assertFalse(j.contains("x5tS256"), j);
+  }
+
+  @Test
+  public void toPublicJSONWebKey_ec_strips_d_keeps_xy() {
+    // Use case: toPublicJSONWebKey for EC strips d but keeps x, y, crv
+    JSONWebKey k = JSONWebKey.builder()
+                             .kty(KeyType.EC)
+                             .alg(Algorithm.ES256)
+                             .crv("P-256")
+                             .x("X-COORD")
+                             .y("Y-COORD")
+                             .d("EC-PRIVATE")
+                             .build();
+
+    JSONWebKey pub = k.toPublicJSONWebKey();
+    assertNull(pub.d());
+    assertEquals(pub.x(), "X-COORD");
+    assertEquals(pub.y(), "Y-COORD");
+    assertEquals(pub.crv(), "P-256");
+    assertEquals(pub.kty(), KeyType.EC);
+  }
+
+  @Test
+  public void toPublicJSONWebKey_okp_strips_d_keeps_x() {
+    // Use case: toPublicJSONWebKey for OKP (Ed25519) strips d keeps x, crv
+    JSONWebKey k = JSONWebKey.builder()
+                             .kty(KeyType.OKP)
+                             .alg(Algorithm.Ed25519)
+                             .crv("Ed25519")
+                             .x("OKP-X")
+                             .d("OKP-PRIVATE")
+                             .build();
+
+    JSONWebKey pub = k.toPublicJSONWebKey();
+    assertNull(pub.d());
+    assertEquals(pub.x(), "OKP-X");
+    assertEquals(pub.crv(), "Ed25519");
+    assertEquals(pub.kty(), KeyType.OKP);
+  }
+
+  // ---------- Builder ----------
+
+  @Test
+  public void toPublicJSONWebKey_preserves_metadata_fields() {
+    // Use case: toPublicJSONWebKey carries x5c, x5t, x5t#S256, x5u, key_ops, use
+    JSONWebKey k = JSONWebKey.builder()
+                             .kty(KeyType.RSA)
+                             .n("AQAB")
+                             .e("AQAB")
+                             .use("sig")
+                             .keyOps(List.of("verify"))
+                             .x5u("https://example.test/cert")
+                             .x5c(List.of("MIIB..."))
+                             .x5t("thumb-sha1")
+                             .x5tS256("thumb-sha256")
+                             .build();
+
+    JSONWebKey pub = k.toPublicJSONWebKey();
+    assertEquals(pub.use(), "sig");
+    assertEquals(pub.key_ops(), List.of("verify"));
+    assertEquals(pub.x5u(), "https://example.test/cert");
+    assertEquals(pub.x5c(), List.of("MIIB..."));
+    assertEquals(pub.x5t(), "thumb-sha1");
+    assertEquals(pub.x5tS256(), "thumb-sha256");
+  }
+
+  @Test
+  public void toPublicJSONWebKey_public_only_returns_distinct_copy() {
+    // Use case: toPublicJSONWebKey on an already-public key is a no-op (still returns a new instance)
+    JSONWebKey k = JSONWebKey.builder()
+                             .kty(KeyType.RSA)
+                             .n("AQAB")
+                             .e("AQAB")
+                             .build();
+
+    JSONWebKey pub = k.toPublicJSONWebKey();
+    assertNotSame(pub, k);
+    assertEquals(pub, k);
+  }
+
+  // ---------- JWKS-style mixed-type list ----------
+
+  @Test
+  public void toPublicJSONWebKey_rsa_strips_private_material() {
+    // Use case: toPublicJSONWebKey for RSA strips d, dp, dq, p, q, qi
+    JSONWebKey k = JSONWebKey.builder()
+                             .kty(KeyType.RSA)
+                             .alg(Algorithm.RS256)
+                             .kid("rsa-1")
+                             .use("sig")
+                             .n("AQAB")
+                             .e("AQAB")
+                             .d("D")
+                             .dp("DP")
+                             .dq("DQ")
+                             .p("P")
+                             .q("Q")
+                             .qi("QI")
+                             .build();
+
+    JSONWebKey pub = k.toPublicJSONWebKey();
+    assertNotSame(pub, k);
+    assertNull(pub.d());
+    assertNull(pub.dp());
+    assertNull(pub.dq());
+    assertNull(pub.p());
+    assertNull(pub.q());
+    assertNull(pub.qi());
+    // Public material preserved.
+    assertEquals(pub.kty(), KeyType.RSA);
+    assertEquals(pub.alg(), Algorithm.RS256);
+    assertEquals(pub.kid(), "rsa-1");
+    assertEquals(pub.use(), "sig");
+    assertEquals(pub.n(), "AQAB");
+    assertEquals(pub.e(), "AQAB");
+
+    // Source unchanged.
+    assertEquals(k.d(), "D");
+    assertEquals(k.p(), "P");
+  }
+
+  // ---------- equals / hashCode ----------
+
+  @Test
+  public void toString_does_not_materialize_absent_private_fields() {
+    // Use case: toString only redacts private fields that are actually present;
+    // absent private fields stay absent rather than appearing as "***".
+    JSONWebKey k = JSONWebKey.builder()
+                             .kty(KeyType.RSA)
+                             .n("AQAB")
+                             .e("AQAB")
+                             .build();
+    // d, dp, dq, p, q, qi all null
+
+    String s = k.toString();
+    assertFalse(s.contains("\"d\""), s);
+    assertFalse(s.contains("\"dp\""), s);
+    assertFalse(s.contains("\"dq\""), s);
+    assertFalse(s.contains("\"p\""), s);
+    assertFalse(s.contains("\"q\""), s);
+    assertFalse(s.contains("\"qi\""), s);
+    assertFalse(s.contains("***"), s);
+  }
+
+  @Test
+  public void toString_redacts_populated_private_fields() {
+    // Use case: toString redacts populated private fields to "***"
+    JSONWebKey k = JSONWebKey.builder()
+                             .kty(KeyType.RSA)
+                             .kid("rsa-1")
+                             .n("AQAB")
+                             .e("AQAB")
+                             .d("SECRET-D")
+                             .dp("SECRET-DP")
+                             .dq("SECRET-DQ")
+                             .p("SECRET-P")
+                             .q("SECRET-Q")
+                             .qi("SECRET-QI")
+                             .build();
+
+    String s = k.toString();
+    for (String secret : new String[]{"SECRET-D", "SECRET-DP", "SECRET-DQ", "SECRET-P", "SECRET-Q", "SECRET-QI"}) {
+      assertFalse(s.contains(secret), "toString leaked private material: " + secret + " in: " + s);
+    }
+    // Each redacted field must appear as "***" in the rendered map.
+    assertTrue(s.contains("\"d\":\"***\""), s);
+    assertTrue(s.contains("\"dp\":\"***\""), s);
+    assertTrue(s.contains("\"dq\":\"***\""), s);
+    assertTrue(s.contains("\"p\":\"***\""), s);
+    assertTrue(s.contains("\"q\":\"***\""), s);
+    assertTrue(s.contains("\"qi\":\"***\""), s);
+    // Public fields are still present verbatim.
+    assertTrue(s.contains("\"n\":\"AQAB\""), s);
+    assertTrue(s.contains("\"e\":\"AQAB\""), s);
+    assertTrue(s.contains("\"kid\":\"rsa-1\""), s);
   }
 
   // ---------- Local helpers ----------
 
-  private static void assertNotSame(Object a, Object b) {
-    assertFalse(a == b, "expected distinct instances");
+  @Test
+  public void x5t_S256_round_trips() {
+    // Use case: fromMap → toJSON round-trip preserves x5t#S256 key form
+    String json = "{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"X\",\"y\":\"Y\",\"x5t#S256\":\"thumb\"}";
+    Map<String, Object> map = new LatteJSONProcessor().deserialize(json.getBytes());
+    JSONWebKey k = JSONWebKey.fromMap(map);
+    assertEquals(k.x5tS256(), "thumb");
+    String back = k.toJSON();
+    assertTrue(back.contains("\"x5t#S256\":\"thumb\""), back);
   }
 }

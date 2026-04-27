@@ -16,7 +16,7 @@
 
 package org.lattejava.jwt;
 
-import java.util.function.Consumer;
+import java.util.function.*;
 
 /**
  * @author Daniel DeGroff

@@ -24,17 +24,16 @@
 package org.lattejava.jwt;
 
 /**
- * Per-instance hardening limits for HTTP fetches and JSON parsing performed
- * by {@link org.lattejava.jwt.jwks.JWKS} and discovery operations.
+ * Per-instance hardening limits for HTTP fetches and JSON parsing performed by {@link org.lattejava.jwt.jwks.JWKS} and
+ * discovery operations.
  *
  * <p>Instances are immutable. {@link #defaults()} returns a shared singleton.
- * Defaults match historical behavior exactly for the carried-forward fields;
- * {@link #allowCrossOriginRedirects()} is new in 7.0 and defaults to
- * {@code false} (stricter than 6.x, which had no origin check).</p>
+ * Defaults match historical behavior exactly for the carried-forward fields; {@link #allowCrossOriginRedirects()} is
+ * new in 7.0 and defaults to {@code false} (stricter than 6.x, which had no origin check).</p>
  *
  * <p>The response cap and JSON parser caps cannot be disabled — the
- * corresponding setters reject zero or negative values. {@link #maxRedirects()}
- * is the exception: zero is permitted and disables redirect following.</p>
+ * corresponding setters reject zero or negative values. {@link #maxRedirects()} is the exception: zero is permitted and
+ * disables redirect following.</p>
  */
 public final class FetchLimits {
   private static final FetchLimits DEFAULTS = new FetchLimits(new Builder());
@@ -66,25 +65,40 @@ public final class FetchLimits {
     return DEFAULTS;
   }
 
-  public boolean allowCrossOriginRedirects() { return allowCrossOriginRedirects; }
+  public boolean allowCrossOriginRedirects() {
+    return allowCrossOriginRedirects;
+  }
 
-  public boolean allowDuplicateJSONKeys() { return allowDuplicateJSONKeys; }
+  public boolean allowDuplicateJSONKeys() {
+    return allowDuplicateJSONKeys;
+  }
 
-  public int maxArrayElements() { return maxArrayElements; }
+  public int maxArrayElements() {
+    return maxArrayElements;
+  }
 
-  public int maxNestingDepth() { return maxNestingDepth; }
+  public int maxNestingDepth() {
+    return maxNestingDepth;
+  }
 
-  public int maxNumberLength() { return maxNumberLength; }
+  public int maxNumberLength() {
+    return maxNumberLength;
+  }
 
-  public int maxObjectMembers() { return maxObjectMembers; }
+  public int maxObjectMembers() {
+    return maxObjectMembers;
+  }
 
-  public int maxRedirects() { return maxRedirects; }
+  public int maxRedirects() {
+    return maxRedirects;
+  }
 
-  public int maxResponseBytes() { return maxResponseBytes; }
+  public int maxResponseBytes() {
+    return maxResponseBytes;
+  }
 
   /**
-   * Reusable, mutable builder. Each {@link #build()} returns a fresh
-   * immutable {@link FetchLimits}.
+   * Reusable, mutable builder. Each {@link #build()} returns a fresh immutable {@link FetchLimits}.
    */
   public static final class Builder {
     private boolean allowCrossOriginRedirects = false;
@@ -96,15 +110,14 @@ public final class FetchLimits {
     private int maxRedirects = 3;
     private int maxResponseBytes = 1024 * 1024;
 
-    private Builder() {}
+    private Builder() {
+    }
 
     /**
-     * Permits redirects whose (scheme, host, port) differ from the original
-     * request. Default: {@code false}. Setting this to {@code true} is a
-     * deliberate security trade-off — a DNS hijack or CDN takeover targeting
-     * the original host can silently swap the verifier's keys via a 302 to
-     * attacker-controlled infrastructure. Real OIDC providers rarely require
-     * cross-origin redirects mid-fetch.
+     * Permits redirects whose (scheme, host, port) differ from the original request. Default: {@code false}. Setting
+     * this to {@code true} is a deliberate security trade-off — a DNS hijack or CDN takeover targeting the original
+     * host can silently swap the verifier's keys via a 302 to attacker-controlled infrastructure. Real OIDC providers
+     * rarely require cross-origin redirects mid-fetch.
      *
      * @param allow {@code true} to permit cross-origin redirects.
      * @return this builder.
@@ -185,8 +198,7 @@ public final class FetchLimits {
     }
 
     /**
-     * Sets the maximum number of HTTP redirects to follow. Zero disables redirect following.
-     * Must be &gt;= 0.
+     * Sets the maximum number of HTTP redirects to follow. Zero disables redirect following. Must be &gt;= 0.
      *
      * @param n the limit.
      * @return this builder.
@@ -199,15 +211,16 @@ public final class FetchLimits {
     }
 
     /**
-     * Sets the maximum number of bytes read from an HTTP response body. Must be &gt; 0;
-     * the response cap cannot be disabled.
+     * Sets the maximum number of bytes read from an HTTP response body. Must be &gt; 0; the response cap cannot be
+     * disabled.
      *
      * @param n the limit.
      * @return this builder.
      * @throws IllegalArgumentException if {@code n} is zero or negative.
      */
     public Builder maxResponseBytes(int n) {
-      if (n <= 0) throw new IllegalArgumentException("maxResponseBytes must be > 0 but found [" + n + "] (the response cap cannot be disabled)");
+      if (n <= 0)
+        throw new IllegalArgumentException("maxResponseBytes must be > 0 but found [" + n + "] (the response cap cannot be disabled)");
       this.maxResponseBytes = n;
       return this;
     }

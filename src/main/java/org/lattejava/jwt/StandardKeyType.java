@@ -23,25 +23,17 @@
 
 package org.lattejava.jwt;
 
-import java.util.Objects;
+import java.util.*;
 
 /**
- * Package-private default {@link KeyType} implementation. Equality and hash
- * code are keyed on {@link #name()}, so two instances with the same kty value
- * compare equal regardless of how they were constructed.
+ * Package-private default {@link KeyType} implementation. Equality and hash code are keyed on {@link #name()}, so two
+ * instances with the same kty value compare equal regardless of how they were constructed.
  *
  * @author Daniel DeGroff
  */
-final class StandardKeyType implements KeyType {
-  private final String name;
-
+record StandardKeyType(String name) implements KeyType {
   StandardKeyType(String name) {
     this.name = Objects.requireNonNull(name, "name");
-  }
-
-  @Override
-  public String name() {
-    return name;
   }
 
   @Override
@@ -53,11 +45,6 @@ final class StandardKeyType implements KeyType {
       return false;
     }
     return name.equals(other.name);
-  }
-
-  @Override
-  public int hashCode() {
-    return name.hashCode();
   }
 
   @Override

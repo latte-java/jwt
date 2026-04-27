@@ -16,26 +16,20 @@
 
 package org.lattejava.jwt.algorithm.ed;
 
-import org.lattejava.jwt.Algorithm;
-import org.lattejava.jwt.JWTSigningException;
-import org.lattejava.jwt.Signer;
-import org.lattejava.jwt.internal.KeyCoercion;
+import java.security.*;
+import java.security.interfaces.*;
+import java.util.*;
 
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
-import java.security.PrivateKey;
-import java.security.Signature;
-import java.security.SignatureException;
-import java.security.interfaces.EdECPrivateKey;
-import java.util.Objects;
+import org.lattejava.jwt.*;
+import org.lattejava.jwt.Signer;
+import org.lattejava.jwt.internal.*;
 
 /**
- * EdDSA {@link Signer} for the {@code Ed25519} / {@code Ed448} JWA
- * algorithms (RFC 8037 §3.1, JOSE registry).
+ * EdDSA {@link Signer} for the {@code Ed25519} / {@code Ed448} JWA algorithms (RFC 8037 §3.1, JOSE registry).
  *
  * <p>The JWA algorithm is derived from the key's curve at construction.
- * Each call to {@link #sign(byte[])} obtains a fresh {@link Signature}
- * instance ({@link Signature} is not thread-safe).</p>
+ * Each call to {@link #sign(byte[])} obtains a fresh {@link Signature} instance ({@link Signature} is not
+ * thread-safe).</p>
  *
  * @author Daniel DeGroff
  */

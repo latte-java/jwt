@@ -16,10 +16,9 @@
 
 package org.lattejava.jwt;
 
-import org.lattejava.jwt.internal.pem.PEM;
+import java.security.*;
 
-import java.security.KeyPairGenerator;
-import java.security.NoSuchAlgorithmException;
+import org.lattejava.jwt.internal.pem.*;
 
 /**
  * Static factories for generating asymmetric {@link KeyPair} values for use with JWT signing schemes.
@@ -76,34 +75,6 @@ public class KeyPairs {
   }
 
   /**
-   * Generate a new public / private key pair using a 2048-bit RSA key. This is the minimum key length for use with an
-   * RSA signing scheme for JWT.
-   *
-   * @return a public and private key PEM in their respective X.509 and PKCS#8 key formats.
-   */
-  public static KeyPair generateRSA_2048() {
-    return generate("RSA", 2048);
-  }
-
-  /**
-   * Generate a new public / private key pair using a 3072-bit RSA key.
-   *
-   * @return a public and private key PEM in their respective X.509 and PKCS#8 key formats.
-   */
-  public static KeyPair generateRSA_3072() {
-    return generate("RSA", 3072);
-  }
-
-  /**
-   * Generate a new public / private key pair using a 4096-bit RSA key.
-   *
-   * @return a public and private key PEM in their respective X.509 and PKCS#8 key formats.
-   */
-  public static KeyPair generateRSA_4096() {
-    return generate("RSA", 4096);
-  }
-
-  /**
    * Generate a new public / private key pair using a 2048-bit RSA-PSS key. This is the minimum key length for use with
    * an RSA-PSS signing scheme for JWT.
    *
@@ -129,6 +100,34 @@ public class KeyPairs {
    */
   public static KeyPair generateRSAPSS_4096() {
     return generate("RSASSA-PSS", 4096);
+  }
+
+  /**
+   * Generate a new public / private key pair using a 2048-bit RSA key. This is the minimum key length for use with an
+   * RSA signing scheme for JWT.
+   *
+   * @return a public and private key PEM in their respective X.509 and PKCS#8 key formats.
+   */
+  public static KeyPair generateRSA_2048() {
+    return generate("RSA", 2048);
+  }
+
+  /**
+   * Generate a new public / private key pair using a 3072-bit RSA key.
+   *
+   * @return a public and private key PEM in their respective X.509 and PKCS#8 key formats.
+   */
+  public static KeyPair generateRSA_3072() {
+    return generate("RSA", 3072);
+  }
+
+  /**
+   * Generate a new public / private key pair using a 4096-bit RSA key.
+   *
+   * @return a public and private key PEM in their respective X.509 and PKCS#8 key formats.
+   */
+  public static KeyPair generateRSA_4096() {
+    return generate("RSA", 4096);
   }
 
   private static KeyPair generate(String algorithm, Integer keySize) {

@@ -26,35 +26,22 @@ package org.lattejava.jwt;
 // HeaderCustomizer compiles without .alg() -- type-system enforcement that
 // the encoded header's algorithm always matches the Signer's algorithm.
 
-import org.lattejava.jwt.algorithm.ec.ECSigner;
-import org.lattejava.jwt.algorithm.ec.ECVerifier;
-import org.lattejava.jwt.algorithm.ed.EdDSASigner;
-import org.lattejava.jwt.algorithm.ed.EdDSAVerifier;
-import org.lattejava.jwt.algorithm.hmac.HMACSigner;
-import org.lattejava.jwt.algorithm.hmac.HMACVerifier;
-import org.lattejava.jwt.algorithm.rsa.RSAPSSSigner;
-import org.lattejava.jwt.algorithm.rsa.RSAPSSVerifier;
-import org.lattejava.jwt.algorithm.rsa.RSASigner;
-import org.lattejava.jwt.algorithm.rsa.RSAVerifier;
-import org.testng.annotations.DataProvider;
-import org.testng.annotations.Test;
+import java.nio.file.*;
+import java.time.*;
+import java.time.temporal.*;
+import java.util.function.*;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.function.Supplier;
+import org.lattejava.jwt.algorithm.ec.*;
+import org.lattejava.jwt.algorithm.ed.*;
+import org.lattejava.jwt.algorithm.hmac.*;
+import org.lattejava.jwt.algorithm.rsa.*;
+import org.testng.annotations.*;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
+import static org.testng.Assert.*;
 
 /**
- * Round-trip {@link JWTEncoder} coverage. Sweeps every algorithm family via
- * a DataProvider over (algorithm, signer-supplier, verifier-supplier) and
- * exercises the {@link HeaderCustomizer} surface.
+ * Round-trip {@link JWTEncoder} coverage. Sweeps every algorithm family via a DataProvider over (algorithm,
+ * signer-supplier, verifier-supplier) and exercises the {@link HeaderCustomizer} surface.
  *
  * @author Daniel DeGroff
  */
@@ -62,6 +49,10 @@ public class JWTEncoderTest {
   private static final String HMAC_SECRET_32 = "super-secret-key-that-is-at-least-32-bytes-long!!";
   private static final String HMAC_SECRET_64 =
       "super-secret-key-that-is-at-least-64-bytes-long-for-sha512-algorithm-compat-requirement!!";
+
+  private static Path getPath(String name) {
+    return Paths.get("src/test/resources/" + name);
+  }
 
   private static String readFile(String name) {
     try {
@@ -71,13 +62,9 @@ public class JWTEncoderTest {
     }
   }
 
-  private static Path getPath(String name) {
-    return Paths.get("src/test/resources/" + name);
-  }
-
   @DataProvider(name = "algorithms")
   public Object[][] algorithms() {
-    return new Object[][] {
+    return new Object[][]{
         {Algorithm.HS256,
             (Supplier<Signer>) () -> HMACSigner.newSHA256Signer(HMAC_SECRET_32),
             (Supplier<Verifier>) () -> HMACVerifier.newVerifier(Algorithm.HS256, HMAC_SECRET_32)},
@@ -117,27 +104,40 @@ public class JWTEncoderTest {
     };
   }
 
-  @Test(dataProvider = "algorithms")
-  public void roundTrip(Algorithm alg, Supplier<Signer> signerFactory, Supplier<Verifier> verifierFactory) {
-    // Use case: every supported algorithm round-trips encode -> decode and preserves all claims.
-    Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
-    JWT original = JWT.builder()
-        .subject("subject-" + alg.name())
-        .issuer("issuer")
-        .audience("aud-1")
-        .issuedAt(now)
-        .expiresAt(now.plus(1, ChronoUnit.HOURS))
-        .id("jwt-id")
-        .claim("custom", "value")
-        .build();
+  @Test
+  public void customizer_kidNull_clears() {
+    // Use case: HeaderCustomizer.kid(null) clears the signer-derived kid.
+    JWT jwt = JWT.builder().subject("abc").build();
+    Signer signer = HMACSigner.newSHA256Signer(HMAC_SECRET_32.getBytes(), "key-1");
+    String encoded = new JWTEncoder().encode(jwt, signer, b -> b.kid(null));
 
-    String encoded = new JWTEncoder().encode(original, signerFactory.get());
-    JWT decoded = new JWTDecoder().decode(encoded, VerifierResolver.of(verifierFactory.get()));
+    JWT decoded = new JWTDecoder().decode(encoded, VerifierResolver.of(HMACVerifier.newVerifier(Algorithm.HS256, HMAC_SECRET_32)));
+    assertNull(decoded.header().kid());
+  }
 
-    assertEquals(decoded.header().alg().name(), alg.name(),
-        "encoded header.alg must equal signer.algorithm()");
-    assertTrue(original.claimsEquals(decoded),
-        "round-trip claims should match: original=" + original + " decoded=" + decoded);
+  @Test
+  public void customizer_kidOverride() {
+    // Use case: HeaderCustomizer.kid("override") replaces signer-derived kid.
+    JWT jwt = JWT.builder().subject("abc").build();
+    Signer signer = HMACSigner.newSHA256Signer(HMAC_SECRET_32.getBytes(), "key-1");
+    String encoded = new JWTEncoder().encode(jwt, signer, b -> b.kid("override"));
+
+    JWT decoded = new JWTDecoder().decode(encoded, VerifierResolver.of(HMACVerifier.newVerifier(Algorithm.HS256, HMAC_SECRET_32)));
+    assertEquals(decoded.header().kid(), "override");
+  }
+
+  @Test
+  public void customizer_parameterAlg_rejected() {
+    // Use case: HeaderCustomizer.parameter("alg", x) is rejected at runtime as
+    // defense-in-depth (the type system already prevents .alg(...) calls).
+    JWT jwt = JWT.builder().subject("abc").build();
+    Signer signer = HMACSigner.newSHA256Signer(HMAC_SECRET_32);
+    try {
+      new JWTEncoder().encode(jwt, signer, b -> b.parameter("alg", "none"));
+      fail("Expected IllegalArgumentException for parameter(\"alg\", ...)");
+    } catch (IllegalArgumentException expected) {
+      // good
+    }
   }
 
   @Test
@@ -162,17 +162,13 @@ public class JWTEncoderTest {
   }
 
   @Test
-  public void customizer_parameterAlg_rejected() {
-    // Use case: HeaderCustomizer.parameter("alg", x) is rejected at runtime as
-    // defense-in-depth (the type system already prevents .alg(...) calls).
+  public void encoded_threeSegments() {
+    // Use case: the encoded JWT is exactly three '.'-separated segments.
     JWT jwt = JWT.builder().subject("abc").build();
-    Signer signer = HMACSigner.newSHA256Signer(HMAC_SECRET_32);
-    try {
-      new JWTEncoder().encode(jwt, signer, b -> b.parameter("alg", "none"));
-      fail("Expected IllegalArgumentException for parameter(\"alg\", ...)");
-    } catch (IllegalArgumentException expected) {
-      // good
-    }
+    String encoded = new JWTEncoder().encode(jwt, HMACSigner.newSHA256Signer(HMAC_SECRET_32));
+    assertNotNull(encoded);
+    long dots = encoded.chars().filter(c -> c == '.').count();
+    assertEquals(dots, 2L);
   }
 
   @Test
@@ -186,35 +182,26 @@ public class JWTEncoderTest {
     assertEquals(decoded.header().kid(), "key-1");
   }
 
-  @Test
-  public void customizer_kidNull_clears() {
-    // Use case: HeaderCustomizer.kid(null) clears the signer-derived kid.
-    JWT jwt = JWT.builder().subject("abc").build();
-    Signer signer = HMACSigner.newSHA256Signer(HMAC_SECRET_32.getBytes(), "key-1");
-    String encoded = new JWTEncoder().encode(jwt, signer, b -> b.kid(null));
+  @Test(dataProvider = "algorithms")
+  public void roundTrip(Algorithm alg, Supplier<Signer> signerFactory, Supplier<Verifier> verifierFactory) {
+    // Use case: every supported algorithm round-trips encode -> decode and preserves all claims.
+    Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+    JWT original = JWT.builder()
+                      .subject("subject-" + alg.name())
+                      .issuer("issuer")
+                      .audience("aud-1")
+                      .issuedAt(now)
+                      .expiresAt(now.plus(1, ChronoUnit.HOURS))
+                      .id("jwt-id")
+                      .claim("custom", "value")
+                      .build();
 
-    JWT decoded = new JWTDecoder().decode(encoded, VerifierResolver.of(HMACVerifier.newVerifier(Algorithm.HS256, HMAC_SECRET_32)));
-    assertEquals(decoded.header().kid(), null);
-  }
+    String encoded = new JWTEncoder().encode(original, signerFactory.get());
+    JWT decoded = new JWTDecoder().decode(encoded, VerifierResolver.of(verifierFactory.get()));
 
-  @Test
-  public void customizer_kidOverride() {
-    // Use case: HeaderCustomizer.kid("override") replaces signer-derived kid.
-    JWT jwt = JWT.builder().subject("abc").build();
-    Signer signer = HMACSigner.newSHA256Signer(HMAC_SECRET_32.getBytes(), "key-1");
-    String encoded = new JWTEncoder().encode(jwt, signer, b -> b.kid("override"));
-
-    JWT decoded = new JWTDecoder().decode(encoded, VerifierResolver.of(HMACVerifier.newVerifier(Algorithm.HS256, HMAC_SECRET_32)));
-    assertEquals(decoded.header().kid(), "override");
-  }
-
-  @Test
-  public void encoded_threeSegments() {
-    // Use case: the encoded JWT is exactly three '.'-separated segments.
-    JWT jwt = JWT.builder().subject("abc").build();
-    String encoded = new JWTEncoder().encode(jwt, HMACSigner.newSHA256Signer(HMAC_SECRET_32));
-    assertNotNull(encoded);
-    long dots = encoded.chars().filter(c -> c == '.').count();
-    assertEquals(dots, 2L);
+    assertEquals(decoded.header().alg().name(), alg.name(),
+        "encoded header.alg must equal signer.algorithm()");
+    assertTrue(original.claimsEquals(decoded),
+        "round-trip claims should match: original=" + original + " decoded=" + decoded);
   }
 }

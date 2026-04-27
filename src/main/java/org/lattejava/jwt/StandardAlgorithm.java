@@ -23,29 +23,21 @@
 
 package org.lattejava.jwt;
 
-import java.util.Objects;
+import java.util.*;
 
 /**
- * Package-private default {@link Algorithm} implementation. Equality and hash
- * code are keyed on {@link #name()}, so two instances with the same JWA name
- * compare equal regardless of how they were constructed.
+ * Package-private default {@link Algorithm} implementation. Equality and hash code are keyed on {@link #name()}, so two
+ * instances with the same JWA name compare equal regardless of how they were constructed.
  *
  * <p>Implemented as a final class (not a record) because the file ships a
- * {@code toString()} that is intentionally minimal -- just the JWA name --
- * rather than the {@code StandardAlgorithm[name=...]} record default.</p>
+ * {@code toString()} that is intentionally minimal -- just the JWA name -- rather than the
+ * {@code StandardAlgorithm[name=...]} record default.</p>
  *
  * @author Daniel DeGroff
  */
-final class StandardAlgorithm implements Algorithm {
-  private final String name;
-
+record StandardAlgorithm(String name) implements Algorithm {
   StandardAlgorithm(String name) {
     this.name = Objects.requireNonNull(name, "name");
-  }
-
-  @Override
-  public String name() {
-    return name;
   }
 
   @Override
@@ -57,11 +49,6 @@ final class StandardAlgorithm implements Algorithm {
       return false;
     }
     return name.equals(other.name);
-  }
-
-  @Override
-  public int hashCode() {
-    return name.hashCode();
   }
 
   @Override

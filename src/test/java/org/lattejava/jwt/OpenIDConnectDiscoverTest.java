@@ -23,49 +23,44 @@
 
 package org.lattejava.jwt;
 
-import com.sun.net.httpserver.HttpServer;
-import org.testng.annotations.AfterMethod;
-import org.testng.annotations.BeforeMethod;
-import org.testng.annotations.Test;
+import java.io.*;
+import java.net.*;
+import java.nio.charset.*;
+import java.util.concurrent.atomic.*;
 
-import java.io.IOException;
-import java.net.HttpURLConnection;
-import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
-import java.util.concurrent.atomic.AtomicReference;
+import com.sun.net.httpserver.*;
+import org.testng.annotations.*;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
+import static org.testng.Assert.*;
 
 public class OpenIDConnectDiscoverTest {
-  private HttpServer server;
   private String baseURL;
+  private HttpServer server;
 
-  @BeforeMethod
-  public void setUp() throws IOException {
-    server = HttpServer.create(new InetSocketAddress(0), 0);
-    server.start();
-    int port = server.getAddress().getPort();
-    baseURL = "http://localhost:" + port;
+  @Test
+  public void discoverFromWellKnown_does_not_validate_issuer_equality() {
+    // Use case: discoverFromWellKnown passes null expectedIssuer, so differing issuer in response is accepted.
+    String body = "{\"issuer\":\"https://some-other-host.example\",\"jwks_uri\":\"" + baseURL + "/jwks\"}";
+    serveJSON("/.well-known/openid-configuration", body);
+
+    OpenIDConnectConfiguration cfg = OpenIDConnect.discoverFromWellKnown(baseURL + "/.well-known/openid-configuration");
+    assertNotNull(cfg);
+    assertEquals(cfg.issuer(), "https://some-other-host.example");
   }
 
-  @AfterMethod
-  public void tearDown() {
-    if (server != null) {
-      server.stop(0);
+  @Test
+  public void discoverFromWellKnown_throws_on_missing_jwks_uri() {
+    // Use case: missing jwks_uri field → OpenIDConnectException mentioning jwks_uri.
+    String body = "{\"issuer\":\"" + baseURL + "\"}";
+    serveJSON("/.well-known/openid-configuration", body);
+
+    try {
+      OpenIDConnect.discoverFromWellKnown(baseURL + "/.well-known/openid-configuration");
+      fail("Expected OpenIDConnectException");
+    } catch (OpenIDConnectException ex) {
+      assertTrue(ex.getMessage().contains("jwks_uri"),
+          "Expected message to contain [jwks_uri] but got: " + ex.getMessage());
     }
-  }
-
-  private void serveJSON(String path, String body) {
-    server.createContext(path, ex -> {
-      byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
-      ex.getResponseHeaders().add("Content-Type", "application/json");
-      ex.sendResponseHeaders(200, bytes.length);
-      ex.getResponseBody().write(bytes);
-      ex.close();
-    });
   }
 
   @Test
@@ -82,32 +77,21 @@ public class OpenIDConnectDiscoverTest {
   }
 
   @Test
-  public void discover_passes_response_through_typed_routing() {
-    // Use case: typed fields and unknown extension keys are both preserved in the parsed config.
-    String body = "{\"issuer\":\"" + baseURL + "\",\"jwks_uri\":\"" + baseURL + "/jwks\"," +
-        "\"response_types_supported\":[\"code\",\"token\"],\"x_custom_extension\":\"hello\"}";
-    serveJSON("/.well-known/openid-configuration", body);
+  public void discover_enforces_response_byte_cap_via_FetchLimits() {
+    // Use case: FetchLimits.maxResponseBytes(64) causes a large response to throw OpenIDConnectException.
+    StringBuilder sb = new StringBuilder("{\"issuer\":\"" + baseURL + "\",\"jwks_uri\":\"" + baseURL + "/jwks\",\"x_padding\":\"");
+    while (sb.length() < 200) {
+      sb.append("AAAAAAAAAA");
+    }
+    sb.append("\"}");
+    serveJSON("/.well-known/openid-configuration", sb.toString());
 
-    OpenIDConnectConfiguration cfg = OpenIDConnect.discover(baseURL);
-    assertNotNull(cfg.responseTypesSupported());
-    assertEquals(cfg.responseTypesSupported().size(), 2);
-    assertEquals(cfg.otherClaims().get("x_custom_extension"), "hello");
-  }
-
-  @Test
-  public void discover_rejects_issuer_equality_mismatch() {
-    // Use case: response issuer differs from the expected issuer → OpenIDConnectException with attacker host in message.
-    String body = "{\"issuer\":\"https://attacker.example\",\"jwks_uri\":\"" + baseURL + "/jwks\"}";
-    serveJSON("/.well-known/openid-configuration", body);
-
+    FetchLimits limits = FetchLimits.builder().maxResponseBytes(64).build();
     try {
-      OpenIDConnect.discover(baseURL);
+      OpenIDConnect.discover(baseURL, limits);
       fail("Expected OpenIDConnectException");
     } catch (OpenIDConnectException ex) {
-      assertTrue(ex.getMessage().contains("attacker.example"),
-          "Expected message to contain [attacker.example] but got: " + ex.getMessage());
-      assertTrue(ex.getMessage().contains(baseURL),
-          "Expected message to contain expected-issuer value, got: " + ex.getMessage());
+      assertNotNull(ex.getMessage());
     }
   }
 
@@ -133,43 +117,50 @@ public class OpenIDConnectDiscoverTest {
   }
 
   @Test
-  public void discover_throws_when_issuer_field_is_missing() {
-    // Use case: missing issuer field in discovery response → OpenIDConnectException.
-    String body = "{\"jwks_uri\":\"" + baseURL + "/jwks\"}";
+  public void discover_passes_response_through_typed_routing() {
+    // Use case: typed fields and unknown extension keys are both preserved in the parsed config.
+    String body = "{\"issuer\":\"" + baseURL + "\",\"jwks_uri\":\"" + baseURL + "/jwks\"," +
+        "\"response_types_supported\":[\"code\",\"token\"],\"x_custom_extension\":\"hello\"}";
+    serveJSON("/.well-known/openid-configuration", body);
+
+    OpenIDConnectConfiguration cfg = OpenIDConnect.discover(baseURL);
+    assertNotNull(cfg.responseTypesSupported());
+    assertEquals(cfg.responseTypesSupported().size(), 2);
+    assertEquals(cfg.otherClaims().get("x_custom_extension"), "hello");
+  }
+
+  @Test
+  public void discover_rejects_cross_origin_redirect_by_default() {
+    // Use case: discovery endpoint redirects to a different origin → OpenIDConnectException with cross-origin message.
+    server.createContext("/.well-known/openid-configuration", ex -> {
+      ex.getResponseHeaders().add("Location", "http://evil.example/.well-known/openid-configuration");
+      ex.sendResponseHeaders(302, -1);
+      ex.close();
+    });
+
+    try {
+      OpenIDConnect.discover(baseURL);
+      fail("Expected OpenIDConnectException");
+    } catch (OpenIDConnectException ex) {
+      assertTrue(ex.getMessage().contains("cross-origin") || ex.getMessage().contains("Refusing"),
+          "Expected cross-origin message but got: " + ex.getMessage());
+    }
+  }
+
+  @Test
+  public void discover_rejects_issuer_equality_mismatch() {
+    // Use case: response issuer differs from the expected issuer → OpenIDConnectException with attacker host in message.
+    String body = "{\"issuer\":\"https://attacker.example\",\"jwks_uri\":\"" + baseURL + "/jwks\"}";
     serveJSON("/.well-known/openid-configuration", body);
 
     try {
       OpenIDConnect.discover(baseURL);
       fail("Expected OpenIDConnectException");
     } catch (OpenIDConnectException ex) {
-      assertTrue(ex.getMessage().contains("issuer"),
-          "Expected message to mention [issuer] but got: " + ex.getMessage());
-    }
-  }
-
-  @Test
-  public void discoverFromWellKnown_does_not_validate_issuer_equality() {
-    // Use case: discoverFromWellKnown passes null expectedIssuer, so differing issuer in response is accepted.
-    String body = "{\"issuer\":\"https://some-other-host.example\",\"jwks_uri\":\"" + baseURL + "/jwks\"}";
-    serveJSON("/.well-known/openid-configuration", body);
-
-    OpenIDConnectConfiguration cfg = OpenIDConnect.discoverFromWellKnown(baseURL + "/.well-known/openid-configuration");
-    assertNotNull(cfg);
-    assertEquals(cfg.issuer(), "https://some-other-host.example");
-  }
-
-  @Test
-  public void discoverFromWellKnown_throws_on_missing_jwks_uri() {
-    // Use case: missing jwks_uri field → OpenIDConnectException mentioning jwks_uri.
-    String body = "{\"issuer\":\"" + baseURL + "\"}";
-    serveJSON("/.well-known/openid-configuration", body);
-
-    try {
-      OpenIDConnect.discoverFromWellKnown(baseURL + "/.well-known/openid-configuration");
-      fail("Expected OpenIDConnectException");
-    } catch (OpenIDConnectException ex) {
-      assertTrue(ex.getMessage().contains("jwks_uri"),
-          "Expected message to contain [jwks_uri] but got: " + ex.getMessage());
+      assertTrue(ex.getMessage().contains("attacker.example"),
+          "Expected message to contain [attacker.example] but got: " + ex.getMessage());
+      assertTrue(ex.getMessage().contains(baseURL),
+          "Expected message to contain expected-issuer value, got: " + ex.getMessage());
     }
   }
 
@@ -208,39 +199,17 @@ public class OpenIDConnectDiscoverTest {
   }
 
   @Test
-  public void discover_enforces_response_byte_cap_via_FetchLimits() {
-    // Use case: FetchLimits.maxResponseBytes(64) causes a large response to throw OpenIDConnectException.
-    StringBuilder sb = new StringBuilder("{\"issuer\":\"" + baseURL + "\",\"jwks_uri\":\"" + baseURL + "/jwks\",\"x_padding\":\"");
-    while (sb.length() < 200) {
-      sb.append("AAAAAAAAAA");
-    }
-    sb.append("\"}");
-    serveJSON("/.well-known/openid-configuration", sb.toString());
-
-    FetchLimits limits = FetchLimits.builder().maxResponseBytes(64).build();
-    try {
-      OpenIDConnect.discover(baseURL, limits);
-      fail("Expected OpenIDConnectException");
-    } catch (OpenIDConnectException ex) {
-      assertNotNull(ex.getMessage());
-    }
-  }
-
-  @Test
-  public void discover_rejects_cross_origin_redirect_by_default() {
-    // Use case: discovery endpoint redirects to a different origin → OpenIDConnectException with cross-origin message.
-    server.createContext("/.well-known/openid-configuration", ex -> {
-      ex.getResponseHeaders().add("Location", "http://evil.example/.well-known/openid-configuration");
-      ex.sendResponseHeaders(302, -1);
-      ex.close();
-    });
+  public void discover_throws_when_issuer_field_is_missing() {
+    // Use case: missing issuer field in discovery response → OpenIDConnectException.
+    String body = "{\"jwks_uri\":\"" + baseURL + "/jwks\"}";
+    serveJSON("/.well-known/openid-configuration", body);
 
     try {
       OpenIDConnect.discover(baseURL);
       fail("Expected OpenIDConnectException");
     } catch (OpenIDConnectException ex) {
-      assertTrue(ex.getMessage().contains("cross-origin") || ex.getMessage().contains("Refusing"),
-          "Expected cross-origin message but got: " + ex.getMessage());
+      assertTrue(ex.getMessage().contains("issuer"),
+          "Expected message to mention [issuer] but got: " + ex.getMessage());
     }
   }
 
@@ -254,5 +223,30 @@ public class OpenIDConnectDiscoverTest {
     OpenIDConnect.discover(baseURL, conn -> captured.set(conn));
 
     assertNotNull(captured.get(), "Customizer should have been called with the connection");
+  }
+
+  @BeforeMethod
+  public void setUp() throws IOException {
+    server = HttpServer.create(new InetSocketAddress(0), 0);
+    server.start();
+    int port = server.getAddress().getPort();
+    baseURL = "http://localhost:" + port;
+  }
+
+  @AfterMethod
+  public void tearDown() {
+    if (server != null) {
+      server.stop(0);
+    }
+  }
+
+  private void serveJSON(String path, String body) {
+    server.createContext(path, ex -> {
+      byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+      ex.getResponseHeaders().add("Content-Type", "application/json");
+      ex.sendResponseHeaders(200, bytes.length);
+      ex.getResponseBody().write(bytes);
+      ex.close();
+    });
   }
 }

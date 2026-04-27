@@ -23,125 +23,33 @@
 
 package org.lattejava.jwt.security;
 
-import org.lattejava.jwt.Algorithm;
-import org.lattejava.jwt.BaseJWTTest;
-import org.lattejava.jwt.Header;
-import org.lattejava.jwt.JWT;
-import org.lattejava.jwt.JWTDecoder;
-import org.lattejava.jwt.JWTEncoder;
-import org.lattejava.jwt.Verifier;
-import org.lattejava.jwt.VerifierResolver;
-import org.lattejava.jwt.algorithm.hmac.HMACSigner;
-import org.lattejava.jwt.algorithm.hmac.HMACVerifier;
-import org.testng.annotations.AfterMethod;
-import org.testng.annotations.BeforeMethod;
-import org.testng.annotations.Test;
+import java.io.*;
+import java.net.*;
+import java.util.*;
+import java.util.concurrent.atomic.*;
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
+import org.lattejava.jwt.*;
+import org.lattejava.jwt.algorithm.hmac.*;
+import org.testng.annotations.*;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 /**
- * Network-addressed headers (jku / x5u / jwk): proves that the decoder never
- * dereferences {@code jku}, {@code x5u}, or inline {@code jwk} header
- * parameters during decode.
+ * Network-addressed headers (jku / x5u / jwk): proves that the decoder never dereferences {@code jku}, {@code x5u}, or
+ * inline {@code jwk} header parameters during decode.
  *
  * <p>The strategy is to bind a real {@link ServerSocket} on a chosen
- * {@code 127.0.0.1:PORT} and assert that no inbound TCP connection is ever
- * made by the decoder. The acceptor thread runs in the background and
- * increments a counter on every accepted connection; after decode we assert
- * the counter is still zero.</p>
+ * {@code 127.0.0.1:PORT} and assert that no inbound TCP connection is ever made by the decoder. The acceptor thread
+ * runs in the background and increments a counter on every accepted connection; after decode we assert the counter is
+ * still zero.</p>
  *
  * @author Daniel DeGroff
  */
 public class NetworkAddressedHeadersTest extends BaseJWTTest {
   private static final String SECRET = "super-secret-key-that-is-at-least-32-bytes-long!!";
-
-  private ServerSocket serverSocket;
-
-  private Thread acceptorThread;
-
   private final AtomicInteger connectionCount = new AtomicInteger();
-
-  @BeforeMethod
-  public void startProbeServer() throws IOException {
-    // Bind to an ephemeral port; let the OS pick.
-    serverSocket = new ServerSocket();
-    serverSocket.setReuseAddress(true);
-    serverSocket.bind(new InetSocketAddress("127.0.0.1", 0));
-    connectionCount.set(0);
-
-    acceptorThread = new Thread(() -> {
-      while (!serverSocket.isClosed()) {
-        try (Socket s = serverSocket.accept()) {
-          connectionCount.incrementAndGet();
-        } catch (IOException ignored) {
-          // socket closed -- acceptor exits
-          return;
-        }
-      }
-    }, "network-probe-acceptor");
-    acceptorThread.setDaemon(true);
-    acceptorThread.start();
-  }
-
-  @AfterMethod
-  public void stopProbeServer() throws IOException, InterruptedException {
-    if (serverSocket != null) {
-      serverSocket.close();
-    }
-    if (acceptorThread != null) {
-      acceptorThread.join(2000);
-    }
-  }
-
-  private int probePort() {
-    return serverSocket.getLocalPort();
-  }
-
-  @Test
-  public void jkuHeader_notDereferenced() throws Exception {
-    // Use case: JWT with jku header referencing localhost:<probe> decodes
-    // without issuing any network connection.
-    String jkuUrl = "http://127.0.0.1:" + probePort() + "/keys.json";
-    JWT jwt = JWT.builder().subject("abc").build();
-    String token = new JWTEncoder().encode(
-        jwt,
-        HMACSigner.newSHA256Signer(SECRET),
-        b -> b.parameter("jku", jkuUrl));
-
-    Verifier hmac = HMACVerifier.newVerifier(Algorithm.HS256, SECRET);
-    JWT decoded = new JWTDecoder().decode(token, VerifierResolver.of(hmac));
-    assertNotNull(decoded);
-    assertEquals(connectionCount.get(), 0,
-        "Decoder must not dereference jku; observed " + connectionCount.get() + " connections");
-  }
-
-  @Test
-  public void x5uHeader_notDereferenced() throws Exception {
-    // Use case: JWT with x5u header referencing a remote URL decodes without
-    // issuing any network connection.
-    String x5uUrl = "http://127.0.0.1:" + probePort() + "/cert.pem";
-    JWT jwt = JWT.builder().subject("abc").build();
-    String token = new JWTEncoder().encode(
-        jwt,
-        HMACSigner.newSHA256Signer(SECRET),
-        b -> b.parameter("x5u", x5uUrl));
-
-    Verifier hmac = HMACVerifier.newVerifier(Algorithm.HS256, SECRET);
-    JWT decoded = new JWTDecoder().decode(token, VerifierResolver.of(hmac));
-    assertNotNull(decoded);
-    assertEquals(connectionCount.get(), 0,
-        "Decoder must not dereference x5u; observed " + connectionCount.get() + " connections");
-  }
+  private Thread acceptorThread;
+  private ServerSocket serverSocket;
 
   @Test
   public void inlineJwkHeader_parsedNotConsumed() throws Exception {
@@ -198,5 +106,77 @@ public class NetworkAddressedHeadersTest extends BaseJWTTest {
     });
     JWT decoded = new JWTDecoder().decode(token, resolver);
     assertNotNull(decoded);
+  }
+
+  @Test
+  public void jkuHeader_notDereferenced() throws Exception {
+    // Use case: JWT with jku header referencing localhost:<probe> decodes
+    // without issuing any network connection.
+    String jkuUrl = "http://127.0.0.1:" + probePort() + "/keys.json";
+    JWT jwt = JWT.builder().subject("abc").build();
+    String token = new JWTEncoder().encode(
+        jwt,
+        HMACSigner.newSHA256Signer(SECRET),
+        b -> b.parameter("jku", jkuUrl));
+
+    Verifier hmac = HMACVerifier.newVerifier(Algorithm.HS256, SECRET);
+    JWT decoded = new JWTDecoder().decode(token, VerifierResolver.of(hmac));
+    assertNotNull(decoded);
+    assertEquals(connectionCount.get(), 0,
+        "Decoder must not dereference jku; observed " + connectionCount.get() + " connections");
+  }
+
+  @BeforeMethod
+  public void startProbeServer() throws IOException {
+    // Bind to an ephemeral port; let the OS pick.
+    serverSocket = new ServerSocket();
+    serverSocket.setReuseAddress(true);
+    serverSocket.bind(new InetSocketAddress("127.0.0.1", 0));
+    connectionCount.set(0);
+
+    acceptorThread = new Thread(() -> {
+      while (!serverSocket.isClosed()) {
+        try (Socket s = serverSocket.accept()) {
+          connectionCount.incrementAndGet();
+        } catch (IOException ignored) {
+          // socket closed -- acceptor exits
+          return;
+        }
+      }
+    }, "network-probe-acceptor");
+    acceptorThread.setDaemon(true);
+    acceptorThread.start();
+  }
+
+  @AfterMethod
+  public void stopProbeServer() throws IOException, InterruptedException {
+    if (serverSocket != null) {
+      serverSocket.close();
+    }
+    if (acceptorThread != null) {
+      acceptorThread.join(2000);
+    }
+  }
+
+  @Test
+  public void x5uHeader_notDereferenced() throws Exception {
+    // Use case: JWT with x5u header referencing a remote URL decodes without
+    // issuing any network connection.
+    String x5uUrl = "http://127.0.0.1:" + probePort() + "/cert.pem";
+    JWT jwt = JWT.builder().subject("abc").build();
+    String token = new JWTEncoder().encode(
+        jwt,
+        HMACSigner.newSHA256Signer(SECRET),
+        b -> b.parameter("x5u", x5uUrl));
+
+    Verifier hmac = HMACVerifier.newVerifier(Algorithm.HS256, SECRET);
+    JWT decoded = new JWTDecoder().decode(token, VerifierResolver.of(hmac));
+    assertNotNull(decoded);
+    assertEquals(connectionCount.get(), 0,
+        "Decoder must not dereference x5u; observed " + connectionCount.get() + " connections");
+  }
+
+  private int probePort() {
+    return serverSocket.getLocalPort();
   }
 }

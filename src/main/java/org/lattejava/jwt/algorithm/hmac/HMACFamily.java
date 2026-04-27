@@ -23,36 +23,18 @@
 
 package org.lattejava.jwt.algorithm.hmac;
 
-import org.lattejava.jwt.Algorithm;
-import org.lattejava.jwt.InvalidKeyLengthException;
+import org.lattejava.jwt.*;
 
 /**
- * Package-private helpers shared between {@link HMACSigner} and
- * {@link org.lattejava.jwt.algorithm.hmac.HMACVerifier}: JWA-to-JCA
- * algorithm name mapping and the RFC 7518 §3.2 minimum-secret-length
- * check.
+ * Package-private helpers shared between {@link HMACSigner} and {@link org.lattejava.jwt.algorithm.hmac.HMACVerifier}:
+ * JWA-to-JCA algorithm name mapping and the RFC 7518 §3.2 minimum-secret-length check.
  */
 final class HMACFamily {
   private HMACFamily() {
   }
 
   /**
-   * Map a JWA HMAC algorithm name to the corresponding JCA
-   * {@code Mac.getInstance(...)} string.
-   */
-  static String toJCA(Algorithm algorithm) {
-    return switch (algorithm.name()) {
-      case "HS256" -> "HmacSHA256";
-      case "HS384" -> "HmacSHA384";
-      case "HS512" -> "HmacSHA512";
-      default ->
-          throw new IllegalArgumentException("Not an HMAC algorithm [" + algorithm.name() + "]");
-    };
-  }
-
-  /**
-   * RFC 7518 §3.2: "A key of the same size as the hash output or larger
-   * MUST be used with this algorithm."
+   * RFC 7518 §3.2: "A key of the same size as the hash output or larger MUST be used with this algorithm."
    */
   static void assertMinimumSecretLength(Algorithm algorithm, byte[] secret) {
     int minimumLength = switch (algorithm.name()) {
@@ -66,5 +48,17 @@ final class HMACFamily {
           + "] bytes is less than required [" + minimumLength
           + "] bytes for algorithm [" + algorithm.name() + "]");
     }
+  }
+
+  /**
+   * Map a JWA HMAC algorithm name to the corresponding JCA {@code Mac.getInstance(...)} string.
+   */
+  static String toJCA(Algorithm algorithm) {
+    return switch (algorithm.name()) {
+      case "HS256" -> "HmacSHA256";
+      case "HS384" -> "HmacSHA384";
+      case "HS512" -> "HmacSHA512";
+      default -> throw new IllegalArgumentException("Not an HMAC algorithm [" + algorithm.name() + "]");
+    };
   }
 }

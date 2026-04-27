@@ -23,16 +23,12 @@
 
 package org.lattejava.jwt;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.*;
 
 /**
- * Wrapped as the {@code cause} of an HTTP-call failure when the remote
- * endpoint returned a non-2xx status. Carries the status code and the
- * response headers so callers (notably {@code JWKS}) can read
- * {@code Retry-After} and {@code Cache-Control} on the failure path.
+ * Wrapped as the {@code cause} of an HTTP-call failure when the remote endpoint returned a non-2xx status. Carries the
+ * status code and the response headers so callers (notably {@code JWKS}) can read {@code Retry-After} and
+ * {@code Cache-Control} on the failure path.
  *
  * <p>Header lookup is case-insensitive per RFC 9110.</p>
  */
@@ -54,17 +50,16 @@ public final class HTTPResponseException extends RuntimeException {
     this.headers = Collections.unmodifiableMap(ci);
   }
 
-  public Map<String, List<String>> headers() {
-    return headers;
-  }
-
   /**
-   * Returns the first value of the named header, or {@code null} if absent.
-   * Lookup is case-insensitive.
+   * Returns the first value of the named header, or {@code null} if absent. Lookup is case-insensitive.
    */
   public String headerValue(String name) {
     List<String> values = headers.get(name);
     return (values == null || values.isEmpty()) ? null : values.get(0);
+  }
+
+  public Map<String, List<String>> headers() {
+    return headers;
   }
 
   public int statusCode() {

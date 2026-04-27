@@ -23,25 +23,22 @@
 
 package org.lattejava.jwt.jacksontest;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.lattejava.jwt.JSONProcessingException;
-import org.lattejava.jwt.JSONProcessor;
+import java.io.*;
+import java.util.*;
 
-import java.io.IOException;
-import java.util.Map;
+import com.fasterxml.jackson.core.*;
+import com.fasterxml.jackson.core.type.*;
+import com.fasterxml.jackson.databind.*;
+import org.lattejava.jwt.*;
 
 /**
- * Test-scope reference {@link JSONProcessor} backed by Jackson. Used by the
- * cross-processor compatibility tests to prove that a JWT encoded with one
- * processor decodes correctly with another, including BigInteger/BigDecimal
- * numeric round-trips.
+ * Test-scope reference {@link JSONProcessor} backed by Jackson. Used by the cross-processor compatibility tests to
+ * prove that a JWT encoded with one processor decodes correctly with another, including BigInteger/BigDecimal numeric
+ * round-trips.
  *
  * <p>This class lives under {@code src/test/java} on purpose -- the production
- * library is zero-dependency. After CP11 the Jackson dependency moves to
- * test-scope and only this class (and the cross-processor test) depend on it.</p>
+ * library is zero-dependency. After CP11 the Jackson dependency moves to test-scope and only this class (and the
+ * cross-processor test) depend on it.</p>
  *
  * @author Daniel DeGroff
  */
@@ -58,20 +55,21 @@ public class JacksonJSONProcessor implements JSONProcessor {
   }
 
   @Override
+  public Map<String, Object> deserialize(byte[] json) {
+    try {
+      return mapper.readValue(json, new TypeReference<>() {
+      });
+    } catch (IOException e) {
+      throw new JSONProcessingException("JSON deserialization failed", e);
+    }
+  }
+
+  @Override
   public byte[] serialize(Map<String, Object> object) {
     try {
       return mapper.writeValueAsBytes(object);
     } catch (JsonProcessingException e) {
       throw new JSONProcessingException("JSON serialization failed", e);
-    }
-  }
-
-  @Override
-  public Map<String, Object> deserialize(byte[] json) {
-    try {
-      return mapper.readValue(json, new TypeReference<>() {});
-    } catch (IOException e) {
-      throw new JSONProcessingException("JSON deserialization failed", e);
     }
   }
 }

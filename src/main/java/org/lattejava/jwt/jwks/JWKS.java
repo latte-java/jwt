@@ -23,51 +23,19 @@
 
 package org.lattejava.jwt.jwks;
 
-import org.lattejava.jwt.FetchLimits;
-import org.lattejava.jwt.HTTPResponseException;
-import org.lattejava.jwt.Header;
-import org.lattejava.jwt.InvalidJWKException;
-import org.lattejava.jwt.OpenIDConnect;
-import org.lattejava.jwt.OpenIDConnectConfiguration;
-import org.lattejava.jwt.OpenIDConnectException;
-import org.lattejava.jwt.Verifier;
-import org.lattejava.jwt.VerifierResolver;
-import org.lattejava.jwt.Verifiers;
-import org.lattejava.jwt.internal.HardenedJSON;
-import org.lattejava.jwt.internal.MessageSanitizer;
-import org.lattejava.jwt.internal.http.AbstractHTTPHelper;
-import org.lattejava.jwt.log.Logger;
-import org.lattejava.jwt.log.NoOpLogger;
+import java.io.*;
+import java.net.*;
+import java.time.*;
+import java.time.format.*;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.*;
+import java.util.function.*;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.time.Clock;
-import java.time.Duration;
-import java.time.Instant;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Consumer;
+import org.lattejava.jwt.*;
+import org.lattejava.jwt.internal.*;
+import org.lattejava.jwt.internal.http.*;
+import org.lattejava.jwt.log.*;
 
 /**
  * A self-refreshing {@link VerifierResolver} backed by a remote JWKS endpoint.
@@ -75,25 +43,25 @@ import java.util.function.Consumer;
 public final class JWKS implements VerifierResolver, AutoCloseable {
   private final CacheControlPolicy cacheControlPolicy;
   private final Clock clock;
-  private volatile boolean closed;
   private final boolean failFast;
   private final FetchLimits fetchLimits;
   private final Consumer<HttpURLConnection> httpConnectionCustomizer;
   private final AtomicReference<CompletableFuture<Snapshot>> inflight = new AtomicReference<>();
-  private volatile Throwable initialFetchFailure;
   private final Logger logger;
-  volatile String lockedJWKSURI = null;
   private final Duration minRefreshInterval;
   private final AtomicReference<Snapshot> ref = new AtomicReference<>();
   private final Duration refreshInterval;
   private final boolean refreshOnMiss;
-  private volatile Thread refreshThread;
   private final Duration refreshTimeout;
   private final boolean scheduledRefresh;
   private final ScheduledExecutorService scheduler;
   private final FetchSource source;
   private final boolean staticMode;
   private final String url;
+  volatile String lockedJWKSURI = null;
+  private volatile boolean closed;
+  private volatile Throwable initialFetchFailure;
+  private volatile Thread refreshThread;
 
   private JWKS(Builder b) {
     this.cacheControlPolicy = b.cacheControlPolicy;
@@ -190,8 +158,8 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
   // --- Public static methods ---
 
   /**
-   * Performs a one-shot fetch of the JWKS at {@code jwksURL} and returns the parsed keys.
-   * Uses {@link FetchLimits#defaults()} for all hardening limits.
+   * Performs a one-shot fetch of the JWKS at {@code jwksURL} and returns the parsed keys. Uses
+   * {@link FetchLimits#defaults()} for all hardening limits.
    *
    * @param jwksURL the JWKS endpoint URL
    * @return the list of parsed {@link JSONWebKey} objects
@@ -202,8 +170,8 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
   }
 
   /**
-   * Performs a one-shot fetch of the JWKS at {@code jwksURL}, applying {@code customizer}
-   * to the connection before the request is sent.
+   * Performs a one-shot fetch of the JWKS at {@code jwksURL}, applying {@code customizer} to the connection before the
+   * request is sent.
    *
    * @param jwksURL    the JWKS endpoint URL
    * @param customizer an optional consumer to configure the connection (e.g., set request headers)
@@ -227,8 +195,8 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
   }
 
   /**
-   * Performs a one-shot fetch of the JWKS at {@code jwksURL} with the supplied hardening limits
-   * and connection customizer.
+   * Performs a one-shot fetch of the JWKS at {@code jwksURL} with the supplied hardening limits and connection
+   * customizer.
    *
    * @param jwksURL    the JWKS endpoint URL
    * @param limits     the hardening limits to apply
@@ -285,8 +253,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
   // --- Package-private static methods (test-visible) ---
 
   /**
-   * Exponential backoff, computed in long ms to avoid integer overflow at
-   * high consecutive-failure counts. Returns
+   * Exponential backoff, computed in long ms to avoid integer overflow at high consecutive-failure counts. Returns
    * {@code min(refreshInterval, minRefreshInterval * 2^(consecutiveFailures-1))}.
    */
   static Duration backoff(int consecutiveFailures, Duration minRefreshInterval, Duration refreshInterval) {
@@ -300,9 +267,9 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
   }
 
   /**
-   * Parse a {@code Cache-Control} header value into {@link CacheControlDirectives}.
-   * Distinguishes "header present but no max-age directive" (e.g. {@code Cache-Control: public})
-   * from "header is malformed" (e.g. {@code max-age=abc}, conflicting {@code max-age}).
+   * Parse a {@code Cache-Control} header value into {@link CacheControlDirectives}. Distinguishes "header present but
+   * no max-age directive" (e.g. {@code Cache-Control: public}) from "header is malformed" (e.g. {@code max-age=abc},
+   * conflicting {@code max-age}).
    */
   static CacheControlDirectives parseCacheControl(String headerValue) {
     if (headerValue == null) return new CacheControlDirectives(null, false, false);
@@ -332,12 +299,11 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
   }
 
   /**
-   * Parse a {@code Retry-After} header value (RFC 9110 §10.2.3). Supports
-   * the delta-seconds form and the HTTP-date (RFC 1123) form. Returns
-   * {@code null} if neither parse succeeds.
+   * Parse a {@code Retry-After} header value (RFC 9110 §10.2.3). Supports the delta-seconds form and the HTTP-date (RFC
+   * 1123) form. Returns {@code null} if neither parse succeeds.
    *
    * @param value the header value
-   * @param now the reference instant for HTTP-date deltas (the source's {@link Clock})
+   * @param now   the reference instant for HTTP-date deltas (the source's {@link Clock})
    */
   static Duration parseRetryAfter(String value, Instant now) {
     if (value == null) return null;
@@ -461,17 +427,16 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
   }
 
   /**
-   * Synchronous, blocking, singleflight-coalesced refresh. Throws a
-   * {@link JWKSFetchException} on failure, with a categorical
-   * {@link JWKSFetchException#reason()} so callers can dispatch
-   * programmatically without unwrapping the cause chain.
+   * Synchronous, blocking, singleflight-coalesced refresh. Throws a {@link JWKSFetchException} on failure, with a
+   * categorical {@link JWKSFetchException#reason()} so callers can dispatch programmatically without unwrapping the
+   * cause chain.
    *
    * <p>While discovery has not yet succeeded, this method re-attempts discovery and may throw
-   * {@link OpenIDConnectException}. After the JWKS URL has been locked from the first successful
-   * discovery, only {@link JWKSFetchException} is thrown. Both extend {@link RuntimeException},
-   * so callers catching the parent are unaffected.</p>
+   * {@link OpenIDConnectException}. After the JWKS URL has been locked from the first successful discovery, only
+   * {@link JWKSFetchException} is thrown. Both extend {@link RuntimeException}, so callers catching the parent are
+   * unaffected.</p>
    *
-   * @throws JWKSFetchException if the JWKS fetch or parse fails, or times out
+   * @throws JWKSFetchException     if the JWKS fetch or parse fails, or times out
    * @throws OpenIDConnectException if discovery has not yet succeeded and the discovery attempt fails
    */
   public void refresh() {
@@ -537,11 +502,9 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
   // --- Private instance methods ---
 
   /**
-   * Returns the {@link Duration} to use for {@code nextDueAt}. Honors the
-   * server's {@code Cache-Control: max-age} when {@link CacheControlPolicy#CLAMP}
-   * is configured, clamped into {@code [minRefreshInterval, refreshInterval]};
-   * the caller applies the {@code minRefreshInterval} floor again as a final
-   * guard.
+   * Returns the {@link Duration} to use for {@code nextDueAt}. Honors the server's {@code Cache-Control: max-age} when
+   * {@link CacheControlPolicy#CLAMP} is configured, clamped into {@code [minRefreshInterval, refreshInterval]}; the
+   * caller applies the {@code minRefreshInterval} floor again as a final guard.
    */
   private Duration chosenInterval(JWKSResponse resp) {
     if (cacheControlPolicy == CacheControlPolicy.IGNORE) return refreshInterval;
@@ -573,9 +536,8 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
   }
 
   /**
-   * Classify a non-{@link JWKSFetchException} failure into a refresh reason.
-   * HTTP-status failures land as {@code NON_2XX}; IOExceptions land as
-   * {@code NETWORK}; everything else lands as {@code PARSE}.
+   * Classify a non-{@link JWKSFetchException} failure into a refresh reason. HTTP-status failures land as
+   * {@code NON_2XX}; IOExceptions land as {@code NETWORK}; everything else lands as {@code PARSE}.
    */
   private JWKSFetchException classifyFailure(Exception e) {
     if (unwrapHTTP(e) != null) {
@@ -595,10 +557,9 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
   }
 
   /**
-   * Performs the refresh: fetch JWKS, build verifiers, install a Snapshot.
-   * Throws {@link JWKSFetchException} for the empty-result case so the
-   * worker can complete the future exceptionally; other failures from
-   * {@code fetch()} propagate directly and are classified by the worker.
+   * Performs the refresh: fetch JWKS, build verifiers, install a Snapshot. Throws {@link JWKSFetchException} for the
+   * empty-result case so the worker can complete the future exceptionally; other failures from {@code fetch()}
+   * propagate directly and are classified by the worker.
    */
   private Snapshot doRefreshOrThrow(Snapshot prev) {
     Instant now = Instant.now(clock);
@@ -654,10 +615,9 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
   }
 
   /**
-   * Build a failure-path {@link Snapshot}: carry forward the prior verifier
-   * map, increment {@code consecutiveFailures}, and compute {@code nextDueAt}
-   * as {@code now + backoff(...)}, extended to honor a {@code Retry-After}
-   * header when present and stricter than the backoff.
+   * Build a failure-path {@link Snapshot}: carry forward the prior verifier map, increment {@code consecutiveFailures},
+   * and compute {@code nextDueAt} as {@code now + backoff(...)}, extended to honor a {@code Retry-After} header when
+   * present and stricter than the backoff.
    */
   private Snapshot failureSnapshot(Snapshot prev, Instant now, Throwable cause) {
     int prior = (prev == null) ? 0 : prev.consecutiveFailures();
@@ -696,9 +656,9 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
       effectiveURL = lockedJWKSURI;
     } else {
       effectiveURL = switch (source) {
-        case ISSUER     -> resolveJWKSURIFromIssuer(url);
+        case ISSUER -> resolveJWKSURIFromIssuer(url);
         case WELL_KNOWN -> resolveJWKSURIFromWellKnown(url);
-        case JWKS       -> url;
+        case JWKS -> url;
       };
     }
     JWKSResponse response = fetchJWKSDirect(effectiveURL);
@@ -720,7 +680,10 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
         (conn, is) -> {
           List<JSONWebKey> keys = parseJWKSResponseKeys(conn, is, fetchLimits);
           int status = -1;
-          try { status = conn.getResponseCode(); } catch (IOException ignored) {}
+          try {
+            status = conn.getResponseCode();
+          } catch (IOException ignored) {
+          }
           Map<String, String> sel = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
           for (String name : new String[]{"Cache-Control", "Retry-After"}) {
             String v = conn.getHeaderField(name);
@@ -751,14 +714,12 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
   }
 
   /**
-   * Returns the in-flight refresh future, dispatching a new one on a virtual
-   * thread if no refresh is currently active. Order on completion: snapshot
-   * updated first, then awaiters notified, then slot cleared.
+   * Returns the in-flight refresh future, dispatching a new one on a virtual thread if no refresh is currently active.
+   * Order on completion: snapshot updated first, then awaiters notified, then slot cleared.
    *
    * <p>If the refresh fails, the future completes exceptionally with a
-   * {@link JWKSFetchException} carrying the categorical reason. The
-   * operator-driven {@link #refresh()} surfaces it; the on-miss path
-   * swallows the exception.</p>
+   * {@link JWKSFetchException} carrying the categorical reason. The operator-driven {@link #refresh()} surfaces it; the
+   * on-miss path swallows the exception.</p>
    */
   private CompletableFuture<Snapshot> singleflightRefresh() {
     CompletableFuture<Snapshot> existing = inflight.get();
@@ -824,9 +785,13 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
 
   // --- Inner types ---
 
+  enum FetchSource {ISSUER, JWKS, WELL_KNOWN}
+
   public static final class Builder {
-    private CacheControlPolicy cacheControlPolicy = CacheControlPolicy.CLAMP;
     private final OpenIDConnectConfiguration cfg;
+    private final FetchSource source;
+    private final String url;
+    private CacheControlPolicy cacheControlPolicy = CacheControlPolicy.CLAMP;
     private Clock clock = Clock.systemUTC();
     private boolean failFast = false;
     private FetchLimits fetchLimits = FetchLimits.defaults();
@@ -837,8 +802,6 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
     private boolean refreshOnMiss = true;
     private Duration refreshTimeout = Duration.ofSeconds(2);
     private boolean scheduledRefresh = false;
-    private final FetchSource source;
-    private final String url;
 
     Builder(FetchSource source, String url) {
       this(source, url, null);
@@ -939,19 +902,21 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
       return this;
     }
 
-    String url() { return url; }
+    String url() {
+      return url;
+    }
   }
 
   /**
-   * Result of parsing a {@code Cache-Control} header. Distinguishes
-   * "no max-age directive of interest" ({@code maxAge==null && !noStore && !malformed})
-   * from "directive(s) present" and "header was malformed".
+   * Result of parsing a {@code Cache-Control} header. Distinguishes "no max-age directive of interest"
+   * ({@code maxAge==null && !noStore && !malformed}) from "directive(s) present" and "header was malformed".
    */
-  record CacheControlDirectives(Long maxAge, boolean noStore, boolean malformed) {}
+  record CacheControlDirectives(Long maxAge, boolean noStore, boolean malformed) {
+  }
 
-  enum FetchSource { ISSUER, JWKS, WELL_KNOWN }
-
-  /** Immutable cache snapshot. */
+  /**
+   * Immutable cache snapshot.
+   */
   record Snapshot(
       List<JSONWebKey> allKeys,
       Map<String, Verifier> byKid,
@@ -959,5 +924,6 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
       Instant fetchedAt,
       Instant nextDueAt,
       int consecutiveFailures,
-      Instant lastFailedRefresh) {}
+      Instant lastFailedRefresh) {
+  }
 }

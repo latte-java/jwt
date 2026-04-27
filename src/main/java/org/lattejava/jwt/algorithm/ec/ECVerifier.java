@@ -16,45 +16,29 @@
 
 package org.lattejava.jwt.algorithm.ec;
 
-import org.lattejava.jwt.Algorithm;
-import org.lattejava.jwt.InvalidJWTSignatureException;
-import org.lattejava.jwt.InvalidKeyTypeException;
-import org.lattejava.jwt.JWTVerifierException;
-import org.lattejava.jwt.Verifier;
-import org.lattejava.jwt.internal.KeyCoercion;
-import org.lattejava.jwt.internal.JOSEConverter;
+import java.io.*;
+import java.nio.charset.*;
+import java.nio.file.*;
+import java.security.*;
+import java.security.interfaces.*;
+import java.security.spec.*;
+import java.util.*;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.security.InvalidKeyException;
-import java.security.KeyFactory;
-import java.security.NoSuchAlgorithmException;
-import java.security.PublicKey;
-import java.security.Signature;
-import java.security.SignatureException;
-import java.security.interfaces.ECPublicKey;
-import java.security.spec.InvalidKeySpecException;
-import java.security.spec.X509EncodedKeySpec;
-import java.util.Objects;
+import org.lattejava.jwt.*;
+import org.lattejava.jwt.internal.*;
 
 /**
- * ECDSA {@link Verifier} for the {@code ES256} / {@code ES384} / {@code ES512}
- * / {@code ES256K} JWA algorithms (RFC 7518 §3.4 and RFC 8812 §3.2).
+ * ECDSA {@link Verifier} for the {@code ES256} / {@code ES384} / {@code ES512} / {@code ES256K} JWA algorithms (RFC
+ * 7518 §3.4 and RFC 8812 §3.2).
  *
  * <p>When constructed with a caller-supplied {@link ECPublicKey}, the key
- * is round-tripped through {@code KeyFactory.generatePublic(new
- * X509EncodedKeySpec(key.getEncoded()))} so the JCE provider rejects
- * off-curve points before verification (CVE-2022-21449 defense). PEM-loaded
- * keys are already produced by the PEM decoder via the same provider path,
- * so they are accepted as-is.</p>
+ * is round-tripped through {@code KeyFactory.generatePublic(new X509EncodedKeySpec(key.getEncoded()))} so the JCE
+ * provider rejects off-curve points before verification (CVE-2022-21449 defense). PEM-loaded keys are already produced
+ * by the PEM decoder via the same provider path, so they are accepted as-is.</p>
  *
  * <p>Each call to {@link #verify(byte[], byte[])} obtains a fresh
- * {@link Signature} instance ({@link Signature} is not thread-safe),
- * validates that the JOSE signature length matches the curve, converts
- * JOSE {@code R || S} to DER via {@link JOSEConverter#joseToDer(byte[], int)},
- * and verifies.</p>
+ * {@link Signature} instance ({@link Signature} is not thread-safe), validates that the JOSE signature length matches
+ * the curve, converts JOSE {@code R || S} to DER via {@link JOSEConverter#joseToDer(byte[], int)}, and verifies.</p>
  *
  * @author Daniel DeGroff
  */
@@ -73,28 +57,6 @@ public class ECVerifier implements Verifier {
     Objects.requireNonNull(pemPublicKey);
     this.publicKey = KeyCoercion.publicFromPem(pemPublicKey, ECPublicKey.class);
     this.algorithm = ECFamily.algorithmForCurve(this.publicKey.getParams());
-  }
-
-  /**
-   * Re-derive the EC public key via {@code KeyFactory.generatePublic} so
-   * the JCE provider runs its on-curve / point-validation checks. Defends
-   * against caller-supplied {@code ECPublicKey} instances that bypass the
-   * provider's validation (the CVE-2022-21449 surface).
-   */
-  private static ECPublicKey revalidate(ECPublicKey key) {
-    byte[] encoded = key.getEncoded();
-    if (encoded == null) {
-      throw new InvalidKeyTypeException("EC public key did not provide X.509 encoding for revalidation");
-    }
-    try {
-      PublicKey derived = KeyFactory.getInstance("EC").generatePublic(new X509EncodedKeySpec(encoded));
-      if (!(derived instanceof ECPublicKey ec)) {
-        throw new InvalidKeyTypeException("Re-derived key is not an ECPublicKey [" + derived.getClass().getSimpleName() + "]");
-      }
-      return ec;
-    } catch (NoSuchAlgorithmException | InvalidKeySpecException e) {
-      throw new InvalidKeyTypeException("EC public key failed re-validation", e);
-    }
   }
 
   public static ECVerifier newVerifier(String pemPublicKey) {
@@ -116,6 +78,27 @@ public class ECVerifier implements Verifier {
       return new ECVerifier(new String(Files.readAllBytes(path), StandardCharsets.UTF_8));
     } catch (IOException e) {
       throw new JWTVerifierException("Unable to read file from path [" + path + "]", e);
+    }
+  }
+
+  /**
+   * Re-derive the EC public key via {@code KeyFactory.generatePublic} so the JCE provider runs its on-curve /
+   * point-validation checks. Defends against caller-supplied {@code ECPublicKey} instances that bypass the provider's
+   * validation (the CVE-2022-21449 surface).
+   */
+  private static ECPublicKey revalidate(ECPublicKey key) {
+    byte[] encoded = key.getEncoded();
+    if (encoded == null) {
+      throw new InvalidKeyTypeException("EC public key did not provide X.509 encoding for revalidation");
+    }
+    try {
+      PublicKey derived = KeyFactory.getInstance("EC").generatePublic(new X509EncodedKeySpec(encoded));
+      if (!(derived instanceof ECPublicKey ec)) {
+        throw new InvalidKeyTypeException("Re-derived key is not an ECPublicKey [" + derived.getClass().getSimpleName() + "]");
+      }
+      return ec;
+    } catch (NoSuchAlgorithmException | InvalidKeySpecException e) {
+      throw new InvalidKeyTypeException("EC public key failed re-validation", e);
     }
   }
 

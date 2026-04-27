@@ -16,11 +16,11 @@
 
 package org.lattejava.jwt;
 
-import java.nio.charset.StandardCharsets;
-import java.util.Objects;
-import java.util.function.Consumer;
+import java.nio.charset.*;
+import java.util.*;
+import java.util.function.*;
 
-import org.lattejava.jwt.internal.Base64URL;
+import org.lattejava.jwt.internal.*;
 
 /**
  * Encodes a {@link JWT} into a compact JWS string:
@@ -50,7 +50,9 @@ import org.lattejava.jwt.internal.Base64URL;
 public class JWTEncoder {
   private final JSONProcessor jsonProcessor;
 
-  /** Constructs an encoder using the built-in {@link LatteJSONProcessor}. */
+  /**
+   * Constructs an encoder using the built-in {@link LatteJSONProcessor}.
+   */
   public JWTEncoder() {
     this(new LatteJSONProcessor());
   }
@@ -76,8 +78,8 @@ public class JWTEncoder {
   }
 
   /**
-   * Encode a JWT, allowing the caller to customize header parameters
-   * (other than {@code alg}, which is always taken from the signer).
+   * Encode a JWT, allowing the caller to customize header parameters (other than {@code alg}, which is always taken
+   * from the signer).
    *
    * @param jwt        the JWT to encode; must be non-null
    * @param signer     the signer; must be non-null
@@ -134,38 +136,32 @@ public class JWTEncoder {
   }
 
   /**
-   * Adapts a {@link Header.Builder} to the {@link HeaderCustomizer} view.
-   * The view exposes {@code typ}, {@code kid}, and arbitrary
-   * {@code parameter(name, value)} -- but no {@code .alg()}.
-   */
-  private static final class BuilderHeaderCustomizer implements HeaderCustomizer {
-    private final Header.Builder builder;
-
-    BuilderHeaderCustomizer(Header.Builder builder) {
-      this.builder = builder;
-    }
+     * Adapts a {@link Header.Builder} to the {@link HeaderCustomizer} view. The view exposes {@code typ}, {@code kid},
+     * and arbitrary {@code parameter(name, value)} -- but no {@code .alg()}.
+     */
+    private record BuilderHeaderCustomizer(Header.Builder builder) implements HeaderCustomizer {
 
     @Override
-    public HeaderCustomizer typ(String type) {
-      builder.typ(type);
-      return this;
-    }
-
-    @Override
-    public HeaderCustomizer kid(String keyId) {
-      builder.kid(keyId);
-      return this;
-    }
-
-    @Override
-    public HeaderCustomizer parameter(String name, Object value) {
-      Objects.requireNonNull(name, "name");
-      if ("alg".equals(name)) {
-        throw new IllegalArgumentException(
-            "HeaderCustomizer cannot set [alg] -- the algorithm is determined by the Signer");
+      public HeaderCustomizer kid(String keyId) {
+        builder.kid(keyId);
+        return this;
       }
-      builder.parameter(name, value);
-      return this;
+
+      @Override
+      public HeaderCustomizer parameter(String name, Object value) {
+        Objects.requireNonNull(name, "name");
+        if ("alg".equals(name)) {
+          throw new IllegalArgumentException(
+              "HeaderCustomizer cannot set [alg] -- the algorithm is determined by the Signer");
+        }
+        builder.parameter(name, value);
+        return this;
+      }
+
+      @Override
+      public HeaderCustomizer typ(String type) {
+        builder.typ(type);
+        return this;
+      }
     }
-  }
 }

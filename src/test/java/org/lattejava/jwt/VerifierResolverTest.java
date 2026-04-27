@@ -23,52 +23,20 @@
 
 package org.lattejava.jwt;
 
-import org.testng.annotations.Test;
+import java.util.*;
+import java.util.concurrent.atomic.*;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
+import org.testng.annotations.*;
 
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertSame;
+import static org.testng.Assert.*;
 
 /**
- * Covers {@link VerifierResolver}: the three static factories ({@code of},
- * {@code byKid}, {@code from}), the {@code byKid} no-kid behavior, and the
- * defense-in-depth {@code canVerify} re-check on resolved verifiers.
+ * Covers {@link VerifierResolver}: the three static factories ({@code of}, {@code byKid}, {@code from}), the
+ * {@code byKid} no-kid behavior, and the defense-in-depth {@code canVerify} re-check on resolved verifiers.
  *
  * @author Daniel DeGroff
  */
 public class VerifierResolverTest {
-
-  @Test
-  public void of_returnsVerifierWhenCanVerify() {
-    // Use case: VerifierResolver.of returns the verifier when canVerify is true.
-    Verifier v = new RecordingVerifier(true);
-    VerifierResolver resolver = VerifierResolver.of(v);
-    Header header = Header.builder().alg(Algorithm.HS256).build();
-    assertSame(resolver.resolve(header), v);
-  }
-
-  @Test
-  public void of_returnsNullWhenCannotVerify() {
-    // Use case: VerifierResolver.of re-checks canVerify; when false, returns null.
-    Verifier v = new RecordingVerifier(false);
-    VerifierResolver resolver = VerifierResolver.of(v);
-    Header header = Header.builder().alg(Algorithm.HS256).build();
-    assertNull(resolver.resolve(header));
-  }
-
-  @Test
-  public void byKid_noKidInHeader_returnsNull() {
-    // Use case: VerifierResolver.byKid with a header that has no kid returns null.
-    Map<String, Verifier> map = new HashMap<>();
-    map.put("k1", new RecordingVerifier(true));
-    VerifierResolver resolver = VerifierResolver.byKid(map);
-    Header header = Header.builder().alg(Algorithm.HS256).build();
-    assertNull(resolver.resolve(header));
-  }
 
   @Test
   public void byKid_kidMatch_returnsVerifier() {
@@ -81,6 +49,16 @@ public class VerifierResolverTest {
     VerifierResolver resolver = VerifierResolver.byKid(map);
     Header header = Header.builder().alg(Algorithm.HS256).kid("k2").build();
     assertSame(resolver.resolve(header), v2);
+  }
+
+  @Test
+  public void byKid_noKidInHeader_returnsNull() {
+    // Use case: VerifierResolver.byKid with a header that has no kid returns null.
+    Map<String, Verifier> map = new HashMap<>();
+    map.put("k1", new RecordingVerifier(true));
+    VerifierResolver resolver = VerifierResolver.byKid(map);
+    Header header = Header.builder().alg(Algorithm.HS256).build();
+    assertNull(resolver.resolve(header));
   }
 
   @Test
@@ -108,22 +86,37 @@ public class VerifierResolverTest {
     assertSame(seen.get(), header);
   }
 
-  /** Minimal {@link Verifier} that reports a configurable {@code canVerify} value. */
-  private static final class RecordingVerifier implements Verifier {
-    private final boolean canVerify;
-
-    RecordingVerifier(boolean canVerify) {
-      this.canVerify = canVerify;
-    }
-
-    @Override
-    public boolean canVerify(Algorithm algorithm) {
-      return canVerify;
-    }
-
-    @Override
-    public void verify(byte[] message, byte[] signature) {
-      // not exercised in this test
-    }
+  @Test
+  public void of_returnsNullWhenCannotVerify() {
+    // Use case: VerifierResolver.of re-checks canVerify; when false, returns null.
+    Verifier v = new RecordingVerifier(false);
+    VerifierResolver resolver = VerifierResolver.of(v);
+    Header header = Header.builder().alg(Algorithm.HS256).build();
+    assertNull(resolver.resolve(header));
   }
+
+  @Test
+  public void of_returnsVerifierWhenCanVerify() {
+    // Use case: VerifierResolver.of returns the verifier when canVerify is true.
+    Verifier v = new RecordingVerifier(true);
+    VerifierResolver resolver = VerifierResolver.of(v);
+    Header header = Header.builder().alg(Algorithm.HS256).build();
+    assertSame(resolver.resolve(header), v);
+  }
+
+  /**
+     * Minimal {@link Verifier} that reports a configurable {@code canVerify} value.
+     */
+    private record RecordingVerifier(boolean canVerify) implements Verifier {
+
+    @Override
+      public boolean canVerify(Algorithm algorithm) {
+        return canVerify;
+      }
+
+      @Override
+      public void verify(byte[] message, byte[] signature) {
+        // not exercised in this test
+      }
+    }
 }

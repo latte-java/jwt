@@ -23,23 +23,17 @@
 
 package org.lattejava.jwt.internal;
 
-import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
+import java.math.*;
+import java.nio.charset.*;
+import java.util.*;
 
 /**
  * Internal RFC 7638-compliant JSON writer for JWK thumbprint computation.
  *
  * <p>Produces canonical JSON: keys lex-sorted by Unicode code-point, no
- * whitespace, UTF-8 bytes. Supports only the primitive value types that
- * appear in RFC 7638 §3.2 / RFC 8037 §2 thumbprint inputs:
- * {@link String}, {@link Number} (rendered as the appropriate JSON
- * numeric form), {@link Boolean}, and {@code null}. Any other value type
- * (including nested {@link Map} or {@link java.util.List}) causes
+ * whitespace, UTF-8 bytes. Supports only the primitive value types that appear in RFC 7638 §3.2 / RFC 8037 §2
+ * thumbprint inputs: {@link String}, {@link Number} (rendered as the appropriate JSON numeric form), {@link Boolean},
+ * and {@code null}. Any other value type (including nested {@link Map} or {@link java.util.List}) causes
  * {@link IllegalArgumentException}.
  *
  * <p>Package-private. Never exposed via public API so thumbprint canonicalization
@@ -57,8 +51,7 @@ final class CanonicalJSONWriter {
    *
    * @param input the map to canonicalize (must not be {@code null})
    * @return canonical UTF-8 JSON bytes
-   * @throws IllegalArgumentException if {@code input} is {@code null} or
-   *                                  contains an unsupported value type
+   * @throws IllegalArgumentException if {@code input} is {@code null} or contains an unsupported value type
    */
   static byte[] write(Map<String, Object> input) {
     if (input == null) {
@@ -87,43 +80,33 @@ final class CanonicalJSONWriter {
     return sb.toString().getBytes(StandardCharsets.UTF_8);
   }
 
-  private static void writeValue(StringBuilder sb, Object v) {
-    if (v == null) {
-      sb.append("null");
-    } else if (v instanceof String s) {
-      writeString(sb, s);
-    } else if (v instanceof Boolean b) {
-      sb.append(b ? "true" : "false");
-    } else if (v instanceof BigDecimal bd) {
-      sb.append(bd.toPlainString());
-    } else if (v instanceof Integer || v instanceof Long || v instanceof Short
-        || v instanceof Byte || v instanceof BigInteger) {
-      sb.append(v.toString());
-    } else if (v instanceof Float || v instanceof Double) {
-      double d = ((Number) v).doubleValue();
-      if (Double.isNaN(d) || Double.isInfinite(d)) {
-        throw new IllegalArgumentException("Non-finite number [" + v + "]");
-      }
-      sb.append(v.toString());
-    } else {
-      throw new IllegalArgumentException(
-          "Unsupported value type for canonical JSON [" + v.getClass().getName() + "]");
-    }
-  }
-
   private static void writeString(StringBuilder sb, String s) {
     sb.append('"');
     int len = s.length();
     for (int i = 0; i < len; i++) {
       char c = s.charAt(i);
       switch (c) {
-        case '"':  sb.append("\\\""); break;
-        case '\\': sb.append("\\\\"); break;
-        case '\b': sb.append("\\b"); break;
-        case '\f': sb.append("\\f"); break;
-        case '\n': sb.append("\\n"); break;
-        case '\r': sb.append("\\r"); break;
-        case '\t': sb.append("\\t"); break;
+        case '"':
+          sb.append("\\\"");
+          break;
+        case '\\':
+          sb.append("\\\\");
+          break;
+        case '\b':
+          sb.append("\\b");
+          break;
+        case '\f':
+          sb.append("\\f");
+          break;
+        case '\n':
+          sb.append("\\n");
+          break;
+        case '\r':
+          sb.append("\\r");
+          break;
+        case '\t':
+          sb.append("\\t");
+          break;
         default:
           if (c < 0x20) {
             sb.append(String.format("\\u%04x", (int) c));
@@ -133,5 +116,29 @@ final class CanonicalJSONWriter {
       }
     }
     sb.append('"');
+  }
+
+  private static void writeValue(StringBuilder sb, Object v) {
+    if (v == null) {
+      sb.append("null");
+    } else if (v instanceof String s) {
+      writeString(sb, s);
+    } else if (v instanceof Boolean b) {
+      sb.append(b.toString());
+    } else if (v instanceof BigDecimal bd) {
+      sb.append(bd.toPlainString());
+    } else if (v instanceof Integer || v instanceof Long || v instanceof Short
+        || v instanceof Byte || v instanceof BigInteger) {
+      sb.append(v);
+    } else if (v instanceof Float || v instanceof Double) {
+      double d = ((Number) v).doubleValue();
+      if (Double.isNaN(d) || Double.isInfinite(d)) {
+        throw new IllegalArgumentException("Non-finite number [" + v + "]");
+      }
+      sb.append(v);
+    } else {
+      throw new IllegalArgumentException(
+          "Unsupported value type for canonical JSON [" + v.getClass().getName() + "]");
+    }
   }
 }

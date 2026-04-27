@@ -22,8 +22,8 @@
  */
 
 /**
- * JSON Web Key (JWK) and JSON Web Key Set (JWKS) types and the
- * {@link org.lattejava.jwt.jwks.JWKS} self-refreshing cache.
+ * JSON Web Key (JWK) and JSON Web Key Set (JWKS) types and the {@link org.lattejava.jwt.jwks.JWKS} self-refreshing
+ * cache.
  *
  * <h2>When to use what</h2>
  * <ul>

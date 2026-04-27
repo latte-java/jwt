@@ -16,26 +16,21 @@
 
 package org.lattejava.jwt.algorithm.hmac;
 
-import org.lattejava.jwt.Algorithm;
-import org.lattejava.jwt.InvalidKeyLengthException;
-import org.lattejava.jwt.JWTSigningException;
+import java.nio.charset.*;
+import java.security.*;
+import java.util.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+import org.lattejava.jwt.*;
 import org.lattejava.jwt.Signer;
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
-import java.util.Objects;
-
 /**
- * HMAC-based {@link Signer} for the {@code HS256} / {@code HS384} /
- * {@code HS512} JWA algorithms (RFC 7518 §3.2).
+ * HMAC-based {@link Signer} for the {@code HS256} / {@code HS384} / {@code HS512} JWA algorithms (RFC 7518 §3.2).
  *
  * <p>The JCA algorithm name and {@link SecretKeySpec} are cached at construction
- * so {@link #sign(byte[])} skips the per-call allocation and the redundant
- * defensive copy of the secret. Each call still obtains a fresh {@link Mac}
- * instance ({@link Mac} is not thread-safe).</p>
+ * so {@link #sign(byte[])} skips the per-call allocation and the redundant defensive copy of the secret. Each call
+ * still obtains a fresh {@link Mac} instance ({@link Mac} is not thread-safe).</p>
  *
  * @author Daniel DeGroff
  */

@@ -16,15 +16,12 @@
 
 package org.lattejava.jwt;
 
-import org.bouncycastle.jcajce.provider.BouncyCastleFipsProvider;
-import org.testng.annotations.Test;
+import java.security.*;
+import javax.crypto.*;
+import javax.net.ssl.*;
 
-import javax.crypto.Mac;
-import javax.net.ssl.SSLContext;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.Security;
-import java.security.Signature;
+import org.bouncycastle.jcajce.provider.*;
+import org.testng.annotations.*;
 
 /**
  * A playground for Bouncy Castle testing (mostly for FIPS).

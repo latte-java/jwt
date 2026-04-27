@@ -16,28 +16,20 @@
 
 package org.lattejava.jwt.algorithm.rsa;
 
-import org.lattejava.jwt.Algorithm;
-import org.lattejava.jwt.JWTSigningException;
-import org.lattejava.jwt.Signer;
-import org.lattejava.jwt.internal.KeyCoercion;
+import java.security.*;
+import java.security.interfaces.*;
+import java.util.*;
 
-import java.security.InvalidAlgorithmParameterException;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
-import java.security.PrivateKey;
-import java.security.Signature;
-import java.security.SignatureException;
-import java.security.interfaces.RSAPrivateKey;
-import java.util.Objects;
+import org.lattejava.jwt.*;
+import org.lattejava.jwt.Signer;
+import org.lattejava.jwt.internal.*;
 
 /**
- * RSASSA-PSS {@link Signer} for the {@code PS256} / {@code PS384}
- * / {@code PS512} JWA algorithms (RFC 7518 §3.5).
+ * RSASSA-PSS {@link Signer} for the {@code PS256} / {@code PS384} / {@code PS512} JWA algorithms (RFC 7518 §3.5).
  *
  * <p>Each call to {@link #sign(byte[])} obtains a fresh
- * {@link Signature} instance and configures it with an explicit
- * {@code PSSParameterSpec} so the parameters are not inherited from the
- * JCA provider's defaults.</p>
+ * {@link Signature} instance and configures it with an explicit {@code PSSParameterSpec} so the parameters are not
+ * inherited from the JCA provider's defaults.</p>
  *
  * @author Daniel DeGroff
  */

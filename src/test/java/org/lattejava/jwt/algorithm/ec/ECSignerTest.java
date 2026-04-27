@@ -16,48 +16,23 @@
 
 package org.lattejava.jwt.algorithm.ec;
 
-import org.lattejava.jwt.BaseJWTTest;
-import org.lattejava.jwt.InvalidKeyTypeException;
-import org.lattejava.jwt.internal.pem.PEM;
-import org.testng.annotations.Test;
-
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.nio.charset.*;
+import java.nio.file.*;
+import java.security.*;
 import java.security.KeyPair;
-import java.security.KeyPairGenerator;
-import java.security.Signature;
-import java.security.interfaces.ECPrivateKey;
-import java.security.interfaces.ECPublicKey;
-import java.security.spec.ECGenParameterSpec;
+import java.security.interfaces.*;
+import java.security.spec.*;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
+import org.lattejava.jwt.*;
+import org.lattejava.jwt.internal.pem.*;
+import org.testng.annotations.*;
+
+import static org.testng.Assert.*;
 
 /**
  * @author Daniel DeGroff
  */
 public class ECSignerTest extends BaseJWTTest {
-  @Test
-  public void test_invalidKey() {
-    // RSA private key cannot be used for an EC signer
-    try {
-      ECSigner.newSHA256Signer(readFile("rsa_private_key_2048.pem"));
-      fail("Expected exception.");
-    } catch (InvalidKeyTypeException e) {
-      assertTrue(e.getMessage().startsWith("Expected private key of type [ECPrivateKey] but found ["));
-    }
-
-    try {
-      ECSigner.newSHA256Signer(PEM.decode(readFile("rsa_private_key_2048.pem")).privateKey);
-      fail("Expected exception.");
-    } catch (InvalidKeyTypeException e) {
-      assertTrue(e.getMessage().startsWith("Expected private key of type [ECPrivateKey] but found ["));
-    }
-  }
-
   @Test
   public void round_trip_raw1() throws Exception {
     // Generate a key-pair and sign and verify a message
@@ -102,6 +77,24 @@ public class ECSignerTest extends BaseJWTTest {
     verifier.initVerify(publicKey);
     verifier.update(message.getBytes(StandardCharsets.UTF_8));
     assertTrue(verifier.verify(signatureBytes));
+  }
+
+  @Test
+  public void test_invalidKey() {
+    // RSA private key cannot be used for an EC signer
+    try {
+      ECSigner.newSHA256Signer(readFile("rsa_private_key_2048.pem"));
+      fail("Expected exception.");
+    } catch (InvalidKeyTypeException e) {
+      assertTrue(e.getMessage().startsWith("Expected private key of type [ECPrivateKey] but found ["));
+    }
+
+    try {
+      ECSigner.newSHA256Signer(PEM.decode(readFile("rsa_private_key_2048.pem")).privateKey);
+      fail("Expected exception.");
+    } catch (InvalidKeyTypeException e) {
+      assertTrue(e.getMessage().startsWith("Expected private key of type [ECPrivateKey] but found ["));
+    }
   }
 
   @Test

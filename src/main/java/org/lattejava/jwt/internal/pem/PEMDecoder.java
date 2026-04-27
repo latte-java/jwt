@@ -16,57 +16,23 @@
 
 package org.lattejava.jwt.internal.pem;
 
-import org.lattejava.jwt.PEMDecoderException;
-import org.lattejava.jwt.internal.der.DerInputStream;
-import org.lattejava.jwt.internal.der.DerOutputStream;
-import org.lattejava.jwt.internal.der.DerValue;
-import org.lattejava.jwt.internal.der.ObjectIdentifier;
-import org.lattejava.jwt.internal.der.Tag;
-import org.lattejava.jwt.KeyType;
-import org.lattejava.jwt.internal.KeyUtils;
+import java.io.*;
+import java.math.*;
+import java.nio.charset.*;
+import java.nio.file.*;
+import java.security.*;
+import java.security.cert.*;
+import java.security.interfaces.*;
+import java.security.spec.*;
+import java.time.*;
+import java.time.format.*;
+import java.util.*;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.security.InvalidAlgorithmParameterException;
-import java.security.InvalidKeyException;
-import java.security.InvalidParameterException;
-import java.security.KeyFactory;
-import java.security.NoSuchAlgorithmException;
-import java.security.PrivateKey;
-import java.security.PublicKey;
-import java.security.cert.CertificateException;
-import java.security.cert.CertificateFactory;
-import java.security.interfaces.ECPrivateKey;
-import java.security.interfaces.EdECPrivateKey;
-import java.security.interfaces.RSAPrivateCrtKey;
-import java.security.spec.InvalidKeySpecException;
-import java.security.spec.PKCS8EncodedKeySpec;
-import java.security.spec.RSAPrivateCrtKeySpec;
-import java.security.spec.RSAPublicKeySpec;
-import java.security.spec.X509EncodedKeySpec;
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
-import java.util.Base64;
-import java.util.Objects;
+import org.lattejava.jwt.*;
+import org.lattejava.jwt.internal.*;
+import org.lattejava.jwt.internal.der.*;
 
-import static org.lattejava.jwt.internal.pem.PEM.EC_PRIVATE_KEY_PREFIX;
-import static org.lattejava.jwt.internal.pem.PEM.EC_PRIVATE_KEY_SUFFIX;
-import static org.lattejava.jwt.internal.pem.PEM.PKCS_1_PRIVATE_KEY_PREFIX;
-import static org.lattejava.jwt.internal.pem.PEM.PKCS_1_PRIVATE_KEY_SUFFIX;
-import static org.lattejava.jwt.internal.pem.PEM.PKCS_1_PUBLIC_KEY_PREFIX;
-import static org.lattejava.jwt.internal.pem.PEM.PKCS_1_PUBLIC_KEY_SUFFIX;
-import static org.lattejava.jwt.internal.pem.PEM.PKCS_8_PRIVATE_KEY_PREFIX;
-import static org.lattejava.jwt.internal.pem.PEM.PKCS_8_PRIVATE_KEY_SUFFIX;
-import static org.lattejava.jwt.internal.pem.PEM.X509_CERTIFICATE_PREFIX;
-import static org.lattejava.jwt.internal.pem.PEM.X509_CERTIFICATE_SUFFIX;
-import static org.lattejava.jwt.internal.pem.PEM.X509_PUBLIC_KEY_PREFIX;
-import static org.lattejava.jwt.internal.pem.PEM.X509_PUBLIC_KEY_SUFFIX;
+import static org.lattejava.jwt.internal.pem.PEM.*;
 
 /**
  * @author Daniel DeGroff
@@ -74,9 +40,48 @@ import static org.lattejava.jwt.internal.pem.PEM.X509_PUBLIC_KEY_SUFFIX;
 public class PEMDecoder {
   private static final byte[] EC_ENCRYPTION_OID = new byte[]{(byte) 0x2A, (byte) 0x86, (byte) 0x48, (byte) 0xCE, (byte) 0x3D, (byte) 0x02, (byte) 0x01};
 
+  private static Instant decodeTime(DerValue v) {
+    String s = new String(v.toByteArray(), StandardCharsets.US_ASCII);
+    if (v.tag.value == Tag.UTCTime) {
+      DateTimeFormatter f = DateTimeFormatter.ofPattern("yyMMddHHmmss'Z'");
+      LocalDateTime ldt = LocalDateTime.parse(s, f);
+      // 2-digit year: 50-99 -> 1950-1999, 00-49 -> 2000-2049 (X.690 §11.8)
+      int year = ldt.getYear();
+      if (year >= 2000 + 50) {
+        ldt = ldt.withYear(year - 100);
+      }
+      return ldt.toInstant(ZoneOffset.UTC);
+    } else if (v.tag.value == Tag.GeneralizedTime) {
+      DateTimeFormatter f = DateTimeFormatter.ofPattern("yyyyMMddHHmmss'Z'");
+      return LocalDateTime.parse(s, f).toInstant(ZoneOffset.UTC);
+    }
+    throw new IllegalArgumentException("Unexpected time tag [" + v.tag + "]");
+  }
+
+  private static byte[] encodeSequenceOf(DerValue dv) throws Exception {
+    // Re-emit the value as full DER (preserve original tag + length + content) so
+    // callers can pass it to e.g. javax.security.auth.x500.X500Principal if they wish.
+    return new DerOutputStream()
+        .writeValue(dv)
+        .toByteArray();
+  }
+
   /**
-   * Decode a PEM and extract the public or private keys. If the encoded private key contains the public key, the returned
-   * PEM object will contain both keys.
+   * Walk a sequence-of-DerValues blob (no outer SEQUENCE tag/length): keep reading tag/length/value triples until
+   * exhausted.
+   */
+  private static java.util.List<DerValue> parseValues(byte[] body) throws Exception {
+    java.util.List<DerValue> out = new java.util.ArrayList<>();
+    DerInputStream s = new DerInputStream(body);
+    while (s.data.available() > 0) {
+      out.add(s.readDerValue());
+    }
+    return out;
+  }
+
+  /**
+   * Decode a PEM and extract the public or private keys. If the encoded private key contains the public key, the
+   * returned PEM object will contain both keys.
    *
    * @param path the path to the encoded PEM file
    * @return a PEM object containing a public or private key, or both
@@ -95,8 +100,8 @@ public class PEMDecoder {
   }
 
   /**
-   * Decode a PEM and extract the public or private keys. If the encoded private key contains the public key, the returned
-   * PEM object will contain both keys.
+   * Decode a PEM and extract the public or private keys. If the encoded private key contains the public key, the
+   * returned PEM object will contain both keys.
    *
    * @param bytes the byte array of the encoded PEM file
    * @return a PEM object containing a public or private key, or both
@@ -107,8 +112,8 @@ public class PEMDecoder {
   }
 
   /**
-   * Decode a PEM and extract the public or private keys. If the encoded private key contains the public key, the returned
-   * PEM object will contain both keys.
+   * Decode a PEM and extract the public or private keys. If the encoded private key contains the public key, the
+   * returned PEM object will contain both keys.
    *
    * @param encodedKey the string representation the encoded PEM
    * @return a PEM object containing a public or private key, or both
@@ -135,6 +140,51 @@ public class PEMDecoder {
       }
     } catch (CertificateException | InvalidAlgorithmParameterException | InvalidKeyException | InvalidKeySpecException |
              IOException | NoSuchAlgorithmException e) {
+      throw new PEMDecoderException(e);
+    }
+  }
+
+  /**
+   * Parse the TBSCertificate fields out of a DER-encoded X.509 certificate without relying on
+   * {@link CertificateFactory}. Supports v1 (no version field) and v3 (explicit [0] EXPLICIT version) layouts.
+   *
+   * <p>Returned fields: {@code serialNumber}, {@code issuer} (raw DN bytes from the DER
+   * encoding), {@code subject} (raw DN bytes), {@code notBefore} and {@code notAfter} (decoded UTCTime /
+   * GeneralizedTime). Use this when you need certificate metadata without materialising an
+   * {@link java.security.cert.X509Certificate}.</p>
+   *
+   * @param derCertificate the full DER-encoded X.509 certificate bytes
+   * @return the parsed TBS field record
+   */
+  public TBSFields decodeTBSCertificateFields(byte[] derCertificate) {
+    Objects.requireNonNull(derCertificate, "derCertificate");
+    try {
+      // Parse outer Certificate SEQUENCE { tbsCertificate, signatureAlgorithm, signatureValue }.
+      DerValue[] outer = new DerInputStream(derCertificate).getSequence();
+      if (outer.length < 1) {
+        throw new PEMDecoderException("Expected at least [1] element in certificate outer sequence but found [" + outer.length + "]");
+      }
+      // outer[0] is TBSCertificate (a SEQUENCE). Its toByteArray() returns the SEQUENCE's
+      // body (children), which we walk as a list of DerValues.
+      java.util.List<DerValue> tbs = parseValues(outer[0].toByteArray());
+
+      int idx = 0;
+      // Optional [0] EXPLICIT version
+      if (!tbs.isEmpty() && tbs.get(0).tag.rawByte == (byte) 0xA0) {
+        idx++;
+      }
+      BigInteger serial = tbs.get(idx++).getBigInteger();
+      // signature AlgorithmIdentifier (SEQUENCE) -- skip
+      idx++;
+      byte[] issuer = encodeSequenceOf(tbs.get(idx++));
+      // validity SEQUENCE { notBefore, notAfter }
+      java.util.List<DerValue> validity = parseValues(tbs.get(idx++).toByteArray());
+      Instant notBefore = decodeTime(validity.get(0));
+      Instant notAfter = decodeTime(validity.get(1));
+      byte[] subject = encodeSequenceOf(tbs.get(idx));
+
+      return new TBSFields(serial, issuer, subject, notBefore, notAfter);
+    } catch (Exception e) {
       throw new PEMDecoderException(e);
     }
   }
@@ -337,7 +387,7 @@ public class PEMDecoder {
       }
 
       PublicKey publicKey = KeyFactory.getInstance(edECPrivateKey.getAlgorithm())
-          .generatePublic(new X509EncodedKeySpec(derEncodedPublicKey, edECPrivateKey.getAlgorithm()));
+                                      .generatePublic(new X509EncodedKeySpec(derEncodedPublicKey, edECPrivateKey.getAlgorithm()));
       return new PEM(privateKey, publicKey);
     }
 
@@ -376,116 +426,6 @@ public class PEMDecoder {
     return new PEM(KeyFactory.getInstance(jcaKeyFactoryName(algorithmOID.decode(), type)).generatePublic(new X509EncodedKeySpec(bytes)));
   }
 
-  /**
-   * Parse the TBSCertificate fields out of a DER-encoded X.509 certificate without
-   * relying on {@link CertificateFactory}. Supports v1 (no version field) and v3
-   * (explicit [0] EXPLICIT version) layouts.
-   *
-   * <p>Returned fields: {@code serialNumber}, {@code issuer} (raw DN bytes from the DER
-   * encoding), {@code subject} (raw DN bytes), {@code notBefore} and {@code notAfter}
-   * (decoded UTCTime / GeneralizedTime). Use this when you need certificate
-   * metadata without materialising an {@link java.security.cert.X509Certificate}.</p>
-   *
-   * @param derCertificate the full DER-encoded X.509 certificate bytes
-   * @return the parsed TBS field record
-   */
-  public TBSFields decodeTBSCertificateFields(byte[] derCertificate) {
-    Objects.requireNonNull(derCertificate, "derCertificate");
-    try {
-      // Parse outer Certificate SEQUENCE { tbsCertificate, signatureAlgorithm, signatureValue }.
-      DerValue[] outer = new DerInputStream(derCertificate).getSequence();
-      if (outer.length < 1) {
-        throw new PEMDecoderException("Expected at least [1] element in certificate outer sequence but found [" + outer.length + "]");
-      }
-      // outer[0] is TBSCertificate (a SEQUENCE). Its toByteArray() returns the SEQUENCE's
-      // body (children), which we walk as a list of DerValues.
-      java.util.List<DerValue> tbs = parseValues(outer[0].toByteArray());
-
-      int idx = 0;
-      // Optional [0] EXPLICIT version
-      if (!tbs.isEmpty() && tbs.get(0).tag.rawByte == (byte) 0xA0) {
-        idx++;
-      }
-      BigInteger serial = tbs.get(idx++).getBigInteger();
-      // signature AlgorithmIdentifier (SEQUENCE) -- skip
-      idx++;
-      byte[] issuer = encodeSequenceOf(tbs.get(idx++));
-      // validity SEQUENCE { notBefore, notAfter }
-      java.util.List<DerValue> validity = parseValues(tbs.get(idx++).toByteArray());
-      Instant notBefore = decodeTime(validity.get(0));
-      Instant notAfter = decodeTime(validity.get(1));
-      byte[] subject = encodeSequenceOf(tbs.get(idx));
-
-      return new TBSFields(serial, issuer, subject, notBefore, notAfter);
-    } catch (Exception e) {
-      throw new PEMDecoderException(e);
-    }
-  }
-
-  /**
-   * Walk a sequence-of-DerValues blob (no outer SEQUENCE tag/length): keep reading
-   * tag/length/value triples until exhausted.
-   */
-  private static java.util.List<DerValue> parseValues(byte[] body) throws Exception {
-    java.util.List<DerValue> out = new java.util.ArrayList<>();
-    DerInputStream s = new DerInputStream(body);
-    while (s.data.available() > 0) {
-      out.add(s.readDerValue());
-    }
-    return out;
-  }
-
-  private static byte[] encodeSequenceOf(DerValue dv) throws Exception {
-    // Re-emit the value as full DER (preserve original tag + length + content) so
-    // callers can pass it to e.g. javax.security.auth.x500.X500Principal if they wish.
-    return new DerOutputStream()
-        .writeValue(dv)
-        .toByteArray();
-  }
-
-  private static Instant decodeTime(DerValue v) {
-    String s = new String(v.toByteArray(), StandardCharsets.US_ASCII);
-    if (v.tag.value == Tag.UTCTime) {
-      DateTimeFormatter f = DateTimeFormatter.ofPattern("yyMMddHHmmss'Z'");
-      LocalDateTime ldt = LocalDateTime.parse(s, f);
-      // 2-digit year: 50-99 -> 1950-1999, 00-49 -> 2000-2049 (X.690 §11.8)
-      int year = ldt.getYear();
-      if (year >= 2000 + 50) {
-        ldt = ldt.withYear(year - 100);
-      }
-      return ldt.toInstant(ZoneOffset.UTC);
-    } else if (v.tag.value == Tag.GeneralizedTime) {
-      DateTimeFormatter f = DateTimeFormatter.ofPattern("yyyyMMddHHmmss'Z'");
-      return LocalDateTime.parse(s, f).toInstant(ZoneOffset.UTC);
-    }
-    throw new IllegalArgumentException("Unexpected time tag [" + v.tag + "]");
-  }
-
-  /**
-   * Field record for a parsed TBSCertificate. Distinguished names are returned in
-   * raw DER form (the encoded {@code Name} SEQUENCE) so callers can hand them to
-   * higher-level X.500 APIs without re-parsing.
-   */
-  public record TBSFields(BigInteger serialNumber,
-                          byte[] issuerDer,
-                          byte[] subjectDer,
-                          Instant notBefore,
-                          Instant notAfter) {
-  }
-
-  private byte[] getKeyBytes(String key, String keyPrefix, String keySuffix) {
-    int startIndex = key.indexOf(keyPrefix);
-    int endIndex = key.indexOf(keySuffix);
-
-    String base64 = key.substring(startIndex + keyPrefix.length(), endIndex).replaceAll("\\s+", "");
-    return Base64.getDecoder().decode(base64);
-  }
-
-  private byte[] getEncodedPublicKeyFromPrivate(byte[] bitString, byte[] encodedKey) throws IOException {
-    DerValue[] sequence = new DerInputStream(encodedKey).getSequence();
-    return derEncodePublicKey(sequence[1].toByteArray(), bitString);
-  }
-
   private byte[] derEncodePublicKey(byte[] algorithmIdentifier, byte[] publicKeyBytes) throws IOException {
     // Build an X.509 DER encoded byte array from the provided byte[]
     //
@@ -500,11 +440,35 @@ public class PEMDecoder {
         .toByteArray();
   }
 
+  private byte[] getEncodedPublicKeyFromPrivate(byte[] bitString, byte[] encodedKey) throws IOException {
+    DerValue[] sequence = new DerInputStream(encodedKey).getSequence();
+    return derEncodePublicKey(sequence[1].toByteArray(), bitString);
+  }
+
+  private byte[] getKeyBytes(String key, String keyPrefix, String keySuffix) {
+    int startIndex = key.indexOf(keyPrefix);
+    int endIndex = key.indexOf(keySuffix);
+
+    String base64 = key.substring(startIndex + keyPrefix.length(), endIndex).replaceAll("\\s+", "");
+    return Base64.getDecoder().decode(base64);
+  }
+
+  private PublicKey getPublicKeyFromPrivateEC(DerValue bitString, ECPrivateKey privateKey) throws InvalidKeySpecException, IOException, NoSuchAlgorithmException {
+    // Build an X.509 DER encoded byte array from the provided bitString
+    //
+    // SubjectPublicKeyInfo ::= SEQUENCE {
+    //   algorithm         AlgorithmIdentifier,
+    //   subjectPublicKey  BIT STRING
+    // }
+    byte[] encodedPublicKey = getEncodedPublicKeyFromPrivate(bitString.toByteArray(), privateKey.getEncoded());
+    return KeyFactory.getInstance("EC").generatePublic(new X509EncodedKeySpec(encodedPublicKey));
+  }
+
   /**
-   * Map a DER algorithm OID + resolved {@link KeyType} to the JCA algorithm
-   * string consumed by {@link KeyFactory#getInstance(String)}.
+   * Map a DER algorithm OID + resolved {@link KeyType} to the JCA algorithm string consumed by
+   * {@link KeyFactory#getInstance(String)}.
    *
-   * @param oid the algorithm OID extracted from the DER stream
+   * @param oid  the algorithm OID extracted from the DER stream
    * @param type the resolved {@code KeyType} (RSA, EC, OKP)
    * @return the JCA name (e.g. {@code "RSA"}, {@code "RSASSA-PSS"}, {@code "EC"}, {@code "EdDSA"})
    */
@@ -520,14 +484,14 @@ public class PEMDecoder {
     return type.name();
   }
 
-  private PublicKey getPublicKeyFromPrivateEC(DerValue bitString, ECPrivateKey privateKey) throws InvalidKeySpecException, IOException, NoSuchAlgorithmException {
-    // Build an X.509 DER encoded byte array from the provided bitString
-    //
-    // SubjectPublicKeyInfo ::= SEQUENCE {
-    //   algorithm         AlgorithmIdentifier,
-    //   subjectPublicKey  BIT STRING
-    // }
-    byte[] encodedPublicKey = getEncodedPublicKeyFromPrivate(bitString.toByteArray(), privateKey.getEncoded());
-    return KeyFactory.getInstance("EC").generatePublic(new X509EncodedKeySpec(encodedPublicKey));
+  /**
+   * Field record for a parsed TBSCertificate. Distinguished names are returned in raw DER form (the encoded
+   * {@code Name} SEQUENCE) so callers can hand them to higher-level X.500 APIs without re-parsing.
+   */
+  public record TBSFields(BigInteger serialNumber,
+                          byte[] issuerDer,
+                          byte[] subjectDer,
+                          Instant notBefore,
+                          Instant notAfter) {
   }
 }

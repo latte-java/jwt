@@ -16,9 +16,8 @@
 
 package org.lattejava.jwt;
 
-import java.nio.file.Path;
-import java.util.HashMap;
-import java.util.Map;
+import java.nio.file.*;
+import java.util.*;
 
 /**
  * @author Daniel DeGroff
@@ -26,13 +25,19 @@ import java.util.Map;
 public class ExpectedResponse implements Buildable<ExpectedResponse> {
   public String contentType = "application/json";
 
-  /** When &gt; 0, the handler sleeps this many ms before responding. */
+  /**
+   * When &gt; 0, the handler sleeps this many ms before responding.
+   */
   public long delayMillis;
 
-  /** Arbitrary response headers emitted before sendResponseHeaders. */
+  /**
+   * Arbitrary response headers emitted before sendResponseHeaders.
+   */
   public Map<String, String> headers = new HashMap<>();
 
-  /** When set, sent as the {@code Location:} header (used with 3xx status codes). */
+  /**
+   * When set, sent as the {@code Location:} header (used with 3xx status codes).
+   */
   public String redirectLocation;
 
   public String response;
@@ -40,10 +45,8 @@ public class ExpectedResponse implements Buildable<ExpectedResponse> {
   public Path responseFile;
 
   /**
-   * When &gt; 0 the handler emits exactly this many bytes for the body
-   * regardless of {@link #response} content. Used to test
-   * {@code maxResponseBytes} enforcement without keeping a large literal in
-   * the test source.
+   * When &gt; 0 the handler emits exactly this many bytes for the body regardless of {@link #response} content. Used to
+   * test {@code maxResponseBytes} enforcement without keeping a large literal in the test source.
    */
   public int responseSize = -1;
 

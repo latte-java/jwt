@@ -23,17 +23,16 @@
 
 package org.lattejava.jwt.internal;
 
-import java.util.Base64;
+import java.util.*;
 
 /**
- * Centralized URL-safe Base64 codec without padding -- the variant required by RFC 7515 (JWS),
- * RFC 7517 (JWK), and RFC 7638 (JWK thumbprint).
+ * Centralized URL-safe Base64 codec without padding -- the variant required by RFC 7515 (JWS), RFC 7517 (JWK), and RFC
+ * 7638 (JWK thumbprint).
  *
  * <p>The JDK's {@link java.util.Base64#getUrlEncoder()} returns a cached encoder that emits
- * padding; calling {@code .withoutPadding()} on it allocates a fresh {@code Encoder} on every
- * invocation. This class caches the no-padding encoder once at class-init time so the per-call
- * allocation is eliminated. The cached encoder and decoder are immutable and thread-safe per
- * the JDK contract.</p>
+ * padding; calling {@code .withoutPadding()} on it allocates a fresh {@code Encoder} on every invocation. This class
+ * caches the no-padding encoder once at class-init time so the per-call allocation is eliminated. The cached encoder
+ * and decoder are immutable and thread-safe per the JDK contract.</p>
  */
 public final class Base64URL {
   private static final Base64.Decoder DECODER = Base64.getUrlDecoder();

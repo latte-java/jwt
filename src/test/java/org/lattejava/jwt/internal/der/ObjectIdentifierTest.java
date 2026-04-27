@@ -16,12 +16,10 @@
 
 package org.lattejava.jwt.internal.der;
 
-import org.lattejava.jwt.BaseJWTTest;
-import org.testng.annotations.DataProvider;
-import org.testng.annotations.Test;
+import org.lattejava.jwt.*;
+import org.testng.annotations.*;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.*;
 
 /**
  * @author Daniel DeGroff
@@ -66,6 +64,17 @@ public class ObjectIdentifierTest extends BaseJWTTest {
         -> assertEquals(decode(0x51, 0x87, 0xFF, 0xFF, 0xFF, 0x7F, 0x01), "2.1.2147483647.1"));
   }
 
+  @Test
+  public void dn_attribute_constants() {
+    // Use case: DN-attribute OID constants exist and have the expected values.
+    assertEquals(ObjectIdentifier.X_520_DN_COMMON_NAME, "2.5.4.3");
+    assertEquals(ObjectIdentifier.X_520_DN_COUNTRY, "2.5.4.6");
+    assertEquals(ObjectIdentifier.X_520_DN_LOCALITY, "2.5.4.7");
+    assertEquals(ObjectIdentifier.X_520_DN_STATE, "2.5.4.8");
+    assertEquals(ObjectIdentifier.X_520_DN_ORGANIZATION, "2.5.4.10");
+    assertEquals(ObjectIdentifier.X_520_DN_ORGANIZATIONAL_UNIT, "2.5.4.11");
+  }
+
   @DataProvider(name = "encodeOIDs")
   public Object[][] encodeOIDs() {
     return new Object[][]{
@@ -91,6 +100,14 @@ public class ObjectIdentifierTest extends BaseJWTTest {
   }
 
   @Test(dataProvider = "encodeOIDs")
+  public void encode_decode_roundtrip(String oid, int[] expected) throws DerDecodingException {
+    // Use case: encode then decode round-trips for every entry in the data provider.
+    byte[] encoded = ObjectIdentifier.encode(oid);
+    String decoded = new ObjectIdentifier(encoded).decode();
+    assertEquals(decoded, oid);
+  }
+
+  @Test(dataProvider = "encodeOIDs")
   public void encode_matches_expected(String oid, int[] expected) {
     // Use case: encode produces the expected DER value bytes for single/two/three-byte arcs and DN OIDs.
     byte[] bytes = ObjectIdentifier.encode(oid);
@@ -101,14 +118,6 @@ public class ObjectIdentifierTest extends BaseJWTTest {
     assertEquals(bytes, exp, "encoding mismatch for " + oid);
   }
 
-  @Test(dataProvider = "encodeOIDs")
-  public void encode_decode_roundtrip(String oid, int[] expected) throws DerDecodingException {
-    // Use case: encode then decode round-trips for every entry in the data provider.
-    byte[] encoded = ObjectIdentifier.encode(oid);
-    String decoded = new ObjectIdentifier(encoded).decode();
-    assertEquals(decoded, oid);
-  }
-
   @Test
   public void encode_rejects_malformed() {
     // Use case: malformed OID strings throw IllegalArgumentException.
@@ -117,17 +126,6 @@ public class ObjectIdentifierTest extends BaseJWTTest {
     assertThrows(IllegalArgumentException.class, () -> ObjectIdentifier.encode("3.0.1"));
     assertThrows(IllegalArgumentException.class, () -> ObjectIdentifier.encode("1.40"));
     assertThrows(IllegalArgumentException.class, () -> ObjectIdentifier.encode("a.b.c"));
-  }
-
-  @Test
-  public void dn_attribute_constants() {
-    // Use case: DN-attribute OID constants exist and have the expected values.
-    assertEquals(ObjectIdentifier.X_520_DN_COMMON_NAME, "2.5.4.3");
-    assertEquals(ObjectIdentifier.X_520_DN_COUNTRY, "2.5.4.6");
-    assertEquals(ObjectIdentifier.X_520_DN_LOCALITY, "2.5.4.7");
-    assertEquals(ObjectIdentifier.X_520_DN_STATE, "2.5.4.8");
-    assertEquals(ObjectIdentifier.X_520_DN_ORGANIZATION, "2.5.4.10");
-    assertEquals(ObjectIdentifier.X_520_DN_ORGANIZATIONAL_UNIT, "2.5.4.11");
   }
 
   private String decode(int... array) throws DerDecodingException {

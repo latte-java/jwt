@@ -23,20 +23,16 @@
 
 package org.lattejava.jwt;
 
-import org.lattejava.jwt.algorithm.hmac.HMACSigner;
-import org.lattejava.jwt.algorithm.hmac.HMACVerifier;
-import org.testng.annotations.DataProvider;
-import org.testng.annotations.Test;
+import java.nio.charset.*;
+import java.util.*;
 
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
+import org.lattejava.jwt.algorithm.hmac.*;
+import org.testng.annotations.*;
 
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.fail;
+import static org.testng.Assert.*;
 
 /**
- * Segment-count matrix: confirms how the decoder treats every structural
- * segment-count permutation.
+ * Segment-count matrix: confirms how the decoder treats every structural segment-count permutation.
  *
  * @author Daniel DeGroff
  */
@@ -47,11 +43,13 @@ public class SegmentCountTest {
     return Base64.getUrlEncoder().withoutPadding().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
   }
 
-  /** Build a header b64 segment for the given alg, and a payload b64 segment with subject. */
+  /**
+   * Build a header b64 segment for the given alg, and a payload b64 segment with subject.
+   */
   private static String[] validHeaderAndPayload() {
     String header = b64("{\"alg\":\"HS256\",\"typ\":\"JWT\"}");
     String payload = b64("{\"sub\":\"abc\"}");
-    return new String[] {header, payload};
+    return new String[]{header, payload};
   }
 
   @DataProvider(name = "segmentCases")
@@ -59,7 +57,7 @@ public class SegmentCountTest {
     String[] hp = validHeaderAndPayload();
     String header = hp[0];
     String payload = hp[1];
-    return new Object[][] {
+    return new Object[][]{
         // input, expected exception class for authenticated decode, description
         {header + "." + payload,
             MissingSignatureException.class,
@@ -102,20 +100,20 @@ public class SegmentCountTest {
   }
 
   @Test
-  public void threeSegments_realToken_succeeds() {
-    // Use case: "a.b.c" proceeds through the full sig flow on a real signed token.
-    JWT jwt = JWT.builder().subject("abc").build();
-    String encoded = new JWTEncoder().encode(jwt, HMACSigner.newSHA256Signer(SECRET));
-    JWT decoded = new JWTDecoder().decode(encoded, VerifierResolver.of(HMACVerifier.newVerifier(Algorithm.HS256, SECRET)));
-    assertNotNull(decoded);
-  }
-
-  @Test
   public void threeSegmentsEmptySig_decodeUnsecured_succeeds() {
     // Use case: "a.b." (empty signature) is structurally valid for decodeUnsecured.
     String[] hp = validHeaderAndPayload();
     String token = hp[0] + "." + hp[1] + ".";
     JWT decoded = new JWTDecoder().decodeUnsecured(token);
+    assertNotNull(decoded);
+  }
+
+  @Test
+  public void threeSegments_realToken_succeeds() {
+    // Use case: "a.b.c" proceeds through the full sig flow on a real signed token.
+    JWT jwt = JWT.builder().subject("abc").build();
+    String encoded = new JWTEncoder().encode(jwt, HMACSigner.newSHA256Signer(SECRET));
+    JWT decoded = new JWTDecoder().decode(encoded, VerifierResolver.of(HMACVerifier.newVerifier(Algorithm.HS256, SECRET)));
     assertNotNull(decoded);
   }
 }

@@ -23,19 +23,14 @@
 
 package org.lattejava.jwt.internal;
 
-import org.lattejava.jwt.BaseTest;
-import org.lattejava.jwt.FetchLimits;
-import org.lattejava.jwt.JSONProcessingException;
-import org.testng.annotations.Test;
+import java.io.*;
+import java.nio.charset.*;
+import java.util.*;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
-import java.util.Map;
+import org.lattejava.jwt.*;
+import org.testng.annotations.*;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.*;
 
 public class HardenedJSONTest extends BaseTest {
   @Test
@@ -78,8 +73,15 @@ public class HardenedJSONTest extends BaseTest {
   public void parse_wraps_io_exception() {
     // Use case: an IOException thrown by the InputStream during drain is wrapped in JSONProcessingException.
     InputStream broken = new InputStream() {
-      @Override public int read() throws IOException { throw new IOException("simulated"); }
-      @Override public int read(byte[] b, int off, int len) throws IOException { throw new IOException("simulated"); }
+      @Override
+      public int read() throws IOException {
+        throw new IOException("simulated");
+      }
+
+      @Override
+      public int read(byte[] b, int off, int len) throws IOException {
+        throw new IOException("simulated");
+      }
     };
     assertThrows(JSONProcessingException.class, () -> HardenedJSON.parse(broken, FetchLimits.defaults()));
   }

@@ -23,27 +23,15 @@
 
 package org.lattejava.jwt;
 
-import org.bouncycastle.jcajce.provider.BouncyCastleFipsProvider;
-import org.lattejava.jwt.internal.SHAKE256;
-import org.testng.annotations.AfterMethod;
-import org.testng.annotations.BeforeMethod;
-import org.testng.annotations.Test;
+import java.security.*;
+import java.util.*;
+import java.util.concurrent.*;
 
-import java.security.MessageDigest;
-import java.security.Provider;
-import java.security.Security;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import org.bouncycastle.jcajce.provider.*;
+import org.lattejava.jwt.internal.*;
+import org.testng.annotations.*;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 /**
  * OIDC provider-preference matrix for the bundled SHAKE256 path.
@@ -71,15 +59,6 @@ public class OpenIDConnectProviderTest extends BaseTest {
   // "Ed25519"/"Ed448" algorithm names) see a pristine environment.
   private List<Provider> baselineProviders;
 
-  @BeforeMethod
-  public void beforeMethod() {
-    baselineProviders = new ArrayList<>();
-    for (Provider p : Security.getProviders()) {
-      baselineProviders.add(p);
-    }
-    SHAKE256.resetProviderCacheForTesting();
-  }
-
   @AfterMethod
   public void afterMethod() {
     // Remove every currently-registered provider, then re-insert the baseline
@@ -94,40 +73,6 @@ public class OpenIDConnectProviderTest extends BaseTest {
     }
     SHAKE256.resetProviderCacheForTesting();
   }
-
-  // [no-provider] When no SHAKE256 provider is registered (or none can be
-  // removed because the JDK ships one natively, e.g. JDK 25's SUN provider),
-  // Ed448 at_hash still produces the canonical RFC value. Output is
-  // deterministic across the bundled and any JCE path.
-  @Test
-  public void noProvider_atHashEd448_usesBundled() {
-    removeAllShake256Providers();
-    SHAKE256.resetProviderCacheForTesting();
-
-    String hash = OpenIDConnect.at_hash("dNZX1hEZ9wBCzNL40Upu646bdzQA", Algorithm.Ed448);
-    assertEquals(hash,
-        "ACuRpk9jl5IEa3yqpBCNNOCpBEI7qjud6mc80cs6vWX2fcqpsk8RozYBKTUuSS6SqJhw302xFZeM");
-  }
-
-  // [no-provider] c_hash for Ed448 — same as at_hash for the same input string.
-  @Test
-  public void noProvider_cHashEd448_usesBundled() {
-    removeAllShake256Providers();
-    SHAKE256.resetProviderCacheForTesting();
-    String hash = OpenIDConnect.c_hash("dNZX1hEZ9wBCzNL40Upu646bdzQA", Algorithm.Ed448);
-    assertEquals(hash,
-        "ACuRpk9jl5IEa3yqpBCNNOCpBEI7qjud6mc80cs6vWX2fcqpsk8RozYBKTUuSS6SqJhw302xFZeM");
-  }
-
-  // Use case: with SHAKE256 entirely absent (probe truly cannot construct
-  // a MessageDigest), the bundled implementation is used and no provider
-  // is cached. We simulate this by wrapping SHAKE256.digest semantics:
-  // the runtime calls SHAKE256.digest directly, and we assert via
-  // hasCachedProviderForTesting that bundled was the path taken in the
-  // simulated-no-provider scenario, validated through an alternative entry:
-  // when only the BrokenShakeProvider is at position 1, BC/SUN are skipped
-  // by priority, the broken probe fails, and bundled runs with no cache.
-  // (Covered by brokenProvider_fallsBackToBundled below.)
 
   // [bc-registered] When a SHAKE256-capable provider (BC-FIPS, or in JDK 25+
   // also the SUN provider) is registered, it is selected by the probe and
@@ -159,6 +104,13 @@ public class OpenIDConnectProviderTest extends BaseTest {
     assertEquals(SHAKE256.cachedProviderNameForTesting(), bc.getName());
   }
 
+  @BeforeMethod
+  public void beforeMethod() {
+    baselineProviders = new ArrayList<>();
+    Collections.addAll(baselineProviders, Security.getProviders());
+    SHAKE256.resetProviderCacheForTesting();
+  }
+
   // [both] Bundled and BC-registered configurations produce byte-identical
   // output (deterministic SHAKE256).
   @Test
@@ -176,6 +128,16 @@ public class OpenIDConnectProviderTest extends BaseTest {
     assertEquals(viaProvider, bundled,
         "BC-FIPS and bundled SHAKE256 must produce identical output");
   }
+
+  // Use case: with SHAKE256 entirely absent (probe truly cannot construct
+  // a MessageDigest), the bundled implementation is used and no provider
+  // is cached. We simulate this by wrapping SHAKE256.digest semantics:
+  // the runtime calls SHAKE256.digest directly, and we assert via
+  // hasCachedProviderForTesting that bundled was the path taken in the
+  // simulated-no-provider scenario, validated through an alternative entry:
+  // when only the BrokenShakeProvider is at position 1, BC/SUN are skipped
+  // by priority, the broken probe fails, and bundled runs with no cache.
+  // (Covered by brokenProvider_fallsBackToBundled below.)
 
   // [broken-provider] A provider whose SHAKE256 service returns wrong bytes
   // is detected via the probe self-test and the library falls back to bundled.
@@ -196,8 +158,31 @@ public class OpenIDConnectProviderTest extends BaseTest {
     // canonical RFC vector.
     assertEquals(hash,
         "ACuRpk9jl5IEa3yqpBCNNOCpBEI7qjud6mc80cs6vWX2fcqpsk8RozYBKTUuSS6SqJhw302xFZeM");
-    assertEquals(SHAKE256.cachedProviderNameForTesting(), null,
-        "broken provider must NOT be cached");
+    assertNull(SHAKE256.cachedProviderNameForTesting(), "broken provider must NOT be cached");
+  }
+
+  // [no-provider] When no SHAKE256 provider is registered (or none can be
+  // removed because the JDK ships one natively, e.g. JDK 25's SUN provider),
+  // Ed448 at_hash still produces the canonical RFC value. Output is
+  // deterministic across the bundled and any JCE path.
+  @Test
+  public void noProvider_atHashEd448_usesBundled() {
+    removeAllShake256Providers();
+    SHAKE256.resetProviderCacheForTesting();
+
+    String hash = OpenIDConnect.at_hash("dNZX1hEZ9wBCzNL40Upu646bdzQA", Algorithm.Ed448);
+    assertEquals(hash,
+        "ACuRpk9jl5IEa3yqpBCNNOCpBEI7qjud6mc80cs6vWX2fcqpsk8RozYBKTUuSS6SqJhw302xFZeM");
+  }
+
+  // [no-provider] c_hash for Ed448 — same as at_hash for the same input string.
+  @Test
+  public void noProvider_cHashEd448_usesBundled() {
+    removeAllShake256Providers();
+    SHAKE256.resetProviderCacheForTesting();
+    String hash = OpenIDConnect.c_hash("dNZX1hEZ9wBCzNL40Upu646bdzQA", Algorithm.Ed448);
+    assertEquals(hash,
+        "ACuRpk9jl5IEa3yqpBCNNOCpBEI7qjud6mc80cs6vWX2fcqpsk8RozYBKTUuSS6SqJhw302xFZeM");
   }
 
   // Thread safety: 16 concurrent first-call invocations all return identical
@@ -213,7 +198,7 @@ public class OpenIDConnectProviderTest extends BaseTest {
     try {
       Future<byte[]>[] futures = new Future[threads];
       for (int i = 0; i < threads; i++) {
-        futures[i] = pool.submit((Callable<byte[]>) () -> {
+        futures[i] = pool.submit(() -> {
           start.await();
           return SHAKE256.digest(input, 57);
         });
@@ -249,26 +234,12 @@ public class OpenIDConnectProviderTest extends BaseTest {
     }
   }
 
-  /** Test-only Provider that registers SHAKE256 returning all-zero bytes. */
-  private static final class BrokenShakeProvider extends Provider {
-    BrokenShakeProvider() {
-      super("BrokenShakeOIDC", "1.0", "Test-only broken SHAKE256 provider");
-      put("MessageDigest.SHAKE256", BrokenShakeMessageDigest.class.getName());
-    }
-  }
-
-  /** Returns all-zeros for any digest length; will fail the KAT self-test. */
+  /**
+   * Returns all-zeros for any digest length; will fail the KAT self-test.
+   */
   public static final class BrokenShakeMessageDigest extends MessageDigest {
     public BrokenShakeMessageDigest() {
       super("SHAKE256");
-    }
-
-    @Override
-    protected void engineUpdate(byte input) {
-    }
-
-    @Override
-    protected void engineUpdate(byte[] input, int offset, int len) {
     }
 
     @Override
@@ -285,12 +256,30 @@ public class OpenIDConnectProviderTest extends BaseTest {
     }
 
     @Override
+    protected int engineGetDigestLength() {
+      return 0;
+    }
+
+    @Override
     protected void engineReset() {
     }
 
     @Override
-    protected int engineGetDigestLength() {
-      return 0;
+    protected void engineUpdate(byte input) {
+    }
+
+    @Override
+    protected void engineUpdate(byte[] input, int offset, int len) {
+    }
+  }
+
+  /**
+   * Test-only Provider that registers SHAKE256 returning all-zero bytes.
+   */
+  private static final class BrokenShakeProvider extends Provider {
+    BrokenShakeProvider() {
+      super("BrokenShakeOIDC", "1.0", "Test-only broken SHAKE256 provider");
+      put("MessageDigest.SHAKE256", BrokenShakeMessageDigest.class.getName());
     }
   }
 }

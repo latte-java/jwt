@@ -23,56 +23,36 @@
 
 package org.lattejava.jwt;
 
-import org.lattejava.jwt.algorithm.hmac.HMACSigner;
-import org.lattejava.jwt.algorithm.hmac.HMACVerifier;
-import org.testng.annotations.DataProvider;
-import org.testng.annotations.Test;
+import org.lattejava.jwt.algorithm.hmac.*;
+import org.testng.annotations.*;
 
-import static org.testng.Assert.fail;
+import static org.testng.Assert.*;
 
 /**
- * Base64URL strictness: every segment must use only the URL-safe alphabet
- * {@code A-Z a-z 0-9 - _}; padding, whitespace, and non-URL-safe characters
- * ({@code +}, {@code /}, {@code =}) must be rejected with
- * {@link InvalidJWTException} before any parsing.
+ * Base64URL strictness: every segment must use only the URL-safe alphabet {@code A-Z a-z 0-9 - _}; padding, whitespace,
+ * and non-URL-safe characters ({@code +}, {@code /}, {@code =}) must be rejected with {@link InvalidJWTException}
+ * before any parsing.
  *
  * @author Daniel DeGroff
  */
 public class Base64URLStrictnessTest {
   private static final String SECRET = "super-secret-key-that-is-at-least-32-bytes-long!!";
 
-  /** Build a valid 3-segment token, then corrupt one segment by inserting a bad char. */
+  /**
+   * Build a valid 3-segment token, then corrupt one segment by inserting a bad char.
+   */
   private static String buildValidToken() {
     JWT jwt = JWT.builder().subject("abc").build();
     return new JWTEncoder().encode(jwt, HMACSigner.newSHA256Signer(SECRET));
   }
 
-  /** Inject a character into segment N (0=header,1=payload,2=signature). */
+  /**
+   * Inject a character into segment N (0=header,1=payload,2=signature).
+   */
   private static String corrupt(String token, int segmentIndex, char badChar) {
     String[] parts = token.split("\\.", -1);
     parts[segmentIndex] = parts[segmentIndex] + badChar;
     return parts[0] + "." + parts[1] + "." + parts[2];
-  }
-
-  @DataProvider(name = "strictnessViolations")
-  public Object[][] strictnessViolations() {
-    return new Object[][] {
-        // segmentIndex, badChar, description
-        {0, '=', "padding '=' in header"},
-        {1, '=', "padding '=' in payload"},
-        {2, '=', "padding '=' in signature"},
-        {0, ' ', "space in header"},
-        {1, ' ', "space in payload"},
-        {2, ' ', "space in signature"},
-        {0, '\t', "tab in header"},
-        {0, '\n', "newline in header"},
-        {0, '+', "standard-alphabet '+' in header (not URL-safe)"},
-        {1, '+', "standard-alphabet '+' in payload"},
-        {2, '+', "standard-alphabet '+' in signature"},
-        {0, '/', "standard-alphabet '/' in header"},
-        {1, '/', "standard-alphabet '/' in payload"},
-        {2, '/', "standard-alphabet '/' in signature"},
-    };
   }
 
   @Test(dataProvider = "strictnessViolations")
@@ -90,5 +70,26 @@ public class Base64URLStrictnessTest {
       throw new AssertionError("Expected InvalidJWTException for [" + description
           + "], got [" + e.getClass().getSimpleName() + "]", e);
     }
+  }
+
+  @DataProvider(name = "strictnessViolations")
+  public Object[][] strictnessViolations() {
+    return new Object[][]{
+        // segmentIndex, badChar, description
+        {0, '=', "padding '=' in header"},
+        {1, '=', "padding '=' in payload"},
+        {2, '=', "padding '=' in signature"},
+        {0, ' ', "space in header"},
+        {1, ' ', "space in payload"},
+        {2, ' ', "space in signature"},
+        {0, '\t', "tab in header"},
+        {0, '\n', "newline in header"},
+        {0, '+', "standard-alphabet '+' in header (not URL-safe)"},
+        {1, '+', "standard-alphabet '+' in payload"},
+        {2, '+', "standard-alphabet '+' in signature"},
+        {0, '/', "standard-alphabet '/' in header"},
+        {1, '/', "standard-alphabet '/' in payload"},
+        {2, '/', "standard-alphabet '/' in signature"},
+    };
   }
 }

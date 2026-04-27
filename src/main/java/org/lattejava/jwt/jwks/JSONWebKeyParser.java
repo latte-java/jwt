@@ -16,36 +16,50 @@
 
 package org.lattejava.jwt.jwks;
 
-import org.lattejava.jwt.KeyType;
-import org.lattejava.jwt.internal.Base64URL;
-import org.lattejava.jwt.internal.MessageSanitizer;
-import org.lattejava.jwt.internal.pem.PEMEncoder;
-import org.lattejava.jwt.internal.pem.PEM;
+import java.math.*;
+import java.security.*;
+import java.security.interfaces.*;
+import java.security.spec.*;
+import java.util.*;
 
-import java.math.BigInteger;
-import java.security.AlgorithmParameters;
-import java.security.KeyFactory;
-import java.security.PublicKey;
-import java.security.interfaces.ECPublicKey;
-import java.security.interfaces.EdECPublicKey;
-import java.security.interfaces.RSAPublicKey;
-import java.security.spec.ECGenParameterSpec;
-import java.security.spec.ECParameterSpec;
-import java.security.spec.ECPoint;
-import java.security.spec.ECPublicKeySpec;
-import java.security.spec.EdECPoint;
-import java.security.spec.EdECPublicKeySpec;
-import java.security.spec.KeySpec;
-import java.security.spec.NamedParameterSpec;
-import java.security.spec.RSAPublicKeySpec;
-import java.util.Objects;
+import org.lattejava.jwt.*;
+import org.lattejava.jwt.internal.*;
+import org.lattejava.jwt.internal.pem.*;
 
-import static org.lattejava.jwt.jwks.JWKUtils.base64DecodeUint;
+import static org.lattejava.jwt.jwks.JWKUtils.*;
 
 /**
  * @author Daniel DeGroff
  */
 public class JSONWebKeyParser {
+  /**
+   * Examine JSON Web Key return true if it contains parameters used in private keys. Parameters used to construct
+   * public keys are not considered. Does not validate that a private key can be reconstructed from the parameters, so
+   * does less work than parsePrivate().
+   * <p>
+   * An example use case is DPoP proof validation that does not allow private keys to be used in JWT headers.
+   *
+   * @param key the JSON web key
+   * @return true if the key contains private key parameters given a key's kty Otherwise false.
+   * @throws JSONWebKeyParserException for unsupported key types
+   */
+  public boolean containsPrivateKeyParams(JSONWebKey key) throws JSONWebKeyParserException {
+    Objects.requireNonNull(key);
+
+    if (key.kty() == KeyType.RSA) {
+      // RSA public key only has n, e
+      return key.p() != null || key.q() != null || key.d() != null || key.dp() != null || key.dq() != null || key.qi() != null;
+    } else if (key.kty() == KeyType.EC) {
+      // EC Public key only has crv, x, y
+      return key.d() != null;
+    } else if (key.kty() == KeyType.OKP) {
+      // EdDSA Public keys have crv and x
+      return key.d() != null;
+    }
+
+    throw new UnsupportedOperationException("Unsupported JWK [kty] [" + MessageSanitizer.forMessage(String.valueOf(key.kty())) + "], expected [RSA], [EC], or [OKP]");
+  }
+
   /**
    * Parse a JSON Web Key and extract the public key.
    *
@@ -129,35 +143,17 @@ public class JSONWebKeyParser {
     throw new UnsupportedOperationException("Unsupported JWK [kty] [" + MessageSanitizer.forMessage(String.valueOf(key.kty())) + "], expected [RSA], [EC], or [OKP]");
   }
 
-  /**
-   * Examine JSON Web Key return true if it contains parameters used in private keys.
-   * Parameters used to construct public keys are not considered. Does not
-   * validate that a private key can be reconstructed from the parameters, so does less work
-   * than parsePrivate().
-   * <p>
-   * An example use case is DPoP proof validation that does not allow private keys to be used in
-   * JWT headers.
-   *
-   * @param key the JSON web key
-   * @return true if the key contains private key parameters given a key's kty
-   * Otherwise false.
-   * @throws JSONWebKeyParserException for unsupported key types
-   */
-  public boolean containsPrivateKeyParams(JSONWebKey key) throws JSONWebKeyParserException{
-    Objects.requireNonNull(key);
+  private void reverseArray(byte[] arr) {
+    int i = 0;
+    int j = arr.length - 1;
 
-    if (key.kty() == KeyType.RSA) {
-      // RSA public key only has n, e
-      return key.p() != null || key.q() != null || key.d() != null || key.dp() != null || key.dq() != null || key.qi() != null;
-    } else if (key.kty() == KeyType.EC) {
-      // EC Public key only has crv, x, y
-      return key.d() != null;
-    } else if (key.kty() == KeyType.OKP) {
-      // EdDSA Public keys have crv and x
-      return key.d() != null;
+    while (i < j) {
+      byte tmp = arr[i];
+      arr[i] = arr[j];
+      arr[j] = tmp;
+      i++;
+      j--;
     }
-
-    throw new UnsupportedOperationException("Unsupported JWK [kty] [" + MessageSanitizer.forMessage(String.valueOf(key.kty())) + "], expected [RSA], [EC], or [OKP]");
   }
 
   private void verifyX5cEC(JSONWebKey key, BigInteger expectedXCoordinate, BigInteger expectedYCoordinate) {
@@ -179,19 +175,6 @@ public class JSONWebKeyParser {
     //noinspection SuspiciousNameCombination
     if (!point.getAffineY().equals(expectedYCoordinate)) {
       throw new JSONWebKeyParserException("Certificate in [x5c] does not match the [y] coordinate: expected [" + expectedYCoordinate + "] but found [" + point.getAffineY() + "]");
-    }
-  }
-
-  private void reverseArray(byte[] arr) {
-    int i = 0;
-    int j = arr.length - 1;
-
-    while (i < j) {
-      byte tmp = arr[i];
-      arr[i] = arr[j];
-      arr[j] = tmp;
-      i++;
-      j--;
     }
   }
 

@@ -16,21 +16,16 @@
 
 package org.lattejava.jwt.algorithm.ec;
 
-import org.lattejava.jwt.BaseJWTTest;
-import org.lattejava.jwt.MissingPublicKeyException;
-import org.lattejava.jwt.Verifier;
-import org.lattejava.jwt.Algorithm;
-import org.lattejava.jwt.internal.pem.PEM;
-import org.testng.Assert;
-import org.testng.annotations.Test;
+import java.nio.charset.*;
+import java.security.interfaces.*;
+import java.util.*;
 
-import java.nio.charset.StandardCharsets;
-import java.security.interfaces.ECPublicKey;
-import java.util.Arrays;
+import org.lattejava.jwt.*;
+import org.lattejava.jwt.internal.pem.*;
+import org.testng.*;
+import org.testng.annotations.*;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 /**
  * @author Daniel DeGroff
@@ -45,10 +40,10 @@ public class ECVerifierTest extends BaseJWTTest {
 
     // Public key parsing fails with private keys w/out an encoded public key
     Arrays.asList(
-            "ec_private_key_p_256.pem",
-            "ec_private_key_p_384.pem",
-            "ec_private_key_p_521.pem")
-        .forEach(this::assertFailed);
+              "ec_private_key_p_256.pem",
+              "ec_private_key_p_384.pem",
+              "ec_private_key_p_521.pem")
+          .forEach(this::assertFailed);
 
     // Public key parsing works with private keys when the private key contains a public key
     assertECVerifierForFile("ec_private_prime256v1_p_256_openssl.pem", Algorithm.ES256);
@@ -57,13 +52,6 @@ public class ECVerifierTest extends BaseJWTTest {
     assertECVerifierForFile("ec_private_secp384r1_p_384_openssl_pkcs8.pem", Algorithm.ES384);
     assertECVerifierForFile("ec_private_secp521r1_p_512_openssl.pem", Algorithm.ES512);
     assertECVerifierForFile("ec_private_secp521r1_p_512_openssl_pkcs8.pem", Algorithm.ES512);
-  }
-
-  private void assertECVerifierForFile(String fileName, Algorithm expectedAlgorithm) {
-    assertECVerifier(ECVerifier.newVerifier(getPath(fileName)), expectedAlgorithm);
-    assertECVerifier(ECVerifier.newVerifier(readFile(fileName)), expectedAlgorithm);
-    assertECVerifier(ECVerifier.newVerifier(readFile(fileName).getBytes(StandardCharsets.UTF_8)), expectedAlgorithm);
-    assertECVerifier(ECVerifier.newVerifier((ECPublicKey) PEM.decode(readFile(fileName)).getPublicKey()), expectedAlgorithm);
   }
 
   private void assertECVerifier(Verifier verifier, Algorithm expectedAlgorithm) {
@@ -75,6 +63,13 @@ public class ECVerifierTest extends BaseJWTTest {
         assertFalse(verifier.canVerify(alg), "Expected canVerify(" + alg + ") to be false");
       }
     }
+  }
+
+  private void assertECVerifierForFile(String fileName, Algorithm expectedAlgorithm) {
+    assertECVerifier(ECVerifier.newVerifier(getPath(fileName)), expectedAlgorithm);
+    assertECVerifier(ECVerifier.newVerifier(readFile(fileName)), expectedAlgorithm);
+    assertECVerifier(ECVerifier.newVerifier(readFile(fileName).getBytes(StandardCharsets.UTF_8)), expectedAlgorithm);
+    assertECVerifier(ECVerifier.newVerifier((ECPublicKey) PEM.decode(readFile(fileName)).getPublicKey()), expectedAlgorithm);
   }
 
   private void assertFailed(String fileName) {

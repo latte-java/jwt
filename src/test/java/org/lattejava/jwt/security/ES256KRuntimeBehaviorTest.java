@@ -23,40 +23,38 @@
 
 package org.lattejava.jwt.security;
 
-import org.lattejava.jwt.Algorithm;
-import org.lattejava.jwt.BaseTest;
-import org.lattejava.jwt.JWTSigningException;
-import org.lattejava.jwt.algorithm.ec.ECSigner;
-import org.lattejava.jwt.algorithm.ec.ECVerifier;
-import org.testng.SkipException;
-import org.testng.annotations.Test;
-
+import java.security.*;
 import java.security.KeyPair;
-import java.security.KeyPairGenerator;
-import java.security.NoSuchAlgorithmException;
-import java.security.NoSuchProviderException;
-import java.security.Provider;
-import java.security.Security;
-import java.security.spec.ECGenParameterSpec;
+import java.security.spec.*;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.fail;
+import org.lattejava.jwt.*;
+import org.lattejava.jwt.algorithm.ec.*;
+import org.testng.*;
+import org.testng.annotations.*;
+
+import static org.testng.Assert.*;
 
 /**
- * ES256K runtime behavior: verifies the ES256K algorithm constant exists
- * and that signing under the FIPS / no-BC profile fails as documented
- * (NoSuchAlgorithmException wrapped as JWTSigningException), while signing
- * succeeds when BouncyCastle is registered.
+ * ES256K runtime behavior: verifies the ES256K algorithm constant exists and that signing under the FIPS / no-BC
+ * profile fails as documented (NoSuchAlgorithmException wrapped as JWTSigningException), while signing succeeds when
+ * BouncyCastle is registered.
  *
  * <p>This test gates on whether a {@code secp256k1} KeyPairGenerator is
- * available in the active JCA configuration. JDK 16+ removed
- * {@code secp256k1} from {@code SunEC}; without BC the test paths
- * exercise the documented failure mode rather than skipping.</p>
+ * available in the active JCA configuration. JDK 16+ removed {@code secp256k1} from {@code SunEC}; without BC the test
+ * paths exercise the documented failure mode rather than skipping.</p>
  *
  * @author Daniel DeGroff
  */
 public class ES256KRuntimeBehaviorTest extends BaseTest {
+  private static String describeProviders() {
+    StringBuilder sb = new StringBuilder();
+    for (Provider p : Security.getProviders()) {
+      if (sb.length() > 0) sb.append(", ");
+      sb.append(p.getName());
+    }
+    return sb.toString();
+  }
+
   @Test
   public void es256KConstantDefined() {
     // Use case: ES256K constant defined and accessible.
@@ -155,14 +153,5 @@ public class ES256KRuntimeBehaviorTest extends BaseTest {
     } catch (NoSuchAlgorithmException | java.security.InvalidAlgorithmParameterException e) {
       // Even P-256 unavailable -- nothing more to assert.
     }
-  }
-
-  private static String describeProviders() {
-    StringBuilder sb = new StringBuilder();
-    for (Provider p : Security.getProviders()) {
-      if (sb.length() > 0) sb.append(", ");
-      sb.append(p.getName());
-    }
-    return sb.toString();
   }
 }

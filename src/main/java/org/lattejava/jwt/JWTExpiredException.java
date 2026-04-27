@@ -16,25 +16,21 @@
 
 package org.lattejava.jwt;
 
-import java.time.Duration;
-import java.time.Instant;
+import java.time.*;
 
 /**
  * The JWT has a valid signature but the JWT is expired. It is not trustworthy.
  * <p>
- * Carries the {@code exp} claim, the clock reading used for the check, and the
- * applied clock skew so consumers diagnosing clock-sync issues can read the
- * numbers directly instead of parsing them out of a message. Any of the three
+ * Carries the {@code exp} claim, the clock reading used for the check, and the applied clock skew so consumers
+ * diagnosing clock-sync issues can read the numbers directly instead of parsing them out of a message. Any of the three
  * may be {@code null} if the exception was thrown without diagnostic context.
  *
  * @author Daniel DeGroff
  */
 public class JWTExpiredException extends JWTException {
-  private final Instant expiration;
-
-  private final Instant now;
-
   private final Duration clockSkew;
+  private final Instant expiration;
+  private final Instant now;
 
   public JWTExpiredException(Instant expiration, Instant now, Duration clockSkew) {
     this.expiration = expiration;

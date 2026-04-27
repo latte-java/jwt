@@ -23,25 +23,19 @@
 
 package org.lattejava.jwt;
 
-import org.lattejava.jwt.algorithm.hmac.HMACSigner;
-import org.testng.annotations.Test;
+import java.nio.charset.*;
+import java.time.*;
+import java.util.*;
 
-import java.nio.charset.StandardCharsets;
-import java.time.Instant;
-import java.util.Base64;
-import java.util.Collections;
-import java.util.HashSet;
+import org.lattejava.jwt.algorithm.hmac.*;
+import org.testng.annotations.*;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.fail;
+import static org.testng.Assert.*;
 
 /**
- * Validates which defenses still run on {@link JWTDecoder#decodeUnsecured(String)}.
- * For every defense we assert either that it fires (when applicable to unsecured)
- * or that it does NOT fire (when explicitly skipped because the token is not
- * authenticated).
+ * Validates which defenses still run on {@link JWTDecoder#decodeUnsecured(String)}. For every defense we assert either
+ * that it fires (when applicable to unsecured) or that it does NOT fire (when explicitly skipped because the token is
+ * not authenticated).
  *
  * @author Daniel DeGroff
  */
@@ -53,6 +47,90 @@ public class DecodeUnsecuredTest {
   }
 
   // ---- defenses that DO run ----
+
+  @Test
+  public void base64UrlStrictness_fires() {
+    // Use case: base64url strictness still enforced under decodeUnsecured.
+    String header = b64("{\"alg\":\"none\"}") + "+";
+    String payload = b64("{\"sub\":\"abc\"}");
+    String token = header + "." + payload + ".";
+    try {
+      new JWTDecoder().decodeUnsecured(token);
+      fail("Expected InvalidJWTException for '+' in segment");
+    } catch (InvalidJWTException expected) {
+      // good
+    }
+  }
+
+  @Test
+  public void crit_doesNotRun() {
+    // Use case: crit understood-parameters check is NOT applied under decodeUnsecured
+    // (decodeUnsecured returns successfully even when crit lists an unknown name).
+    String header = b64("{\"alg\":\"none\",\"crit\":[\"unknown-ext\"],\"unknown-ext\":1}");
+    String payload = b64("{\"sub\":\"abc\"}");
+    String token = header + "." + payload + ".";
+
+    JWT jwt = new JWTDecoder().decodeUnsecured(token);
+    assertNotNull(jwt);
+  }
+
+  @Test
+  public void duplicateJsonKeys_defaultRejection_fires() {
+    // Use case: duplicate JSON keys rejected by default under decodeUnsecured.
+    String header = b64("{\"alg\":\"none\"}");
+    String payload = b64("{\"sub\":\"abc\",\"sub\":\"def\"}");
+    String token = header + "." + payload + ".";
+    try {
+      new JWTDecoder().decodeUnsecured(token);
+      fail("Expected JSONProcessingException for duplicate JSON key");
+    } catch (JSONProcessingException expected) {
+      // good
+    }
+  }
+
+  @Test
+  public void expectedAlgorithms_doesNotRun() {
+    // Use case: expectedAlgorithms whitelist is NOT applied under decodeUnsecured.
+    String header = b64("{\"alg\":\"none\"}");
+    String payload = b64("{\"sub\":\"abc\"}");
+    String token = header + "." + payload + ".";
+
+    JWTDecoder decoder = JWTDecoder.builder()
+                                   .expectedAlgorithms(new HashSet<>(Collections.singletonList(Algorithm.RS256)))
+                                   .build();
+    JWT jwt = decoder.decodeUnsecured(token);
+    assertNotNull(jwt);
+  }
+
+  @Test
+  public void expectedType_fires() {
+    // Use case: expectedType still enforced under decodeUnsecured.
+    String header = b64("{\"alg\":\"none\",\"typ\":\"JWT\"}");
+    String payload = b64("{\"sub\":\"abc\"}");
+    String token = header + "." + payload + ".";
+
+    JWTDecoder decoder = JWTDecoder.builder().expectedType("at+jwt").build();
+    try {
+      decoder.decodeUnsecured(token);
+      fail("Expected InvalidJWTException for typ mismatch");
+    } catch (InvalidJWTException expected) {
+      // good
+    }
+  }
+
+  @Test
+  public void headerShapeValidation_fires() {
+    // Use case: Header.fromMap shape validation still runs (e.g. crit not an array).
+    String header = b64("{\"alg\":\"none\",\"crit\":\"notAnArray\"}");
+    String payload = b64("{\"sub\":\"abc\"}");
+    String token = header + "." + payload + ".";
+    try {
+      new JWTDecoder().decodeUnsecured(token);
+      fail("Expected InvalidJWTException for malformed crit");
+    } catch (InvalidJWTException expected) {
+      // good
+    }
+  }
 
   @Test
   public void maxInputBytes_fires() {
@@ -70,59 +148,6 @@ public class DecodeUnsecuredTest {
     } catch (InvalidJWTException expected) {
       // good
     }
-  }
-
-  @Test
-  public void base64UrlStrictness_fires() {
-    // Use case: base64url strictness still enforced under decodeUnsecured.
-    String header = b64("{\"alg\":\"none\"}") + "+";
-    String payload = b64("{\"sub\":\"abc\"}");
-    String token = header + "." + payload + ".";
-    try {
-      new JWTDecoder().decodeUnsecured(token);
-      fail("Expected InvalidJWTException for '+' in segment");
-    } catch (InvalidJWTException expected) {
-      // good
-    }
-  }
-
-  @Test
-  public void segmentCount_twoSegments_missingSignature() {
-    // Use case: 3-segment split still enforced; 2-segment input -> MissingSignatureException.
-    String header = b64("{\"alg\":\"none\"}");
-    String payload = b64("{\"sub\":\"abc\"}");
-    String token = header + "." + payload;
-    try {
-      new JWTDecoder().decodeUnsecured(token);
-      fail("Expected MissingSignatureException for 2-segment input");
-    } catch (MissingSignatureException expected) {
-      // good
-    }
-  }
-
-  @Test
-  public void segmentCount_fourSegments_invalid() {
-    // Use case: 4+-segment input -> InvalidJWTException.
-    String header = b64("{\"alg\":\"none\"}");
-    String payload = b64("{\"sub\":\"abc\"}");
-    String token = header + "." + payload + ".s.x";
-    try {
-      new JWTDecoder().decodeUnsecured(token);
-      fail("Expected InvalidJWTException for 4-segment input");
-    } catch (InvalidJWTException expected) {
-      // good
-    }
-  }
-
-  @Test
-  public void segmentCount_emptyThirdSegment_accepted() {
-    // Use case: 3-segment "header.payload." (empty signature) is accepted.
-    String header = b64("{\"alg\":\"none\"}");
-    String payload = b64("{\"sub\":\"abc\"}");
-    String token = header + "." + payload + ".";
-    JWT jwt = new JWTDecoder().decodeUnsecured(token);
-    assertNotNull(jwt);
-    assertEquals(jwt.subject(), "abc");
   }
 
   @Test
@@ -165,50 +190,45 @@ public class DecodeUnsecuredTest {
   }
 
   @Test
-  public void duplicateJsonKeys_defaultRejection_fires() {
-    // Use case: duplicate JSON keys rejected by default under decodeUnsecured.
+  public void segmentCount_emptyThirdSegment_accepted() {
+    // Use case: 3-segment "header.payload." (empty signature) is accepted.
     String header = b64("{\"alg\":\"none\"}");
-    String payload = b64("{\"sub\":\"abc\",\"sub\":\"def\"}");
-    String token = header + "." + payload + ".";
-    try {
-      new JWTDecoder().decodeUnsecured(token);
-      fail("Expected JSONProcessingException for duplicate JSON key");
-    } catch (JSONProcessingException expected) {
-      // good
-    }
-  }
-
-  @Test
-  public void headerShapeValidation_fires() {
-    // Use case: Header.fromMap shape validation still runs (e.g. crit not an array).
-    String header = b64("{\"alg\":\"none\",\"crit\":\"notAnArray\"}");
     String payload = b64("{\"sub\":\"abc\"}");
     String token = header + "." + payload + ".";
-    try {
-      new JWTDecoder().decodeUnsecured(token);
-      fail("Expected InvalidJWTException for malformed crit");
-    } catch (InvalidJWTException expected) {
-      // good
-    }
-  }
-
-  @Test
-  public void expectedType_fires() {
-    // Use case: expectedType still enforced under decodeUnsecured.
-    String header = b64("{\"alg\":\"none\",\"typ\":\"JWT\"}");
-    String payload = b64("{\"sub\":\"abc\"}");
-    String token = header + "." + payload + ".";
-
-    JWTDecoder decoder = JWTDecoder.builder().expectedType("at+jwt").build();
-    try {
-      decoder.decodeUnsecured(token);
-      fail("Expected InvalidJWTException for typ mismatch");
-    } catch (InvalidJWTException expected) {
-      // good
-    }
+    JWT jwt = new JWTDecoder().decodeUnsecured(token);
+    assertNotNull(jwt);
+    assertEquals(jwt.subject(), "abc");
   }
 
   // ---- defenses that DO NOT run ----
+
+  @Test
+  public void segmentCount_fourSegments_invalid() {
+    // Use case: 4+-segment input -> InvalidJWTException.
+    String header = b64("{\"alg\":\"none\"}");
+    String payload = b64("{\"sub\":\"abc\"}");
+    String token = header + "." + payload + ".s.x";
+    try {
+      new JWTDecoder().decodeUnsecured(token);
+      fail("Expected InvalidJWTException for 4-segment input");
+    } catch (InvalidJWTException expected) {
+      // good
+    }
+  }
+
+  @Test
+  public void segmentCount_twoSegments_missingSignature() {
+    // Use case: 3-segment split still enforced; 2-segment input -> MissingSignatureException.
+    String header = b64("{\"alg\":\"none\"}");
+    String payload = b64("{\"sub\":\"abc\"}");
+    String token = header + "." + payload;
+    try {
+      new JWTDecoder().decodeUnsecured(token);
+      fail("Expected MissingSignatureException for 2-segment input");
+    } catch (MissingSignatureException expected) {
+      // good
+    }
+  }
 
   @Test
   public void signatureVerification_doesNotRun() {
@@ -221,32 +241,6 @@ public class DecodeUnsecuredTest {
     JWT decoded = new JWTDecoder().decodeUnsecured(tampered);
     assertNotNull(decoded);
     assertEquals(decoded.subject(), "abc");
-  }
-
-  @Test
-  public void expectedAlgorithms_doesNotRun() {
-    // Use case: expectedAlgorithms whitelist is NOT applied under decodeUnsecured.
-    String header = b64("{\"alg\":\"none\"}");
-    String payload = b64("{\"sub\":\"abc\"}");
-    String token = header + "." + payload + ".";
-
-    JWTDecoder decoder = JWTDecoder.builder()
-        .expectedAlgorithms(new HashSet<>(Collections.singletonList(Algorithm.RS256)))
-        .build();
-    JWT jwt = decoder.decodeUnsecured(token);
-    assertNotNull(jwt);
-  }
-
-  @Test
-  public void crit_doesNotRun() {
-    // Use case: crit understood-parameters check is NOT applied under decodeUnsecured
-    // (decodeUnsecured returns successfully even when crit lists an unknown name).
-    String header = b64("{\"alg\":\"none\",\"crit\":[\"unknown-ext\"],\"unknown-ext\":1}");
-    String payload = b64("{\"sub\":\"abc\"}");
-    String token = header + "." + payload + ".";
-
-    JWT jwt = new JWTDecoder().decodeUnsecured(token);
-    assertNotNull(jwt);
   }
 
   @Test

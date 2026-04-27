@@ -16,35 +16,17 @@
 
 package org.lattejava.jwt.internal.der;
 
-import org.testng.annotations.Test;
+import java.nio.*;
+import java.nio.charset.*;
 
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
+import org.testng.annotations.*;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.*;
 
 /**
  * @author Daniel DeGroff
  */
 public class DerOutputStreamTest {
-  @Test
-  public void writeValue_rawBytes() throws Exception {
-    // Use case: writeValue(byte[]) injects raw, already-DER-encoded bytes verbatim.
-    byte[] raw = new byte[]{0x02, 0x01, 0x05}; // INTEGER 5
-    DerOutputStream os = new DerOutputStream();
-    os.writeValue(raw);
-    assertEquals(os.toByteArray(), raw);
-  }
-
-  @Test
-  public void writeValue_zeroLength() throws Exception {
-    // Use case: zero-length value (NULL) writes as [tag, 0x00] with no body.
-    DerOutputStream os = new DerOutputStream();
-    os.writeValue(DerValue.newNull());
-    assertEquals(os.toByteArray(), new byte[]{0x05, 0x00});
-  }
-
   @Test
   public void long_binaryString() throws Exception {
     // Test each threshold to get 1, 2, 3, and 4 byte lengths
@@ -80,5 +62,22 @@ public class DerOutputStreamTest {
         assertEquals(ByteBuffer.wrap(new byte[]{output[2], output[3], output[4], output[5]}).getInt(), bytes.length, "For length length [" + length + "]");
       }
     }
+  }
+
+  @Test
+  public void writeValue_rawBytes() throws Exception {
+    // Use case: writeValue(byte[]) injects raw, already-DER-encoded bytes verbatim.
+    byte[] raw = new byte[]{0x02, 0x01, 0x05}; // INTEGER 5
+    DerOutputStream os = new DerOutputStream();
+    os.writeValue(raw);
+    assertEquals(os.toByteArray(), raw);
+  }
+
+  @Test
+  public void writeValue_zeroLength() throws Exception {
+    // Use case: zero-length value (NULL) writes as [tag, 0x00] with no body.
+    DerOutputStream os = new DerOutputStream();
+    os.writeValue(DerValue.newNull());
+    assertEquals(os.toByteArray(), new byte[]{0x05, 0x00});
   }
 }

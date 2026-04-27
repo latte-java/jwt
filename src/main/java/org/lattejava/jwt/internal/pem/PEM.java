@@ -16,12 +16,10 @@
 
 package org.lattejava.jwt.internal.pem;
 
-import java.nio.file.Path;
-import java.security.Key;
-import java.security.PrivateKey;
-import java.security.PublicKey;
+import java.nio.file.*;
+import java.security.*;
 import java.security.cert.Certificate;
-import java.util.Objects;
+import java.util.*;
 
 /**
  * @author Daniel DeGroff
@@ -134,7 +132,8 @@ public class PEM {
   /**
    * Encode a private key in PEM format given both the private and public key.
    * <p>
-   * The use of this method is only necessary if you are providing a private key that does not contain the encoded public key.
+   * The use of this method is only necessary if you are providing a private key that does not contain the encoded
+   * public key.
    *
    * @param privateKey a private key
    * @param publicKey  a public key

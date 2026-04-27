@@ -16,21 +16,14 @@
 
 package org.lattejava.jwt;
 
-import org.lattejava.jwt.jwks.JSONWebKey;
-import org.testng.Assert;
+import java.io.*;
+import java.nio.file.*;
+import java.util.*;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
+import org.lattejava.jwt.jwks.*;
+import org.testng.*;
 
-import static org.testng.Assert.fail;
+import static org.testng.Assert.*;
 
 /**
  * @author Daniel DeGroff
@@ -82,6 +75,21 @@ public abstract class BaseJWTTest extends BaseTest {
     return String.valueOf(value);
   }
 
+  /**
+   * LatteJSONProcessor only deals in {@link Map} structures. Convert the given test fixture object to a Map suitable
+   * for round-trip comparison.
+   */
+  @SuppressWarnings("unchecked")
+  private static Map<String, Object> toMap(Object object) {
+    if (object instanceof JSONWebKey) {
+      return new LinkedHashMap<>(((JSONWebKey) object).toSerializableMap());
+    }
+    if (object instanceof Map) {
+      return (Map<String, Object>) object;
+    }
+    throw new AssertionError("BaseJWTTest.assertJSONEquals does not know how to serialize " + object.getClass());
+  }
+
   protected void assertJSONEquals(Object object, String jsonFile) throws IOException {
     Map<String, Object> actual = toMap(object);
     Map<String, Object> expected = JSON.deserialize(Files.readAllBytes(Paths.get(jsonFile)));
@@ -94,21 +102,6 @@ public abstract class BaseJWTTest extends BaseTest {
       String expectedString = new String(JSON.serialize(expected));
       throw new AssertionError("The actual JSON doesn't match the expected JSON output. expected [" + expectedString + "] but found [" + actualString + "]");
     }
-  }
-
-  /**
-   * LatteJSONProcessor only deals in {@link Map} structures. Convert the given
-   * test fixture object to a Map suitable for round-trip comparison.
-   */
-  @SuppressWarnings("unchecked")
-  private static Map<String, Object> toMap(Object object) {
-    if (object instanceof JSONWebKey) {
-      return new LinkedHashMap<>(((JSONWebKey) object).toSerializableMap());
-    }
-    if (object instanceof Map) {
-      return (Map<String, Object>) object;
-    }
-    throw new AssertionError("BaseJWTTest.assertJSONEquals does not know how to serialize " + object.getClass());
   }
 
   protected void expectException(Class<? extends Exception> expected, ThrowingRunnable runnable) {

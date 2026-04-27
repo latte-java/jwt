@@ -16,15 +16,13 @@
 
 package org.lattejava.jwt;
 
-import com.sun.net.httpserver.HttpServer;
-import org.bouncycastle.jcajce.provider.BouncyCastleFipsProvider;
-import org.testng.ITestResult;
-import org.testng.annotations.AfterMethod;
-import org.testng.annotations.BeforeSuite;
+import java.security.*;
+import java.util.*;
 
-import java.security.Security;
-import java.util.ArrayList;
-import java.util.List;
+import com.sun.net.httpserver.*;
+import org.bouncycastle.jcajce.provider.*;
+import org.testng.*;
+import org.testng.annotations.*;
 
 /**
  * @author Daniel DeGroff
@@ -35,6 +33,16 @@ public abstract class BaseTest {
   public List<BuilderHTTPHandler> httpHandlers = new ArrayList<>();
 
   public List<HttpServer> httpServers = new ArrayList<>();
+
+  @AfterMethod
+  public void afterMethod(ITestResult result) {
+    for (HttpServer httpServer : httpServers) {
+      try {
+        httpServer.stop(0);
+      } catch (Exception ignore) {
+      }
+    }
+  }
 
   @BeforeSuite
   public void beforeSuite() {
@@ -49,25 +57,15 @@ public abstract class BaseTest {
         Security.getProviders()[0].getClass().getCanonicalName());
   }
 
-  @AfterMethod
-  public void afterMethod(ITestResult result) {
-    for (HttpServer httpServer : httpServers) {
-      try {
-        httpServer.stop(0);
-      } catch (Exception ignore) {
-      }
-    }
+  public void startHttpServer(HttpServerBuilder builder) {
+    httpServers.add(builder.build());
+    httpHandlers.add(builder.handler);
   }
 
   protected void startHttpServer(ThrowingConsumer<HttpServerBuilder> consumer) throws Exception {
     HttpServerBuilder builder = new HttpServerBuilder();
     consumer.accept(builder);
     startHttpServer(builder);
-  }
-
-  public void startHttpServer(HttpServerBuilder builder) {
-    httpServers.add(builder.build());
-    httpHandlers.add(builder.handler);
   }
 
   public interface ThrowingConsumer<T> {

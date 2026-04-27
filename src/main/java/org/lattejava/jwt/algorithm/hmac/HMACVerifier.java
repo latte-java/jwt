@@ -16,42 +16,31 @@
 
 package org.lattejava.jwt.algorithm.hmac;
 
-import org.lattejava.jwt.Algorithm;
-import org.lattejava.jwt.InvalidJWTSignatureException;
-import org.lattejava.jwt.JWTVerifierException;
-import org.lattejava.jwt.Verifier;
+import java.io.*;
+import java.nio.charset.*;
+import java.nio.file.*;
+import java.security.*;
+import java.util.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.security.InvalidKeyException;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.Objects;
+import org.lattejava.jwt.*;
 
 /**
- * HMAC-based {@link Verifier} for the {@code HS256} / {@code HS384} /
- * {@code HS512} JWA algorithms (RFC 7518 §3.2).
+ * HMAC-based {@link Verifier} for the {@code HS256} / {@code HS384} / {@code HS512} JWA algorithms (RFC 7518 §3.2).
  *
  * <p>Each instance is bound to a single JWA algorithm at construction time;
- * {@link #canVerify(Algorithm)} returns true only for that exact algorithm.
- * Binding at construction prevents algorithm-confusion attacks where a
- * tampered header {@code alg} could coax a family-accepting verifier into
- * using a weaker hash than the caller intended (RFC 8725 §3.1).</p>
+ * {@link #canVerify(Algorithm)} returns true only for that exact algorithm. Binding at construction prevents
+ * algorithm-confusion attacks where a tampered header {@code alg} could coax a family-accepting verifier into using a
+ * weaker hash than the caller intended (RFC 8725 §3.1).</p>
  *
  * <p>Signature comparison uses
- * {@link MessageDigest#isEqual(byte[], byte[])} -- documented as
- * constant-time since JDK 7u40 (JDK-8006276) -- to avoid leaking the
- * valid MAC via comparison-timing side channels.</p>
+ * {@link MessageDigest#isEqual(byte[], byte[])} -- documented as constant-time since JDK 7u40 (JDK-8006276) -- to avoid
+ * leaking the valid MAC via comparison-timing side channels.</p>
  *
  * <p>The JCA algorithm name and {@link SecretKeySpec} are cached at
- * construction so {@link #verify(byte[], byte[])} skips the per-call
- * allocation and the redundant defensive copy of the secret. Each call
- * still obtains a fresh {@link Mac} instance ({@link Mac} is not
- * thread-safe).</p>
+ * construction so {@link #verify(byte[], byte[])} skips the per-call allocation and the redundant defensive copy of the
+ * secret. Each call still obtains a fresh {@link Mac} instance ({@link Mac} is not thread-safe).</p>
  *
  * @author Daniel DeGroff
  */
@@ -92,6 +81,15 @@ public class HMACVerifier implements Verifier {
     }
   }
 
+  private static void requireHMAC(Algorithm algorithm) {
+    switch (algorithm.name()) {
+      case "HS256", "HS384", "HS512" -> {
+      }
+      default -> throw new IllegalArgumentException(
+          "Expected HMAC algorithm but found [" + algorithm.name() + "]");
+    }
+  }
+
   @Override
   public boolean canVerify(Algorithm algorithm) {
     return algorithm != null && this.algorithm.name().equals(algorithm.name());
@@ -111,15 +109,6 @@ public class HMACVerifier implements Verifier {
       }
     } catch (InvalidKeyException | NoSuchAlgorithmException e) {
       throw new JWTVerifierException("An unexpected exception occurred when attempting to verify the JWT", e);
-    }
-  }
-
-  private static void requireHMAC(Algorithm algorithm) {
-    switch (algorithm.name()) {
-      case "HS256", "HS384", "HS512" -> {
-      }
-      default -> throw new IllegalArgumentException(
-          "Expected HMAC algorithm but found [" + algorithm.name() + "]");
     }
   }
 }

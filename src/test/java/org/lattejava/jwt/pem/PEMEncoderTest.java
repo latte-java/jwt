@@ -16,89 +16,32 @@
 
 package org.lattejava.jwt.pem;
 
-import org.lattejava.jwt.BaseTest;
-import org.lattejava.jwt.internal.pem.PEM;
-import org.testng.annotations.Test;
-
-import java.math.BigInteger;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.security.Key;
+import java.math.*;
+import java.nio.file.*;
+import java.security.*;
 import java.security.KeyPair;
-import java.security.KeyPairGenerator;
-import java.security.interfaces.ECPublicKey;
-import java.security.interfaces.RSAPublicKey;
+import java.security.interfaces.*;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
+import org.lattejava.jwt.*;
+import org.lattejava.jwt.internal.pem.*;
+import org.testng.annotations.*;
+
+import static org.testng.Assert.*;
 
 /**
  * Note that the higher invocationCount parameters are helpful to indentify incorrect assumptions in key parsing.
  * <p>
- * Key lengths can differ, and when encoding larger integers in DER encode sequences, or parsing them in and out of
- * JWK formats, we want to be certain we are not making incorrect assumptions. During development, you may wish to
- * run some of these with 5-10k invocation counts to ensure these types of anomalies are un-covered and addressed.
+ * Key lengths can differ, and when encoding larger integers in DER encode sequences, or parsing them in and out of JWK
+ * formats, we want to be certain we are not making incorrect assumptions. During development, you may wish to run some
+ * of these with 5-10k invocation counts to ensure these types of anomalies are un-covered and addressed.
  * <p>
- * It may be reasonable to reduce the invocation counts if tests take too long to run - once we know that the tests
- * will pass with a high number of invocations. However, the time is not yet that significant, and there is value to
- * ensuring that the same result can be expected regardless of the number of times we run the same test.
+ * It may be reasonable to reduce the invocation counts if tests take too long to run - once we know that the tests will
+ * pass with a high number of invocations. However, the time is not yet that significant, and there is value to ensuring
+ * that the same result can be expected regardless of the number of times we run the same test.
  *
  * @author Daniel DeGroff
  */
 public class PEMEncoderTest extends BaseTest {
-  @Test
-  public void eddsa() throws Exception {
-    String privateKeyPEM = new String(Files.readAllBytes(Paths.get("src/test/resources/ed_dsa_ed25519_private_key.pem"))).trim();
-    String publicKeyPEM = new String(Files.readAllBytes(Paths.get("src/test/resources/ed_dsa_ed25519_public_key.pem"))).trim();
-
-    PEM pem = PEM.decode(privateKeyPEM);
-    String extractedPublicKeyPEM = PEM.encode(pem.publicKey);
-    assertEquals(publicKeyPEM, extractedPublicKeyPEM);
-
-    // The key is already in the correct format, and we don't recombine them. So the result should be equal to the private key.
-    String pkcs8PEM = PEM.encode(pem.getPrivateKey(), pem.getPublicKey());
-    assertEquals(privateKeyPEM, pkcs8PEM);
-
-    // Key generation and PEM Encoding
-    KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("Ed25519");
-    KeyPair keyPair = keyPairGenerator.generateKeyPair();
-
-    String encodedPublicKey = PEM.encode(keyPair.getPublic());
-    assertNotNull(encodedPublicKey);
-    assertTrue(encodedPublicKey.startsWith(PEM.X509_PUBLIC_KEY_PREFIX));
-    assertTrue(encodedPublicKey.endsWith(PEM.X509_PUBLIC_KEY_SUFFIX));
-
-    String encodedPrivateKey = PEM.encode(keyPair.getPrivate());
-    assertNotNull(encodedPrivateKey);
-    assertTrue(encodedPrivateKey.startsWith(PEM.PKCS_8_PRIVATE_KEY_PREFIX));
-    assertTrue(encodedPrivateKey.endsWith(PEM.PKCS_8_PRIVATE_KEY_SUFFIX));
-
-    // The public key can always be derived from the private key, so expect them both to be returned.
-    PEM pem2 = PEM.decode(encodedPrivateKey);
-    assertNotNull(pem2.getPrivateKey());
-    assertEquals(pem2.getPrivateKey().getFormat(), "PKCS#8");
-    assertEquals(pem2.getPrivateKey().getAlgorithm(), FipsEnabled ? "Ed25519" : "EdDSA");
-    assertNotNull(pem2.getPublicKey());
-    assertEquals(pem2.getPublicKey().getFormat(), "X.509");
-    assertEquals(pem2.getPublicKey().getAlgorithm(), FipsEnabled ? "Ed25519" : "EdDSA");
-
-    // Try again, but provide both keys to encode into the PEM. The PEM won't include the public key, but it can always be derived.
-    String encodedPrivateKey2 = PEM.encode(keyPair.getPrivate(), keyPair.getPublic());
-    assertNotNull(encodedPrivateKey2);
-    PEM pem3 = PEM.decode(encodedPrivateKey2);
-    // They will be the same, we didn't repackage it.
-    assertEquals(encodedPrivateKey, encodedPrivateKey2);
-    assertNotNull(pem3.getPrivateKey());
-    assertEquals(pem3.getPrivateKey().getFormat(), "PKCS#8");
-    assertEquals(pem3.getPrivateKey().getAlgorithm(), FipsEnabled ? "Ed25519" : "EdDSA");
-    assertNotNull(pem3.getPublicKey());
-    assertEquals(pem3.getPublicKey().getFormat(), "X.509");
-    assertEquals(pem3.getPublicKey().getAlgorithm(), FipsEnabled ? "Ed25519" : "EdDSA");
-  }
-
   @Test(invocationCount = 1_000)
   public void ec() throws Exception {
     KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("EC");
@@ -154,6 +97,56 @@ public class PEMEncoderTest extends BaseTest {
     // Re-encode the public key to PEM X.509 format and ensure it equals the original
     String encodedPublicKey = PEM.encode((Key) pem.getPublicKey());
     assertEquals(encodedPublicKey, expectedPublic);
+  }
+
+  @Test
+  public void eddsa() throws Exception {
+    String privateKeyPEM = new String(Files.readAllBytes(Paths.get("src/test/resources/ed_dsa_ed25519_private_key.pem"))).trim();
+    String publicKeyPEM = new String(Files.readAllBytes(Paths.get("src/test/resources/ed_dsa_ed25519_public_key.pem"))).trim();
+
+    PEM pem = PEM.decode(privateKeyPEM);
+    String extractedPublicKeyPEM = PEM.encode(pem.publicKey);
+    assertEquals(publicKeyPEM, extractedPublicKeyPEM);
+
+    // The key is already in the correct format, and we don't recombine them. So the result should be equal to the private key.
+    String pkcs8PEM = PEM.encode(pem.getPrivateKey(), pem.getPublicKey());
+    assertEquals(privateKeyPEM, pkcs8PEM);
+
+    // Key generation and PEM Encoding
+    KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("Ed25519");
+    KeyPair keyPair = keyPairGenerator.generateKeyPair();
+
+    String encodedPublicKey = PEM.encode(keyPair.getPublic());
+    assertNotNull(encodedPublicKey);
+    assertTrue(encodedPublicKey.startsWith(PEM.X509_PUBLIC_KEY_PREFIX));
+    assertTrue(encodedPublicKey.endsWith(PEM.X509_PUBLIC_KEY_SUFFIX));
+
+    String encodedPrivateKey = PEM.encode(keyPair.getPrivate());
+    assertNotNull(encodedPrivateKey);
+    assertTrue(encodedPrivateKey.startsWith(PEM.PKCS_8_PRIVATE_KEY_PREFIX));
+    assertTrue(encodedPrivateKey.endsWith(PEM.PKCS_8_PRIVATE_KEY_SUFFIX));
+
+    // The public key can always be derived from the private key, so expect them both to be returned.
+    PEM pem2 = PEM.decode(encodedPrivateKey);
+    assertNotNull(pem2.getPrivateKey());
+    assertEquals(pem2.getPrivateKey().getFormat(), "PKCS#8");
+    assertEquals(pem2.getPrivateKey().getAlgorithm(), FipsEnabled ? "Ed25519" : "EdDSA");
+    assertNotNull(pem2.getPublicKey());
+    assertEquals(pem2.getPublicKey().getFormat(), "X.509");
+    assertEquals(pem2.getPublicKey().getAlgorithm(), FipsEnabled ? "Ed25519" : "EdDSA");
+
+    // Try again, but provide both keys to encode into the PEM. The PEM won't include the public key, but it can always be derived.
+    String encodedPrivateKey2 = PEM.encode(keyPair.getPrivate(), keyPair.getPublic());
+    assertNotNull(encodedPrivateKey2);
+    PEM pem3 = PEM.decode(encodedPrivateKey2);
+    // They will be the same, we didn't repackage it.
+    assertEquals(encodedPrivateKey, encodedPrivateKey2);
+    assertNotNull(pem3.getPrivateKey());
+    assertEquals(pem3.getPrivateKey().getFormat(), "PKCS#8");
+    assertEquals(pem3.getPrivateKey().getAlgorithm(), FipsEnabled ? "Ed25519" : "EdDSA");
+    assertNotNull(pem3.getPublicKey());
+    assertEquals(pem3.getPublicKey().getFormat(), "X.509");
+    assertEquals(pem3.getPublicKey().getAlgorithm(), FipsEnabled ? "Ed25519" : "EdDSA");
   }
 
   @Test(invocationCount = 100)

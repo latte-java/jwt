@@ -16,24 +16,13 @@
 
 package org.lattejava.jwt.algorithm.ed;
 
-import org.lattejava.jwt.BaseJWTTest;
-import org.lattejava.jwt.MissingVerifierException;
-import org.lattejava.jwt.Signer;
-import org.lattejava.jwt.Verifier;
-import org.lattejava.jwt.VerifierResolver;
-import org.lattejava.jwt.JWT;
-import org.lattejava.jwt.JWTDecoder;
-import org.lattejava.jwt.JWTEncoder;
-import org.lattejava.jwt.internal.pem.PEM;
-import org.testng.annotations.Test;
+import java.nio.file.*;
 
-import java.nio.file.Files;
-import java.nio.file.Paths;
+import org.lattejava.jwt.*;
+import org.lattejava.jwt.internal.pem.*;
+import org.testng.annotations.*;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
+import static org.testng.Assert.*;
 
 /**
  * @author Daniel DeGroff

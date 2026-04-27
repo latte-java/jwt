@@ -16,35 +16,19 @@
 
 package org.lattejava.jwt.algorithm;
 
-import org.lattejava.jwt.Algorithm;
-import org.lattejava.jwt.Signer;
-import org.lattejava.jwt.Verifier;
-import org.lattejava.jwt.VerifierResolver;
-import org.lattejava.jwt.JWT;
-import org.lattejava.jwt.JWTDecoder;
-import org.lattejava.jwt.JWTEncoder;
-import org.lattejava.jwt.algorithm.ec.ECSigner;
-import org.lattejava.jwt.algorithm.ec.ECVerifier;
-import org.lattejava.jwt.algorithm.ed.EdDSASigner;
-import org.lattejava.jwt.algorithm.ed.EdDSAVerifier;
-import org.lattejava.jwt.algorithm.hmac.HMACSigner;
-import org.lattejava.jwt.algorithm.hmac.HMACVerifier;
-import org.lattejava.jwt.algorithm.rsa.RSAPSSSigner;
-import org.lattejava.jwt.algorithm.rsa.RSAPSSVerifier;
-import org.lattejava.jwt.algorithm.rsa.RSASigner;
-import org.lattejava.jwt.algorithm.rsa.RSAVerifier;
-import org.testng.annotations.Test;
-import org.testng.internal.collections.Pair;
+import java.io.*;
+import java.nio.file.*;
+import java.util.*;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
+import org.lattejava.jwt.*;
+import org.lattejava.jwt.algorithm.ec.*;
+import org.lattejava.jwt.algorithm.ed.*;
+import org.lattejava.jwt.algorithm.hmac.*;
+import org.lattejava.jwt.algorithm.rsa.*;
+import org.testng.annotations.*;
+import org.testng.internal.collections.*;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.fail;
+import static org.testng.Assert.*;
 
 /**
  * @author Daniel DeGroff

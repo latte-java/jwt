@@ -16,35 +16,29 @@
 
 package org.lattejava.jwt.internal.der;
 
-import java.io.IOException;
-import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
-import java.time.Instant;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
-import java.util.Arrays;
-import java.util.Objects;
+import java.io.*;
+import java.math.*;
+import java.nio.charset.*;
+import java.time.*;
+import java.time.format.*;
+import java.util.*;
 
 /**
  * @author Daniel DeGroff
  */
 public class DerValue {
   /**
-   * Year boundary at which UTCTime gives way to GeneralizedTime per RFC 5280 §4.1.2.5.
-   * Dates strictly before 2050-01-01T00:00:00Z encode as UTCTime (2-digit year);
-   * dates on or after that instant encode as GeneralizedTime (4-digit year).
+   * Year boundary at which UTCTime gives way to GeneralizedTime per RFC 5280 §4.1.2.5. Dates strictly before
+   * 2050-01-01T00:00:00Z encode as UTCTime (2-digit year); dates on or after that instant encode as GeneralizedTime
+   * (4-digit year).
    */
   public static final Instant TIME_ENCODING_BOUNDARY = Instant.parse("2050-01-01T00:00:00Z");
-
-  private static final DateTimeFormatter UTC_TIME_FORMATTER =
-      DateTimeFormatter.ofPattern("yyMMddHHmmss'Z'").withZone(ZoneOffset.UTC);
-
   private static final DateTimeFormatter GENERALIZED_TIME_FORMATTER =
       DateTimeFormatter.ofPattern("yyyyMMddHHmmss'Z'").withZone(ZoneOffset.UTC);
-
-  private final DerInputStream value;
-
+  private static final DateTimeFormatter UTC_TIME_FORMATTER =
+      DateTimeFormatter.ofPattern("yyMMddHHmmss'Z'").withZone(ZoneOffset.UTC);
   public final Tag tag;
+  private final DerInputStream value;
 
   public DerValue(Tag tag, byte[] value) {
     this.tag = tag;
@@ -72,8 +66,20 @@ public class DerValue {
   }
 
   /**
-   * Create a BIT STRING DerValue. The DER encoding for BIT STRING prepends a single
-   * &quot;number of unused bits&quot; byte; for raw byte content this is always
+   * Create a PrintableString DerValue. The caller is responsible for ensuring the input is restricted to the
+   * PrintableString alphabet (RFC 5280 §4.1.2.4).
+   *
+   * @param s the string to encode
+   * @return a {@code DerValue} carrying tag {@link Tag#PrintableString}
+   */
+  public static DerValue newASCIIString(String s) {
+    Objects.requireNonNull(s, "s");
+    return new DerValue(Tag.PrintableString, s.getBytes(StandardCharsets.US_ASCII));
+  }
+
+  /**
+   * Create a BIT STRING DerValue. The DER encoding for BIT STRING prepends a single &quot;number of unused bits&quot;
+   * byte; for raw byte content this is always
    * <code>0x00</code> (every bit is significant).
    *
    * @param bytes the raw bit-string content (without the leading unused-bits byte)
@@ -88,20 +94,7 @@ public class DerValue {
   }
 
   /**
-   * Create a UTCTime DerValue (2-digit year, valid 1950-2049 per X.690 §11.8).
-   *
-   * @param instant the UTC instant
-   * @return a {@code DerValue} carrying tag {@link Tag#UTCTime}
-   */
-  public static DerValue newUTCTime(Instant instant) {
-    Objects.requireNonNull(instant, "instant");
-    String formatted = UTC_TIME_FORMATTER.format(instant);
-    return new DerValue(Tag.UTCTime, formatted.getBytes(StandardCharsets.US_ASCII));
-  }
-
-  /**
-   * Create a GeneralizedTime DerValue (4-digit year). Per RFC 5280, used for dates
-   * &gt;= 2050-01-01.
+   * Create a GeneralizedTime DerValue (4-digit year). Per RFC 5280, used for dates &gt;= 2050-01-01.
    *
    * @param instant the UTC instant
    * @return a {@code DerValue} carrying tag {@link Tag#GeneralizedTime}
@@ -122,15 +115,15 @@ public class DerValue {
   }
 
   /**
-   * Create a PrintableString DerValue. The caller is responsible for ensuring the
-   * input is restricted to the PrintableString alphabet (RFC 5280 §4.1.2.4).
+   * Create a UTCTime DerValue (2-digit year, valid 1950-2049 per X.690 §11.8).
    *
-   * @param s the string to encode
-   * @return a {@code DerValue} carrying tag {@link Tag#PrintableString}
+   * @param instant the UTC instant
+   * @return a {@code DerValue} carrying tag {@link Tag#UTCTime}
    */
-  public static DerValue newASCIIString(String s) {
-    Objects.requireNonNull(s, "s");
-    return new DerValue(Tag.PrintableString, s.getBytes(StandardCharsets.US_ASCII));
+  public static DerValue newUTCTime(Instant instant) {
+    Objects.requireNonNull(instant, "instant");
+    String formatted = UTC_TIME_FORMATTER.format(instant);
+    return new DerValue(Tag.UTCTime, formatted.getBytes(StandardCharsets.US_ASCII));
   }
 
   /**
@@ -184,12 +177,11 @@ public class DerValue {
   }
 
   /**
-   * Read the BIT STRING content as raw bytes, stripping the leading
-   * &quot;number of unused bits&quot; pad byte. Caller must ensure the bit string
-   * encodes whole bytes only (the pad byte must be 0).
+   * Read the BIT STRING content as raw bytes, stripping the leading &quot;number of unused bits&quot; pad byte. Caller
+   * must ensure the bit string encodes whole bytes only (the pad byte must be 0).
    *
    * @return the raw bytes (without pad byte)
-   * @throws IllegalStateException if this DerValue is not a BIT STRING
+   * @throws IllegalStateException    if this DerValue is not a BIT STRING
    * @throws IllegalArgumentException if the leading pad byte is non-zero
    */
   public byte[] getBitStringBytes() {

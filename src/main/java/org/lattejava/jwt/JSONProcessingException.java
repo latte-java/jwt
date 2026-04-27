@@ -24,9 +24,8 @@
 package org.lattejava.jwt;
 
 /**
- * Thrown by {@link JSONProcessor} implementations when JSON serialization
- * or deserialization fails. The {@code JSONProcessor} interface itself
- * declares this in its {@code throws} clause for documentation; the
+ * Thrown by {@link JSONProcessor} implementations when JSON serialization or deserialization fails. The
+ * {@code JSONProcessor} interface itself declares this in its {@code throws} clause for documentation; the
  * encoder/decoder catch and propagate these directly.
  *
  * @author Daniel DeGroff

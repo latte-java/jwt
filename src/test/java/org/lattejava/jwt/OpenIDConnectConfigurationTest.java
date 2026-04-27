@@ -23,17 +23,11 @@
 
 package org.lattejava.jwt;
 
-import org.testng.annotations.Test;
+import java.util.*;
 
-import java.util.List;
-import java.util.Map;
+import org.testng.annotations.*;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertThrows;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 public class OpenIDConnectConfigurationTest extends BaseTest {
   @Test
@@ -41,8 +35,8 @@ public class OpenIDConnectConfigurationTest extends BaseTest {
     // Use case: mutating a list passed to a setter after build() must not affect the built instance.
     java.util.List<String> scopes = new java.util.ArrayList<>(List.of("openid"));
     OpenIDConnectConfiguration.Builder b = OpenIDConnectConfiguration.builder()
-        .issuer("a")
-        .scopesSupported(scopes);
+                                                                     .issuer("a")
+                                                                     .scopesSupported(scopes);
     OpenIDConnectConfiguration first = b.build();
     scopes.add("profile");  // mutate the original list AFTER build()
     OpenIDConnectConfiguration second = b.issuer("b").build();
@@ -69,7 +63,7 @@ public class OpenIDConnectConfigurationTest extends BaseTest {
     OpenIDConnectConfiguration c = OpenIDConnectConfiguration.builder().issuer("y").build();
     assertEquals(a, b);
     assertEquals(a.hashCode(), b.hashCode());
-    assertFalse(a.equals(c));
+    assertNotEquals(c, a);
   }
 
   @Test
@@ -125,8 +119,8 @@ public class OpenIDConnectConfigurationTest extends BaseTest {
   public void list_accessors_return_unmodifiable_views() {
     // Use case: callers cannot mutate list-typed fields through the accessor
     OpenIDConnectConfiguration cfg = OpenIDConnectConfiguration.builder()
-        .scopesSupported(List.of("openid", "profile"))
-        .build();
+                                                               .scopesSupported(List.of("openid", "profile"))
+                                                               .build();
     assertThrows(UnsupportedOperationException.class, () -> cfg.scopesSupported().add("email"));
   }
 
@@ -134,8 +128,8 @@ public class OpenIDConnectConfigurationTest extends BaseTest {
   public void otherClaims_returns_unmodifiable_view() {
     // Use case: callers cannot mutate the otherClaims map through the accessor
     OpenIDConnectConfiguration cfg = OpenIDConnectConfiguration.builder()
-        .claim("mfa_challenge_endpoint", "https://example.com/mfa")
-        .build();
+                                                               .claim("mfa_challenge_endpoint", "https://example.com/mfa")
+                                                               .build();
     assertThrows(UnsupportedOperationException.class, () -> cfg.otherClaims().put("x", "y"));
   }
 
@@ -143,12 +137,12 @@ public class OpenIDConnectConfigurationTest extends BaseTest {
   public void toJSON_round_trip_via_LatteJSONProcessor() throws Exception {
     // Use case: toJSON produces valid JSON that round-trips through LatteJSONProcessor with correct wire names
     OpenIDConnectConfiguration cfg = OpenIDConnectConfiguration.builder()
-        .issuer("https://example.com")
-        .jwksURI("https://example.com/.well-known/jwks.json")
-        .responseTypesSupported(List.of("code", "id_token"))
-        .requireRequestURIRegistration(true)
-        .claim("mfa_challenge_endpoint", "https://example.com/mfa")
-        .build();
+                                                               .issuer("https://example.com")
+                                                               .jwksURI("https://example.com/.well-known/jwks.json")
+                                                               .responseTypesSupported(List.of("code", "id_token"))
+                                                               .requireRequestURIRegistration(true)
+                                                               .claim("mfa_challenge_endpoint", "https://example.com/mfa")
+                                                               .build();
     String json = cfg.toJSON();
     Map<String, Object> reparsed = new LatteJSONProcessor().deserialize(json.getBytes());
     assertEquals(reparsed.get("issuer"), "https://example.com");
@@ -162,9 +156,9 @@ public class OpenIDConnectConfigurationTest extends BaseTest {
   public void toSerializableMap_flattens_otherClaims_to_top_level() {
     // Use case: otherClaims entries appear at the top level of the serializable map alongside typed fields
     OpenIDConnectConfiguration cfg = OpenIDConnectConfiguration.builder()
-        .issuer("x")
-        .claim("vendor_extension", 42)
-        .build();
+                                                               .issuer("x")
+                                                               .claim("vendor_extension", 42)
+                                                               .build();
     Map<String, Object> map = cfg.toSerializableMap();
     assertEquals(map.get("issuer"), "x");
     assertEquals(map.get("vendor_extension"), 42);
@@ -191,30 +185,30 @@ public class OpenIDConnectConfigurationTest extends BaseTest {
   public void typed_accessors_round_trip_through_builder() {
     // Use case: every typed accessor returns the value set on the builder
     OpenIDConnectConfiguration cfg = OpenIDConnectConfiguration.builder()
-        .acrValuesSupported(List.of("0"))
-        .authorizationEndpoint("https://example.com/auth")
-        .claimsSupported(List.of("sub"))
-        .codeChallengeMethodsSupported(List.of("S256"))
-        .endSessionEndpoint("https://example.com/logout")
-        .grantTypesSupported(List.of("authorization_code"))
-        .idTokenSigningAlgValuesSupported(List.of("RS256"))
-        .introspectionEndpoint("https://example.com/introspect")
-        .issuer("https://example.com")
-        .jwksURI("https://example.com/jwks")
-        .registrationEndpoint("https://example.com/register")
-        .requestParameterSupported(false)
-        .requestURIParameterSupported(true)
-        .requireRequestURIRegistration(false)
-        .responseModesSupported(List.of("query"))
-        .responseTypesSupported(List.of("code"))
-        .revocationEndpoint("https://example.com/revoke")
-        .scopesSupported(List.of("openid"))
-        .subjectTypesSupported(List.of("public"))
-        .tokenEndpoint("https://example.com/token")
-        .tokenEndpointAuthMethodsSupported(List.of("client_secret_basic"))
-        .tokenEndpointAuthSigningAlgValuesSupported(List.of("RS256"))
-        .userinfoEndpoint("https://example.com/userinfo")
-        .build();
+                                                               .acrValuesSupported(List.of("0"))
+                                                               .authorizationEndpoint("https://example.com/auth")
+                                                               .claimsSupported(List.of("sub"))
+                                                               .codeChallengeMethodsSupported(List.of("S256"))
+                                                               .endSessionEndpoint("https://example.com/logout")
+                                                               .grantTypesSupported(List.of("authorization_code"))
+                                                               .idTokenSigningAlgValuesSupported(List.of("RS256"))
+                                                               .introspectionEndpoint("https://example.com/introspect")
+                                                               .issuer("https://example.com")
+                                                               .jwksURI("https://example.com/jwks")
+                                                               .registrationEndpoint("https://example.com/register")
+                                                               .requestParameterSupported(false)
+                                                               .requestURIParameterSupported(true)
+                                                               .requireRequestURIRegistration(false)
+                                                               .responseModesSupported(List.of("query"))
+                                                               .responseTypesSupported(List.of("code"))
+                                                               .revocationEndpoint("https://example.com/revoke")
+                                                               .scopesSupported(List.of("openid"))
+                                                               .subjectTypesSupported(List.of("public"))
+                                                               .tokenEndpoint("https://example.com/token")
+                                                               .tokenEndpointAuthMethodsSupported(List.of("client_secret_basic"))
+                                                               .tokenEndpointAuthSigningAlgValuesSupported(List.of("RS256"))
+                                                               .userinfoEndpoint("https://example.com/userinfo")
+                                                               .build();
     assertEquals(cfg.acrValuesSupported(), List.of("0"));
     assertEquals(cfg.authorizationEndpoint(), "https://example.com/auth");
     assertEquals(cfg.claimsSupported(), List.of("sub"));

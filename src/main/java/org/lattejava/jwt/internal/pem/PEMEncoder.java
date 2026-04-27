@@ -16,29 +16,18 @@
 
 package org.lattejava.jwt.internal.pem;
 
-import org.lattejava.jwt.PEMEncoderException;
-import org.lattejava.jwt.internal.der.DerInputStream;
-import org.lattejava.jwt.internal.der.DerOutputStream;
-import org.lattejava.jwt.internal.der.DerValue;
-import org.lattejava.jwt.internal.der.ObjectIdentifier;
-import org.lattejava.jwt.internal.der.Tag;
-
-import java.io.IOException;
-import java.math.BigInteger;
-import java.security.InvalidParameterException;
-import java.security.Key;
-import java.security.PrivateKey;
-import java.security.PublicKey;
+import java.io.*;
+import java.math.*;
+import java.security.*;
+import java.security.cert.*;
 import java.security.cert.Certificate;
-import java.security.cert.CertificateEncodingException;
-import java.security.interfaces.ECPrivateKey;
-import java.util.ArrayList;
-import java.util.Base64;
-import java.util.List;
-import java.util.Objects;
+import java.security.interfaces.*;
+import java.util.*;
 
-import static org.lattejava.jwt.internal.pem.PEM.X509_CERTIFICATE_PREFIX;
-import static org.lattejava.jwt.internal.pem.PEM.X509_CERTIFICATE_SUFFIX;
+import org.lattejava.jwt.*;
+import org.lattejava.jwt.internal.der.*;
+
+import static org.lattejava.jwt.internal.pem.PEM.*;
 
 /**
  * Encode a <code>PrivateKey</code> or <code>PublicKey</code> into a PEM formatted string.
@@ -48,44 +37,12 @@ import static org.lattejava.jwt.internal.pem.PEM.X509_CERTIFICATE_SUFFIX;
 public class PEMEncoder {
   private static final Base64.Encoder Base64_MIME_Encoder = Base64.getMimeEncoder(64, new byte[]{'\n'});
 
-  private String removeLineReturns(String str) {
-    if (str == null) {
-      return null;
-    }
-
-    return str.replaceAll("\\r\\n|\\r|\\n", "");
-  }
-
   /**
-   * Attempt to covert a ASN.1 DER encoded X.509 certificate into a PEM encoded string.
-   *
-   * @param derEncoded base64 ASN.1 DER encoded bytes of an X.509 certificate
-   * @return a PEM encoded certificate
-   */
-  public String parseEncodedCertificate(String derEncoded) {
-    return PEM.X509_CERTIFICATE_PREFIX + "\n" + chopIt(derEncoded) + "\n" + PEM.X509_CERTIFICATE_SUFFIX;
-  }
-
-  private String chopIt(String s) {
-    List<String> lines = new ArrayList<>();
-
-    // The incoming string may or may not contain line returns, normalize first and then re-encode to 64 characters wide
-    String normalized = removeLineReturns(s);
-
-    for (int i = 0; i < normalized.length(); ) {
-      lines.add(normalized.substring(i, Math.min(i + 64, normalized.length())));
-      i = i + 64;
-    }
-
-    return String.join("\n", lines);
-  }
-
-  /**
-   * Encode the provided keys in a PEM format and return a string. If both private and public keys are provided a private
-   * key PEM will be returned with the public key embedded.
+   * Encode the provided keys in a PEM format and return a string. If both private and public keys are provided a
+   * private key PEM will be returned with the public key embedded.
    * <p>
-   * If <code>null</code> is passed for one of the two parameters, a PEM will be returned that only includes the non-null
-   * value.
+   * If <code>null</code> is passed for one of the two parameters, a PEM will be returned that only includes the
+   * non-null value.
    * <p>
    * Both values may not be null.
    *
@@ -203,6 +160,16 @@ public class PEMEncoder {
     }
   }
 
+  /**
+   * Attempt to covert a ASN.1 DER encoded X.509 certificate into a PEM encoded string.
+   *
+   * @param derEncoded base64 ASN.1 DER encoded bytes of an X.509 certificate
+   * @return a PEM encoded certificate
+   */
+  public String parseEncodedCertificate(String derEncoded) {
+    return PEM.X509_CERTIFICATE_PREFIX + "\n" + chopIt(derEncoded) + "\n" + PEM.X509_CERTIFICATE_SUFFIX;
+  }
+
   private void addClosingTag(Key key, StringBuilder sb) {
     sb.append("\n");
     if (key instanceof PrivateKey) {
@@ -235,5 +202,27 @@ public class PEMEncoder {
             new InvalidParameterException("Expected public key format [X.509] but found [" + format + "]"));
       }
     }
+  }
+
+  private String chopIt(String s) {
+    List<String> lines = new ArrayList<>();
+
+    // The incoming string may or may not contain line returns, normalize first and then re-encode to 64 characters wide
+    String normalized = removeLineReturns(s);
+
+    for (int i = 0; i < normalized.length(); ) {
+      lines.add(normalized.substring(i, Math.min(i + 64, normalized.length())));
+      i = i + 64;
+    }
+
+    return String.join("\n", lines);
+  }
+
+  private String removeLineReturns(String str) {
+    if (str == null) {
+      return null;
+    }
+
+    return str.replaceAll("\\r\\n|\\r|\\n", "");
   }
 }

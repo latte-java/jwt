@@ -16,28 +16,21 @@
 
 package org.lattejava.jwt.algorithm.ec;
 
-import org.lattejava.jwt.Algorithm;
-import org.lattejava.jwt.JWTSigningException;
-import org.lattejava.jwt.Signer;
-import org.lattejava.jwt.internal.KeyCoercion;
-import org.lattejava.jwt.internal.JOSEConverter;
+import java.security.*;
+import java.security.interfaces.*;
+import java.util.*;
 
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
-import java.security.PrivateKey;
-import java.security.Signature;
-import java.security.SignatureException;
-import java.security.interfaces.ECPrivateKey;
-import java.util.Objects;
+import org.lattejava.jwt.*;
+import org.lattejava.jwt.Signer;
+import org.lattejava.jwt.internal.*;
 
 /**
- * ECDSA {@link Signer} for the {@code ES256} / {@code ES384} / {@code ES512}
- * / {@code ES256K} JWA algorithms (RFC 7518 §3.4 and RFC 8812 §3.2).
+ * ECDSA {@link Signer} for the {@code ES256} / {@code ES384} / {@code ES512} / {@code ES256K} JWA algorithms (RFC 7518
+ * §3.4 and RFC 8812 §3.2).
  *
  * <p>Each call to {@link #sign(byte[])} obtains a fresh {@link Signature}
- * instance ({@link Signature} is not thread-safe), produces a DER-encoded
- * ECDSA signature, then converts it to JOSE {@code R || S} fixed-length form
- * via {@link JOSEConverter#derToJose(byte[], int)}.</p>
+ * instance ({@link Signature} is not thread-safe), produces a DER-encoded ECDSA signature, then converts it to JOSE
+ * {@code R || S} fixed-length form via {@link JOSEConverter#derToJose(byte[], int)}.</p>
  *
  * @author Daniel DeGroff
  */

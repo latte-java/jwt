@@ -16,12 +16,12 @@
 
 package org.lattejava.jwt;
 
-import org.testng.annotations.Test;
+import java.nio.charset.*;
+import java.util.*;
 
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
+import org.testng.annotations.*;
 
-import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.*;
 
 /**
  * @author Daniel DeGroff

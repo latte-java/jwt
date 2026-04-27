@@ -23,36 +23,21 @@
 
 package org.lattejava.jwt;
 
-import org.lattejava.jwt.algorithm.ec.ECSigner;
-import org.lattejava.jwt.algorithm.ec.ECVerifier;
-import org.lattejava.jwt.algorithm.ed.EdDSASigner;
-import org.lattejava.jwt.algorithm.ed.EdDSAVerifier;
-import org.lattejava.jwt.algorithm.hmac.HMACSigner;
-import org.lattejava.jwt.algorithm.hmac.HMACVerifier;
-import org.lattejava.jwt.algorithm.rsa.RSAPSSSigner;
-import org.lattejava.jwt.algorithm.rsa.RSAPSSVerifier;
-import org.lattejava.jwt.algorithm.rsa.RSASigner;
-import org.lattejava.jwt.algorithm.rsa.RSAVerifier;
-import org.lattejava.jwt.internal.pem.PEM;
-import org.testng.SkipException;
-import org.testng.annotations.DataProvider;
-import org.testng.annotations.Test;
+import java.nio.charset.*;
+import java.nio.file.*;
+import java.security.*;
+import java.security.spec.*;
+import java.util.function.*;
 
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.security.KeyPairGenerator;
-import java.security.NoSuchAlgorithmException;
-import java.security.PrivateKey;
-import java.security.PublicKey;
-import java.security.spec.ECGenParameterSpec;
-import java.util.function.Supplier;
+import org.lattejava.jwt.algorithm.ec.*;
+import org.lattejava.jwt.algorithm.ed.*;
+import org.lattejava.jwt.algorithm.hmac.*;
+import org.lattejava.jwt.algorithm.rsa.*;
+import org.lattejava.jwt.internal.pem.*;
+import org.testng.*;
+import org.testng.annotations.*;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertSame;
-import static org.testng.Assert.assertThrows;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 /**
  * Coverage of the {@code Signers} factory contract:
@@ -84,19 +69,29 @@ public class SignersTest extends BaseTest {
   // DataProviders
   // ---------------------------------------------------------------------
 
-  @DataProvider(name = "hmacAlgorithms")
-  public Object[][] hmacAlgorithms() {
-    return new Object[][] {
-        {Algorithm.HS256, HMAC_SECRET_32},
-        {Algorithm.HS384, HMAC_SECRET_64},
-        {Algorithm.HS512, HMAC_SECRET_64},
+  private static Signer signerForHMAC(Algorithm algorithm, String secret) {
+    return switch (algorithm.name()) {
+      case "HS256" -> HMACSigner.newSHA256Signer(secret);
+      case "HS384" -> HMACSigner.newSHA384Signer(secret);
+      case "HS512" -> HMACSigner.newSHA512Signer(secret);
+      default -> throw new AssertionError(algorithm.name());
+    };
+  }
+
+  // (HMAC algorithm crossed with asymmetric API call) -- IllegalArgumentException
+  @DataProvider(name = "asymmetricAPIRejectsHMAC")
+  public Object[][] asymmetricAPIRejectsHMAC() {
+    return new Object[][]{
+        {Algorithm.HS256},
+        {Algorithm.HS384},
+        {Algorithm.HS512},
     };
   }
 
   // (algorithm, signer-from-factory supplier, verifier supplier)
   @DataProvider(name = "asymmetricAlgorithms")
   public Object[][] asymmetricAlgorithms() {
-    return new Object[][] {
+    return new Object[][]{
         {Algorithm.RS256,
             (Supplier<Signer>) () -> Signers.forAsymmetric(Algorithm.RS256, readFile("rsa_private_key_2048.pem")),
             (Supplier<Verifier>) () -> RSAVerifier.newVerifier(Algorithm.RS256, readFile("rsa_public_key_2048.pem"))},
@@ -133,123 +128,23 @@ public class SignersTest extends BaseTest {
     };
   }
 
-  // (HMAC algorithm crossed with asymmetric API call) -- IllegalArgumentException
-  @DataProvider(name = "asymmetricAPIRejectsHMAC")
-  public Object[][] asymmetricAPIRejectsHMAC() {
-    return new Object[][] {
-        {Algorithm.HS256},
-        {Algorithm.HS384},
-        {Algorithm.HS512},
-    };
-  }
-
-  // (asymmetric algorithm crossed with HMAC API call) -- IllegalArgumentException
-  @DataProvider(name = "hmacAPIRejectsAsymmetric")
-  public Object[][] hmacAPIRejectsAsymmetric() {
-    return new Object[][] {
-        {Algorithm.RS256}, {Algorithm.RS384}, {Algorithm.RS512},
-        {Algorithm.PS256}, {Algorithm.PS384}, {Algorithm.PS512},
-        {Algorithm.ES256}, {Algorithm.ES384}, {Algorithm.ES512},
-        {Algorithm.Ed25519}, {Algorithm.Ed448},
-        {Algorithm.ES256K},
-    };
+  @Test
+  public void forAsymmetric_kidPropagated_pem() {
+    Signer signer = Signers.forAsymmetric(Algorithm.RS256,
+        readFile("rsa_private_key_2048.pem"), "rsa-kid");
+    assertEquals(signer.kid(), "rsa-kid");
   }
 
   // ---------------------------------------------------------------------
   // forHMAC -- happy paths
   // ---------------------------------------------------------------------
 
-  @Test(dataProvider = "hmacAlgorithms")
-  public void forHMAC_string_returnsWorkingSigner(Algorithm algorithm, String secret) {
-    // Use case: Signers.forHMAC(HS256, secret) creates an HMACSigner.
-    Signer signer = Signers.forHMAC(algorithm, secret);
-    assertNotNull(signer);
-    assertSame(signer.algorithm(), algorithm);
-
-    byte[] signature = signer.sign("message".getBytes(StandardCharsets.UTF_8));
-    assertNotNull(signature);
-    assertTrue(signature.length > 0);
-
-    // round-trip verify with the matching family verifier
-    Verifier verifier = HMACVerifier.newVerifier(algorithm, secret);
-    verifier.verify("message".getBytes(StandardCharsets.UTF_8), signature);
-  }
-
-  @Test(dataProvider = "hmacAlgorithms")
-  public void forHMAC_bytes_returnsWorkingSigner(Algorithm algorithm, String secret) {
-    byte[] secretBytes = secret.getBytes(StandardCharsets.UTF_8);
-    Signer signer = Signers.forHMAC(algorithm, secretBytes);
-    assertSame(signer.algorithm(), algorithm);
-
-    byte[] signature = signer.sign("message".getBytes(StandardCharsets.UTF_8));
-    Verifier verifier = HMACVerifier.newVerifier(algorithm, secretBytes);
-    verifier.verify("message".getBytes(StandardCharsets.UTF_8), signature);
-  }
-
   @Test
-  public void forHMAC_stringAndBytesEquivalent() {
-    // Use case: Signers.forHMAC(HS256, byte[]) and forHMAC(HS256, String) produce signers
-    // that verify each other's signatures when the underlying bytes match.
-    Signer fromString = Signers.forHMAC(Algorithm.HS256, HMAC_SECRET_32);
-    Signer fromBytes = Signers.forHMAC(Algorithm.HS256, HMAC_SECRET_32.getBytes(StandardCharsets.UTF_8));
-    byte[] msg = "message".getBytes(StandardCharsets.UTF_8);
-    byte[] sigA = fromString.sign(msg);
-    byte[] sigB = fromBytes.sign(msg);
-    assertEquals(sigA, sigB);
+  public void forAsymmetric_kidPropagated_privateKey() {
+    PrivateKey key = PEM.decode(readFile("rsa_private_key_2048.pem")).privateKey;
+    Signer signer = Signers.forAsymmetric(Algorithm.RS256, key, "rsa-kid-pk");
+    assertEquals(signer.kid(), "rsa-kid-pk");
   }
-
-  @Test
-  public void forHMAC_kidIsPropagated_string() {
-    Signer signer = Signers.forHMAC(Algorithm.HS256, HMAC_SECRET_32, "kid-1");
-    assertEquals(signer.kid(), "kid-1");
-  }
-
-  @Test
-  public void forHMAC_kidIsPropagated_bytes() {
-    Signer signer = Signers.forHMAC(Algorithm.HS256, HMAC_SECRET_32.getBytes(StandardCharsets.UTF_8), "kid-2");
-    assertEquals(signer.kid(), "kid-2");
-  }
-
-  @Test
-  public void forHMAC_nullKidYieldsNullKid() {
-    Signer signer = Signers.forHMAC(Algorithm.HS256, HMAC_SECRET_32);
-    // default Signer.kid() returns null when not provided
-    assertEquals(signer.kid(), null);
-  }
-
-  // ---------------------------------------------------------------------
-  // forHMAC -- mismatch rejection
-  // ---------------------------------------------------------------------
-
-  @Test(dataProvider = "hmacAPIRejectsAsymmetric")
-  public void forHMAC_rejectsAsymmetricAlgorithm_string(Algorithm algorithm) {
-    // Use case: Signers.forHMAC(RS256, secret) throws IllegalArgumentException -- algorithm
-    // class mismatch caught at call time so that misplaced key material is fail-fast.
-    assertThrows(IllegalArgumentException.class,
-        () -> Signers.forHMAC(algorithm, HMAC_SECRET_32));
-  }
-
-  @Test(dataProvider = "hmacAPIRejectsAsymmetric")
-  public void forHMAC_rejectsAsymmetricAlgorithm_bytes(Algorithm algorithm) {
-    assertThrows(IllegalArgumentException.class,
-        () -> Signers.forHMAC(algorithm, HMAC_SECRET_32.getBytes(StandardCharsets.UTF_8)));
-  }
-
-  @Test(dataProvider = "hmacAPIRejectsAsymmetric")
-  public void forHMAC_rejectsAsymmetricAlgorithm_stringWithKid(Algorithm algorithm) {
-    assertThrows(IllegalArgumentException.class,
-        () -> Signers.forHMAC(algorithm, HMAC_SECRET_32, "kid"));
-  }
-
-  @Test(dataProvider = "hmacAPIRejectsAsymmetric")
-  public void forHMAC_rejectsAsymmetricAlgorithm_bytesWithKid(Algorithm algorithm) {
-    assertThrows(IllegalArgumentException.class,
-        () -> Signers.forHMAC(algorithm, HMAC_SECRET_32.getBytes(StandardCharsets.UTF_8), "kid"));
-  }
-
-  // ---------------------------------------------------------------------
-  // forAsymmetric -- happy paths
-  // ---------------------------------------------------------------------
 
   @Test(dataProvider = "asymmetricAlgorithms")
   public void forAsymmetric_pem_returnsWorkingSigner(Algorithm algorithm,
@@ -271,6 +166,13 @@ public class SignersTest extends BaseTest {
   }
 
   @Test
+  public void forAsymmetric_privateKey_ed25519() {
+    PrivateKey key = PEM.decode(readFile("ed_dsa_ed25519_private_key.pem")).privateKey;
+    Signer signer = Signers.forAsymmetric(Algorithm.Ed25519, key);
+    assertSame(signer.algorithm(), Algorithm.Ed25519);
+  }
+
+  @Test
   public void forAsymmetric_privateKey_es256() {
     // Use case: Signers.forAsymmetric(ES256, privateKey) -- accepts a pre-built PrivateKey.
     PrivateKey key = PEM.decode(readFile("ec_private_key_p_256.pem")).privateKey;
@@ -281,35 +183,6 @@ public class SignersTest extends BaseTest {
 
     PublicKey pub = PEM.decode(readFile("ec_public_key_p_256.pem")).publicKey;
     ECVerifier.newVerifier(pub).verify(msg, sig);
-  }
-
-  @Test
-  public void forAsymmetric_privateKey_rs256() {
-    PrivateKey key = PEM.decode(readFile("rsa_private_key_2048.pem")).privateKey;
-    Signer signer = Signers.forAsymmetric(Algorithm.RS256, key);
-    assertSame(signer.algorithm(), Algorithm.RS256);
-    byte[] msg = "message".getBytes(StandardCharsets.UTF_8);
-    byte[] sig = signer.sign(msg);
-    PublicKey pub = PEM.decode(readFile("rsa_public_key_2048.pem")).publicKey;
-    RSAVerifier.newVerifier(Algorithm.RS256, pub).verify(msg, sig);
-  }
-
-  @Test
-  public void forAsymmetric_privateKey_ed25519() {
-    PrivateKey key = PEM.decode(readFile("ed_dsa_ed25519_private_key.pem")).privateKey;
-    Signer signer = Signers.forAsymmetric(Algorithm.Ed25519, key);
-    assertSame(signer.algorithm(), Algorithm.Ed25519);
-  }
-
-  @Test
-  public void forAsymmetric_privateKey_ps256() {
-    PrivateKey key = PEM.decode(readFile("rsa_pss_private_key_2048.pem")).privateKey;
-    Signer signer = Signers.forAsymmetric(Algorithm.PS256, key);
-    assertSame(signer.algorithm(), Algorithm.PS256);
-    byte[] msg = "message".getBytes(StandardCharsets.UTF_8);
-    byte[] sig = signer.sign(msg);
-    PublicKey pub = PEM.decode(readFile("rsa_pss_public_key_2048.pem")).publicKey;
-    RSAPSSVerifier.newVerifier(Algorithm.PS256, pub).verify(msg, sig);
   }
 
   @Test
@@ -365,23 +238,31 @@ public class SignersTest extends BaseTest {
     assertEquals(signer.kid(), "btc-kid");
   }
 
+  // ---------------------------------------------------------------------
+  // forHMAC -- mismatch rejection
+  // ---------------------------------------------------------------------
+
   @Test
-  public void forAsymmetric_kidPropagated_pem() {
-    Signer signer = Signers.forAsymmetric(Algorithm.RS256,
-        readFile("rsa_private_key_2048.pem"), "rsa-kid");
-    assertEquals(signer.kid(), "rsa-kid");
+  public void forAsymmetric_privateKey_ps256() {
+    PrivateKey key = PEM.decode(readFile("rsa_pss_private_key_2048.pem")).privateKey;
+    Signer signer = Signers.forAsymmetric(Algorithm.PS256, key);
+    assertSame(signer.algorithm(), Algorithm.PS256);
+    byte[] msg = "message".getBytes(StandardCharsets.UTF_8);
+    byte[] sig = signer.sign(msg);
+    PublicKey pub = PEM.decode(readFile("rsa_pss_public_key_2048.pem")).publicKey;
+    RSAPSSVerifier.newVerifier(Algorithm.PS256, pub).verify(msg, sig);
   }
 
   @Test
-  public void forAsymmetric_kidPropagated_privateKey() {
+  public void forAsymmetric_privateKey_rs256() {
     PrivateKey key = PEM.decode(readFile("rsa_private_key_2048.pem")).privateKey;
-    Signer signer = Signers.forAsymmetric(Algorithm.RS256, key, "rsa-kid-pk");
-    assertEquals(signer.kid(), "rsa-kid-pk");
+    Signer signer = Signers.forAsymmetric(Algorithm.RS256, key);
+    assertSame(signer.algorithm(), Algorithm.RS256);
+    byte[] msg = "message".getBytes(StandardCharsets.UTF_8);
+    byte[] sig = signer.sign(msg);
+    PublicKey pub = PEM.decode(readFile("rsa_public_key_2048.pem")).publicKey;
+    RSAVerifier.newVerifier(Algorithm.RS256, pub).verify(msg, sig);
   }
-
-  // ---------------------------------------------------------------------
-  // forAsymmetric -- mismatch rejection
-  // ---------------------------------------------------------------------
 
   @Test(dataProvider = "asymmetricAPIRejectsHMAC")
   public void forAsymmetric_rejectsHMACAlgorithm_pem(Algorithm hmacAlgorithm) {
@@ -399,6 +280,10 @@ public class SignersTest extends BaseTest {
         () -> Signers.forAsymmetric(hmacAlgorithm, anyPem, "kid"));
   }
 
+  // ---------------------------------------------------------------------
+  // forAsymmetric -- happy paths
+  // ---------------------------------------------------------------------
+
   @Test(dataProvider = "asymmetricAPIRejectsHMAC")
   public void forAsymmetric_rejectsHMACAlgorithm_privateKey(Algorithm hmacAlgorithm) {
     PrivateKey rsa = PEM.decode(readFile("rsa_private_key_2048.pem")).privateKey;
@@ -413,73 +298,117 @@ public class SignersTest extends BaseTest {
         () -> Signers.forAsymmetric(hmacAlgorithm, rsa, "kid"));
   }
 
+  @Test(dataProvider = "hmacAlgorithms")
+  public void forHMAC_bytes_returnsWorkingSigner(Algorithm algorithm, String secret) {
+    byte[] secretBytes = secret.getBytes(StandardCharsets.UTF_8);
+    Signer signer = Signers.forHMAC(algorithm, secretBytes);
+    assertSame(signer.algorithm(), algorithm);
+
+    byte[] signature = signer.sign("message".getBytes(StandardCharsets.UTF_8));
+    Verifier verifier = HMACVerifier.newVerifier(algorithm, secretBytes);
+    verifier.verify("message".getBytes(StandardCharsets.UTF_8), signature);
+  }
+
+  @Test
+  public void forHMAC_kidIsPropagated_bytes() {
+    Signer signer = Signers.forHMAC(Algorithm.HS256, HMAC_SECRET_32.getBytes(StandardCharsets.UTF_8), "kid-2");
+    assertEquals(signer.kid(), "kid-2");
+  }
+
+  @Test
+  public void forHMAC_kidIsPropagated_string() {
+    Signer signer = Signers.forHMAC(Algorithm.HS256, HMAC_SECRET_32, "kid-1");
+    assertEquals(signer.kid(), "kid-1");
+  }
+
+  @Test
+  public void forHMAC_nullKidYieldsNullKid() {
+    Signer signer = Signers.forHMAC(Algorithm.HS256, HMAC_SECRET_32);
+    // default Signer.kid() returns null when not provided
+    assertNull(signer.kid());
+  }
+
+  @Test(dataProvider = "hmacAPIRejectsAsymmetric")
+  public void forHMAC_rejectsAsymmetricAlgorithm_bytes(Algorithm algorithm) {
+    assertThrows(IllegalArgumentException.class,
+        () -> Signers.forHMAC(algorithm, HMAC_SECRET_32.getBytes(StandardCharsets.UTF_8)));
+  }
+
+  @Test(dataProvider = "hmacAPIRejectsAsymmetric")
+  public void forHMAC_rejectsAsymmetricAlgorithm_bytesWithKid(Algorithm algorithm) {
+    assertThrows(IllegalArgumentException.class,
+        () -> Signers.forHMAC(algorithm, HMAC_SECRET_32.getBytes(StandardCharsets.UTF_8), "kid"));
+  }
+
+  @Test(dataProvider = "hmacAPIRejectsAsymmetric")
+  public void forHMAC_rejectsAsymmetricAlgorithm_string(Algorithm algorithm) {
+    // Use case: Signers.forHMAC(RS256, secret) throws IllegalArgumentException -- algorithm
+    // class mismatch caught at call time so that misplaced key material is fail-fast.
+    assertThrows(IllegalArgumentException.class,
+        () -> Signers.forHMAC(algorithm, HMAC_SECRET_32));
+  }
+
+  // ---------------------------------------------------------------------
+  // forAsymmetric -- mismatch rejection
+  // ---------------------------------------------------------------------
+
+  @Test(dataProvider = "hmacAPIRejectsAsymmetric")
+  public void forHMAC_rejectsAsymmetricAlgorithm_stringWithKid(Algorithm algorithm) {
+    assertThrows(IllegalArgumentException.class,
+        () -> Signers.forHMAC(algorithm, HMAC_SECRET_32, "kid"));
+  }
+
+  @Test
+  public void forHMAC_stringAndBytesEquivalent() {
+    // Use case: Signers.forHMAC(HS256, byte[]) and forHMAC(HS256, String) produce signers
+    // that verify each other's signatures when the underlying bytes match.
+    Signer fromString = Signers.forHMAC(Algorithm.HS256, HMAC_SECRET_32);
+    Signer fromBytes = Signers.forHMAC(Algorithm.HS256, HMAC_SECRET_32.getBytes(StandardCharsets.UTF_8));
+    byte[] msg = "message".getBytes(StandardCharsets.UTF_8);
+    byte[] sigA = fromString.sign(msg);
+    byte[] sigB = fromBytes.sign(msg);
+    assertEquals(sigA, sigB);
+  }
+
+  @Test(dataProvider = "hmacAlgorithms")
+  public void forHMAC_string_returnsWorkingSigner(Algorithm algorithm, String secret) {
+    // Use case: Signers.forHMAC(HS256, secret) creates an HMACSigner.
+    Signer signer = Signers.forHMAC(algorithm, secret);
+    assertNotNull(signer);
+    assertSame(signer.algorithm(), algorithm);
+
+    byte[] signature = signer.sign("message".getBytes(StandardCharsets.UTF_8));
+    assertNotNull(signature);
+    assertTrue(signature.length > 0);
+
+    // round-trip verify with the matching family verifier
+    Verifier verifier = HMACVerifier.newVerifier(algorithm, secret);
+    verifier.verify("message".getBytes(StandardCharsets.UTF_8), signature);
+  }
+
+  // (asymmetric algorithm crossed with HMAC API call) -- IllegalArgumentException
+  @DataProvider(name = "hmacAPIRejectsAsymmetric")
+  public Object[][] hmacAPIRejectsAsymmetric() {
+    return new Object[][]{
+        {Algorithm.RS256}, {Algorithm.RS384}, {Algorithm.RS512},
+        {Algorithm.PS256}, {Algorithm.PS384}, {Algorithm.PS512},
+        {Algorithm.ES256}, {Algorithm.ES384}, {Algorithm.ES512},
+        {Algorithm.Ed25519}, {Algorithm.Ed448},
+        {Algorithm.ES256K},
+    };
+  }
+
   // ---------------------------------------------------------------------
   // Verifiers.forHMAC / forAsymmetric -- happy paths and mismatch rejection
   // ---------------------------------------------------------------------
 
-  @Test(dataProvider = "hmacAlgorithms")
-  public void verifiers_forHMAC_string_roundTrip(Algorithm algorithm, String secret) {
-    // Use case: Verifiers.forHMAC(HS256, byte[]) and forHMAC(HS256, String) produce verifiers
-    // that accept signatures from a matching HMACSigner.
-    Verifier verifier = Verifiers.forHMAC(algorithm, secret);
-    assertNotNull(verifier);
-    assertTrue(verifier.canVerify(algorithm));
-
-    Signer signer = HMACSigner.class == HMACSigner.class
-        ? signerForHMAC(algorithm, secret)
-        : null;
-    byte[] msg = "message".getBytes(StandardCharsets.UTF_8);
-    byte[] sig = signer.sign(msg);
-    verifier.verify(msg, sig);
-  }
-
-  @Test(dataProvider = "hmacAlgorithms")
-  public void verifiers_forHMAC_bytes_roundTrip(Algorithm algorithm, String secret) {
-    byte[] secretBytes = secret.getBytes(StandardCharsets.UTF_8);
-    Verifier verifier = Verifiers.forHMAC(algorithm, secretBytes);
-    assertTrue(verifier.canVerify(algorithm));
-    Signer signer = signerForHMAC(algorithm, secret);
-    byte[] msg = "message".getBytes(StandardCharsets.UTF_8);
-    byte[] sig = signer.sign(msg);
-    verifier.verify(msg, sig);
-  }
-
-  @Test(dataProvider = "hmacAPIRejectsAsymmetric")
-  public void verifiers_forHMAC_rejectsAsymmetric_string(Algorithm algorithm) {
-    assertThrows(IllegalArgumentException.class,
-        () -> Verifiers.forHMAC(algorithm, HMAC_SECRET_32));
-  }
-
-  @Test(dataProvider = "hmacAPIRejectsAsymmetric")
-  public void verifiers_forHMAC_rejectsAsymmetric_bytes(Algorithm algorithm) {
-    assertThrows(IllegalArgumentException.class,
-        () -> Verifiers.forHMAC(algorithm, HMAC_SECRET_32.getBytes(StandardCharsets.UTF_8)));
-  }
-
-  @Test
-  public void verifiers_forAsymmetric_pem_rsa() {
-    // Use case: Verifiers.forAsymmetric(RS256, publicKey) creates RSAVerifier.
-    Verifier verifier = Verifiers.forAsymmetric(Algorithm.RS256, readFile("rsa_public_key_2048.pem"));
-    assertTrue(verifier.canVerify(Algorithm.RS256));
-    Signer signer = RSASigner.newSHA256Signer(readFile("rsa_private_key_2048.pem"));
-    byte[] msg = "m".getBytes(StandardCharsets.UTF_8);
-    verifier.verify(msg, signer.sign(msg));
-  }
-
-  @Test
-  public void verifiers_forAsymmetric_publicKey_rsa() {
-    PublicKey pub = PEM.decode(readFile("rsa_public_key_2048.pem")).publicKey;
-    Verifier verifier = Verifiers.forAsymmetric(Algorithm.RS256, pub);
-    assertTrue(verifier.canVerify(Algorithm.RS256));
-  }
-
-  @Test
-  public void verifiers_forAsymmetric_pem_pss() {
-    Verifier verifier = Verifiers.forAsymmetric(Algorithm.PS256, readFile("rsa_pss_public_key_2048.pem"));
-    assertTrue(verifier.canVerify(Algorithm.PS256));
-    Signer signer = RSAPSSSigner.newSHA256Signer(readFile("rsa_pss_private_key_2048.pem"));
-    byte[] msg = "m".getBytes(StandardCharsets.UTF_8);
-    verifier.verify(msg, signer.sign(msg));
+  @DataProvider(name = "hmacAlgorithms")
+  public Object[][] hmacAlgorithms() {
+    return new Object[][]{
+        {Algorithm.HS256, HMAC_SECRET_32},
+        {Algorithm.HS384, HMAC_SECRET_64},
+        {Algorithm.HS512, HMAC_SECRET_64},
+    };
   }
 
   @Test
@@ -500,6 +429,32 @@ public class SignersTest extends BaseTest {
     verifier.verify(msg, signer.sign(msg));
   }
 
+  @Test
+  public void verifiers_forAsymmetric_pem_pss() {
+    Verifier verifier = Verifiers.forAsymmetric(Algorithm.PS256, readFile("rsa_pss_public_key_2048.pem"));
+    assertTrue(verifier.canVerify(Algorithm.PS256));
+    Signer signer = RSAPSSSigner.newSHA256Signer(readFile("rsa_pss_private_key_2048.pem"));
+    byte[] msg = "m".getBytes(StandardCharsets.UTF_8);
+    verifier.verify(msg, signer.sign(msg));
+  }
+
+  @Test
+  public void verifiers_forAsymmetric_pem_rsa() {
+    // Use case: Verifiers.forAsymmetric(RS256, publicKey) creates RSAVerifier.
+    Verifier verifier = Verifiers.forAsymmetric(Algorithm.RS256, readFile("rsa_public_key_2048.pem"));
+    assertTrue(verifier.canVerify(Algorithm.RS256));
+    Signer signer = RSASigner.newSHA256Signer(readFile("rsa_private_key_2048.pem"));
+    byte[] msg = "m".getBytes(StandardCharsets.UTF_8);
+    verifier.verify(msg, signer.sign(msg));
+  }
+
+  @Test
+  public void verifiers_forAsymmetric_publicKey_rsa() {
+    PublicKey pub = PEM.decode(readFile("rsa_public_key_2048.pem")).publicKey;
+    Verifier verifier = Verifiers.forAsymmetric(Algorithm.RS256, pub);
+    assertTrue(verifier.canVerify(Algorithm.RS256));
+  }
+
   @Test(dataProvider = "asymmetricAPIRejectsHMAC")
   public void verifiers_forAsymmetric_rejectsHMACAlgorithm_pem(Algorithm hmacAlgorithm) {
     String anyPem = readFile("rsa_public_key_2048.pem");
@@ -514,16 +469,46 @@ public class SignersTest extends BaseTest {
         () -> Verifiers.forAsymmetric(hmacAlgorithm, pub));
   }
 
+  @Test(dataProvider = "hmacAlgorithms")
+  public void verifiers_forHMAC_bytes_roundTrip(Algorithm algorithm, String secret) {
+    byte[] secretBytes = secret.getBytes(StandardCharsets.UTF_8);
+    Verifier verifier = Verifiers.forHMAC(algorithm, secretBytes);
+    assertTrue(verifier.canVerify(algorithm));
+    Signer signer = signerForHMAC(algorithm, secret);
+    byte[] msg = "message".getBytes(StandardCharsets.UTF_8);
+    byte[] sig = signer.sign(msg);
+    verifier.verify(msg, sig);
+  }
+
+  @Test(dataProvider = "hmacAPIRejectsAsymmetric")
+  public void verifiers_forHMAC_rejectsAsymmetric_bytes(Algorithm algorithm) {
+    assertThrows(IllegalArgumentException.class,
+        () -> Verifiers.forHMAC(algorithm, HMAC_SECRET_32.getBytes(StandardCharsets.UTF_8)));
+  }
+
+  @Test(dataProvider = "hmacAPIRejectsAsymmetric")
+  public void verifiers_forHMAC_rejectsAsymmetric_string(Algorithm algorithm) {
+    assertThrows(IllegalArgumentException.class,
+        () -> Verifiers.forHMAC(algorithm, HMAC_SECRET_32));
+  }
+
   // ---------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------
 
-  private static Signer signerForHMAC(Algorithm algorithm, String secret) {
-    return switch (algorithm.name()) {
-      case "HS256" -> HMACSigner.newSHA256Signer(secret);
-      case "HS384" -> HMACSigner.newSHA384Signer(secret);
-      case "HS512" -> HMACSigner.newSHA512Signer(secret);
-      default -> throw new AssertionError(algorithm.name());
-    };
+  @Test(dataProvider = "hmacAlgorithms")
+  public void verifiers_forHMAC_string_roundTrip(Algorithm algorithm, String secret) {
+    // Use case: Verifiers.forHMAC(HS256, byte[]) and forHMAC(HS256, String) produce verifiers
+    // that accept signatures from a matching HMACSigner.
+    Verifier verifier = Verifiers.forHMAC(algorithm, secret);
+    assertNotNull(verifier);
+    assertTrue(verifier.canVerify(algorithm));
+
+    Signer signer = HMACSigner.class == HMACSigner.class
+        ? signerForHMAC(algorithm, secret)
+        : null;
+    byte[] msg = "message".getBytes(StandardCharsets.UTF_8);
+    byte[] sig = signer.sign(msg);
+    verifier.verify(msg, sig);
   }
 }

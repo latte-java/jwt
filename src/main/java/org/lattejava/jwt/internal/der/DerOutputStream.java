@@ -16,8 +16,7 @@
 
 package org.lattejava.jwt.internal.der;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
+import java.io.*;
 
 /**
  * @author Daniel DeGroff
@@ -45,10 +44,9 @@ public class DerOutputStream {
   }
 
   /**
-   * Write raw, already-DER-encoded bytes (tag + length + content) directly into this
-   * stream. Useful for embedding pre-computed encodings such as the result of
-   * {@code PublicKey.getEncoded()} (which is already a SubjectPublicKeyInfo SEQUENCE)
-   * without re-parsing.
+   * Write raw, already-DER-encoded bytes (tag + length + content) directly into this stream. Useful for embedding
+   * pre-computed encodings such as the result of {@code PublicKey.getEncoded()} (which is already a
+   * SubjectPublicKeyInfo SEQUENCE) without re-parsing.
    *
    * @param bytes the raw DER-encoded bytes to inject
    * @return {@code this} for chaining

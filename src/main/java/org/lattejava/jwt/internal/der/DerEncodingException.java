@@ -16,7 +16,7 @@
 
 package org.lattejava.jwt.internal.der;
 
-import java.io.IOException;
+import java.io.*;
 
 /**
  * @author Daniel DeGroff

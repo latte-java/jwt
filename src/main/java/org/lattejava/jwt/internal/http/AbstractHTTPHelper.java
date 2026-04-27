@@ -16,20 +16,13 @@
 
 package org.lattejava.jwt.internal.http;
 
-import org.lattejava.jwt.HTTPResponseException;
-import org.lattejava.jwt.ResponseTooLargeException;
-import org.lattejava.jwt.TooManyRedirectsException;
-import org.lattejava.jwt.internal.MessageSanitizer;
+import java.io.*;
+import java.net.*;
+import java.util.*;
+import java.util.function.*;
 
-import java.io.BufferedInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.function.BiFunction;
+import org.lattejava.jwt.*;
+import org.lattejava.jwt.internal.*;
 
 /**
  * Shared HTTP helper for JWKS / discovery / metadata fetches.
@@ -49,21 +42,40 @@ import java.util.function.BiFunction;
  */
 public abstract class AbstractHTTPHelper {
   /**
-   * Performs a GET on the supplied connection, manually following up to
-   * {@code maxRedirects} 3xx responses, capping each hop's body at
-   * {@code maxResponseBytes} bytes.
+   * Open and prepare an {@link HttpURLConnection} for {@code endpoint}.
+   *
+   * @param endpoint  the URL to open
+   * @param exception caller-supplied wrapper for any {@link IOException} surfaced while opening the connection. Passed
+   *                  through so each subclass can surface a domain-appropriate type (e.g. {@code JSONWebKeyException}
+   *                  for the JWKS helper, {@code ServerMetaDataException} for the OAuth2 helper) rather than leaking a
+   *                  JWKS-named exception out of an unrelated caller.
+   */
+  public static HttpURLConnection buildURLConnection(String endpoint, BiFunction<String, Throwable, ? extends RuntimeException> exception) {
+    try {
+      HttpURLConnection urlConnection = (HttpURLConnection) new URL(endpoint).openConnection();
+      urlConnection.setDoOutput(true);
+      urlConnection.setConnectTimeout(10_000);
+      urlConnection.setReadTimeout(10_000);
+      urlConnection.addRequestProperty("User-Agent", "latte-jwt (https://github.com/latte-java/jwt)");
+      return urlConnection;
+    } catch (IOException e) {
+      throw exception.apply("Failed to build connection to [" + MessageSanitizer.forMessage(endpoint) + "]", e);
+    }
+  }
+
+  /**
+   * Performs a GET on the supplied connection, manually following up to {@code maxRedirects} 3xx responses, capping
+   * each hop's body at {@code maxResponseBytes} bytes.
    *
    * <p>When {@code sameOriginRedirectsOnly} is {@code true}, any redirect
-   * that changes the scheme, host, or port relative to the original URL is
-   * rejected by invoking {@code exception} with a message of the form
-   * {@code "Refusing cross-origin redirect from [<origin>] to [<origin>]"}.
+   * that changes the scheme, host, or port relative to the original URL is rejected by invoking {@code exception} with
+   * a message of the form {@code "Refusing cross-origin redirect from [<origin>] to [<origin>]"}.
    *
-   * @param urlConnection           the prepared {@link HttpURLConnection} (the helper sets
-   *                                the request method and disables auto-redirect)
-   * @param maxResponseBytes        per-hop body cap; must be strictly positive (the
-   *                                cap cannot be disabled)
-   * @param maxRedirects            maximum number of 3xx redirects to follow before
-   *                                aborting; {@code 0} disables redirect following
+   * @param urlConnection           the prepared {@link HttpURLConnection} (the helper sets the request method and
+   *                                disables auto-redirect)
+   * @param maxResponseBytes        per-hop body cap; must be strictly positive (the cap cannot be disabled)
+   * @param maxRedirects            maximum number of 3xx redirects to follow before aborting; {@code 0} disables
+   *                                redirect following
    * @param sameOriginRedirectsOnly when {@code true}, cross-origin redirects are rejected
    * @param consumer                response-body parser
    * @param exception               wrapper for any {@link IOException} surfaced
@@ -144,29 +156,6 @@ public abstract class AbstractHTTPHelper {
     }
   }
 
-  /**
-   * Open and prepare an {@link HttpURLConnection} for {@code endpoint}.
-   *
-   * @param endpoint  the URL to open
-   * @param exception caller-supplied wrapper for any {@link IOException} surfaced while
-   *                  opening the connection. Passed through so each subclass can surface a
-   *                  domain-appropriate type (e.g. {@code JSONWebKeyException} for the JWKS
-   *                  helper, {@code ServerMetaDataException} for the OAuth2 helper) rather
-   *                  than leaking a JWKS-named exception out of an unrelated caller.
-   */
-  public static HttpURLConnection buildURLConnection(String endpoint, BiFunction<String, Throwable, ? extends RuntimeException> exception) {
-    try {
-      HttpURLConnection urlConnection = (HttpURLConnection) new URL(endpoint).openConnection();
-      urlConnection.setDoOutput(true);
-      urlConnection.setConnectTimeout(10_000);
-      urlConnection.setReadTimeout(10_000);
-      urlConnection.addRequestProperty("User-Agent", "latte-jwt (https://github.com/latte-java/jwt)");
-      return urlConnection;
-    } catch (IOException e) {
-      throw exception.apply("Failed to build connection to [" + MessageSanitizer.forMessage(endpoint) + "]", e);
-    }
-  }
-
   private static int effectivePort(URL url) {
     int port = url.getPort();
     return port == -1 ? url.getDefaultPort() : port;
@@ -183,10 +172,8 @@ public abstract class AbstractHTTPHelper {
   }
 
   /**
-   * An InputStream wrapper that limits the number of bytes that can be read.
-   * Throws a {@link ResponseTooLargeException} when the configured maximum
-   * is exceeded mid-stream (the read aborts; the library never buffers past
-   * the limit).
+   * An InputStream wrapper that limits the number of bytes that can be read. Throws a {@link ResponseTooLargeException}
+   * when the configured maximum is exceeded mid-stream (the read aborts; the library never buffers past the limit).
    */
   static class LimitedInputStream extends InputStream {
     private final InputStream delegate;
@@ -202,20 +189,8 @@ public abstract class AbstractHTTPHelper {
     }
 
     @Override
-    public int read() throws IOException {
-      if (bytesRead >= maximumBytes) {
-        throw new ResponseTooLargeException(maximumBytes);
-      }
-
-      int b = delegate.read();
-      if (b != -1) {
-        bytesRead++;
-        if (bytesRead > maximumBytes) {
-          throw new ResponseTooLargeException(maximumBytes);
-        }
-      }
-
-      return b;
+    public void close() throws IOException {
+      delegate.close();
     }
 
     @Override
@@ -245,8 +220,20 @@ public abstract class AbstractHTTPHelper {
     }
 
     @Override
-    public void close() throws IOException {
-      delegate.close();
+    public int read() throws IOException {
+      if (bytesRead >= maximumBytes) {
+        throw new ResponseTooLargeException(maximumBytes);
+      }
+
+      int b = delegate.read();
+      if (b != -1) {
+        bytesRead++;
+        if (bytesRead > maximumBytes) {
+          throw new ResponseTooLargeException(maximumBytes);
+        }
+      }
+
+      return b;
     }
   }
 }

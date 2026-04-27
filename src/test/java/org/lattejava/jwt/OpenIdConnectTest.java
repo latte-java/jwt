@@ -16,11 +16,10 @@
 
 package org.lattejava.jwt;
 
-import org.testng.annotations.Test;
+import org.testng.annotations.*;
 
-import static org.lattejava.jwt.OpenIDConnect.at_hash;
-import static org.lattejava.jwt.OpenIDConnect.c_hash;
-import static org.testng.Assert.assertEquals;
+import static org.lattejava.jwt.OpenIDConnect.*;
+import static org.testng.Assert.*;
 
 /**
  * @author Daniel DeGroff

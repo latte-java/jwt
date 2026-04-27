@@ -16,33 +16,22 @@
 
 package org.lattejava.jwt.algorithm.ed;
 
-import org.lattejava.jwt.Algorithm;
-import org.lattejava.jwt.InvalidJWTSignatureException;
-import org.lattejava.jwt.JWTVerifierException;
-import org.lattejava.jwt.Verifier;
-import org.lattejava.jwt.internal.KeyCoercion;
+import java.io.*;
+import java.nio.charset.*;
+import java.nio.file.*;
+import java.security.*;
+import java.security.interfaces.*;
+import java.util.*;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
-import java.security.PublicKey;
-import java.security.Signature;
-import java.security.SignatureException;
-import java.security.interfaces.EdECPublicKey;
-import java.util.Objects;
+import org.lattejava.jwt.*;
+import org.lattejava.jwt.internal.*;
 
 /**
- * EdDSA {@link Verifier} for the {@code Ed25519} / {@code Ed448} JWA
- * algorithms (RFC 8037 §3.1, JOSE registry).
+ * EdDSA {@link Verifier} for the {@code Ed25519} / {@code Ed448} JWA algorithms (RFC 8037 §3.1, JOSE registry).
  *
  * <p>The bound JWA algorithm is derived from the key's curve at
- * construction. {@link #canVerify(Algorithm)} returns true only for that
- * exact algorithm, so a key cannot be cross-used (Ed25519 key handed an
- * Ed448-tagged signature) once the decoder gates the verify call on
- * {@code canVerify}.</p>
+ * construction. {@link #canVerify(Algorithm)} returns true only for that exact algorithm, so a key cannot be cross-used
+ * (Ed25519 key handed an Ed448-tagged signature) once the decoder gates the verify call on {@code canVerify}.</p>
  *
  * <p>Each call to {@link #verify(byte[], byte[])} obtains a fresh
  * {@link Signature} instance ({@link Signature} is not thread-safe).</p>

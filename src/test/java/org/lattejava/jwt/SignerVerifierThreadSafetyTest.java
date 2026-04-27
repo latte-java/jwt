@@ -23,41 +23,58 @@
 
 package org.lattejava.jwt;
 
-import org.lattejava.jwt.algorithm.ec.ECSigner;
-import org.lattejava.jwt.algorithm.ec.ECVerifier;
-import org.lattejava.jwt.algorithm.ed.EdDSASigner;
-import org.lattejava.jwt.algorithm.ed.EdDSAVerifier;
-import org.lattejava.jwt.algorithm.hmac.HMACSigner;
-import org.lattejava.jwt.algorithm.hmac.HMACVerifier;
-import org.lattejava.jwt.algorithm.rsa.RSAPSSSigner;
-import org.lattejava.jwt.algorithm.rsa.RSAPSSVerifier;
-import org.lattejava.jwt.algorithm.rsa.RSASigner;
-import org.lattejava.jwt.algorithm.rsa.RSAVerifier;
-import org.testng.annotations.DataProvider;
-import org.testng.annotations.Test;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.*;
 
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
+import org.lattejava.jwt.algorithm.ec.*;
+import org.lattejava.jwt.algorithm.ed.*;
+import org.lattejava.jwt.algorithm.hmac.*;
+import org.lattejava.jwt.algorithm.rsa.*;
+import org.testng.annotations.*;
 
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 /**
- * Verifies that every {@link Signer}/{@link Verifier} pair is safe to share
- * across threads. Each call to {@code sign()} / {@code verify()} must obtain
- * a fresh JCA primitive ({@code Mac}/{@code Signature}) -- reusing one
- * across threads produces corrupted state and/or intermittent
- * {@code SignatureException}s.
+ * Verifies that every {@link Signer}/{@link Verifier} pair is safe to share across threads. Each call to {@code sign()}
+ * / {@code verify()} must obtain a fresh JCA primitive ({@code Mac}/{@code Signature}) -- reusing one across threads
+ * produces corrupted state and/or intermittent {@code SignatureException}s.
  *
  * @author Daniel DeGroff
  */
 public class SignerVerifierThreadSafetyTest extends BaseJWTTest {
+  private static final int ITERATIONS_PER_THREAD = 100;
   private static final int THREAD_COUNT = 32;
 
-  private static final int ITERATIONS_PER_THREAD = 100;
+  @Test(dataProvider = "signerVerifierPairs")
+  public void sharedAcrossThreads(String label, Signer signer, Verifier verifier) throws Exception {
+    byte[] message = ("thread-safety test for " + label).getBytes();
+    ExecutorService pool = Executors.newFixedThreadPool(THREAD_COUNT);
+    CountDownLatch start = new CountDownLatch(1);
+    CountDownLatch done = new CountDownLatch(THREAD_COUNT);
+    AtomicReference<Throwable> failure = new AtomicReference<>();
+    try {
+      for (int t = 0; t < THREAD_COUNT; t++) {
+        pool.submit(() -> {
+          try {
+            start.await();
+            for (int i = 0; i < ITERATIONS_PER_THREAD; i++) {
+              byte[] signature = signer.sign(message);
+              verifier.verify(message, signature);
+            }
+          } catch (Throwable th) {
+            failure.compareAndSet(null, th);
+          } finally {
+            done.countDown();
+          }
+        });
+      }
+      start.countDown();
+      assertTrue(done.await(60, TimeUnit.SECONDS), "Threads did not complete in time for [" + label + "]");
+      assertNull(failure.get(), "Concurrent sign/verify failed for [" + label + "]: " + failure.get());
+    } finally {
+      pool.shutdownNow();
+    }
+  }
 
   @DataProvider(name = "signerVerifierPairs")
   public Object[][] signerVerifierPairs() {
@@ -90,36 +107,5 @@ public class SignerVerifierThreadSafetyTest extends BaseJWTTest {
         {"Ed25519", EdDSASigner.newSigner(ed25519Priv), EdDSAVerifier.newVerifier(ed25519Pub)},
         {"Ed448", EdDSASigner.newSigner(ed448Priv), EdDSAVerifier.newVerifier(ed448Pub)},
     };
-  }
-
-  @Test(dataProvider = "signerVerifierPairs")
-  public void sharedAcrossThreads(String label, Signer signer, Verifier verifier) throws Exception {
-    byte[] message = ("thread-safety test for " + label).getBytes();
-    ExecutorService pool = Executors.newFixedThreadPool(THREAD_COUNT);
-    CountDownLatch start = new CountDownLatch(1);
-    CountDownLatch done = new CountDownLatch(THREAD_COUNT);
-    AtomicReference<Throwable> failure = new AtomicReference<>();
-    try {
-      for (int t = 0; t < THREAD_COUNT; t++) {
-        pool.submit(() -> {
-          try {
-            start.await();
-            for (int i = 0; i < ITERATIONS_PER_THREAD; i++) {
-              byte[] signature = signer.sign(message);
-              verifier.verify(message, signature);
-            }
-          } catch (Throwable th) {
-            failure.compareAndSet(null, th);
-          } finally {
-            done.countDown();
-          }
-        });
-      }
-      start.countDown();
-      assertTrue(done.await(60, TimeUnit.SECONDS), "Threads did not complete in time for [" + label + "]");
-      assertNull(failure.get(), "Concurrent sign/verify failed for [" + label + "]: " + failure.get());
-    } finally {
-      pool.shutdownNow();
-    }
   }
 }

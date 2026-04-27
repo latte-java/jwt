@@ -16,32 +16,46 @@
 
 package org.lattejava.jwt.pem;
 
-import org.lattejava.jwt.Algorithm;
-import org.lattejava.jwt.X509;
-import org.lattejava.jwt.internal.pem.PEM;
-import org.lattejava.jwt.internal.pem.PEMDecoder;
-import org.lattejava.jwt.x509.X509BuilderTest;
-import org.testng.annotations.Test;
-
-import java.math.BigInteger;
-import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.math.*;
+import java.nio.file.*;
 import java.security.KeyPair;
-import java.security.cert.X509Certificate;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.Arrays;
-import java.util.List;
+import java.security.cert.*;
+import java.time.*;
+import java.time.temporal.*;
+import java.util.*;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
+import org.lattejava.jwt.*;
+import org.lattejava.jwt.internal.pem.*;
+import org.lattejava.jwt.x509.*;
+import org.testng.annotations.*;
+
+import static org.testng.Assert.*;
 
 /**
  * @author Daniel DeGroff
  */
 public class PEMDecoderTest {
+  @Test
+  public void certificates() throws Exception {
+    List<String> files = Arrays.asList(
+        "rsa_certificate_1024.pem",
+        "rsa_certificate_2048.pem"
+    );
+
+    for (String f : files) {
+      String message = "For file [" + f + "]";
+      String encodedPEM = new String(Files.readAllBytes(Paths.get("src/test/resources/" + f)));
+      assertTrue(encodedPEM.contains(PEM.X509_CERTIFICATE_PREFIX), message);
+
+      PEM pem = PEM.decode(encodedPEM);
+      assertNull(pem.privateKey, message);
+      assertNotNull(pem.certificate, message);
+      assertNotNull(pem.publicKey, message);
+      assertEquals(pem.publicKey.getFormat(), "X.509", message);
+      assertEquals(pem.certificate.getType(), "X.509", message);
+    }
+  }
+
   @Test
   public void decodeTBSCertificateFields_roundTrip() throws Exception {
     // Use case: decodeTBSCertificateFields parses serial / validity / issuer / subject from a
@@ -50,14 +64,14 @@ public class PEMDecoderTest {
     Instant notBefore = Instant.parse("2024-06-01T12:00:00Z");
     Instant notAfter = notBefore.plus(180, ChronoUnit.DAYS);
     X509Certificate cert = X509.builder()
-        .serialNumber(BigInteger.valueOf(424242))
-        .issuer("CN=TBS Issuer")
-        .subject("CN=TBS Subject")
-        .validity(notBefore, notAfter)
-        .publicKey(kp.getPublic())
-        .signingKey(kp.getPrivate())
-        .signatureAlgorithm(Algorithm.RS256)
-        .build();
+                               .serialNumber(BigInteger.valueOf(424242))
+                               .issuer("CN=TBS Issuer")
+                               .subject("CN=TBS Subject")
+                               .validity(notBefore, notAfter)
+                               .publicKey(kp.getPublic())
+                               .signingKey(kp.getPrivate())
+                               .signatureAlgorithm(Algorithm.RS256)
+                               .build();
 
     PEMDecoder.TBSFields tbs = new PEMDecoder().decodeTBSCertificateFields(cert.getEncoded());
     assertEquals(tbs.serialNumber(), BigInteger.valueOf(424242));
@@ -164,27 +178,6 @@ public class PEMDecoderTest {
       assertEquals(pem.privateKey.getFormat(), "PKCS#8", message);
       assertNotNull(pem.publicKey, message);
       assertEquals(pem.publicKey.getFormat(), "X.509", message);
-    }
-  }
-
-  @Test
-  public void certificates() throws Exception {
-    List<String> files = Arrays.asList(
-        "rsa_certificate_1024.pem",
-        "rsa_certificate_2048.pem"
-    );
-
-    for (String f : files) {
-      String message = "For file [" + f + "]";
-      String encodedPEM = new String(Files.readAllBytes(Paths.get("src/test/resources/" + f)));
-      assertTrue(encodedPEM.contains(PEM.X509_CERTIFICATE_PREFIX), message);
-
-      PEM pem = PEM.decode(encodedPEM);
-      assertNull(pem.privateKey, message);
-      assertNotNull(pem.certificate, message);
-      assertNotNull(pem.publicKey, message);
-      assertEquals(pem.publicKey.getFormat(), "X.509", message);
-      assertEquals(pem.certificate.getType(), "X.509", message);
     }
   }
 

@@ -23,16 +23,9 @@
 
 package org.lattejava.jwt;
 
-import org.testng.annotations.DataProvider;
-import org.testng.annotations.Test;
+import org.testng.annotations.*;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotEquals;
-import static org.testng.Assert.assertNotSame;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertSame;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 /**
  * Tests for the Algorithm interface and StandardAlgorithm implementation.
@@ -40,6 +33,92 @@ import static org.testng.Assert.assertTrue;
  * @author Daniel DeGroff
  */
 public class AlgorithmTest {
+  @Test
+  public void caseSensitivityForStandardNames() {
+    // Use case: Case sensitivity -- "rs256" vs "RS256" -- exact-case lookup
+    Algorithm lower = Algorithm.of("rs256");
+    assertNotSame(lower, Algorithm.RS256);
+    assertNotEquals(lower, Algorithm.RS256);
+    assertEquals(lower.name(), "rs256");
+  }
+
+  @Test
+  public void equalsAcrossStandardAndCustomWithSameName() {
+    // Use case: A standard constant equals a custom one with the same name (equals by name())
+    Algorithm custom = new TestAlgorithm("RS256");
+    // The standard constant equals a custom Algorithm with the same name only if both
+    // sides honor name()-based equality. StandardAlgorithm.equals only compares to other
+    // StandardAlgorithm instances; the custom side may use Object identity. The defense
+    // against hostile equals impls is that the decoder keys by name(). For
+    // this test, just confirm that two StandardAlgorithm instances with the same name
+    // are equal (which is the documented StandardAlgorithm contract).
+    Algorithm a = Algorithm.of("CUSTOM_X");
+    Algorithm b = Algorithm.of("CUSTOM_X");
+    assertEquals(a, b);
+    // Sanity: the custom Algorithm name() also returns the value
+    assertEquals(custom.name(), "RS256");
+  }
+
+  @Test
+  public void equalsAndHashCodeForSameName() {
+    // Use case: equals/hashCode contract -- two instances with the same name are equal
+    Algorithm a = Algorithm.of("MY_ALG");
+    Algorithm b = Algorithm.of("MY_ALG");
+    assertEquals(a, b);
+    assertEquals(a.hashCode(), b.hashCode());
+  }
+
+  @Test
+  public void equalsFalseForNullAndDifferentType() {
+    // Use case: equals returns false for null and other types
+    Algorithm a = Algorithm.of("X");
+    assertNotEquals(a, null);
+    assertNotEquals(a, "X");
+  }
+
+  @Test(dataProvider = "standardAlgorithms")
+  public void nameNeverNull(Algorithm algorithm, String expectedName) {
+    // Use case: name() never returns null on standard constants
+    assertNotEquals(algorithm.name(), null);
+  }
+
+  @Test
+  public void ofEdDSAReturnsNonStandardAlgorithm() {
+    // Use case: of("EdDSA") returns a non-standard Algorithm (no constant per RFC 9864)
+    Algorithm eddsa = Algorithm.of("EdDSA");
+    assertEquals(eddsa.name(), "EdDSA");
+    assertNotSame(eddsa, Algorithm.Ed25519);
+    assertNotSame(eddsa, Algorithm.Ed448);
+  }
+
+  @Test
+  public void ofNoneReturnsNonStandardAlgorithm() {
+    // Use case: of("none") returns a non-standard Algorithm with name() == "none"
+    Algorithm none = Algorithm.of("none");
+    assertEquals(none.name(), "none");
+    assertNotSame(none, Algorithm.of("none"));
+  }
+
+  @Test(expectedExceptions = NullPointerException.class)
+  public void ofNullThrows() {
+    // Use case: of(null) throws NullPointerException
+    Algorithm.of(null);
+  }
+
+  @Test(dataProvider = "standardAlgorithms")
+  public void ofReturnsInternedStandardConstant(Algorithm algorithm, String name) {
+    // Use case: of() returns interned constant for standard names (reference equality with ==)
+    assertSame(Algorithm.of(name), algorithm);
+  }
+
+  @Test
+  public void ofReturnsNewInstanceForUnknownNames() {
+    // Use case: of() returns a new instance for unknown names (not interned)
+    Algorithm a = Algorithm.of("MY_ALG");
+    Algorithm b = Algorithm.of("MY_ALG");
+    assertNotSame(a, b);
+  }
+
   @DataProvider(name = "standardAlgorithms")
   public Object[][] standardAlgorithms() {
     return new Object[][]{
@@ -67,67 +146,6 @@ public class AlgorithmTest {
     assertEquals(algorithm.name(), expectedName);
   }
 
-  @Test(dataProvider = "standardAlgorithms")
-  public void ofReturnsInternedStandardConstant(Algorithm algorithm, String name) {
-    // Use case: of() returns interned constant for standard names (reference equality with ==)
-    assertSame(Algorithm.of(name), algorithm);
-  }
-
-  @Test
-  public void equalsAndHashCodeForSameName() {
-    // Use case: equals/hashCode contract -- two instances with the same name are equal
-    Algorithm a = Algorithm.of("MY_ALG");
-    Algorithm b = Algorithm.of("MY_ALG");
-    assertEquals(a, b);
-    assertEquals(a.hashCode(), b.hashCode());
-  }
-
-  @Test
-  public void ofReturnsNewInstanceForUnknownNames() {
-    // Use case: of() returns a new instance for unknown names (not interned)
-    Algorithm a = Algorithm.of("MY_ALG");
-    Algorithm b = Algorithm.of("MY_ALG");
-    assertNotSame(a, b);
-  }
-
-  @Test
-  public void caseSensitivityForStandardNames() {
-    // Use case: Case sensitivity -- "rs256" vs "RS256" -- exact-case lookup
-    Algorithm lower = Algorithm.of("rs256");
-    assertNotSame(lower, Algorithm.RS256);
-    assertNotEquals(lower, Algorithm.RS256);
-    assertEquals(lower.name(), "rs256");
-  }
-
-  @Test
-  public void equalsAcrossStandardAndCustomWithSameName() {
-    // Use case: A standard constant equals a custom one with the same name (equals by name())
-    Algorithm custom = new TestAlgorithm("RS256");
-    // The standard constant equals a custom Algorithm with the same name only if both
-    // sides honor name()-based equality. StandardAlgorithm.equals only compares to other
-    // StandardAlgorithm instances; the custom side may use Object identity. The defense
-    // against hostile equals impls is that the decoder keys by name(). For
-    // this test, just confirm that two StandardAlgorithm instances with the same name
-    // are equal (which is the documented StandardAlgorithm contract).
-    Algorithm a = Algorithm.of("CUSTOM_X");
-    Algorithm b = Algorithm.of("CUSTOM_X");
-    assertEquals(a, b);
-    // Sanity: the custom Algorithm name() also returns the value
-    assertEquals(custom.name(), "RS256");
-  }
-
-  @Test(expectedExceptions = NullPointerException.class)
-  public void ofNullThrows() {
-    // Use case: of(null) throws NullPointerException
-    Algorithm.of(null);
-  }
-
-  @Test(dataProvider = "standardAlgorithms")
-  public void nameNeverNull(Algorithm algorithm, String expectedName) {
-    // Use case: name() never returns null on standard constants
-    assertNotEquals(algorithm.name(), null);
-  }
-
   @Test
   public void standardValuesContainsAllStandardAlgorithms() {
     // Use case: standardValues() returns all 15 standard algorithms
@@ -146,44 +164,9 @@ public class AlgorithmTest {
     }
   }
 
-  @Test
-  public void equalsFalseForNullAndDifferentType() {
-    // Use case: equals returns false for null and other types
-    Algorithm a = Algorithm.of("X");
-    assertFalse(a.equals(null));
-    assertFalse(a.equals("X"));
-  }
-
-  @Test
-  public void ofNoneReturnsNonStandardAlgorithm() {
-    // Use case: of("none") returns a non-standard Algorithm with name() == "none"
-    Algorithm none = Algorithm.of("none");
-    assertEquals(none.name(), "none");
-    assertNotSame(none, Algorithm.of("none"));
-  }
-
-  @Test
-  public void ofEdDSAReturnsNonStandardAlgorithm() {
-    // Use case: of("EdDSA") returns a non-standard Algorithm (no constant per RFC 9864)
-    Algorithm eddsa = Algorithm.of("EdDSA");
-    assertEquals(eddsa.name(), "EdDSA");
-    assertNotSame(eddsa, Algorithm.Ed25519);
-    assertNotSame(eddsa, Algorithm.Ed448);
-  }
-
   /**
-   * Test-only Algorithm impl used to confirm the interface contract is open for extension.
-   */
-  private static final class TestAlgorithm implements Algorithm {
-    private final String name;
-
-    TestAlgorithm(String name) {
-      this.name = name;
-    }
-
-    @Override
-    public String name() {
-      return name;
-    }
+     * Test-only Algorithm impl used to confirm the interface contract is open for extension.
+     */
+    private record TestAlgorithm(String name) implements Algorithm {
   }
 }

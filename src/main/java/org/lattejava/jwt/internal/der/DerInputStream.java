@@ -16,13 +16,8 @@
 
 package org.lattejava.jwt.internal.der;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
+import java.io.*;
+import java.util.*;
 
 /**
  * @author Daniel DeGroff

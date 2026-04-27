@@ -23,15 +23,12 @@
 
 package org.lattejava.jwt.internal.der;
 
-import org.testng.annotations.DataProvider;
-import org.testng.annotations.Test;
+import java.nio.charset.*;
+import java.time.*;
 
-import java.nio.charset.StandardCharsets;
-import java.time.Instant;
+import org.testng.annotations.*;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertThrows;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 /**
  * Tests for the new {@link DerValue} factory methods introduced in Checkpoint 9.
@@ -39,6 +36,21 @@ import static org.testng.Assert.assertTrue;
  * @author Daniel DeGroff
  */
 public class DerValueTest {
+  @Test
+  public void asciiString_round_trip() {
+    // Use case: newASCIIString uses PrintableString tag (19 / 0x13) with US-ASCII body.
+    DerValue v = DerValue.newASCIIString("Latte");
+    assertEquals(v.tag.value, Tag.PrintableString);
+    assertEquals(v.toByteArray(), "Latte".getBytes(StandardCharsets.US_ASCII));
+  }
+
+  @Test
+  public void bitString_nonZeroPad_rejected() {
+    // Use case: getBitStringBytes rejects non-zero pad byte.
+    DerValue v = new DerValue(Tag.BitString, new byte[]{0x03, 0x06});
+    assertThrows(IllegalArgumentException.class, v::getBitStringBytes);
+  }
+
   @Test
   public void bitString_round_trip() {
     // Use case: newBitString prepends a zero pad byte and getBitStringBytes round-trips it back.
@@ -55,74 +67,10 @@ public class DerValueTest {
   }
 
   @Test
-  public void bitString_nonZeroPad_rejected() {
-    // Use case: getBitStringBytes rejects non-zero pad byte.
-    DerValue v = new DerValue(Tag.BitString, new byte[]{0x03, 0x06});
-    assertThrows(IllegalArgumentException.class, v::getBitStringBytes);
-  }
-
-  @Test
   public void bitString_wrongTag_rejected() {
     // Use case: getBitStringBytes errors when called on a non-BitString value.
     DerValue v = new DerValue(Tag.OctetString, new byte[]{1, 2, 3});
     assertThrows(IllegalStateException.class, v::getBitStringBytes);
-  }
-
-  @Test
-  public void nullValue_zeroLengthBody() {
-    // Use case: newNull produces a NULL tag with zero-length body.
-    DerValue v = DerValue.newNull();
-    assertEquals(v.tag.value, Tag.Null);
-    assertEquals(v.getLength(), 0);
-    assertEquals(v.toByteArray().length, 0);
-  }
-
-  @Test
-  public void asciiString_round_trip() {
-    // Use case: newASCIIString uses PrintableString tag (19 / 0x13) with US-ASCII body.
-    DerValue v = DerValue.newASCIIString("Latte");
-    assertEquals(v.tag.value, Tag.PrintableString);
-    assertEquals(v.toByteArray(), "Latte".getBytes(StandardCharsets.US_ASCII));
-  }
-
-  @Test
-  public void utf8String_round_trip() {
-    // Use case: newUTF8String uses tag 12 (0x0C) with UTF-8 bytes.
-    DerValue v = DerValue.newUTF8String("naïve\u4e2d");
-    assertEquals(v.tag.value, Tag.UTFString);
-    assertEquals(v.toByteArray(), "naïve\u4e2d".getBytes(StandardCharsets.UTF_8));
-  }
-
-  @Test
-  public void utcTime_format() {
-    // Use case: newUTCTime formats as yyMMddHHmmssZ and emits tag 23.
-    Instant t = Instant.parse("2024-04-22T10:30:45Z");
-    DerValue v = DerValue.newUTCTime(t);
-    assertEquals(v.tag.value, Tag.UTCTime);
-    assertEquals(new String(v.toByteArray(), StandardCharsets.US_ASCII), "240422103045Z");
-  }
-
-  @Test
-  public void generalizedTime_format() {
-    // Use case: newGeneralizedTime formats as yyyyMMddHHmmssZ and emits tag 24.
-    Instant t = Instant.parse("2050-04-22T10:30:45Z");
-    DerValue v = DerValue.newGeneralizedTime(t);
-    assertEquals(v.tag.value, Tag.GeneralizedTime);
-    assertEquals(new String(v.toByteArray(), StandardCharsets.US_ASCII), "20500422103045Z");
-  }
-
-  @DataProvider(name = "timeBoundary")
-  public Object[][] timeBoundary() {
-    return new Object[][]{
-        // Strictly before 2050-01-01: UTCTime
-        {Instant.parse("2049-12-31T23:59:59Z"), Tag.UTCTime},
-        // Exactly the boundary: GeneralizedTime
-        {Instant.parse("2050-01-01T00:00:00Z"), Tag.GeneralizedTime},
-        // After: GeneralizedTime
-        {Instant.parse("2050-01-01T00:00:01Z"), Tag.GeneralizedTime},
-        // Far past (still UTC range): UTCTime
-        {Instant.parse("1970-01-01T00:00:00Z"), Tag.UTCTime}
-    };
   }
 
   @Test(dataProvider = "timeBoundary")
@@ -144,5 +92,54 @@ public class DerValueTest {
     assertTrue(v.tag.isConstructed());
     // Should contain the encoded inner integer: [02 01 01]
     assertEquals(v.toByteArray(), new byte[]{0x02, 0x01, 0x01});
+  }
+
+  @Test
+  public void generalizedTime_format() {
+    // Use case: newGeneralizedTime formats as yyyyMMddHHmmssZ and emits tag 24.
+    Instant t = Instant.parse("2050-04-22T10:30:45Z");
+    DerValue v = DerValue.newGeneralizedTime(t);
+    assertEquals(v.tag.value, Tag.GeneralizedTime);
+    assertEquals(new String(v.toByteArray(), StandardCharsets.US_ASCII), "20500422103045Z");
+  }
+
+  @Test
+  public void nullValue_zeroLengthBody() {
+    // Use case: newNull produces a NULL tag with zero-length body.
+    DerValue v = DerValue.newNull();
+    assertEquals(v.tag.value, Tag.Null);
+    assertEquals(v.getLength(), 0);
+    assertEquals(v.toByteArray().length, 0);
+  }
+
+  @DataProvider(name = "timeBoundary")
+  public Object[][] timeBoundary() {
+    return new Object[][]{
+        // Strictly before 2050-01-01: UTCTime
+        {Instant.parse("2049-12-31T23:59:59Z"), Tag.UTCTime},
+        // Exactly the boundary: GeneralizedTime
+        {Instant.parse("2050-01-01T00:00:00Z"), Tag.GeneralizedTime},
+        // After: GeneralizedTime
+        {Instant.parse("2050-01-01T00:00:01Z"), Tag.GeneralizedTime},
+        // Far past (still UTC range): UTCTime
+        {Instant.parse("1970-01-01T00:00:00Z"), Tag.UTCTime}
+    };
+  }
+
+  @Test
+  public void utcTime_format() {
+    // Use case: newUTCTime formats as yyMMddHHmmssZ and emits tag 23.
+    Instant t = Instant.parse("2024-04-22T10:30:45Z");
+    DerValue v = DerValue.newUTCTime(t);
+    assertEquals(v.tag.value, Tag.UTCTime);
+    assertEquals(new String(v.toByteArray(), StandardCharsets.US_ASCII), "240422103045Z");
+  }
+
+  @Test
+  public void utf8String_round_trip() {
+    // Use case: newUTF8String uses tag 12 (0x0C) with UTF-8 bytes.
+    DerValue v = DerValue.newUTF8String("naïve\u4e2d");
+    assertEquals(v.tag.value, Tag.UTFString);
+    assertEquals(v.toByteArray(), "naïve\u4e2d".getBytes(StandardCharsets.UTF_8));
   }
 }

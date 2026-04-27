@@ -16,37 +16,57 @@
 
 package org.lattejava.jwt.internal;
 
-import org.lattejava.jwt.internal.der.DerInputStream;
-import org.lattejava.jwt.internal.der.DerValue;
-import org.lattejava.jwt.internal.der.ObjectIdentifier;
+import java.io.*;
+import java.security.*;
+import java.security.interfaces.*;
+import java.security.spec.*;
+import java.util.*;
 
-import java.io.IOException;
-import java.security.InvalidAlgorithmParameterException;
-import java.security.Key;
-import java.security.KeyPairGenerator;
-import java.security.NoSuchAlgorithmException;
-import java.security.PrivateKey;
-import java.security.SecureRandom;
-import java.security.interfaces.ECKey;
-import java.security.interfaces.ECPrivateKey;
-import java.security.interfaces.ECPublicKey;
-import java.security.interfaces.EdECKey;
-import java.security.interfaces.EdECPrivateKey;
-import java.security.interfaces.EdECPublicKey;
-import java.security.interfaces.RSAKey;
-import java.security.spec.NamedParameterSpec;
-import java.util.Arrays;
+import org.lattejava.jwt.internal.der.*;
 
-import static org.lattejava.jwt.internal.der.ObjectIdentifier.ECDSA_P256;
-import static org.lattejava.jwt.internal.der.ObjectIdentifier.ECDSA_P384;
-import static org.lattejava.jwt.internal.der.ObjectIdentifier.ECDSA_P521;
-import static org.lattejava.jwt.internal.der.ObjectIdentifier.EdDSA_25519;
-import static org.lattejava.jwt.internal.der.ObjectIdentifier.EdDSA_448;
+import static org.lattejava.jwt.internal.der.ObjectIdentifier.*;
 
 /**
  * @author Daniel DeGroff
  */
 public class KeyUtils {
+  /**
+   * Calculate the public key for the provided EdDSA private key.
+   *
+   * @param privateKey the private EdDSA key
+   * @param curve      the curve used by the private key
+   * @return the public key
+   */
+  public static byte[] deriveEdDSAPublicKeyFromPrivate(byte[] privateKey, String curve) throws NoSuchAlgorithmException, InvalidAlgorithmParameterException {
+    KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance(curve);
+
+    // Ensure the curve is expected, and we can identify the expected key length.
+    String algorithm = keyPairGenerator.getAlgorithm();
+    int expectedByteLength = switch (algorithm) {
+      case "Ed25519" -> 32;
+      case "Ed448" -> 57;
+      default -> throw new IllegalArgumentException("Unsupported algorithm [" + algorithm + "]");
+    };
+
+    // Ensure the caller provided a key of the correct length.
+    if (privateKey.length != expectedByteLength) {
+      throw new IllegalArgumentException("Expected private key length [" + expectedByteLength + "] but found [" + privateKey.length + "]");
+    }
+
+    keyPairGenerator.initialize(new NamedParameterSpec(curve), new SecureRandom() {
+      public void nextBytes(byte[] bytes) {
+        // Note that because we pass the curve to the NamedParameterSpec constructor, it would be unexpected that the provided
+        // byte array would not fit the expected key length. As a fail save, ensure it fits.
+        if (bytes.length != privateKey.length) {
+          throw new IllegalStateException("Expected byte array of length [" + privateKey.length + "] but found [" + bytes.length + "]");
+        }
+        System.arraycopy(privateKey, 0, bytes, 0, privateKey.length);
+      }
+    });
+    byte[] spki = keyPairGenerator.generateKeyPair().getPublic().getEncoded();
+    return Arrays.copyOfRange(spki, spki.length - privateKey.length, spki.length);
+  }
+
   /**
    * @param key the key
    * @return the name of the curve used by the key or null if it cannot be identified.
@@ -87,44 +107,6 @@ public class KeyUtils {
       sequence[0].getOID();
       return sequence[0].getOID();
     }
-  }
-
-  /**
-   * Calculate the public key for the provided EdDSA private key.
-   *
-   * @param privateKey the private EdDSA key
-   * @param curve      the curve used by the private key
-   * @return the public key
-   */
-  public static byte[] deriveEdDSAPublicKeyFromPrivate(byte[] privateKey, String curve) throws NoSuchAlgorithmException, InvalidAlgorithmParameterException {
-    KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance(curve);
-
-    // Ensure the curve is expected, and we can identify the expected key length.
-    String algorithm = keyPairGenerator.getAlgorithm();
-    int expectedByteLength = switch (algorithm) {
-      case "Ed25519" -> 32;
-      case "Ed448" -> 57;
-      default ->
-          throw new IllegalArgumentException("Unsupported algorithm [" + algorithm + "]");
-    };
-
-    // Ensure the caller provided a key of the correct length.
-    if (privateKey.length != expectedByteLength) {
-      throw new IllegalArgumentException("Expected private key length [" + expectedByteLength + "] but found [" + privateKey.length + "]");
-    }
-
-    keyPairGenerator.initialize(new NamedParameterSpec(curve), new SecureRandom() {
-      public void nextBytes(byte[] bytes) {
-        // Note that because we pass the curve to the NamedParameterSpec constructor, it would be unexpected that the provided
-        // byte array would not fit the expected key length. As a fail save, ensure it fits.
-        if (bytes.length != privateKey.length) {
-          throw new IllegalStateException("Expected byte array of length [" + privateKey.length + "] but found [" + bytes.length + "]");
-        }
-        System.arraycopy(privateKey, 0, bytes, 0, privateKey.length);
-      }
-    });
-    byte[] spki = keyPairGenerator.generateKeyPair().getPublic().getEncoded();
-    return Arrays.copyOfRange(spki, spki.length - privateKey.length, spki.length);
   }
 
   /**

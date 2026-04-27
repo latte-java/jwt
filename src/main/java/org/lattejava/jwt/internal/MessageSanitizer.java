@@ -24,8 +24,7 @@
 package org.lattejava.jwt.internal;
 
 /**
- * Sanitize attacker-controlled strings before interpolation into
- * exception messages. Applies two protections:
+ * Sanitize attacker-controlled strings before interpolation into exception messages. Applies two protections:
  * <ul>
  *   <li>Replace control characters with '?' to prevent log injection
  *       via embedded CRLF or terminal escape sequences. Covers C0

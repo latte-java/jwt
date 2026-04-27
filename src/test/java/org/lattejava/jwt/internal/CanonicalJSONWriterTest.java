@@ -23,16 +23,13 @@
 
 package org.lattejava.jwt.internal;
 
-import org.testng.annotations.Test;
+import java.math.*;
+import java.nio.charset.*;
+import java.util.*;
 
-import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import org.testng.annotations.*;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.expectThrows;
-import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.*;
 
 /**
  * Tests for {@link CanonicalJSONWriter}.
@@ -40,6 +37,89 @@ import static org.testng.Assert.assertFalse;
  * @author Daniel DeGroff
  */
 public class CanonicalJSONWriterTest {
+
+  @Test
+  public void emptyObject() {
+    // Use case: Empty object writes "{}"
+    String out = new String(CanonicalJSONWriter.write(new LinkedHashMap<>()),
+        StandardCharsets.UTF_8);
+    assertEquals(out, "{}");
+  }
+
+  @Test
+  public void lexOrderingByCodePoint() {
+    // Use case: Lex ordering by Unicode code point (NOT Unicode collation)
+    // ASCII lowercase 'a' (0x61) sorts before 'b' (0x62), and 'b' sorts before
+    // 'z' (0x7A). Uppercase letters (0x41-0x5A) sort before lowercase. Test with
+    // a non-ASCII key to confirm code-point semantics.
+    Map<String, Object> input = new LinkedHashMap<>();
+    input.put("z", "z");
+    input.put("a", "a");
+    input.put("B", "B");          // uppercase 0x42 < lowercase 'a' 0x61
+    input.put("\u00e9", "eacute"); // U+00E9 0xE9 -- after ASCII
+    input.put("\u00e0", "agrave"); // U+00E0 0xE0 -- before eacute
+
+    String out = new String(CanonicalJSONWriter.write(input), StandardCharsets.UTF_8);
+    String expected = "{\"B\":\"B\",\"a\":\"a\",\"z\":\"z\",\"\u00e0\":\"agrave\",\"\u00e9\":\"eacute\"}";
+    assertEquals(out, expected);
+  }
+
+  @Test
+  public void noWhitespace() {
+    // Use case: Whitespace is absent in canonical output
+    Map<String, Object> jwk = new LinkedHashMap<>();
+    jwk.put("kty", "oct");
+    jwk.put("k", "secret");
+
+    String out = new String(CanonicalJSONWriter.write(jwk), StandardCharsets.UTF_8);
+    assertFalse(out.contains(" "), "no spaces");
+    assertFalse(out.contains("\t"), "no tabs");
+    assertFalse(out.contains("\n"), "no newlines");
+    assertFalse(out.contains("\r"), "no CR");
+  }
+
+  @Test
+  public void primitiveValueTypes() {
+    // Use case: Numbers, booleans, and null serialize as JSON primitives
+    Map<String, Object> input = new LinkedHashMap<>();
+    input.put("a", BigInteger.valueOf(1));
+    input.put("b", Boolean.TRUE);
+    input.put("c", Boolean.FALSE);
+    input.put("d", null);
+
+    String out = new String(CanonicalJSONWriter.write(input), StandardCharsets.UTF_8);
+    assertEquals(out, "{\"a\":1,\"b\":true,\"c\":false,\"d\":null}");
+  }
+
+  @Test
+  public void rejectsArbitraryObject() {
+    // Use case: Unsupported value type (arbitrary Object) throws IllegalArgumentException
+    Map<String, Object> input = new LinkedHashMap<>();
+    input.put("a", new Object());
+    expectThrows(IllegalArgumentException.class, () -> CanonicalJSONWriter.write(input));
+  }
+
+  @Test
+  public void rejectsListValue() {
+    // Use case: Unsupported value type (List value) throws IllegalArgumentException
+    Map<String, Object> input = new LinkedHashMap<>();
+    input.put("a", java.util.Arrays.asList(1, 2, 3));
+    expectThrows(IllegalArgumentException.class, () -> CanonicalJSONWriter.write(input));
+  }
+
+  @Test
+  public void rejectsNestedMapValue() {
+    // Use case: Unsupported value type (Map nested value) throws IllegalArgumentException
+    Map<String, Object> input = new LinkedHashMap<>();
+    input.put("a", new LinkedHashMap<String, Object>());
+    expectThrows(IllegalArgumentException.class, () -> CanonicalJSONWriter.write(input));
+  }
+
+  @Test
+  public void rejectsNullInput() {
+    // Use case: null input throws IllegalArgumentException
+    expectThrows(IllegalArgumentException.class, () -> CanonicalJSONWriter.write(null));
+  }
 
   @Test
   public void rfc7638RSAExample() {
@@ -81,94 +161,11 @@ public class CanonicalJSONWriterTest {
   }
 
   @Test
-  public void noWhitespace() {
-    // Use case: Whitespace is absent in canonical output
-    Map<String, Object> jwk = new LinkedHashMap<>();
-    jwk.put("kty", "oct");
-    jwk.put("k", "secret");
-
-    String out = new String(CanonicalJSONWriter.write(jwk), StandardCharsets.UTF_8);
-    assertFalse(out.contains(" "), "no spaces");
-    assertFalse(out.contains("\t"), "no tabs");
-    assertFalse(out.contains("\n"), "no newlines");
-    assertFalse(out.contains("\r"), "no CR");
-  }
-
-  @Test
-  public void lexOrderingByCodePoint() {
-    // Use case: Lex ordering by Unicode code point (NOT Unicode collation)
-    // ASCII lowercase 'a' (0x61) sorts before 'b' (0x62), and 'b' sorts before
-    // 'z' (0x7A). Uppercase letters (0x41-0x5A) sort before lowercase. Test with
-    // a non-ASCII key to confirm code-point semantics.
-    Map<String, Object> input = new LinkedHashMap<>();
-    input.put("z", "z");
-    input.put("a", "a");
-    input.put("B", "B");          // uppercase 0x42 < lowercase 'a' 0x61
-    input.put("\u00e9", "eacute"); // U+00E9 0xE9 -- after ASCII
-    input.put("\u00e0", "agrave"); // U+00E0 0xE0 -- before eacute
-
-    String out = new String(CanonicalJSONWriter.write(input), StandardCharsets.UTF_8);
-    String expected = "{\"B\":\"B\",\"a\":\"a\",\"z\":\"z\",\"\u00e0\":\"agrave\",\"\u00e9\":\"eacute\"}";
-    assertEquals(out, expected);
-  }
-
-  @Test
-  public void primitiveValueTypes() {
-    // Use case: Numbers, booleans, and null serialize as JSON primitives
-    Map<String, Object> input = new LinkedHashMap<>();
-    input.put("a", BigInteger.valueOf(1));
-    input.put("b", Boolean.TRUE);
-    input.put("c", Boolean.FALSE);
-    input.put("d", null);
-
-    String out = new String(CanonicalJSONWriter.write(input), StandardCharsets.UTF_8);
-    assertEquals(out, "{\"a\":1,\"b\":true,\"c\":false,\"d\":null}");
-  }
-
-  @Test
-  public void rejectsNestedMapValue() {
-    // Use case: Unsupported value type (Map nested value) throws IllegalArgumentException
-    Map<String, Object> input = new LinkedHashMap<>();
-    input.put("a", new LinkedHashMap<String, Object>());
-    expectThrows(IllegalArgumentException.class, () -> CanonicalJSONWriter.write(input));
-  }
-
-  @Test
-  public void rejectsListValue() {
-    // Use case: Unsupported value type (List value) throws IllegalArgumentException
-    Map<String, Object> input = new LinkedHashMap<>();
-    input.put("a", java.util.Arrays.asList(1, 2, 3));
-    expectThrows(IllegalArgumentException.class, () -> CanonicalJSONWriter.write(input));
-  }
-
-  @Test
-  public void rejectsArbitraryObject() {
-    // Use case: Unsupported value type (arbitrary Object) throws IllegalArgumentException
-    Map<String, Object> input = new LinkedHashMap<>();
-    input.put("a", new Object());
-    expectThrows(IllegalArgumentException.class, () -> CanonicalJSONWriter.write(input));
-  }
-
-  @Test
-  public void emptyObject() {
-    // Use case: Empty object writes "{}"
-    String out = new String(CanonicalJSONWriter.write(new LinkedHashMap<>()),
-        StandardCharsets.UTF_8);
-    assertEquals(out, "{}");
-  }
-
-  @Test
   public void stringEscaping() {
     // Use case: String values with special chars are escaped per RFC 8259
     Map<String, Object> input = new LinkedHashMap<>();
     input.put("k", "a\"b\\c\nd");
     String out = new String(CanonicalJSONWriter.write(input), StandardCharsets.UTF_8);
     assertEquals(out, "{\"k\":\"a\\\"b\\\\c\\nd\"}");
-  }
-
-  @Test
-  public void rejectsNullInput() {
-    // Use case: null input throws IllegalArgumentException
-    expectThrows(IllegalArgumentException.class, () -> CanonicalJSONWriter.write(null));
   }
 }

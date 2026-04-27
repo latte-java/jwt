@@ -16,42 +16,25 @@
 
 package org.lattejava.jwt.jwks;
 
-import org.lattejava.jwt.Algorithm;
-import org.lattejava.jwt.KeyType;
-import org.lattejava.jwt.internal.Base64URL;
-import org.lattejava.jwt.internal.der.DerDecodingException;
-import org.lattejava.jwt.internal.der.DerInputStream;
-import org.lattejava.jwt.internal.der.ObjectIdentifier;
-import org.lattejava.jwt.internal.KeyUtils;
-import org.lattejava.jwt.internal.pem.PEM;
-import org.lattejava.jwt.X509;
-
-import java.io.IOException;
-import java.math.BigInteger;
-import java.security.Key;
-import java.security.PrivateKey;
-import java.security.PublicKey;
+import java.io.*;
+import java.math.*;
+import java.security.*;
+import java.security.cert.*;
 import java.security.cert.Certificate;
-import java.security.cert.CertificateEncodingException;
-import java.security.cert.X509Certificate;
-import java.security.interfaces.ECKey;
-import java.security.interfaces.ECPrivateKey;
-import java.security.interfaces.ECPublicKey;
-import java.security.interfaces.EdECPrivateKey;
-import java.security.interfaces.RSAPrivateCrtKey;
-import java.security.interfaces.RSAPrivateKey;
-import java.security.interfaces.RSAPublicKey;
-import java.util.Base64;
-import java.util.Collections;
-import java.util.Objects;
+import java.security.interfaces.*;
+import java.util.*;
 
-import static org.lattejava.jwt.jwks.JWKUtils.base64EncodeUint;
+import org.lattejava.jwt.*;
+import org.lattejava.jwt.internal.*;
+import org.lattejava.jwt.internal.der.*;
+import org.lattejava.jwt.internal.pem.*;
+
+import static org.lattejava.jwt.jwks.JWKUtils.*;
 
 /**
- * Internal helper that converts Java key material (PEM, PrivateKey,
- * PublicKey, Certificate) into {@link JSONWebKey} instances. Package-private
- * by design — external callers should use the {@code JSONWebKey.from(...)}
- * overloads instead.
+ * Internal helper that converts Java key material (PEM, PrivateKey, PublicKey, Certificate) into {@link JSONWebKey}
+ * instances. Package-private by design — external callers should use the {@code JSONWebKey.from(...)} overloads
+ * instead.
  *
  * @author Daniel DeGroff
  */
@@ -79,8 +62,8 @@ class JSONWebKeyConverter {
   JSONWebKey build(PrivateKey privateKey) {
     Objects.requireNonNull(privateKey);
     JSONWebKey.Builder b = JSONWebKey.builder()
-        .kty(getKeyType(privateKey))
-        .use("sig");
+                                     .kty(getKeyType(privateKey))
+                                     .use("sig");
 
     if (privateKey instanceof RSAPrivateKey rsaPrivateKey) {
       b.n(base64EncodeUint(rsaPrivateKey.getModulus()));
@@ -106,9 +89,15 @@ class JSONWebKeyConverter {
       b.crv(crv);
       if (crv != null) {
         switch (crv) {
-          case "P-256": b.alg(Algorithm.ES256); break;
-          case "P-384": b.alg(Algorithm.ES384); break;
-          case "P-521": b.alg(Algorithm.ES512); break;
+          case "P-256":
+            b.alg(Algorithm.ES256);
+            break;
+          case "P-384":
+            b.alg(Algorithm.ES384);
+            break;
+          case "P-521":
+            b.alg(Algorithm.ES512);
+            break;
         }
       }
 
@@ -135,14 +124,6 @@ class JSONWebKeyConverter {
     return b.build();
   }
 
-  private String getCurveOID(Key key) {
-    try {
-      return KeyUtils.getCurveName(key);
-    } catch (IOException e) {
-      throw new JSONWebKeyException("Failed to read OID from the public key", e);
-    }
-  }
-
   /**
    * Build a JSON Web Key from the provided PublicKey.
    */
@@ -150,8 +131,8 @@ class JSONWebKeyConverter {
     Objects.requireNonNull(publicKey);
     KeyType kty = getKeyType(publicKey);
     JSONWebKey.Builder b = JSONWebKey.builder()
-        .kty(kty)
-        .use("sig");
+                                     .kty(kty)
+                                     .use("sig");
 
     if (publicKey instanceof RSAPublicKey rsaPublicKey) {
       b.e(base64EncodeUint(rsaPublicKey.getPublicExponent()));
@@ -208,27 +189,23 @@ class JSONWebKeyConverter {
       String encodedCertificate = new String(Base64.getEncoder().encode(certificate.getEncoded()));
       // Rebuild using the existing fields plus alg + x5c chain.
       return JSONWebKey.builder()
-          .alg(alg)
-          .crv(base.crv())
-          .kid(base.kid())
-          .kty(base.kty())
-          .use(base.use())
-          .keyOps(base.key_ops())
-          .x5u(base.x5u())
-          .d(base.d()).dp(base.dp()).dq(base.dq()).e(base.e()).n(base.n())
-          .p(base.p()).q(base.q()).qi(base.qi())
-          .x(base.x()).y(base.y())
-          .x5c(Collections.singletonList(encodedCertificate))
-          .x5t(X509.thumbprintSHA1(x509Certificate))
-          .x5tS256(X509.thumbprintSHA256(x509Certificate))
-          .build();
+                       .alg(alg)
+                       .crv(base.crv())
+                       .kid(base.kid())
+                       .kty(base.kty())
+                       .use(base.use())
+                       .keyOps(base.key_ops())
+                       .x5u(base.x5u())
+                       .d(base.d()).dp(base.dp()).dq(base.dq()).e(base.e()).n(base.n())
+                       .p(base.p()).q(base.q()).qi(base.qi())
+                       .x(base.x()).y(base.y())
+                       .x5c(Collections.singletonList(encodedCertificate))
+                       .x5t(X509.thumbprintSHA1(x509Certificate))
+                       .x5tS256(X509.thumbprintSHA256(x509Certificate))
+                       .build();
     } catch (CertificateEncodingException e) {
       throw new JSONWebKeyException("Failed to encode X.509 certificate", e);
     }
-  }
-
-  private int getCoordinateLength(ECKey key) {
-    return (int) Math.ceil(key.getParams().getCurve().getField().getFieldSize() / 8d);
   }
 
   private Algorithm determineKeyAlgorithm(X509Certificate x509Certificate) {
@@ -258,6 +235,18 @@ class JSONWebKeyConverter {
     }
 
     return result;
+  }
+
+  private int getCoordinateLength(ECKey key) {
+    return (int) Math.ceil(key.getParams().getCurve().getField().getFieldSize() / 8d);
+  }
+
+  private String getCurveOID(Key key) {
+    try {
+      return KeyUtils.getCurveName(key);
+    } catch (IOException e) {
+      throw new JSONWebKeyException("Failed to read OID from the public key", e);
+    }
   }
 
   private KeyType getKeyType(Key key) {
