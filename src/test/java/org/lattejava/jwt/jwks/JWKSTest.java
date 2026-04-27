@@ -26,6 +26,7 @@ package org.lattejava.jwt.jwks;
 import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.BaseTest;
 import org.lattejava.jwt.ExpectedResponse;
+import org.lattejava.jwt.FetchLimits;
 import org.lattejava.jwt.Header;
 import org.lattejava.jwt.KeyType;
 import org.lattejava.jwt.OpenIDConnectConfiguration;
@@ -34,6 +35,7 @@ import org.testng.annotations.Test;
 import java.time.Duration;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
@@ -42,6 +44,7 @@ import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.expectThrows;
+import static org.testng.Assert.fail;
 
 public class JWKSTest extends BaseTest {
   private static final int PORT = 4244;
@@ -1136,5 +1139,149 @@ public class JWKSTest extends BaseTest {
     String kidless = "{\"kty\":\"RSA\",\"alg\":\"RS256\",\"use\":\"sig\",\"n\":\"" + n + "\",\"e\":\"" + e + "\"}";
     String keyed1 = "{\"kty\":\"RSA\",\"kid\":\"" + kid1 + "\",\"alg\":\"RS256\",\"use\":\"sig\",\"n\":\"" + n + "\",\"e\":\"" + e + "\"}";
     return "{\"keys\":[" + keyed0 + "," + kidless + "," + keyed1 + "]}";
+  }
+
+  // --- failFast and fetchOnce tests ---
+
+  @Test
+  public void builder_failFast_default_false_does_not_throw_on_initial_failure() throws Exception {
+    // Use case: failFast defaults to false; a network-unreachable URL returns a usable (empty) JWKS.
+    String url = "http://127.0.0.1:1/no-such-server";
+    try (JWKS jwks = JWKS.fromJWKS(url).build()) {
+      assertNotNull(jwks);
+      assertNull(jwks.lastSuccessfulRefresh());
+    }
+  }
+
+  @Test
+  public void builder_failFast_does_not_leak_threads_on_failure() throws Exception {
+    // Use case: when failFast throws, the scheduler is shut down and no jwks-* threads remain.
+    long before = countJWKSThreads();
+    String url = "http://127.0.0.1:1/no-such-server";
+    assertThrows(JWKSFetchException.class,
+        () -> JWKS.fromJWKS(url).failFast(true).scheduledRefresh(true).build());
+    Thread.sleep(200);
+    long after = countJWKSThreads();
+    assertTrue(after <= before, "expected no new jwks-* threads but went from " + before + " to " + after);
+  }
+
+  @Test
+  public void builder_failFast_throws_on_initial_failure() throws Exception {
+    // Use case: failFast(true) re-raises the initial fetch exception synchronously from build().
+    String url = "http://127.0.0.1:1/no-such-server";
+    assertThrows(JWKSFetchException.class,
+        () -> JWKS.fromJWKS(url).failFast(true).build());
+  }
+
+  @Test
+  public void builder_fetchLimits_applies_to_jwks_response_size_cap() throws Exception {
+    // Use case: a tight maxResponseBytes forces the initial fetch to fail; consecutiveFailures >= 1.
+    String url = startJWKSServerReturningLargeBody();
+    FetchLimits tight = FetchLimits.builder().maxResponseBytes(64).build();
+    try (JWKS jwks = JWKS.fromJWKS(url).fetchLimits(tight).build()) {
+      Thread.sleep(200);  // give async worker time to fail
+      assertTrue(jwks.consecutiveFailures() >= 1);
+    }
+  }
+
+  @Test
+  public void fetchOnce_rejects_cross_origin_redirect_by_default() throws Exception {
+    // Use case: fetchOnce uses sameOriginRedirectsOnly=true by default; cross-origin redirect is rejected.
+    String url = startServerThatRedirectsToDifferentHost();
+    JWKSFetchException ex = null;
+    try {
+      JWKS.fetchOnce(url);
+      fail("expected JWKSFetchException");
+    } catch (JWKSFetchException e) {
+      ex = e;
+    }
+    assertTrue(ex.getMessage().contains("Refusing cross-origin redirect"),
+        "Unexpected: " + ex.getMessage());
+  }
+
+  @Test
+  public void fetchOnce_returns_keys_from_jwks_endpoint() throws Exception {
+    // Use case: fetchOnce performs a one-shot fetch and returns all parsed keys.
+    String url = startJWKSServer("kid-1", "kid-2");
+    List<JSONWebKey> keys = JWKS.fetchOnce(url);
+    assertEquals(keys.stream().map(JSONWebKey::kid).toList(), List.of("kid-1", "kid-2"));
+  }
+
+  @Test
+  public void fetchOnce_with_FetchLimits_enforces_response_cap() throws Exception {
+    // Use case: a tight maxResponseBytes causes fetchOnce to throw JWKSFetchException.
+    String url = startJWKSServerReturningLargeBody();
+    FetchLimits tight = FetchLimits.builder().maxResponseBytes(64).build();
+    assertThrows(JWKSFetchException.class, () -> JWKS.fetchOnce(url, tight));
+  }
+
+  @Test
+  public void fetchOnce_with_customizer_applies_to_connection() throws Exception {
+    // Use case: the customizer Consumer is called before the request is sent.
+    AtomicBoolean called = new AtomicBoolean();
+    String url = startJWKSServer("kid-1");
+    JWKS.fetchOnce(url, conn -> { called.set(true); conn.setRequestProperty("X-Test", "y"); });
+    assertTrue(called.get());
+  }
+
+  private static long countJWKSThreads() {
+    return Thread.getAllStackTraces().keySet().stream()
+        .filter(t -> t.getName().startsWith("jwks-"))
+        .count();
+  }
+
+  /**
+   * Starts an HTTP server that serves a minimal JWKS body containing RSA keys with the given kids,
+   * and returns the URL to the endpoint.
+   */
+  private String startJWKSServer(String... kids) throws Exception {
+    StringBuilder keys = new StringBuilder();
+    String n = "sXch9_uEVyZw4d4XNjUMl7-DnbBwfXz9V_DwiHCNL5KNg6oHEcF7T7zJDSsBmWxAOKtc6vK4Ek5oN_R5kxdovfBdRRiClNxrRwmExZGMC8oBROHFEJiOFdDmqNJZbJ-w_e8KE2j_yWctgxX9LowhOWy0VEArLjr5tLqhwAtFm6gK_DfXXyZjU2DBBL_3Iaiu0YQz-jRR4lA1IAKVLA98m_4cP3pUvP6m9Eds3qpf0CzrI4DT9byOPQQX-FQOPaWTBcOJG6L9_kg7XYmbgrUKf6JhPYiTEVNvSXpHlxF6PoJiLvCNpyhGzFtOZf3GkmwNRbAdyOJ2HyjgNtuKnHcPlw";
+    for (int i = 0; i < kids.length; i++) {
+      if (i > 0) keys.append(",");
+      keys.append("{\"kty\":\"RSA\",\"kid\":\"").append(kids[i])
+          .append("\",\"alg\":\"RS256\",\"use\":\"sig\",\"n\":\"").append(n)
+          .append("\",\"e\":\"AQAB\"}");
+    }
+    String body = "{\"keys\":[" + keys + "]}";
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = body)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+    return "http://localhost:" + PORT + "/jwks.json";
+  }
+
+  /**
+   * Starts an HTTP server that returns a JWKS response body larger than 64 bytes
+   * (triggering a maxResponseBytes cap), and returns the URL to the endpoint.
+   */
+  private String startJWKSServerReturningLargeBody() throws Exception {
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.responseSize = 1024 * 10)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+    return "http://localhost:" + PORT + "/jwks.json";
+  }
+
+  /**
+   * Starts an HTTP server that redirects to a different host (cross-origin), and returns the
+   * URL to the redirecting endpoint.
+   */
+  private String startServerThatRedirectsToDifferentHost() throws Exception {
+    // Redirect from 127.0.0.1 to localhost — these are distinct hostnames even though both
+    // typically resolve to the loopback address, satisfying the cross-origin check.
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.status = 302)
+            .with(r -> r.redirectLocation = "http://localhost:" + PORT + "/jwks.json")));
+    return "http://127.0.0.1:" + PORT + "/jwks.json";
   }
 }

@@ -28,13 +28,17 @@ import org.lattejava.jwt.HTTPResponseException;
 import org.lattejava.jwt.Header;
 import org.lattejava.jwt.InvalidJWKException;
 import org.lattejava.jwt.OpenIDConnectConfiguration;
+import org.lattejava.jwt.OpenIDConnectException;
 import org.lattejava.jwt.Verifier;
 import org.lattejava.jwt.VerifierResolver;
 import org.lattejava.jwt.Verifiers;
+import org.lattejava.jwt.internal.HardenedJSON;
+import org.lattejava.jwt.internal.http.AbstractHTTPHelper;
 import org.lattejava.jwt.log.Logger;
 import org.lattejava.jwt.log.NoOpLogger;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.time.Clock;
 import java.time.Duration;
@@ -53,6 +57,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
@@ -73,6 +78,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
   private final FetchLimits fetchLimits;
   private final Consumer<HttpURLConnection> httpConnectionCustomizer;
   private final AtomicReference<CompletableFuture<Snapshot>> inflight = new AtomicReference<>();
+  volatile Throwable initialFetchFailure;
   private final Logger logger;
   private final Duration minRefreshInterval;
   private final AtomicReference<Snapshot> ref = new AtomicReference<>();
@@ -109,9 +115,11 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
       // empty snapshot stays; the worker continues asynchronously
     } catch (InterruptedException ie) {
       Thread.currentThread().interrupt();
-    } catch (ExecutionException ignored) {
+    } catch (ExecutionException ee) {
       // closed is necessarily false during construction, so the worker's
       // !closed guard always passes here and the failure snapshot is in ref
+      Throwable c = ee.getCause();
+      this.initialFetchFailure = (c != null) ? c : ee;
     }
     if (scheduledRefresh) {
       this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
@@ -177,6 +185,73 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
   }
 
   // --- Public static methods ---
+
+  /**
+   * Performs a one-shot fetch of the JWKS at {@code jwksURL} and returns the parsed keys.
+   * Uses {@link FetchLimits#defaults()} for all hardening limits.
+   *
+   * @param jwksURL the JWKS endpoint URL
+   * @return the list of parsed {@link JSONWebKey} objects
+   * @throws JWKSFetchException if the fetch or parse fails
+   */
+  public static List<JSONWebKey> fetchOnce(String jwksURL) {
+    return fetchOnce(jwksURL, FetchLimits.defaults(), null);
+  }
+
+  /**
+   * Performs a one-shot fetch of the JWKS at {@code jwksURL}, applying {@code customizer}
+   * to the connection before the request is sent.
+   *
+   * @param jwksURL    the JWKS endpoint URL
+   * @param customizer an optional consumer to configure the connection (e.g., set request headers)
+   * @return the list of parsed {@link JSONWebKey} objects
+   * @throws JWKSFetchException if the fetch or parse fails
+   */
+  public static List<JSONWebKey> fetchOnce(String jwksURL, Consumer<HttpURLConnection> customizer) {
+    return fetchOnce(jwksURL, FetchLimits.defaults(), customizer);
+  }
+
+  /**
+   * Performs a one-shot fetch of the JWKS at {@code jwksURL} with the supplied hardening limits.
+   *
+   * @param jwksURL the JWKS endpoint URL
+   * @param limits  the hardening limits to apply
+   * @return the list of parsed {@link JSONWebKey} objects
+   * @throws JWKSFetchException if the fetch or parse fails
+   */
+  public static List<JSONWebKey> fetchOnce(String jwksURL, FetchLimits limits) {
+    return fetchOnce(jwksURL, limits, null);
+  }
+
+  /**
+   * Performs a one-shot fetch of the JWKS at {@code jwksURL} with the supplied hardening limits
+   * and connection customizer.
+   *
+   * @param jwksURL    the JWKS endpoint URL
+   * @param limits     the hardening limits to apply
+   * @param customizer an optional consumer to configure the connection before sending
+   * @return the list of parsed {@link JSONWebKey} objects
+   * @throws JWKSFetchException if the fetch or parse fails
+   */
+  public static List<JSONWebKey> fetchOnce(String jwksURL, FetchLimits limits, Consumer<HttpURLConnection> customizer) {
+    Objects.requireNonNull(jwksURL, "jwksURL");
+    Objects.requireNonNull(limits, "limits");
+    HttpURLConnection connection = AbstractHTTPHelper.buildURLConnection(jwksURL,
+        (msg, cause) -> new JWKSFetchException(JWKSFetchException.Reason.NETWORK, msg, cause));
+    if (customizer != null) customizer.accept(connection);
+    try {
+      return AbstractHTTPHelper.get(connection,
+          limits.maxResponseBytes(),
+          limits.maxRedirects(),
+          !limits.allowCrossOriginRedirects(),
+          (conn, is) -> parseJWKSResponseKeys(conn, is, limits),
+          JWKS::classifyFetchFailure);
+    } catch (JWKSFetchException e) {
+      throw e;
+    } catch (RuntimeException e) {
+      throw classifyFetchFailure("JWKS fetch failed", e);
+    }
+  }
 
   public static Builder fromConfiguration(OpenIDConnectConfiguration cfg) {
     Objects.requireNonNull(cfg, "cfg");
@@ -281,8 +356,42 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
 
   // --- Private static methods ---
 
+  private static JWKSFetchException classifyFetchFailure(String msg, Throwable cause) {
+    if (cause instanceof HTTPResponseException) {
+      return new JWKSFetchException(JWKSFetchException.Reason.NON_2XX, msg, cause);
+    }
+    Throwable t = cause;
+    while (t != null) {
+      if (t instanceof IOException) {
+        return new JWKSFetchException(JWKSFetchException.Reason.NETWORK, msg, cause);
+      }
+      t = t.getCause();
+    }
+    return new JWKSFetchException(JWKSFetchException.Reason.PARSE, msg, cause);
+  }
+
   private static Duration maxOf(Duration a, Duration b) {
     return a.compareTo(b) >= 0 ? a : b;
+  }
+
+  private static List<JSONWebKey> parseJWKSResponseKeys(HttpURLConnection conn, InputStream is, FetchLimits limits) {
+    Map<String, Object> map = HardenedJSON.parse(is, limits);
+    Object keys = map.get("keys");
+    if (!(keys instanceof List<?> keyList)) {
+      throw new JWKSFetchException(JWKSFetchException.Reason.PARSE,
+          "JWKS endpoint [" + conn.getURL() + "] response is missing the [keys] array");
+    }
+    List<JSONWebKey> result = new ArrayList<>();
+    for (Object element : keyList) {
+      if (!(element instanceof Map<?, ?> elementMap)) {
+        throw new JWKSFetchException(JWKSFetchException.Reason.PARSE,
+            "JWKS endpoint [" + conn.getURL() + "] response contains a non-object element in [keys]");
+      }
+      @SuppressWarnings("unchecked")
+      Map<String, Object> typed = (Map<String, Object>) elementMap;
+      result.add(JSONWebKey.fromMap(typed));
+    }
+    return result;
   }
 
   private static HTTPResponseException unwrapHTTP(Throwable t) {
@@ -574,10 +683,32 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
 
   private JWKSResponse fetch() {
     return switch (source) {
-      case ISSUER     -> JSONWebKeySetHelper.retrieveJWKSResponseFromIssuer(url, httpConnectionCustomizer);
-      case WELL_KNOWN -> JSONWebKeySetHelper.retrieveJWKSResponseFromWellKnownConfiguration(url, httpConnectionCustomizer);
-      case JWKS       -> JSONWebKeySetHelper.retrieveJWKSResponseFromJWKS(url, httpConnectionCustomizer);
+      case ISSUER     -> JSONWebKeySetHelper.retrieveJWKSResponseFromIssuer(url, httpConnectionCustomizer);     // Task 13 inlines
+      case WELL_KNOWN -> JSONWebKeySetHelper.retrieveJWKSResponseFromWellKnownConfiguration(url, httpConnectionCustomizer);  // Task 13 inlines
+      case JWKS       -> fetchJWKSDirect(url);
     };
+  }
+
+  private JWKSResponse fetchJWKSDirect(String jwksURL) {
+    HttpURLConnection connection = AbstractHTTPHelper.buildURLConnection(jwksURL,
+        (msg, cause) -> new JWKSFetchException(JWKSFetchException.Reason.NETWORK, msg, cause));
+    if (httpConnectionCustomizer != null) httpConnectionCustomizer.accept(connection);
+    return AbstractHTTPHelper.get(connection,
+        fetchLimits.maxResponseBytes(),
+        fetchLimits.maxRedirects(),
+        !fetchLimits.allowCrossOriginRedirects(),
+        (conn, is) -> {
+          List<JSONWebKey> keys = parseJWKSResponseKeys(conn, is, fetchLimits);
+          int status = -1;
+          try { status = conn.getResponseCode(); } catch (IOException ignored) {}
+          Map<String, String> sel = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+          for (String name : new String[]{"Cache-Control", "Retry-After"}) {
+            String v = conn.getHeaderField(name);
+            if (v != null) sel.put(name, v);
+          }
+          return new JWKSResponse(keys, status, sel);
+        },
+        JWKS::classifyFetchFailure);
   }
 
   private void onTick() {
@@ -643,6 +774,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
         if (failureCause != null) {
           mine.completeExceptionally(failureCause);
         } else {
+          initialFetchFailure = null;
           mine.complete(fresh);
         }
       } finally {
@@ -705,7 +837,15 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
       if (refreshTimeout.isZero() || refreshTimeout.isNegative()) {
         throw new IllegalArgumentException("refreshTimeout must be > 0 but found [" + refreshTimeout + "]");
       }
-      return new JWKS(this);
+      JWKS jwks = new JWKS(this);
+      if (failFast && jwks.initialFetchFailure != null) {
+        Throwable f = jwks.initialFetchFailure;
+        if (jwks.scheduler != null) jwks.scheduler.shutdownNow();
+        if (f instanceof JWKSFetchException jfe) throw jfe;
+        if (f instanceof OpenIDConnectException oce) throw oce;
+        throw new JWKSFetchException(JWKSFetchException.Reason.PARSE, "Initial JWKS fetch failed", f);
+      }
+      return jwks;
     }
 
     public Builder cacheControlPolicy(CacheControlPolicy p) {
@@ -715,6 +855,16 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
 
     public Builder clock(Clock c) {
       this.clock = Objects.requireNonNull(c, "clock");
+      return this;
+    }
+
+    public Builder failFast(boolean failFast) {
+      this.failFast = failFast;
+      return this;
+    }
+
+    public Builder fetchLimits(FetchLimits limits) {
+      this.fetchLimits = Objects.requireNonNull(limits, "fetchLimits");
       return this;
     }
 
