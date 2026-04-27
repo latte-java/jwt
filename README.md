@@ -62,9 +62,9 @@ dependency(id: "org.lattejava:latte-jwt:1.0.0")
 
 The recommended entry points are the `Signers` and `Verifiers` factories. They take an `Algorithm` constant plus key material, and reject the wrong key type for the wrong family (e.g. passing a private key to `forHMAC`) so a misplaced key can't be silently coerced into the wrong algorithm family. A `Signer` or `Verifier` is safe to reuse and safe to share across threads.
 
-JWTs are built with an immutable fluent builder and serialized by a `JWTEncoder`. Decoding is done by a `JWTDecoder`, which takes a `VerifierResolver` — use `VerifierResolver.of(verifier)` for the simple single-key case, or `VerifierResolver.byKid(Map<String, Verifier>)` for a `kid`-indexed keyring.
+JWTs are built with an immutable fluent builder and serialized by a `JWTEncoder`. Decoding is done by a `JWTDecoder`, which takes a `VerifierResolver` — use `VerifierResolver.byKid(Map<String, Verifier>)` for a `kid`-indexed keyring, or `VerifierResolver.of(verifier)` to wrap a single verifier.
 
-For the happy path, `JWT.decode(encodedJWT, resolver)` (and an `(encodedJWT, resolver, validator)` overload) routes through a shared default `JWTDecoder` so you don't have to construct one. Build your own `JWTDecoder` with `JWTDecoder.builder()` when you need non-default settings — a custom `JSONProcessor`, `clockSkew`, allowed algorithms, `fixedTime`, etc. — and pass it to the `JWT.decode(encodedJWT, decoder, resolver)` overload (or call `decoder.decode(...)` directly).
+For the happy path, `JWT.decode(encodedJWT, verifier)` (and an `(encodedJWT, verifier, validator)` overload) routes through a shared default `JWTDecoder` so you don't have to construct one. The same overloads accept a `VerifierResolver` when you have a keyring. Build your own `JWTDecoder` with `JWTDecoder.builder()` when you need non-default settings — a custom `JSONProcessor`, `clockSkew`, allowed algorithms, `fixedTime`, etc. — and pass it to the `JWT.decode(encodedJWT, decoder, verifier)` overload (or call `decoder.decode(...)` directly).
 
 #### Sign and encode a JWT using HMAC
 ```java
@@ -100,11 +100,13 @@ Signer signer = HMACSigner.newSHA256Signer("too many secrets");
 Verifier verifier = Verifiers.forHMAC(Algorithm.HS256, "too many secrets");
 
 // Verify and decode the encoded string JWT to a rich object
-JWT jwt = JWT.decode(encodedJWT, VerifierResolver.of(verifier));
+JWT jwt = JWT.decode(encodedJWT, verifier);
 
 // Assert the subject of the JWT is as expected
 assertEquals(jwt.subject(), "f1e33ab3-027f-47c5-bb07-8dd8ab37a2d3");
 ```
+
+For a `kid`-indexed keyring or any other multi-key arrangement, pass a `VerifierResolver` instead — `JWT.decode(encodedJWT, VerifierResolver.byKid(Map<String, Verifier>))`.
 
 Alternate: `HMACVerifier.newVerifier("too many secrets")` produces the same verifier.
 
@@ -139,7 +141,7 @@ String pemPublicKey = Files.readString(Paths.get("public_key.pem"));
 Verifier verifier = Verifiers.forAsymmetric(Algorithm.RS256, pemPublicKey);
 
 // Verify and decode the encoded string JWT to a rich object
-JWT jwt = JWT.decode(encodedJWT, VerifierResolver.of(verifier));
+JWT jwt = JWT.decode(encodedJWT, verifier);
 
 // Assert the subject of the JWT is as expected
 assertEquals(jwt.subject(), "f1e33ab3-027f-47c5-bb07-8dd8ab37a2d3");
@@ -177,7 +179,7 @@ Alternate: `ECSigner.newSHA256Signer(pemPrivateKey)` (and the `SHA384` / `SHA512
 String pemPublicKey = Files.readString(Paths.get("public_key.pem"));
 Verifier verifier = Verifiers.forAsymmetric(Algorithm.ES256, pemPublicKey);
 
-JWT jwt = JWT.decode(encodedJWT, VerifierResolver.of(verifier));
+JWT jwt = JWT.decode(encodedJWT, verifier);
 
 assertEquals(jwt.subject(), "f1e33ab3-027f-47c5-bb07-8dd8ab37a2d3");
 ```
@@ -203,9 +205,11 @@ JWTDecoder decoder = JWTDecoder.builder()
                                .build();
 
 // Either pass the decoder to the JWT.decode helper:
-JWT jwt = JWT.decode(encodedJWT, decoder, VerifierResolver.of(verifier));
+JWT jwt = JWT.decode(encodedJWT, decoder, verifier);
 
-// ...or call decoder.decode(...) directly. Both forms are equivalent.
+// ...or call decoder.decode(...) directly. Both forms are equivalent (the
+// decoder.decode instance method takes a VerifierResolver -- wrap with
+// VerifierResolver.of(verifier) when you only have a single verifier).
 ```
 
 #### Verify a JWT adjusting for Clock Skew
@@ -339,6 +343,48 @@ This call triggers the one-time probe on first invocation, so the result is stab
 When using `Ed25519` or `Ed448`, the `alg` JWT header and the JWK `alg` property will be equal to the algorithm name. The legacy `EdDSA` value has been deprecated in JOSE in favor of the fully-specified algorithm names `Ed25519` and `Ed448`, and this library will not accept a JWT with `alg: EdDSA` out of the box.
 
 If you need to interoperate with a producer that still emits `alg: EdDSA`, you can support it by implementing your own `Verifier`. The interface has just two methods — `canVerify(Algorithm)` and `verify(byte[], byte[])` — so a small delegating shim that accepts `EdDSA` and dispatches to the appropriate `Ed25519` or `Ed448` verifier is straightforward to write.
+
+Wrap an `EdDSAVerifier` (which is already bound 1:1 to a single curve via its public key) and broaden `canVerify` to also recognize the `EdDSA` header value:
+
+```java
+import org.lattejava.jwt.Algorithm;
+import org.lattejava.jwt.Verifier;
+import org.lattejava.jwt.algorithm.ed.EdDSAVerifier;
+
+// Accepts the legacy JOSE header value [alg: EdDSA] and delegates to the
+// wrapped verifier. The wrapped EdDSAVerifier is locked to one curve at
+// construction time (Ed25519 or Ed448, derived from the public key), so
+// the shim cannot be coerced into using the wrong curve.
+public final class EdDSAAliasVerifier implements Verifier {
+  private final EdDSAVerifier delegate;
+
+  public EdDSAAliasVerifier(EdDSAVerifier delegate) {
+    this.delegate = delegate;
+  }
+
+  @Override
+  public boolean canVerify(Algorithm algorithm) {
+    return algorithm != null
+        && ("EdDSA".equals(algorithm.name()) || delegate.canVerify(algorithm));
+  }
+
+  @Override
+  public void verify(byte[] message, byte[] signature) {
+    delegate.verify(message, signature);
+  }
+}
+```
+
+Use it the same way as any other `Verifier`:
+
+```java
+String pemPublicKey = Files.readString(Paths.get("ed25519_public_key.pem"));
+Verifier verifier = new EdDSAAliasVerifier(EdDSAVerifier.newVerifier(pemPublicKey));
+
+JWT jwt = JWT.decode(encodedJWT, verifier);
+```
+
+The shim accepts both the legacy `EdDSA` and the fully-specified `Ed25519` / `Ed448` header values. Tokens that carry an `alg` other than those three (or that are signed with the wrong curve) still fail at the JCA verify step.
 
 ## JSON Web Keys
 

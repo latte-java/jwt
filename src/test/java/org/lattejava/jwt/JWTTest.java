@@ -660,6 +660,57 @@ public class JWTTest {
   }
 
   @Test
+  public void decode_single_verifier_shortcut_default_decoder() {
+    // Use case: JWT.decode(encodedJWT, verifier) is shorthand for JWT.decode(encodedJWT, VerifierResolver.of(verifier)).
+    String encoded = encodeFreshJWT();
+    Verifier verifier = Verifiers.forHMAC(Algorithm.HS256, DECODE_SECRET);
+
+    JWT decoded = JWT.decode(encoded, verifier);
+    assertEquals(decoded.subject(), "decode-helpers");
+  }
+
+  @Test
+  public void decode_single_verifier_shortcut_supplied_decoder() {
+    // Use case: JWT.decode(encodedJWT, decoder, verifier) is shorthand for the resolver overload.
+    String encoded = encodeFreshJWT();
+    JWTDecoder decoder = JWTDecoder.builder().clockSkew(Duration.ofSeconds(30)).build();
+    Verifier verifier = Verifiers.forHMAC(Algorithm.HS256, DECODE_SECRET);
+
+    JWT decoded = JWT.decode(encoded, decoder, verifier);
+    assertEquals(decoded.subject(), "decode-helpers");
+  }
+
+  @Test
+  public void decode_single_verifier_shortcut_with_validator() {
+    // Use case: the verifier+validator overload runs the validator with the decoded JWT.
+    String encoded = encodeFreshJWT();
+    Verifier verifier = Verifiers.forHMAC(Algorithm.HS256, DECODE_SECRET);
+    AtomicReference<JWT> seen = new AtomicReference<>();
+
+    JWT decoded = JWT.decode(encoded, verifier, seen::set);
+    assertSame(seen.get(), decoded);
+  }
+
+  @Test
+  public void decode_single_verifier_shortcut_with_supplied_decoder_and_validator() {
+    // Use case: the (decoder, verifier, validator) overload routes the supplied decoder and runs the validator.
+    String encoded = encodeFreshJWT();
+    JWTDecoder decoder = JWTDecoder.builder().clockSkew(Duration.ofSeconds(30)).build();
+    Verifier verifier = Verifiers.forHMAC(Algorithm.HS256, DECODE_SECRET);
+    AtomicReference<JWT> seen = new AtomicReference<>();
+
+    JWT decoded = JWT.decode(encoded, decoder, verifier, seen::set);
+    assertSame(seen.get(), decoded);
+  }
+
+  @Test
+  public void decode_single_verifier_shortcut_rejects_null_verifier() {
+    // Use case: a null verifier flows through VerifierResolver.of, which throws NPE.
+    String encoded = encodeFreshJWT();
+    expectThrows(NullPointerException.class, () -> JWT.decode(encoded, (Verifier) null));
+  }
+
+  @Test
   public void getDefault_returns_shared_singleton() {
     // Use case: JWTDecoder.getDefault() returns the same instance on repeated calls.
     assertSame(JWTDecoder.getDefault(), JWTDecoder.getDefault());

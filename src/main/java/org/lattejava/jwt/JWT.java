@@ -110,6 +110,18 @@ public final class JWT {
     }
 
     /**
+     * Single-verifier convenience overload. Equivalent to
+     * {@code decode(encodedJWT, VerifierResolver.of(verifier))}.
+     *
+     * @param encodedJWT the compact JWS string; must be non-null
+     * @param verifier   the verifier; must be non-null
+     * @return the decoded {@link JWT}
+     */
+    public static JWT decode(String encodedJWT, Verifier verifier) {
+        return JWTDecoder.getDefault().decode(encodedJWT, VerifierResolver.of(verifier));
+    }
+
+    /**
      * Decodes a JWT using the supplied {@link JWTDecoder} and {@link VerifierResolver}. Signature verification runs
      * BEFORE payload deserialization so a malformed payload cannot be observed until the signature has been validated.
      *
@@ -120,6 +132,19 @@ public final class JWT {
      */
     public static JWT decode(String encodedJWT, JWTDecoder decoder, VerifierResolver resolver) {
         return decoder.decode(encodedJWT, resolver);
+    }
+
+    /**
+     * Single-verifier convenience overload. Equivalent to
+     * {@code decode(encodedJWT, decoder, VerifierResolver.of(verifier))}.
+     *
+     * @param encodedJWT the compact JWS string; must be non-null
+     * @param decoder    the JWT decoder; must be non-null
+     * @param verifier   the verifier; must be non-null
+     * @return the decoded {@link JWT}
+     */
+    public static JWT decode(String encodedJWT, JWTDecoder decoder, Verifier verifier) {
+        return decoder.decode(encodedJWT, VerifierResolver.of(verifier));
     }
 
     /**
@@ -140,6 +165,19 @@ public final class JWT {
     }
 
     /**
+     * Single-verifier convenience overload. Equivalent to
+     * {@code decode(encodedJWT, VerifierResolver.of(verifier), validator)}.
+     *
+     * @param encodedJWT the compact JWS string; must be non-null
+     * @param verifier   the verifier; must be non-null
+     * @param validator  optional post-decode validator; may be null
+     * @return the decoded {@link JWT}
+     */
+    public static JWT decode(String encodedJWT, Verifier verifier, Consumer<JWT> validator) {
+        return JWTDecoder.getDefault().decode(encodedJWT, VerifierResolver.of(verifier), validator);
+    }
+
+    /**
      * Decodes a JWT using the supplied {@link JWTDecoder} and {@link VerifierResolver}, with an optional post-decode
      * validator. The validator runs after signature verification and built-in time validation; implementations throw
      * any {@link JWTException} subclass to reject the token.
@@ -152,6 +190,20 @@ public final class JWT {
      */
     public static JWT decode(String encodedJWT, JWTDecoder decoder, VerifierResolver resolver, Consumer<JWT> validator) {
         return decoder.decode(encodedJWT, resolver, validator);
+    }
+
+    /**
+     * Single-verifier convenience overload. Equivalent to
+     * {@code decode(encodedJWT, decoder, VerifierResolver.of(verifier), validator)}.
+     *
+     * @param encodedJWT the compact JWS string; must be non-null
+     * @param decoder    the JWT decoder; must be non-null
+     * @param verifier   the verifier; must be non-null
+     * @param validator  optional post-decode validator; may be null
+     * @return the decoded {@link JWT}
+     */
+    public static JWT decode(String encodedJWT, JWTDecoder decoder, Verifier verifier, Consumer<JWT> validator) {
+        return decoder.decode(encodedJWT, VerifierResolver.of(verifier), validator);
     }
 
     /**
