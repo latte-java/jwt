@@ -68,8 +68,7 @@ For the happy path, `JWT.decode(encodedJWT, verifier)` (and an `(encodedJWT, ver
 
 #### Sign and encode a JWT using HMAC
 ```java
-// Generate a fresh HMAC secret sized for the chosen algorithm. Persist this
-// so the verifier can reuse the exact same value.
+// Generate and persist a secret; the verifier needs the same value.
 String secret = HMACSecrets.generateSHA256();
 
 // Build an HMAC signer for HS256
@@ -96,10 +95,7 @@ String secret512 = HMACSecrets.generateSHA512();
 Signer signer512 = Signers.forHMAC(Algorithm.HS512, secret512);
 ```
 
-Alternate: the family-specific static factories are still available if you prefer them.
-```java
-Signer signer = HMACSigner.newSHA256Signer(secret);
-```
+Alternate: `HMACSigner.newSHA256Signer(secret)` is the family-specific static factory.
 
 #### Verify and decode a JWT using HMAC
 ```java
