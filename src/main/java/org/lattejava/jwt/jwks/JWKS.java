@@ -41,6 +41,7 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -243,8 +244,17 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
     return ref.get().consecutiveFailures();
   }
 
-  public Set<String> currentKids() {
-    return Collections.unmodifiableSet(new LinkedHashSet<>(ref.get().byKid().keySet()));
+  public JSONWebKey get(String kid) {
+    if (kid == null) return null;
+    return ref.get().jwkByKid().get(kid);
+  }
+
+  public Set<String> keyIds() {
+    return Collections.unmodifiableSet(new LinkedHashSet<>(ref.get().jwkByKid().keySet()));
+  }
+
+  public Collection<JSONWebKey> keys() {
+    return Collections.unmodifiableCollection(new ArrayList<>(ref.get().allKeys()));
   }
 
   public Instant lastFailedRefresh() {
@@ -404,12 +414,17 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
       try {
         v = Verifiers.fromJWK(jwk);
       } catch (InvalidJWKException reject) {
-        if (reject.reason() == InvalidJWKException.Reason.ALG_CRV_MISMATCH) {
-          if (logger.isWarnEnabled()) {
-            logger.warn("JWK rejected [" + reject.reason() + "]: " + reject.getMessage());
+        if (reject.reason() == InvalidJWKException.Reason.MISSING_KID) {
+          // Kidless JWKs land in allKeys (visible via keys()) but cannot be resolved by kid.
+          allKeys.add(jwk);
+        } else {
+          if (reject.reason() == InvalidJWKException.Reason.ALG_CRV_MISMATCH) {
+            if (logger.isWarnEnabled()) {
+              logger.warn("JWK rejected [" + reject.reason() + "]: " + reject.getMessage());
+            }
+          } else if (logger.isDebugEnabled()) {
+            logger.debug("JWK rejected [" + reject.reason() + "]: " + reject.getMessage());
           }
-        } else if (logger.isDebugEnabled()) {
-          logger.debug("JWK rejected [" + reject.reason() + "]: " + reject.getMessage());
         }
         continue;
       }

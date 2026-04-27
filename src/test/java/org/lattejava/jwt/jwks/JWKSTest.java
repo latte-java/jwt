@@ -105,7 +105,7 @@ public class JWKSTest extends BaseTest {
     JWKS source = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json").build();
     assertNotNull(source.lastSuccessfulRefresh());
     assertEquals(source.consecutiveFailures(), 0);
-    assertEquals(source.currentKids(), java.util.Set.of("k1"));
+    assertEquals(source.keyIds(), java.util.Set.of("k1"));
     source.close();
   }
 
@@ -213,7 +213,7 @@ public class JWKSTest extends BaseTest {
             .with(r -> r.contentType = "application/json")));
 
     JWKS source = JWKS.fromIssuer("http://localhost:" + PORT).build();
-    assertEquals(source.currentKids(), java.util.Set.of("k1"));
+    assertEquals(source.keyIds(), java.util.Set.of("k1"));
     source.close();
   }
 
@@ -236,8 +236,109 @@ public class JWKSTest extends BaseTest {
 
     JWKS source = JWKS.fromWellKnown(
         "http://localhost:" + PORT + "/.custom-discovery").build();
-    assertEquals(source.currentKids(), java.util.Set.of("k1"));
+    assertEquals(source.keyIds(), java.util.Set.of("k1"));
     source.close();
+  }
+
+  @Test
+  public void get_returns_jwk_for_known_kid() throws Exception {
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = RSA_JWKS_BODY)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+    try (JWKS jwks = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json").build()) {
+      assertNotNull(jwks.get("k1"));
+      assertEquals(jwks.get("k1").kid(), "k1");
+    }
+  }
+
+  @Test
+  public void get_returns_null_for_null_kid() throws Exception {
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = RSA_JWKS_BODY)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+    try (JWKS jwks = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json").build()) {
+      assertNull(jwks.get(null));
+    }
+  }
+
+  @Test
+  public void get_returns_null_for_unknown_kid() throws Exception {
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = RSA_JWKS_BODY)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+    try (JWKS jwks = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json").build()) {
+      assertNull(jwks.get("not-present"));
+    }
+  }
+
+  @Test
+  public void keyIds_excludes_null_kids() throws Exception {
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = rsaJWKSBodyWithKidlessMiddle("kid-A", "kid-B"))
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+    try (JWKS jwks = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json").build()) {
+      assertEquals(jwks.keyIds(), new java.util.LinkedHashSet<>(java.util.List.of("kid-A", "kid-B")));
+    }
+  }
+
+  @Test
+  public void keyIds_returns_unmodifiable_view() throws Exception {
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = RSA_JWKS_BODY)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+    try (JWKS jwks = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json").build()) {
+      assertThrows(UnsupportedOperationException.class, () -> jwks.keyIds().clear());
+    }
+  }
+
+  @Test
+  public void keys_preserves_insertion_order_and_includes_kidless() throws Exception {
+    // Use case: kidless JWKs land in keys() but not in keyIds() / get(kid).
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = rsaJWKSBodyWithKidlessMiddle("kid-A", "kid-B"))
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+    try (JWKS jwks = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json").build()) {
+      java.util.List<String> kids = jwks.keys().stream().map(JSONWebKey::kid).toList();
+      assertEquals(kids, java.util.Arrays.asList("kid-A", null, "kid-B"));
+    }
+  }
+
+  @Test
+  public void keys_returns_unmodifiable_view() throws Exception {
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = RSA_JWKS_BODY)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+    try (JWKS jwks = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json").build()) {
+      assertThrows(UnsupportedOperationException.class, () -> jwks.keys().clear());
+    }
   }
 
   @Test
@@ -256,7 +357,7 @@ public class JWKSTest extends BaseTest {
     JWKS source = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json").build();
     assertNull(source.lastSuccessfulRefresh());
     assertEquals(source.consecutiveFailures(), 1);
-    assertTrue(source.currentKids().isEmpty());
+    assertTrue(source.keyIds().isEmpty());
     JWKSFetchException ex = expectThrows(JWKSFetchException.class, source::refresh);
     assertEquals(ex.reason(), JWKSFetchException.Reason.EMPTY_RESULT);
     source.close();
@@ -286,6 +387,26 @@ public class JWKSTest extends BaseTest {
     @Override public boolean isWarnEnabled() { return true; }
     @Override public boolean isErrorEnabled() { return true; }
     @Override public void setLevel(org.lattejava.jwt.log.Level level) {}
+  }
+
+  @Test
+  public void kidless_only_jwks_is_a_valid_snapshot() throws Exception {
+    // Use case: a JWKS containing only kidless JWKs is permitted; keys() returns them,
+    // but keyIds() and resolve() can't match anything. build() must NOT throw.
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = rsaJWKSBodyAllKidless())
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+    try (JWKS jwks = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json").build()) {
+      assertEquals(jwks.keys().size(), 1);
+      assertTrue(jwks.keyIds().isEmpty());
+      assertNull(jwks.get("anything"));
+      assertEquals(jwks.consecutiveFailures(), 0);
+      assertNotNull(jwks.lastSuccessfulRefresh());
+    }
   }
 
   @Test
@@ -706,7 +827,7 @@ public class JWKSTest extends BaseTest {
         .minRefreshInterval(Duration.ofMillis(100))
         .refreshInterval(Duration.ofMillis(100))
         .build();
-    assertEquals(source.currentKids(), java.util.Set.of("k1"));
+    assertEquals(source.keyIds(), java.util.Set.of("k1"));
 
     b.responses.get("/jwks.json").response = body2;
     Thread.sleep(150);  // pass nextDueAt window
@@ -726,8 +847,24 @@ public class JWKSTest extends BaseTest {
         .build();
     assertNull(source.lastSuccessfulRefresh());
     assertEquals(source.consecutiveFailures(), 1);
-    assertTrue(source.currentKids().isEmpty());
+    assertTrue(source.keyIds().isEmpty());
     source.close();
+  }
+
+  @Test
+  public void duplicate_kid_first_write_wins() throws Exception {
+    // Use case: a JWKS with two entries sharing the same kid keeps only the first; subsequent ones are dropped.
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = RSA_JWKS_DUPLICATE_KID_BODY)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+    try (JWKS jwks = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json").build()) {
+      assertEquals(jwks.keys().size(), 1);
+      assertNotNull(jwks.get("k1"));
+    }
   }
 
   @Test
@@ -872,5 +1009,30 @@ public class JWKSTest extends BaseTest {
       return out;
     }
     return bytes;
+  }
+
+  /**
+   * Returns a JWKS JSON body containing a single kidless RSA JWK.
+   */
+  private static String rsaJWKSBodyAllKidless() {
+    String n = "sXch9_uEVyZw4d4XNjUMl7-DnbBwfXz9V_DwiHCNL5KNg6oHEcF7T7zJDSsBmWxAOKtc6vK4Ek5oN_R5kxdovfBdRRiClNxrRwmExZGMC8oBROHFEJiOFdDmqNJZbJ-w_e8KE2j_yWctgxX9LowhOWy0VEArLjr5tLqhwAtFm6gK_DfXXyZjU2DBBL_3Iaiu0YQz-jRR4lA1IAKVLA98m_4cP3pUvP6m9Eds3qpf0CzrI4DT9byOPQQX-FQOPaWTBcOJG6L9_kg7XYmbgrUKf6JhPYiTEVNvSXpHlxF6PoJiLvCNpyhGzFtOZf3GkmwNRbAdyOJ2HyjgNtuKnHcPlw";
+    String e = "AQAB";
+    String kidless = "{\"kty\":\"RSA\",\"alg\":\"RS256\",\"use\":\"sig\",\"n\":\"" + n + "\",\"e\":\"" + e + "\"}";
+    return "{\"keys\":[" + kidless + "]}";
+  }
+
+  /**
+   * Returns a JWKS JSON body containing three RSA JWKs: [kid0, kidless, kid1]. The kidless key
+   * uses the same modulus/exponent as the keyed entries; tests use this to verify that kidless
+   * JWKs appear in {@code keys()} but not in {@code keyIds()} or {@code get(kid)}.
+   */
+  private static String rsaJWKSBodyWithKidlessMiddle(String kid0, String kid1) {
+    // Reuse a fixed modulus/exponent from the test RSA key -- distinct kids so no duplicate-kid drop.
+    String n = "sXch9_uEVyZw4d4XNjUMl7-DnbBwfXz9V_DwiHCNL5KNg6oHEcF7T7zJDSsBmWxAOKtc6vK4Ek5oN_R5kxdovfBdRRiClNxrRwmExZGMC8oBROHFEJiOFdDmqNJZbJ-w_e8KE2j_yWctgxX9LowhOWy0VEArLjr5tLqhwAtFm6gK_DfXXyZjU2DBBL_3Iaiu0YQz-jRR4lA1IAKVLA98m_4cP3pUvP6m9Eds3qpf0CzrI4DT9byOPQQX-FQOPaWTBcOJG6L9_kg7XYmbgrUKf6JhPYiTEVNvSXpHlxF6PoJiLvCNpyhGzFtOZf3GkmwNRbAdyOJ2HyjgNtuKnHcPlw";
+    String e = "AQAB";
+    String keyed0 = "{\"kty\":\"RSA\",\"kid\":\"" + kid0 + "\",\"alg\":\"RS256\",\"use\":\"sig\",\"n\":\"" + n + "\",\"e\":\"" + e + "\"}";
+    String kidless = "{\"kty\":\"RSA\",\"alg\":\"RS256\",\"use\":\"sig\",\"n\":\"" + n + "\",\"e\":\"" + e + "\"}";
+    String keyed1 = "{\"kty\":\"RSA\",\"kid\":\"" + kid1 + "\",\"alg\":\"RS256\",\"use\":\"sig\",\"n\":\"" + n + "\",\"e\":\"" + e + "\"}";
+    return "{\"keys\":[" + keyed0 + "," + kidless + "," + keyed1 + "]}";
   }
 }
