@@ -2,34 +2,31 @@
  * Copyright (c) 2016-2025, The Latte Project, All Rights Reserved
  * License: MIT (See LICENSE file in root)
  */
-jacksonVersion = "2.21.2"
-slf4jVersion = "2.0.17"
-testngVersion = "7.11.0"
 
 project(group: "org.lattejava", name: "jwt", version: "0.1.0", licenses: ["MIT"]) {
   workflow {
     standard()
   }
 
-//  publishWorkflow {
-//    s3(endpoint: global.latteRepositoryS3URL, bucket: "latte-repository",
-//       accessKeyId: global.latteRepositoryS3AccessKeyID, secretAccessKey: global.latteRepositoryS3SecretAccessKey)
-//  }
+  publishWorkflow {
+    s3(endpoint: global.latteRepositoryS3URL, bucket: "latte-repository",
+       accessKeyId: global.latteRepositoryS3AccessKeyID, secretAccessKey: global.latteRepositoryS3SecretAccessKey)
+  }
 
   dependencies {
     group(name: "compile") {
       // Ha! Just kidding. This is pure Java - no dependencies.
     }
     group(name: "test-compile", export: false) {
-      dependency(id: "com.fasterxml.jackson.core:jackson-core:${jacksonVersion}")
-      dependency(id: "com.fasterxml.jackson.core:jackson-databind:${jacksonVersion}")
+      dependency(id: "com.fasterxml.jackson.core:jackson-core:2.21.2")
+      dependency(id: "com.fasterxml.jackson.core:jackson-databind:2.21.2")
       dependency(id: "org.bouncycastle:bc-fips:2.1.2")
-      dependency(id: "org.testng:testng:${testngVersion}")
+      dependency(id: "org.testng:testng:7.12.0")
       // Gets rid of SLF warnings on test run
       //   SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
       //   SLF4J: Defaulting to no-operation (NOP) logger implementation
       //   SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
-      dependency(id: "org.slf4j:slf4j-nop:${slf4jVersion}")
+      dependency(id: "org.slf4j:slf4j-nop:2.0.17")
     }
   }
 
