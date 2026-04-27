@@ -156,28 +156,6 @@ public abstract class AbstractHTTPHelper {
   }
 
   /**
-   * Performs a GET on the supplied connection, manually following up to
-   * {@code maxRedirects} 3xx responses, capping each hop's body at
-   * {@code maxResponseBytes} bytes. Redirects are followed permissively
-   * (cross-origin redirects are allowed). Delegates to
-   * {@link #get(HttpURLConnection, int, int, boolean, BiFunction, BiFunction)} with
-   * {@code sameOriginRedirectsOnly=false}.
-   *
-   * @param urlConnection    the prepared {@link HttpURLConnection} (the helper sets
-   *                         the request method and disables auto-redirect)
-   * @param maxResponseBytes per-hop body cap; must be strictly positive (the
-   *                         cap cannot be disabled)
-   * @param maxRedirects     maximum number of 3xx redirects to follow before
-   *                         aborting; {@code 0} disables redirect following
-   * @param consumer         response-body parser
-   * @param exception        wrapper for any {@link IOException} surfaced
-   * @throws IllegalArgumentException if {@code maxResponseBytes <= 0}
-   */
-  protected static <T> T get(HttpURLConnection urlConnection, int maxResponseBytes, int maxRedirects, BiFunction<HttpURLConnection, InputStream, T> consumer, BiFunction<String, Throwable, ? extends RuntimeException> exception) {
-    return get(urlConnection, maxResponseBytes, maxRedirects, false, consumer, exception);
-  }
-
-  /**
    * Open and prepare an {@link HttpURLConnection} for {@code endpoint}.
    *
    * @param endpoint  the URL to open
