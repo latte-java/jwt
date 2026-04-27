@@ -191,8 +191,8 @@ public class VerifiersFromJWKTest extends BaseTest {
 
   @Test(dataProvider = "validAlgCrvPairs")
   public void fromJWK_validAlgCrvPair_producesUsableVerifier(String fixturePath, Algorithm expectedAlg) throws IOException {
-    // Use case: spec §2.8 — each (alg, kty, crv) pair in the valid matrix must produce a Verifier
-    // bound to the expected algorithm. Adds a kid since fixtures don't carry one.
+    // Use case: each (alg, kty, crv) pair in the valid matrix must produce a Verifier bound to
+    // the expected algorithm. Adds a kid since fixtures don't carry one.
     @SuppressWarnings("unchecked")
     Map<String, Object> m = new org.lattejava.jwt.LatteJSONProcessor().deserialize(Files.readAllBytes(Paths.get(fixturePath)));
     m.put("kid", "k1");

@@ -33,7 +33,7 @@
  *       singleflight coalescing, {@code Cache-Control}/{@code Retry-After}
  *       honoring, and rotation. Construct via {@code fromIssuer},
  *       {@code fromWellKnown}, {@code fromJWKS}, {@code fromConfiguration},
- *       or {@code of(...)} for in-memory keys. Use {@code fetchOnce(...)}
+ *       or {@code of(...)} for in-memory keys. Use {@code fetch(...)}
  *       for a one-shot fetch returning a {@code List<JSONWebKey>}.</li>
  *   <li>{@link org.lattejava.jwt.jwks.JSONWebKey} — the JWK type itself. Use
  *       {@link org.lattejava.jwt.jwks.JSONWebKey#toPublicKey()} or

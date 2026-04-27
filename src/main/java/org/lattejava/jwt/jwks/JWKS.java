@@ -34,6 +34,7 @@ import org.lattejava.jwt.Verifier;
 import org.lattejava.jwt.VerifierResolver;
 import org.lattejava.jwt.Verifiers;
 import org.lattejava.jwt.internal.HardenedJSON;
+import org.lattejava.jwt.internal.MessageSanitizer;
 import org.lattejava.jwt.internal.http.AbstractHTTPHelper;
 import org.lattejava.jwt.log.Logger;
 import org.lattejava.jwt.log.NoOpLogger;
@@ -79,7 +80,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
   private final FetchLimits fetchLimits;
   private final Consumer<HttpURLConnection> httpConnectionCustomizer;
   private final AtomicReference<CompletableFuture<Snapshot>> inflight = new AtomicReference<>();
-  volatile Throwable initialFetchFailure;
+  private volatile Throwable initialFetchFailure;
   private final Logger logger;
   volatile String lockedJWKSURI = null;
   private final Duration minRefreshInterval;
@@ -196,8 +197,8 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
    * @return the list of parsed {@link JSONWebKey} objects
    * @throws JWKSFetchException if the fetch or parse fails
    */
-  public static List<JSONWebKey> fetchOnce(String jwksURL) {
-    return fetchOnce(jwksURL, FetchLimits.defaults(), null);
+  public static List<JSONWebKey> fetch(String jwksURL) {
+    return fetch(jwksURL, FetchLimits.defaults(), null);
   }
 
   /**
@@ -209,8 +210,8 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
    * @return the list of parsed {@link JSONWebKey} objects
    * @throws JWKSFetchException if the fetch or parse fails
    */
-  public static List<JSONWebKey> fetchOnce(String jwksURL, Consumer<HttpURLConnection> customizer) {
-    return fetchOnce(jwksURL, FetchLimits.defaults(), customizer);
+  public static List<JSONWebKey> fetch(String jwksURL, Consumer<HttpURLConnection> customizer) {
+    return fetch(jwksURL, FetchLimits.defaults(), customizer);
   }
 
   /**
@@ -221,8 +222,8 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
    * @return the list of parsed {@link JSONWebKey} objects
    * @throws JWKSFetchException if the fetch or parse fails
    */
-  public static List<JSONWebKey> fetchOnce(String jwksURL, FetchLimits limits) {
-    return fetchOnce(jwksURL, limits, null);
+  public static List<JSONWebKey> fetch(String jwksURL, FetchLimits limits) {
+    return fetch(jwksURL, limits, null);
   }
 
   /**
@@ -235,7 +236,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
    * @return the list of parsed {@link JSONWebKey} objects
    * @throws JWKSFetchException if the fetch or parse fails
    */
-  public static List<JSONWebKey> fetchOnce(String jwksURL, FetchLimits limits, Consumer<HttpURLConnection> customizer) {
+  public static List<JSONWebKey> fetch(String jwksURL, FetchLimits limits, Consumer<HttpURLConnection> customizer) {
     Objects.requireNonNull(jwksURL, "jwksURL");
     Objects.requireNonNull(limits, "limits");
     HttpURLConnection connection = AbstractHTTPHelper.buildURLConnection(jwksURL,
@@ -381,13 +382,13 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
     Object keys = map.get("keys");
     if (!(keys instanceof List<?> keyList)) {
       throw new JWKSFetchException(JWKSFetchException.Reason.PARSE,
-          "JWKS endpoint [" + conn.getURL() + "] response is missing the [keys] array");
+          "JWKS endpoint [" + MessageSanitizer.forMessage(conn.getURL().toString()) + "] response is missing the [keys] array");
     }
     List<JSONWebKey> result = new ArrayList<>();
     for (Object element : keyList) {
       if (!(element instanceof Map<?, ?> elementMap)) {
         throw new JWKSFetchException(JWKSFetchException.Reason.PARSE,
-            "JWKS endpoint [" + conn.getURL() + "] response contains a non-object element in [keys]");
+            "JWKS endpoint [" + MessageSanitizer.forMessage(conn.getURL().toString()) + "] response contains a non-object element in [keys]");
       }
       @SuppressWarnings("unchecked")
       Map<String, Object> typed = (Map<String, Object>) elementMap;
@@ -550,12 +551,12 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
     CacheControlDirectives d = parseCacheControl(cc);
     if (d.malformed()) {
       if (logger.isWarnEnabled()) {
-        logger.warn("Malformed Cache-Control header [" + cc + "]; treating as absent");
+        logger.warn("Malformed Cache-Control header [" + MessageSanitizer.forMessage(cc) + "]; treating as absent");
       }
       return refreshInterval;
     }
     if (d.noStore()) {
-      // no-store and max-age=0 both clamp to the floor under CLAMP per spec §2.6
+      // no-store is clamped to the minRefreshInterval floor (same treatment as max-age=0 below).
       return minRefreshInterval;
     }
     if (d.maxAge() == null) {
@@ -601,7 +602,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
    */
   private Snapshot doRefreshOrThrow(Snapshot prev) {
     Instant now = Instant.now(clock);
-    JWKSResponse resp = fetch();
+    JWKSResponse resp = fetchFromSource();
     List<JSONWebKey> allKeys = new ArrayList<>();
     Map<String, Verifier> byKid = new LinkedHashMap<>();
     Map<String, JSONWebKey> jwkByKid = new LinkedHashMap<>();
@@ -682,14 +683,14 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
             }
           }
         } else if (logger.isDebugEnabled()) {
-          logger.debug("Retry-After header [" + ra + "] could not be parsed; falling back to backoff");
+          logger.debug("Retry-After header [" + MessageSanitizer.forMessage(ra) + "] could not be parsed; falling back to backoff");
         }
       }
     }
     return new Snapshot(allKeys, byKid, jwkByKid, fetchedAt, nextDue, next, now);
   }
 
-  private JWKSResponse fetch() {
+  private JWKSResponse fetchFromSource() {
     String effectiveURL;
     if (lockedJWKSURI != null) {
       effectiveURL = lockedJWKSURI;

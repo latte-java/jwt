@@ -242,7 +242,7 @@ Other entry points:
 - `JWKS.fromJWKS(url)` — direct JWKS endpoint, no discovery.
 - `JWKS.fromConfiguration(cfg)` — use a pre-fetched `OpenIDConnectConfiguration`.
 - `JWKS.of(jwk1, jwk2, ...)` — static in-memory keys (no HTTP, no scheduler).
-- `JWKS.fetchOnce(url)` — one-shot `List<JSONWebKey>` from a JWKS URL.
+- `JWKS.fetch(url)` — one-shot `List<JSONWebKey>` from a JWKS URL.
 
 #### OIDC discovery
 
@@ -346,15 +346,15 @@ If you need to interoperate with a producer that still emits `alg: EdDSA`, you c
 
 ### Retrieve JSON Web Keys from a JWKS endpoint
 
-For a one-shot fetch (no caching, no refresh), use `JWKS.fetchOnce`:
+For a one-shot fetch (no caching, no refresh), use `JWKS.fetch`:
 
 ```java
 // One-shot fetch from a known JWKS endpoint
-List<JSONWebKey> keys = JWKS.fetchOnce("https://www.googleapis.com/oauth2/v3/certs");
+List<JSONWebKey> keys = JWKS.fetch("https://www.googleapis.com/oauth2/v3/certs");
 
 // One-shot fetch via OIDC Discovery — discover the JWKS URI, then fetch
 OpenIDConnectConfiguration cfg = OpenIDConnect.discover("https://accounts.google.com");
-List<JSONWebKey> discoveredKeys = JWKS.fetchOnce(cfg.jwksURI());
+List<JSONWebKey> discoveredKeys = JWKS.fetch(cfg.jwksURI());
 ```
 
 For self-refreshing key management, use the `JWKS` builder API described above.

@@ -27,7 +27,7 @@ import org.lattejava.jwt.JWTException;
 
 /**
  * Thrown by JWKS-endpoint fetches: {@link JWKS#refresh()} on a
- * remote-backed JWKS, {@code JWKS.fetchOnce(...)} (one-shot), and the
+ * remote-backed JWKS, {@code JWKS.fetch(...)} (one-shot), and the
  * initial fetch performed inside {@code Builder.build()} when
  * {@code failFast == true} and the JWKS hop fails. {@link #reason()} carries
  * the categorical reason so callers can dispatch programmatically without

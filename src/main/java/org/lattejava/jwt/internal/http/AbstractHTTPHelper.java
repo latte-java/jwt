@@ -115,17 +115,6 @@ public abstract class AbstractHTTPHelper {
         } catch (IOException e) {
           throw exception.apply("Failed to parse redirect Location header [" + MessageSanitizer.forMessage(location) + "] from [" + MessageSanitizer.forMessage(endpoint) + "]", e);
         }
-        // Drain & close the body of the redirect hop so the connection can be reused.
-        try {
-          InputStream errorBody = current.getErrorStream();
-          if (errorBody != null) {
-            errorBody.close();
-          }
-        } catch (IOException ignored) {
-          // Best-effort drain/close of the redirect hop's error stream so the connection can be reused.
-          // Only close() can throw here (getErrorStream() returns null, not throws), and an IOException
-          // draining a hop we've already chosen to abandon is not actionable.
-        }
         if (sameOriginRedirectsOnly && !sameOrigin(originalURL, nextURL)) {
           throw exception.apply("Refusing cross-origin redirect from [" + originString(originalURL) + "] to [" + originString(nextURL) + "]", null);
         }

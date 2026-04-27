@@ -625,7 +625,7 @@ public class JWKSTest extends BaseTest {
 
   @Test
   public void backoffSequence_30s_to_60m_capped() {
-    // Use case: spec §2.7.2 backoff formula in long ms; sequence with default settings.
+    // Use case: backoff sequence with default settings is 30s, 60s, 120s, ... capped at 60m.
     Duration min = Duration.ofSeconds(30);
     Duration max = Duration.ofMinutes(60);
     long[] expectedSeconds = {30, 60, 120, 240, 480, 960, 1920, 3600, 3600, 3600};
@@ -959,9 +959,8 @@ public class JWKSTest extends BaseTest {
 
   @Test
   public void close_whileRefreshInflight_lateResultIsDiscarded() throws Exception {
-    // Use case: spec §4 step 4 — after close(), the in-flight fetch's result is
-    // discarded. The snapshot must not advance even though the underlying fetch
-    // eventually succeeds.
+    // Use case: after close(), the in-flight fetch's result is discarded. The snapshot must not
+    // advance even though the underlying fetch eventually succeeds.
     startHttpServer(server -> server
         .listenOn(PORT)
         .handleURI("/jwks.json")
@@ -1356,7 +1355,7 @@ public class JWKSTest extends BaseTest {
     return "{\"keys\":[" + keyed0 + "," + kidless + "," + keyed1 + "]}";
   }
 
-  // --- failFast and fetchOnce tests ---
+  // --- failFast and fetch tests ---
 
   @Test
   public void builder_failFast_default_false_does_not_throw_on_initial_failure() throws Exception {
@@ -1400,12 +1399,12 @@ public class JWKSTest extends BaseTest {
   }
 
   @Test
-  public void fetchOnce_rejects_cross_origin_redirect_by_default() throws Exception {
-    // Use case: fetchOnce uses sameOriginRedirectsOnly=true by default; cross-origin redirect is rejected.
+  public void fetch_rejects_cross_origin_redirect_by_default() throws Exception {
+    // Use case: fetch uses sameOriginRedirectsOnly=true by default; cross-origin redirect is rejected.
     String url = startServerThatRedirectsToDifferentHost();
     JWKSFetchException ex = null;
     try {
-      JWKS.fetchOnce(url);
+      JWKS.fetch(url);
       fail("expected JWKSFetchException");
     } catch (JWKSFetchException e) {
       ex = e;
@@ -1415,27 +1414,27 @@ public class JWKSTest extends BaseTest {
   }
 
   @Test
-  public void fetchOnce_returns_keys_from_jwks_endpoint() throws Exception {
-    // Use case: fetchOnce performs a one-shot fetch and returns all parsed keys.
+  public void fetch_returns_keys_from_jwks_endpoint() throws Exception {
+    // Use case: fetch performs a one-shot fetch and returns all parsed keys.
     String url = startJWKSServer("kid-1", "kid-2");
-    List<JSONWebKey> keys = JWKS.fetchOnce(url);
+    List<JSONWebKey> keys = JWKS.fetch(url);
     assertEquals(keys.stream().map(JSONWebKey::kid).toList(), List.of("kid-1", "kid-2"));
   }
 
   @Test
-  public void fetchOnce_with_FetchLimits_enforces_response_cap() throws Exception {
-    // Use case: a tight maxResponseBytes causes fetchOnce to throw JWKSFetchException.
+  public void fetch_with_FetchLimits_enforces_response_cap() throws Exception {
+    // Use case: a tight maxResponseBytes causes fetch to throw JWKSFetchException.
     String url = startJWKSServerReturningLargeBody();
     FetchLimits tight = FetchLimits.builder().maxResponseBytes(64).build();
-    assertThrows(JWKSFetchException.class, () -> JWKS.fetchOnce(url, tight));
+    assertThrows(JWKSFetchException.class, () -> JWKS.fetch(url, tight));
   }
 
   @Test
-  public void fetchOnce_with_customizer_applies_to_connection() throws Exception {
+  public void fetch_with_customizer_applies_to_connection() throws Exception {
     // Use case: the customizer Consumer is called before the request is sent.
     AtomicBoolean called = new AtomicBoolean();
     String url = startJWKSServer("kid-1");
-    JWKS.fetchOnce(url, conn -> { called.set(true); conn.setRequestProperty("X-Test", "y"); });
+    JWKS.fetch(url, conn -> { called.set(true); conn.setRequestProperty("X-Test", "y"); });
     assertTrue(called.get());
   }
 
