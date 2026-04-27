@@ -898,7 +898,7 @@ Lenient base64url decoding is a known source of token ambiguity (two encodings p
 
 ### Unsecured JWT Decoding
 
-Moved from `JWTUtils.decodePayload()` and `JWT.decodeUnsecured()` to `JWTDecoder.decodeUnsecured()`. This keeps the `JWT` class as a pure model/POJO with no infrastructure dependencies. The method is explicitly named to make the security implications clear. It parses the payload without any signature verification -- for inspection/debugging only.
+Unsecured decoding lives on `JWTDecoder.decodeUnsecured()`, keeping the `JWT` class a pure model/POJO with no infrastructure dependencies. The method is explicitly named to make the security implications clear. It parses the payload without any signature verification -- for inspection/debugging only.
 
 ```java
 JWT claims = new JWTDecoder().decodeUnsecured(token);
@@ -1127,7 +1127,7 @@ All built-in `Signer` and `Verifier` implementations enforce minimum key sizes a
 
 EC and EdDSA signers/verifiers additionally validate that the key's curve matches the algorithm (e.g., `ES256` with a P-384 key is rejected as `InvalidKeyTypeException`).
 
-This enforcement cannot detect low-entropy keys. A 32-byte HMAC secret of all zeros passes the length check; callers are responsible for generating keys with sufficient entropy (use `JWTUtils.generateSHA256_HMACSecret()` or equivalent).
+This enforcement cannot detect low-entropy keys. A 32-byte HMAC secret of all zeros passes the length check; callers are responsible for generating keys with sufficient entropy (use `HMACSecrets.generateSHA256()` or equivalent).
 
 ### HMAC Constant-Time Comparison (Contract)
 
@@ -1570,20 +1570,22 @@ Primary use case: extracting the public key and metadata from PEM-encoded certif
 
 The goal is to handle the common X.509 use cases in JWT/JWK workflows -- generating self-signed certificates, extracting public keys from certificates, and `x5c` chain handling. Full PKIX path validation, CRL/OCSP checking, and v3 extensions are out of scope, but the DER infrastructure should be extensible enough to add them later.
 
-## 10. JWTUtils
+## 10. Key and Secret Generation
 
-`JWTUtils` remains as a utility class. Two methods move, the rest stay:
+Two focused utility classes own the random-key helpers, with names that match the prior art on the per-family `Signer` / `Verifier` factories (alg/spec first):
 
-**Moved:**
-- `decodePayload(String)` -> `JWTDecoder.decodeUnsecured(String)` (see [Section 5](#5-encoder--decoder))
-- `decodeHeader(String)` -> `JWTDecoder.decodeUnsecured(String)` returns a JWT with the header populated, making a separate header-only decode unnecessary.
+**`KeyPairs` -- asymmetric key generation:**
+- `generateRSA_2048()`, `generateRSA_3072()`, `generateRSA_4096()`
+- `generateRSAPSS_2048()`, `generateRSAPSS_3072()`, `generateRSAPSS_4096()`
+- `generateEC_256()`, `generateEC_384()`, `generateEC_521()`
+- `generateEd25519()`, `generateEd448()`
 
-**Stays in JWTUtils (updated to use JSONProcessor where needed):**
-- Key generation: `generate2048_RSAKeyPair()`, `generate3072_RSAKeyPair()`, `generate4096_RSAKeyPair()`, `generate2048_RSAPSSKeyPair()`, `generate3072_RSAPSSKeyPair()`, `generate4096_RSAPSSKeyPair()`, `generate256_ECKeyPair()`, `generate384_ECKeyPair()`, `generate521_ECKeyPair()`, `generate_ed25519_EdDSAKeyPair()`, `generate_ed448_EdDSAKeyPair()`
-- HMAC secret generation: `generateSHA256_HMACSecret()`, `generateSHA384_HMACSecret()`, `generateSHA512_HMACSecret()`
-- Random generation: `generateSecureRandom()` -- no changes needed
+**`HMACSecrets` -- HMAC secret generation:**
+- `generateSHA256()`, `generateSHA384()`, `generateSHA512()`
 
-JWK thumbprints are not in `JWTUtils`; they live as instance methods on the domain object: `JSONWebKey.thumbprintSHA1()` and `JSONWebKey.thumbprintSHA256()`. See "JWK Thumbprint Canonicalization" below.
+The underlying `SecureRandom`-backed random helper is package-private; callers that need a custom byte length implement it themselves.
+
+JWK thumbprints live as instance methods on the domain object: `JSONWebKey.thumbprintSHA1()` and `JSONWebKey.thumbprintSHA256()`. See "JWK Thumbprint Canonicalization" below.
 
 **Moved to `org.lattejava.jwt.x509.X509`:** the X.509 fingerprint and thumbprint helpers (`fingerprintSHA1`, `fingerprintSHA256`, `thumbprintSHA1`, `thumbprintSHA256`, `fingerprintToThumbprint`, `thumbprintToFingerprint`) — see [Section 6: X.509 Facade](#6-x509-facade).
 
@@ -2072,7 +2074,7 @@ These tests are grouped in a `RFC8725ComplianceTest.java` class. Each test carri
 | §3.2 | Use appropriate algorithms | All standard algorithms in [Section 1](#1-algorithm-interface) are from the IANA JOSE registry. Deprecated `"EdDSA"` identifier is not a standard constant per RFC 9864. No `Algorithm.NONE` constant. |
 | §3.3 | Validate all cryptographic operations | `Verifier.verify()` throws on failure and the library does not silently fall through. Signature verification runs before payload parsing, so an unauthenticated payload is never surfaced through a `JWT` object. |
 | §3.4 | Validate cryptographic inputs | Base64URL strictness rejects malformed segments. `LatteJSONProcessor` rejects duplicate keys and enforces depth limits. Token size is capped via `maxInputBytes`. `crit` structural validation rejects malformed critical-parameter lists (see [Section 3](#3-header-immutable--builder)). |
-| §3.5 | Ensure cryptographic keys have sufficient entropy | Library enforces minimum key sizes (see [Section 6](#6-signer--verifier) "Key Length and Strength Enforcement"). **Caller responsibility:** key entropy itself cannot be measured; use `JWTUtils.generate*()` helpers which use `SecureRandom`. |
+| §3.5 | Ensure cryptographic keys have sufficient entropy | Library enforces minimum key sizes (see [Section 6](#6-signer--verifier) "Key Length and Strength Enforcement"). **Caller responsibility:** key entropy itself cannot be measured; use the `KeyPairs.generate*()` / `HMACSecrets.generate*()` helpers which use `SecureRandom`. |
 | §3.6 | Avoid compression of encryption inputs | N/A -- JWE is out of scope. |
 | §3.7 | Use UTF-8 | All JSON and base64url decoding uses UTF-8 explicitly via `StandardCharsets.UTF_8`. |
 | §3.8 | Validate issuer and subject | **Caller responsibility** -- use the post-decode `Consumer<JWT> validator` parameter to check `iss`/`sub` per application policy. |

@@ -503,7 +503,7 @@ Supported signature algorithms: `RS256`/`RS384`/`RS512`, `PS256`/`PS384`/`PS512`
 
 ```java
 // A self-signed EC certificate, valid for one year.
-KeyPair keyPair = JWTUtils.generate256_ECKeyPair();
+KeyPair keyPair = KeyPairs.generateEC_256();
 
 X509Certificate cert = X509.builder()
                            .serialNumber(BigInteger.valueOf(System.currentTimeMillis()))

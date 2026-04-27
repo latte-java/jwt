@@ -16,10 +16,10 @@
 
 package org.lattejava.jwt.jwks;
 
-import org.lattejava.jwt.BaseJWTTest;
-import org.lattejava.jwt.JWTUtils;
 import org.lattejava.jwt.Algorithm;
+import org.lattejava.jwt.BaseJWTTest;
 import org.lattejava.jwt.KeyPair;
+import org.lattejava.jwt.KeyPairs;
 import org.lattejava.jwt.KeyType;
 import org.lattejava.jwt.LatteJSONProcessor;
 import org.lattejava.jwt.internal.pem.PEM;
@@ -167,7 +167,7 @@ public class JSONWebKeyParserTest extends BaseJWTTest {
   @Test
   public void unsignedEncodingTest() {
     // Generate a key pair and produce the RSA Public key as well as the PEM
-    KeyPair keyPair = JWTUtils.generate2048_RSAKeyPair();
+    KeyPair keyPair = KeyPairs.generateRSA_2048();
     PEM pem = PEM.decode(keyPair.publicKey);
     JSONWebKey key = JSONWebKey.from(keyPair.publicKey);
 
@@ -192,7 +192,7 @@ public class JSONWebKeyParserTest extends BaseJWTTest {
 
   @Test(invocationCount = 1_000)
   public void parse_ec() {
-    KeyPair keyPair = JWTUtils.generate256_ECKeyPair();
+    KeyPair keyPair = KeyPairs.generateEC_256();
 
     // Build a JSON Web Key from our own EC key pair
     JSONWebKey base = JSONWebKey.from(keyPair.publicKey);
@@ -236,8 +236,8 @@ public class JSONWebKeyParserTest extends BaseJWTTest {
   @Test(dataProvider = "EdDSACurves")
   public void parse_eddsa(String curve) {
     KeyPair keyPair = curve.equals("Ed25519")
-        ? JWTUtils.generate_ed25519_EdDSAKeyPair()
-        : JWTUtils.generate_ed448_EdDSAKeyPair();
+        ? KeyPairs.generateEd25519()
+        : KeyPairs.generateEd448();
 
     // Build a JSON Web Key from our own EdDSA key pair
     JSONWebKey publicBase = JSONWebKey.from(keyPair.publicKey);
@@ -283,7 +283,7 @@ public class JSONWebKeyParserTest extends BaseJWTTest {
 
   @Test(invocationCount = 100)
   public void parse_rsa() {
-    KeyPair keyPair = JWTUtils.generate2048_RSAKeyPair();
+    KeyPair keyPair = KeyPairs.generateRSA_2048();
 
     // Build a JSON Web Key from our own RSA key pair
     JSONWebKey base = JSONWebKey.from(keyPair.publicKey);
@@ -320,7 +320,7 @@ public class JSONWebKeyParserTest extends BaseJWTTest {
   public void containsPrivateKeyParams_rsa() {
     // Build an RSA key pair. Ensure containsPrivateKeyParams()
     // returns true for the private key and false for the public key
-    KeyPair keyPair = JWTUtils.generate2048_RSAKeyPair();
+    KeyPair keyPair = KeyPairs.generateRSA_2048();
 
     // Build JSON Web Keys from the RSA key pair
     JSONWebKey privateJwk = JSONWebKey.from(keyPair.privateKey);
@@ -335,7 +335,7 @@ public class JSONWebKeyParserTest extends BaseJWTTest {
   public void containsPrivateKeyParams_rsapss() {
     // Build an RSAPSS key pair. Ensure containsPrivateKeyParams()
     // returns true for the private key and false for the public key
-    KeyPair keyPair = JWTUtils.generate2048_RSAPSSKeyPair();
+    KeyPair keyPair = KeyPairs.generateRSAPSS_2048();
 
     // Build JSON Web Keys from the RSA key pair
     JSONWebKey privateJwk = JSONWebKey.from(keyPair.privateKey);
@@ -350,7 +350,7 @@ public class JSONWebKeyParserTest extends BaseJWTTest {
   public void containsPrivateKeyParams_ec() {
     // Build an EC key pair. Ensure containsPrivateKeyParams()
     // returns true for the private key and false for the public key
-    KeyPair keyPair = JWTUtils.generate256_ECKeyPair();
+    KeyPair keyPair = KeyPairs.generateEC_256();
 
     // Build a JSON Web Key from our own EC key pair (including private key)
     JSONWebKey privateJwk = JSONWebKey.from(keyPair.privateKey);
@@ -366,8 +366,8 @@ public class JSONWebKeyParserTest extends BaseJWTTest {
     // Build an EdDSA key pair. Ensure containsPrivateKeyParams()
     // returns true for the private key and false for the public key
     KeyPair keyPair = curve.equals("Ed25519")
-        ? JWTUtils.generate_ed25519_EdDSAKeyPair()
-        : JWTUtils.generate_ed448_EdDSAKeyPair();
+        ? KeyPairs.generateEd25519()
+        : KeyPairs.generateEd448();
 
     // Build a JSON Web Key from our own EdDSA key pair (including private key)
     JSONWebKey privateJwk = JSONWebKey.from(keyPair.privateKey);

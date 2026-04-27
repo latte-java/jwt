@@ -89,8 +89,7 @@ public class JWKThumbprintTest {
         .x("MKBCTNIcKUSDii11ySs3526iDZ8AiTo7Tu6KPAqv7D4")
         .y("4Etl6SRW2YiLUrN5vfvVHuhp7x8PxltmWWlbbM4IFyM")
         .build();
-    // Pinned: this matches both the existing JWTUtilsTest vector AND the
-    // canonical RFC 7638 §3.2 EC member set {crv,kty,x,y} in lex order.
+    // Pinned to the canonical RFC 7638 §3.2 EC member set {crv,kty,x,y} in lex order.
     assertEquals(k.thumbprintSHA256(),
         "cn-I_WNMClehiVp51i_0VpOENW1upEerA8sEam5hn-s");
   }
@@ -150,7 +149,6 @@ public class JWKThumbprintTest {
   @Test
   public void sha1Thumbprints() {
     // Use case: SHA-1 thumbprint differs from SHA-256 and is stable.
-    // Pinned from the existing JWTUtilsTest vectors.
     JSONWebKey k = rfc7638Rsa();
     String s1 = k.thumbprintSHA1();
     String s256 = k.thumbprintSHA256();
