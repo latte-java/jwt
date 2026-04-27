@@ -289,11 +289,9 @@ JWKS jwks = JWKS.fromIssuer("https://idp.example.com/").failFast(true).build();
 Without `failFast`, a failed initial fetch is silently tolerated and the `JWKS` starts with an empty key set, retrying on the next refresh tick or `kid` miss.
 
 #### Verify an expired JWT by going back in time
-Please only use this for testing, or if you happen to be a time traveler.
+Please only use this for testing or if you happen to be a time traveler.
 
-If you have a hard-coded JWT in a test case that you want to validate, you can pin the decoder's notion of "now" to any `Instant` — past or future. Ideally you would generate a fresh JWT per test run so the expiration check passes naturally; this option exists for the times that isn't practical.
-
-This is the modern replacement for the old "time machine decoder". The name is gone but the capability isn't — it now lives on the `JWTDecoder` builder as `fixedTime(Instant)`.
+If you have a hard-coded JWT in a test case that you want to validate, you can pin the decoder's notion of "now" to any `Instant` — past or future. Ideally you would generate a fresh JWT per test run so the expiration check passes naturally; this option exists when that isn't practical.
 
 ```java
 Verifier verifier = Verifiers.forAsymmetric(Algorithm.ES256,
