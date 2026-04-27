@@ -53,22 +53,29 @@ public abstract class AbstractHTTPHelper {
    * {@code maxRedirects} 3xx responses, capping each hop's body at
    * {@code maxResponseBytes} bytes.
    *
-   * @param urlConnection    the prepared {@link HttpURLConnection} (the helper sets
-   *                         the request method and disables auto-redirect)
-   * @param maxResponseBytes per-hop body cap; must be strictly positive (the
-   *                         cap cannot be disabled)
-   * @param maxRedirects     maximum number of 3xx redirects to follow before
-   *                         aborting; {@code 0} disables redirect following
-   * @param consumer         response-body parser
-   * @param exception        wrapper for any {@link IOException} surfaced
-   * @throws IllegalArgumentException if {@code maxResponseBytes &lt;= 0}
+   * <p>When {@code sameOriginRedirectsOnly} is {@code true}, any redirect
+   * that changes the scheme, host, or port relative to the original URL is
+   * rejected by invoking {@code exception} with a message of the form
+   * {@code "Refusing cross-origin redirect from [<origin>] to [<origin>]"}.
+   *
+   * @param urlConnection           the prepared {@link HttpURLConnection} (the helper sets
+   *                                the request method and disables auto-redirect)
+   * @param maxResponseBytes        per-hop body cap; must be strictly positive (the
+   *                                cap cannot be disabled)
+   * @param maxRedirects            maximum number of 3xx redirects to follow before
+   *                                aborting; {@code 0} disables redirect following
+   * @param sameOriginRedirectsOnly when {@code true}, cross-origin redirects are rejected
+   * @param consumer                response-body parser
+   * @param exception               wrapper for any {@link IOException} surfaced
+   * @throws IllegalArgumentException if {@code maxResponseBytes <= 0}
    */
-  protected static <T> T get(HttpURLConnection urlConnection, int maxResponseBytes, int maxRedirects, BiFunction<HttpURLConnection, InputStream, T> consumer, BiFunction<String, Throwable, ? extends RuntimeException> exception) {
+  public static <T> T get(HttpURLConnection urlConnection, int maxResponseBytes, int maxRedirects, boolean sameOriginRedirectsOnly, BiFunction<HttpURLConnection, InputStream, T> consumer, BiFunction<String, Throwable, ? extends RuntimeException> exception) {
     if (maxResponseBytes <= 0) {
       throw new IllegalArgumentException("maxResponseBytes must be > 0; the response cap cannot be disabled");
     }
     HttpURLConnection current = urlConnection;
-    String originalEndpoint = current.getURL().toString();
+    URL originalURL = current.getURL();
+    String originalEndpoint = originalURL.toString();
     int redirectsFollowed = 0;
     while (true) {
       String endpoint = current.getURL().toString();
@@ -119,6 +126,9 @@ public abstract class AbstractHTTPHelper {
           // Only close() can throw here (getErrorStream() returns null, not throws), and an IOException
           // draining a hop we've already chosen to abandon is not actionable.
         }
+        if (sameOriginRedirectsOnly && !sameOrigin(originalURL, nextURL)) {
+          throw exception.apply("Refusing cross-origin redirect from [" + originString(originalURL) + "] to [" + originString(nextURL) + "]", null);
+        }
         current = buildURLConnection(nextURL.toString(), exception);
         redirectsFollowed++;
         continue;
@@ -146,6 +156,66 @@ public abstract class AbstractHTTPHelper {
   }
 
   /**
+   * Performs a GET on the supplied connection, manually following up to
+   * {@code maxRedirects} 3xx responses, capping each hop's body at
+   * {@code maxResponseBytes} bytes. Redirects are followed permissively
+   * (cross-origin redirects are allowed). Delegates to
+   * {@link #get(HttpURLConnection, int, int, boolean, BiFunction, BiFunction)} with
+   * {@code sameOriginRedirectsOnly=false}.
+   *
+   * @param urlConnection    the prepared {@link HttpURLConnection} (the helper sets
+   *                         the request method and disables auto-redirect)
+   * @param maxResponseBytes per-hop body cap; must be strictly positive (the
+   *                         cap cannot be disabled)
+   * @param maxRedirects     maximum number of 3xx redirects to follow before
+   *                         aborting; {@code 0} disables redirect following
+   * @param consumer         response-body parser
+   * @param exception        wrapper for any {@link IOException} surfaced
+   * @throws IllegalArgumentException if {@code maxResponseBytes <= 0}
+   */
+  protected static <T> T get(HttpURLConnection urlConnection, int maxResponseBytes, int maxRedirects, BiFunction<HttpURLConnection, InputStream, T> consumer, BiFunction<String, Throwable, ? extends RuntimeException> exception) {
+    return get(urlConnection, maxResponseBytes, maxRedirects, false, consumer, exception);
+  }
+
+  /**
+   * Open and prepare an {@link HttpURLConnection} for {@code endpoint}.
+   *
+   * @param endpoint  the URL to open
+   * @param exception caller-supplied wrapper for any {@link IOException} surfaced while
+   *                  opening the connection. Passed through so each subclass can surface a
+   *                  domain-appropriate type (e.g. {@code JSONWebKeyException} for the JWKS
+   *                  helper, {@code ServerMetaDataException} for the OAuth2 helper) rather
+   *                  than leaking a JWKS-named exception out of an unrelated caller.
+   */
+  public static HttpURLConnection buildURLConnection(String endpoint, BiFunction<String, Throwable, ? extends RuntimeException> exception) {
+    try {
+      HttpURLConnection urlConnection = (HttpURLConnection) new URL(endpoint).openConnection();
+      urlConnection.setDoOutput(true);
+      urlConnection.setConnectTimeout(10_000);
+      urlConnection.setReadTimeout(10_000);
+      urlConnection.addRequestProperty("User-Agent", "latte-jwt (https://github.com/latte-java/jwt)");
+      return urlConnection;
+    } catch (IOException e) {
+      throw exception.apply("Failed to build connection to [" + MessageSanitizer.forMessage(endpoint) + "]", e);
+    }
+  }
+
+  private static int effectivePort(URL url) {
+    int port = url.getPort();
+    return port == -1 ? url.getDefaultPort() : port;
+  }
+
+  private static String originString(URL url) {
+    return MessageSanitizer.forMessage(url.getProtocol()) + "://" + MessageSanitizer.forMessage(url.getHost()) + ":" + effectivePort(url);
+  }
+
+  private static boolean sameOrigin(URL a, URL b) {
+    return a.getProtocol().equalsIgnoreCase(b.getProtocol())
+        && a.getHost().equalsIgnoreCase(b.getHost())
+        && effectivePort(a) == effectivePort(b);
+  }
+
+  /**
    * An InputStream wrapper that limits the number of bytes that can be read.
    * Throws a {@link ResponseTooLargeException} when the configured maximum
    * is exceeded mid-stream (the read aborts; the library never buffers past
@@ -153,9 +223,7 @@ public abstract class AbstractHTTPHelper {
    */
   static class LimitedInputStream extends InputStream {
     private final InputStream delegate;
-
     private final int maximumBytes;
-
     private int bytesRead;
 
     LimitedInputStream(InputStream delegate, int maximumBytes) {
@@ -212,29 +280,6 @@ public abstract class AbstractHTTPHelper {
     @Override
     public void close() throws IOException {
       delegate.close();
-    }
-  }
-
-  /**
-   * Open and prepare an {@link HttpURLConnection} for {@code endpoint}.
-   *
-   * @param endpoint  the URL to open
-   * @param exception caller-supplied wrapper for any {@link IOException} surfaced while
-   *                  opening the connection. Passed through so each subclass can surface a
-   *                  domain-appropriate type (e.g. {@code JSONWebKeyException} for the JWKS
-   *                  helper, {@code ServerMetaDataException} for the OAuth2 helper) rather
-   *                  than leaking a JWKS-named exception out of an unrelated caller.
-   */
-  protected static HttpURLConnection buildURLConnection(String endpoint, BiFunction<String, Throwable, ? extends RuntimeException> exception) {
-    try {
-      HttpURLConnection urlConnection = (HttpURLConnection) new URL(endpoint).openConnection();
-      urlConnection.setDoOutput(true);
-      urlConnection.setConnectTimeout(10_000);
-      urlConnection.setReadTimeout(10_000);
-      urlConnection.addRequestProperty("User-Agent", "latte-jwt (https://github.com/latte-java/jwt)");
-      return urlConnection;
-    } catch (IOException e) {
-      throw exception.apply("Failed to build connection to [" + MessageSanitizer.forMessage(endpoint) + "]", e);
     }
   }
 }
