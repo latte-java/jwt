@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Approved |
+| **Status** | Implemented |
 | **Version / Scope** | Tooling (not part of any release) |
 | **Owner** | Daniel DeGroff |
 | **Created** | 2026-04-25 |
@@ -13,6 +13,7 @@
 - **2026-04-25** — Initial draft.
 - **2026-04-25** — Drop `alg=none` operations; refocus `parse_only` as `unsafe_decode` (each library's public no-verify decode API; N/A where unavailable). JMH config bumped to 3 forks × 3 measurement iterations × 10s for defensible CIs. Add `Mode.AverageTime` to decode-verify-validate. Specify pre-flight parity check, DCE/Blackhole protection, hardware/JVM capture commands, `compare-results.sh` CLI, results `.gitignore` rule, license-header convention, `@Param`-not-used rationale.
 - **2026-04-26** — Status: Draft → Approved. Library version policy clarified: pin the latest stable at time of adapter authoring; bump manually thereafter.
+- **2026-04-26** — Status: Approved → Implemented. Framework shipped: 7 competitor adapters (auth0-java-jwt, jose4j, nimbus-jose-jwt, jjwt, fusionauth-jwt, vertx-auth-jwt) plus baseline + latte-jwt. inverno-security-jose dropped — no public synchronous non-CDI API. Initial smoke-grade snapshot committed (`--quick` config); canonical 3-fork run is left for the operator to produce on a quiet machine.
 
 ## Problem statement
 
