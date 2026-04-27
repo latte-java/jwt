@@ -158,8 +158,8 @@ public class JWKSourceTest extends BaseTest {
     assertEquals(source.consecutiveFailures(), 0);
 
     b.responses.get("/jwks.json").status = 500;
-    JWKSRefreshException ex = expectThrows(JWKSRefreshException.class, source::refresh);
-    assertEquals(ex.reason(), JWKSRefreshException.Reason.NON_2XX);
+    JWKSFetchException ex = expectThrows(JWKSFetchException.class, source::refresh);
+    assertEquals(ex.reason(), JWKSFetchException.Reason.NON_2XX);
 
     assertEquals(source.lastSuccessfulRefresh(), priorSuccess,
         "lastSuccessfulRefresh must not advance on failure");
@@ -257,8 +257,8 @@ public class JWKSourceTest extends BaseTest {
     assertNull(source.lastSuccessfulRefresh());
     assertEquals(source.consecutiveFailures(), 1);
     assertTrue(source.currentKids().isEmpty());
-    JWKSRefreshException ex = expectThrows(JWKSRefreshException.class, source::refresh);
-    assertEquals(ex.reason(), JWKSRefreshException.Reason.EMPTY_RESULT);
+    JWKSFetchException ex = expectThrows(JWKSFetchException.class, source::refresh);
+    assertEquals(ex.reason(), JWKSFetchException.Reason.EMPTY_RESULT);
     source.close();
   }
 
@@ -407,8 +407,8 @@ public class JWKSourceTest extends BaseTest {
     JWKSource source = JWKSource.fromJWKS("http://localhost:" + PORT + "/jwks.json").build();
 
     httpServers.get(httpServers.size() - 1).stop(0);
-    JWKSRefreshException ex = expectThrows(JWKSRefreshException.class, source::refresh);
-    assertEquals(ex.reason(), JWKSRefreshException.Reason.NETWORK);
+    JWKSFetchException ex = expectThrows(JWKSFetchException.class, source::refresh);
+    assertEquals(ex.reason(), JWKSFetchException.Reason.NETWORK);
     assertEquals(source.consecutiveFailures(), 1);
     source.close();
   }

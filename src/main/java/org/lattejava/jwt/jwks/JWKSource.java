@@ -260,11 +260,11 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
 
   /**
    * Synchronous, blocking, singleflight-coalesced refresh. Throws a
-   * {@link JWKSRefreshException} on failure, with a categorical
-   * {@link JWKSRefreshException#reason()} so callers can dispatch
+   * {@link JWKSFetchException} on failure, with a categorical
+   * {@link JWKSFetchException#reason()} so callers can dispatch
    * programmatically without unwrapping the cause chain.
    *
-   * @throws JWKSRefreshException if the refresh fails or times out
+   * @throws JWKSFetchException if the refresh fails or times out
    */
   public void refresh() {
     if (closed) {
@@ -275,17 +275,17 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
     try {
       fut.get(refreshTimeout.toMillis(), TimeUnit.MILLISECONDS);
     } catch (TimeoutException te) {
-      throw new JWKSRefreshException(JWKSRefreshException.Reason.TIMEOUT,
+      throw new JWKSFetchException(JWKSFetchException.Reason.TIMEOUT,
           "Timed out after [" + refreshTimeout + "] waiting for JWKS refresh", te);
     } catch (InterruptedException ie) {
       Thread.currentThread().interrupt();
-      throw new JWKSRefreshException(JWKSRefreshException.Reason.TIMEOUT,
+      throw new JWKSFetchException(JWKSFetchException.Reason.TIMEOUT,
           "Interrupted while waiting for JWKS refresh", ie);
     } catch (ExecutionException ee) {
       Throwable c = ee.getCause();
-      if (c instanceof JWKSRefreshException re) throw re;
+      if (c instanceof JWKSFetchException re) throw re;
       // worker always wraps; defense-in-depth path
-      throw new JWKSRefreshException(JWKSRefreshException.Reason.PARSE,
+      throw new JWKSFetchException(JWKSFetchException.Reason.PARSE,
           "JWKS refresh failed", c != null ? c : ee);
     }
   }
@@ -364,30 +364,30 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
   }
 
   /**
-   * Classify a non-{@link JWKSRefreshException} failure into a refresh reason.
+   * Classify a non-{@link JWKSFetchException} failure into a refresh reason.
    * HTTP-status failures land as {@code NON_2XX}; IOExceptions land as
    * {@code NETWORK}; everything else lands as {@code PARSE}.
    */
-  private JWKSRefreshException classifyFailure(Exception e) {
+  private JWKSFetchException classifyFailure(Exception e) {
     if (unwrapHTTP(e) != null) {
-      return new JWKSRefreshException(JWKSRefreshException.Reason.NON_2XX,
+      return new JWKSFetchException(JWKSFetchException.Reason.NON_2XX,
           "JWKS refresh failed: non-2xx HTTP response", e);
     }
     Throwable t = e;
     while (t != null) {
       if (t instanceof IOException) {
-        return new JWKSRefreshException(JWKSRefreshException.Reason.NETWORK,
+        return new JWKSFetchException(JWKSFetchException.Reason.NETWORK,
             "JWKS refresh failed: network error", e);
       }
       t = t.getCause();
     }
-    return new JWKSRefreshException(JWKSRefreshException.Reason.PARSE,
+    return new JWKSFetchException(JWKSFetchException.Reason.PARSE,
         "JWKS refresh failed: parse error", e);
   }
 
   /**
    * Performs the refresh: fetch JWKS, build verifiers, install a Snapshot.
-   * Throws {@link JWKSRefreshException} for the empty-result case so the
+   * Throws {@link JWKSFetchException} for the empty-result case so the
    * worker can complete the future exceptionally; other failures from
    * {@code fetch()} propagate directly and are classified by the worker.
    */
@@ -418,7 +418,7 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
       byKid.put(jwk.kid(), v);
     }
     if (byKid.isEmpty()) {
-      throw new JWKSRefreshException(JWKSRefreshException.Reason.EMPTY_RESULT,
+      throw new JWKSFetchException(JWKSFetchException.Reason.EMPTY_RESULT,
           "JWKS refresh produced no usable keys after JWK conversion");
     }
     Duration chosen = chosenInterval(resp);
@@ -488,7 +488,7 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
    * updated first, then awaiters notified, then slot cleared.
    *
    * <p>If the refresh fails, the future completes exceptionally with a
-   * {@link JWKSRefreshException} carrying the categorical reason. The
+   * {@link JWKSFetchException} carrying the categorical reason. The
    * operator-driven {@link #refresh()} surfaces it; the on-miss path
    * swallows the exception.</p>
    */
@@ -516,14 +516,14 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
         Throwable failureCause = null;
         try {
           fresh = doRefreshOrThrow(prev);
-        } catch (JWKSRefreshException re) {
+        } catch (JWKSFetchException re) {
           failureCause = re;
           if (logger.isErrorEnabled()) {
             logger.error("JWKS refresh failed [" + re.reason() + "]", re);
           }
           fresh = failureSnapshot(prev, Instant.now(clock), re);
         } catch (Exception e) {
-          JWKSRefreshException wrapped = classifyFailure(e);
+          JWKSFetchException wrapped = classifyFailure(e);
           failureCause = wrapped;
           if (logger.isErrorEnabled()) {
             logger.error("JWKS refresh failed [" + wrapped.reason() + "]", e);
