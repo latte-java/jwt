@@ -14,101 +14,102 @@
     <orderEntry type="module-library" scope="TEST">
       <library>
         <CLASSES>
-          <root url="jar://$MAVEN_REPOSITORY$/com/fasterxml/jackson/core/jackson-databind/2.21.2/jackson-databind-2.21.2.jar!/" />
+          <root url="jar://$USER_HOME$/.m2/repository/com/fasterxml/jackson/core/jackson-databind/2.21.2/jackson-databind-2.21.2.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES>
-          <root url="jar://$MAVEN_REPOSITORY$/com/fasterxml/jackson/core/jackson-databind/2.21.2/jackson-databind-2.21.2-sources.jar!/" />
+          <root url="jar://$USER_HOME$/.m2/repository/com/fasterxml/jackson/core/jackson-databind/2.21.2/jackson-databind-2.21.2-sources.jar!/" />
         </SOURCES>
       </library>
     </orderEntry>
     <orderEntry type="module-library" scope="TEST">
       <library>
         <CLASSES>
-          <root url="jar://$MAVEN_REPOSITORY$/com/fasterxml/jackson/core/jackson-annotations/2.21/jackson-annotations-2.21.jar!/" />
+          <root url="jar://$USER_HOME$/.m2/repository/com/fasterxml/jackson/core/jackson-annotations/2.21/jackson-annotations-2.21.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES>
-          <root url="jar://$MAVEN_REPOSITORY$/com/fasterxml/jackson/core/jackson-annotations/2.21/jackson-annotations-2.21-sources.jar!/" />
+          <root url="jar://$USER_HOME$/.m2/repository/com/fasterxml/jackson/core/jackson-annotations/2.21/jackson-annotations-2.21-sources.jar!/" />
         </SOURCES>
       </library>
     </orderEntry>
     <orderEntry type="module-library" scope="TEST">
       <library>
         <CLASSES>
-          <root url="jar://$MAVEN_REPOSITORY$/com/fasterxml/jackson/core/jackson-core/2.21.2/jackson-core-2.21.2.jar!/" />
+          <root url="jar://$USER_HOME$/.m2/repository/com/fasterxml/jackson/core/jackson-core/2.21.2/jackson-core-2.21.2.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES>
-          <root url="jar://$MAVEN_REPOSITORY$/com/fasterxml/jackson/core/jackson-core/2.21.2/jackson-core-2.21.2-sources.jar!/" />
+          <root url="jar://$USER_HOME$/.m2/repository/com/fasterxml/jackson/core/jackson-core/2.21.2/jackson-core-2.21.2-sources.jar!/" />
         </SOURCES>
       </library>
     </orderEntry>
     <orderEntry type="module-library" scope="TEST">
       <library>
         <CLASSES>
-          <root url="jar://$MAVEN_REPOSITORY$/org/bouncycastle/bc-fips/2.1.2/bc-fips-2.1.2.jar!/" />
+          <root url="jar://$USER_HOME$/.m2/repository/org/bouncycastle/bc-fips/2.1.2/bc-fips-2.1.2.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES>
-          <root url="jar://$MAVEN_REPOSITORY$/org/bouncycastle/bc-fips/2.1.2/bc-fips-2.1.2-sources.jar!/" />
+          <root url="jar://$USER_HOME$/.m2/repository/org/bouncycastle/bc-fips/2.1.2/bc-fips-2.1.2-sources.jar!/" />
         </SOURCES>
       </library>
     </orderEntry>
     <orderEntry type="module-library" scope="TEST">
       <library>
         <CLASSES>
-          <root url="jar://$MAVEN_REPOSITORY$/org/testng/testng/7.11.0/testng-7.11.0.jar!/" />
+          <root url="jar://$USER_HOME$/.m2/repository/org/testng/testng/7.11.0/testng-7.11.0.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES>
-          <root url="jar://$MAVEN_REPOSITORY$/org/testng/testng/7.11.0/testng-7.11.0-sources.jar!/" />
+          <root url="jar://$USER_HOME$/.m2/repository/org/testng/testng/7.11.0/testng-7.11.0-sources.jar!/" />
         </SOURCES>
       </library>
     </orderEntry>
     <orderEntry type="module-library" scope="TEST">
       <library>
         <CLASSES>
-          <root url="jar://$MAVEN_REPOSITORY$/org/jcommander/jcommander/1.83/jcommander-1.83.jar!/" />
+          <root url="jar://$USER_HOME$/.m2/repository/org/jcommander/jcommander/1.83/jcommander-1.83.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES>
-          <root url="jar://$MAVEN_REPOSITORY$/org/jcommander/jcommander/1.83/jcommander-1.83-sources.jar!/" />
+          <root url="jar://$USER_HOME$/.m2/repository/org/jcommander/jcommander/1.83/jcommander-1.83-sources.jar!/" />
         </SOURCES>
       </library>
     </orderEntry>
     <orderEntry type="module-library" scope="TEST">
       <library>
         <CLASSES>
-          <root url="jar://$MAVEN_REPOSITORY$/org/webjars/jquery/3.7.1/jquery-3.7.1.jar!/" />
+          <root url="jar://$USER_HOME$/.m2/repository/org/webjars/jquery/3.7.1/jquery-3.7.1.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES>
-          <root url="jar://$MAVEN_REPOSITORY$/org/webjars/jquery/3.7.1/jquery-3.7.1-sources.jar!/" />
+          <root url="jar://$USER_HOME$/.m2/repository/org/webjars/jquery/3.7.1/jquery-3.7.1-sources.jar!/" />
         </SOURCES>
       </library>
     </orderEntry>
     <orderEntry type="module-library" scope="TEST">
       <library>
         <CLASSES>
-          <root url="jar://$MAVEN_REPOSITORY$/org/slf4j/slf4j-api/2.0.17/slf4j-api-2.0.17.jar!/" />
+          <root url="jar://$USER_HOME$/.m2/repository/org/slf4j/slf4j-api/2.0.17/slf4j-api-2.0.17.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES>
-          <root url="jar://$MAVEN_REPOSITORY$/org/slf4j/slf4j-api/2.0.17/slf4j-api-2.0.17-sources.jar!/" />
+          <root url="jar://$USER_HOME$/.m2/repository/org/slf4j/slf4j-api/2.0.17/slf4j-api-2.0.17-sources.jar!/" />
         </SOURCES>
       </library>
     </orderEntry>
     <orderEntry type="module-library" scope="TEST">
       <library>
         <CLASSES>
-          <root url="jar://$MAVEN_REPOSITORY$/org/slf4j/slf4j-nop/2.0.17/slf4j-nop-2.0.17.jar!/" />
+          <root url="jar://$USER_HOME$/.m2/repository/org/slf4j/slf4j-nop/2.0.17/slf4j-nop-2.0.17.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES>
-          <root url="jar://$MAVEN_REPOSITORY$/org/slf4j/slf4j-nop/2.0.17/slf4j-nop-2.0.17-sources.jar!/" />
+          <root url="jar://$USER_HOME$/.m2/repository/org/slf4j/slf4j-nop/2.0.17/slf4j-nop-2.0.17-sources.jar!/" />
         </SOURCES>
       </library>
     </orderEntry>
   </component>
 </module>
+
