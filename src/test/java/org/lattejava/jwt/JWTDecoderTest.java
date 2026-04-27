@@ -524,9 +524,9 @@ public class JWTDecoderTest {
   }
 
   /**
-     * Custom Algorithm with Object-identity equals/hashCode -- decoder must still match by name().
-     */
-    private record BrokenEqualsAlgorithm(String name) implements Algorithm {
+   * Custom Algorithm with Object-identity equals/hashCode -- decoder must still match by name().
+   */
+  private record BrokenEqualsAlgorithm(String name) implements Algorithm {
     // intentionally inherits Object.equals / Object.hashCode (identity-based)
-    }
+  }
 }

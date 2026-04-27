@@ -136,32 +136,32 @@ public class JWTEncoder {
   }
 
   /**
-     * Adapts a {@link Header.Builder} to the {@link HeaderCustomizer} view. The view exposes {@code typ}, {@code kid},
-     * and arbitrary {@code parameter(name, value)} -- but no {@code .alg()}.
-     */
-    private record BuilderHeaderCustomizer(Header.Builder builder) implements HeaderCustomizer {
+   * Adapts a {@link Header.Builder} to the {@link HeaderCustomizer} view. The view exposes {@code typ}, {@code kid},
+   * and arbitrary {@code parameter(name, value)} -- but no {@code .alg()}.
+   */
+  private record BuilderHeaderCustomizer(Header.Builder builder) implements HeaderCustomizer {
 
     @Override
-      public HeaderCustomizer kid(String keyId) {
-        builder.kid(keyId);
-        return this;
-      }
-
-      @Override
-      public HeaderCustomizer parameter(String name, Object value) {
-        Objects.requireNonNull(name, "name");
-        if ("alg".equals(name)) {
-          throw new IllegalArgumentException(
-              "HeaderCustomizer cannot set [alg] -- the algorithm is determined by the Signer");
-        }
-        builder.parameter(name, value);
-        return this;
-      }
-
-      @Override
-      public HeaderCustomizer typ(String type) {
-        builder.typ(type);
-        return this;
-      }
+    public HeaderCustomizer kid(String keyId) {
+      builder.kid(keyId);
+      return this;
     }
+
+    @Override
+    public HeaderCustomizer parameter(String name, Object value) {
+      Objects.requireNonNull(name, "name");
+      if ("alg".equals(name)) {
+        throw new IllegalArgumentException(
+            "HeaderCustomizer cannot set [alg] -- the algorithm is determined by the Signer");
+      }
+      builder.parameter(name, value);
+      return this;
+    }
+
+    @Override
+    public HeaderCustomizer typ(String type) {
+      builder.typ(type);
+      return this;
+    }
+  }
 }

@@ -105,18 +105,18 @@ public class VerifierResolverTest {
   }
 
   /**
-     * Minimal {@link Verifier} that reports a configurable {@code canVerify} value.
-     */
-    private record RecordingVerifier(boolean canVerify) implements Verifier {
+   * Minimal {@link Verifier} that reports a configurable {@code canVerify} value.
+   */
+  private record RecordingVerifier(boolean canVerify) implements Verifier {
 
     @Override
-      public boolean canVerify(Algorithm algorithm) {
-        return canVerify;
-      }
-
-      @Override
-      public void verify(byte[] message, byte[] signature) {
-        // not exercised in this test
-      }
+    public boolean canVerify(Algorithm algorithm) {
+      return canVerify;
     }
+
+    @Override
+    public void verify(byte[] message, byte[] signature) {
+      // not exercised in this test
+    }
+  }
 }

@@ -165,8 +165,8 @@ public class AlgorithmTest {
   }
 
   /**
-     * Test-only Algorithm impl used to confirm the interface contract is open for extension.
-     */
-    private record TestAlgorithm(String name) implements Algorithm {
+   * Test-only Algorithm impl used to confirm the interface contract is open for extension.
+   */
+  private record TestAlgorithm(String name) implements Algorithm {
   }
 }

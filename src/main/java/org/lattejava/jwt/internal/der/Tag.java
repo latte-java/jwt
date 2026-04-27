@@ -115,8 +115,7 @@ public class Tag {
    * <p>
    * For example, if this is a sequence tag, this value will be <code>16</code> and you should expect
    * <code>primitive</code> to be false. If you want the raw byte which will be <code>48</code> or <code>0x30</code>
-   * you
-   * can read <code>rawByte</code>.
+   * you can read <code>rawByte</code>.
    * </p>
    */
   public final int value;
