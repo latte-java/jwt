@@ -26,19 +26,22 @@ package org.lattejava.jwt.jwks;
 import org.lattejava.jwt.JWTException;
 
 /**
- * Thrown by {@link JWKSource#refresh()} when an operator-driven refresh fails.
- * {@link #reason()} carries the categorical reason so callers can dispatch
- * programmatically without inspecting the cause chain.
+ * Thrown by JWKS-endpoint fetches: {@link JWKS#refresh()} on a
+ * remote-backed JWKS, {@code JWKS.fetch(...)} (one-shot), and the
+ * initial fetch performed inside {@code Builder.build()} when
+ * {@code failFast == true} and the JWKS hop fails. {@link #reason()} carries
+ * the categorical reason so callers can dispatch programmatically without
+ * inspecting the cause chain.
  */
-public final class JWKSRefreshException extends JWTException {
+public final class JWKSFetchException extends JWTException {
   private final Reason reason;
 
-  public JWKSRefreshException(Reason reason, String message) {
+  public JWKSFetchException(Reason reason, String message) {
     super(message);
     this.reason = reason;
   }
 
-  public JWKSRefreshException(Reason reason, String message, Throwable cause) {
+  public JWKSFetchException(Reason reason, String message, Throwable cause) {
     super(message, cause);
     this.reason = reason;
   }

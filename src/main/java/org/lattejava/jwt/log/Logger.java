@@ -25,7 +25,7 @@ package org.lattejava.jwt.log;
 
 /**
  * A small logging interface used by latte-jwt internals (notably
- * {@code JWKSource}). Removes any compile-time coupling to a specific
+ * {@code JWKS}). Removes any compile-time coupling to a specific
  * logging framework like SLF4J or JUL.
  *
  * <p>Shape mirrors {@code org.lattejava.http.log.Logger} with one

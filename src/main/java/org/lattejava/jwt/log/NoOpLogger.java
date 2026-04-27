@@ -25,7 +25,7 @@ package org.lattejava.jwt.log;
 
 /**
  * Singleton {@link Logger} that swallows every event. Default for
- * {@code JWKSource.Builder.logger(Logger)} so the library is silent unless
+ * {@code JWKS.Builder.logger(Logger)} so the library is silent unless
  * the integrator opts in.
  */
 public final class NoOpLogger implements Logger {

@@ -21,27 +21,27 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.lattejava.jwt.jwks;
-
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
+package org.lattejava.jwt;
 
 /**
- * Package-visible JWKS-fetch result carrying the parsed keys, the HTTP
- * status, and the response headers JWKS is interested in
- * ({@code Cache-Control}, {@code Retry-After}).
+ * Thrown by {@code OpenIDConnect.discover(...)} and
+ * {@code OpenIDConnect.discoverFromWellKnown(...)} for any discovery-fetch
+ * failure: network error, non-2xx HTTP response, JSON parse error, missing
+ * {@code jwks_uri} or {@code issuer} field, oversize response, redirect
+ * overflow, cross-origin redirect rejection, and the OIDC Discovery 1.0 §4.3
+ * issuer-equality mismatch.
  *
- * <p>Header lookup keys are case-insensitive.</p>
+ * <p>Intentionally does <strong>not</strong> extend {@link JWTException}.
+ * Discovery is a precursor to JWT verification, not a JWT operation. Putting
+ * it under {@code JWTException} would mislead {@code catch} blocks targeting
+ * JWT-specific failures.</p>
  */
-record JWKSResponse(List<JSONWebKey> keys, int statusCode, Map<String, String> selectedHeaders) {
-  JWKSResponse {
-    keys = (keys == null) ? List.of() : List.copyOf(keys);
-    Map<String, String> ci = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
-    if (selectedHeaders != null) {
-      ci.putAll(selectedHeaders);
-    }
-    selectedHeaders = Collections.unmodifiableMap(ci);
+public class OpenIDConnectException extends RuntimeException {
+  public OpenIDConnectException(String message) {
+    super(message);
+  }
+
+  public OpenIDConnectException(String message, Throwable cause) {
+    super(message, cause);
   }
 }

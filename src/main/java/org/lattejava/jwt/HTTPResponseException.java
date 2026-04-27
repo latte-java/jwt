@@ -31,7 +31,7 @@ import java.util.TreeMap;
 /**
  * Wrapped as the {@code cause} of an HTTP-call failure when the remote
  * endpoint returned a non-2xx status. Carries the status code and the
- * response headers so callers (notably {@code JWKSource}) can read
+ * response headers so callers (notably {@code JWKS}) can read
  * {@code Retry-After} and {@code Cache-Control} on the failure path.
  *
  * <p>Header lookup is case-insensitive per RFC 9110.</p>
