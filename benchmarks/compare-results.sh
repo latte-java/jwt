@@ -56,6 +56,7 @@ prettyname() {
   case "$1" in
     BaselineBenchmark)    echo "baseline (JCA)" ;;
     LatteJWTBenchmark)    echo "latte-jwt" ;;
+    LatteJWTJacksonBenchmark) echo "latte-jwt-jackson" ;;
     Auth0Benchmark)       echo "auth0-java-jwt" ;;
     Jose4jBenchmark)      echo "jose4j" ;;
     NimbusBenchmark)      echo "nimbus-jose-jwt" ;;

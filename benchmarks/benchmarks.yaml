@@ -1,6 +1,7 @@
 libraries:
   - baseline
   - latte-jwt
+  - latte-jwt-jackson
   - auth0-java-jwt
   - jose4j
   - nimbus-jose-jwt

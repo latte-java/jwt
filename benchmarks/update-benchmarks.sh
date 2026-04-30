@@ -57,7 +57,8 @@ render_leaderboard() {
       vs_leader   = (ld > 0) ? ($4 / ld) * 100 : 0
       libn = $1
       sub(/Benchmark$/, "", libn)
-      if      (libn == "LatteJWT")   libn = "latte-jwt"
+      if      (libn == "LatteJWTJackson") libn = "latte-jwt-jackson"
+      else if (libn == "LatteJWT")   libn = "latte-jwt"
       else if (libn == "Auth0")      libn = "auth0-java-jwt"
       else if (libn == "Jose4j")     libn = "jose4j"
       else if (libn == "Nimbus")     libn = "nimbus-jose-jwt"
@@ -105,7 +106,8 @@ render_aggregate() {
       rank++
       libn = $1
       sub(/Benchmark$/, "", libn)
-      if      (libn == "LatteJWT")   libn = "latte-jwt"
+      if      (libn == "LatteJWTJackson") libn = "latte-jwt-jackson"
+      else if (libn == "LatteJWT")   libn = "latte-jwt"
       else if (libn == "Auth0")      libn = "auth0-java-jwt"
       else if (libn == "Jose4j")     libn = "jose4j"
       else if (libn == "Nimbus")     libn = "nimbus-jose-jwt"

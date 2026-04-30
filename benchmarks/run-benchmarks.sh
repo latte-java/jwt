@@ -239,6 +239,7 @@ classpath_for_library() {
     jjwt)            cp="${cp}:${JJWT_API_JAR}:${JJWT_IMPL_JAR}:${JJWT_JACKSON_JAR}:${JACKSON_DATABIND_JAR}:${JACKSON_CORE_JAR}:${JACKSON_ANNOTATIONS_JAR}" ;;
     jose4j)          cp="${cp}:${JOSE4J_JAR}:${SLF4J_API_JAR}" ;;
     latte-jwt)       cp="${cp}:${LATTE_JWT_JAR}" ;;
+    latte-jwt-jackson) cp="${cp}:${LATTE_JWT_JAR}:${JACKSON_DATABIND_JAR}:${JACKSON_CORE_JAR}:${JACKSON_ANNOTATIONS_JAR}" ;;
     nimbus-jose-jwt) cp="${cp}:${NIMBUS_JAR}" ;;
     vertx-auth-jwt)
       cp="${cp}:${VERTX_AUTH_JWT_JAR}:${VERTX_AUTH_COMMON_JAR}:${VERTX_CORE_JAR}"
@@ -267,6 +268,7 @@ main_class_for_library() {
     jjwt)            echo "org.lattejava.jwt.benchmarks.jjwt.Main" ;;
     jose4j)          echo "org.lattejava.jwt.benchmarks.jose4j.Main" ;;
     latte-jwt)       echo "org.lattejava.jwt.benchmarks.lattejwt.Main" ;;
+    latte-jwt-jackson) echo "org.lattejava.jwt.benchmarks.lattejwtjackson.Main" ;;
     nimbus-jose-jwt) echo "org.lattejava.jwt.benchmarks.nimbus.Main" ;;
     vertx-auth-jwt)  echo "org.lattejava.jwt.benchmarks.vertx.Main" ;;
     *) echo "unknown library: ${lib}" >&2; exit 1 ;;
