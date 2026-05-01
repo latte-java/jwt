@@ -99,11 +99,14 @@ public final class JjwtAdapter implements JwtBenchmarkAdapter {
   }
 
   @Override
-  public Object unsafeDecode(String token) {
+  public Object unsafeDecodeClaims(String token) {
     // jjwt 0.12+ does not expose a clean public API for parsing a signed token without
-    // verifying the signature. The unsecured() builder method only accepts alg=none tokens,
-    // not signed tokens with signature stripped. Reaching into impl internals is out of
-    // scope. Return N/A.
+    // verifying the signature. The unsecured() builder method only accepts alg=none tokens.
+    throw new UnsupportedOperationException("jjwt 0.12+ has no public API for parse-signed-without-verify");
+  }
+
+  @Override
+  public Object unsafeDecodeFull(String token) {
     throw new UnsupportedOperationException("jjwt 0.12+ has no public API for parse-signed-without-verify");
   }
 }

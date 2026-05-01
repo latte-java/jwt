@@ -80,8 +80,15 @@ public final class FusionAuthAdapter implements JwtBenchmarkAdapter {
   }
 
   @Override
-  public Object unsafeDecode(String token) {
+  public Object unsafeDecodeClaims(String token) {
     return JWTUtils.decodePayload(token);
+  }
+
+  @Override
+  public Object unsafeDecodeFull(String token) {
+    // fusionauth-jwt exposes only claims-only (decodePayload) for no-verify access; the
+    // full JWT.getDecoder().decode path requires a Verifier.
+    throw new UnsupportedOperationException("fusionauth-jwt has no full-JWT no-verify API");
   }
 
   @SuppressWarnings("unchecked")

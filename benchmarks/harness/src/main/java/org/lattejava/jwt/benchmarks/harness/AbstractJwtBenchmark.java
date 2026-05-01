@@ -83,7 +83,13 @@ public abstract class AbstractJwtBenchmark {
 
   @Benchmark
   @BenchmarkMode(Mode.Throughput)
-  public Object unsafe_decode() throws Exception {
-    return adapter.unsafeDecode(hs256Token);
+  public Object unsafe_decode_claims() throws Exception {
+    return adapter.unsafeDecodeClaims(hs256Token);
+  }
+
+  @Benchmark
+  @BenchmarkMode(Mode.Throughput)
+  public Object unsafe_decode_full() throws Exception {
+    return adapter.unsafeDecodeFull(hs256Token);
   }
 }

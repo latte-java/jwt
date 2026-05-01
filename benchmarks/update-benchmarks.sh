@@ -145,7 +145,8 @@ generate_body() {
   render_leaderboard "es256_decode_verify_validate" "thrpt" "ES256 — decode + verify + validate"
   echo "## Supporting operations"
   echo
-  render_leaderboard "unsafe_decode" "thrpt" "Unsafe decode (no signature verification)"
+  render_leaderboard "unsafe_decode_claims" "thrpt" "Unsafe decode — claims only (base64 + JSON parse of payload, no signature verification, no header parse)"
+  render_leaderboard "unsafe_decode_full"   "thrpt" "Unsafe decode — full (header + claims, no signature verification)"
 
   echo "## Run conditions"
   if [[ -f "${CONDITIONS_FILE}" ]]; then

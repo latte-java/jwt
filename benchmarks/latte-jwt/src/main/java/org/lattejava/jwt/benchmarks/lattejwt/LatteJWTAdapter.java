@@ -85,7 +85,12 @@ public final class LatteJWTAdapter implements JwtBenchmarkAdapter {
   }
 
   @Override
-  public Object unsafeDecode(String token) {
+  public Object unsafeDecodeClaims(String token) {
+    return unsafeDecoder.decodeClaimsUnsecured(token);
+  }
+
+  @Override
+  public Object unsafeDecodeFull(String token) {
     return unsafeDecoder.decodeUnsecured(token);
   }
 }

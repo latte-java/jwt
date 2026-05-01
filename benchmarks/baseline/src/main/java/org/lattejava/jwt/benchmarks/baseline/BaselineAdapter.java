@@ -102,10 +102,21 @@ public final class BaselineAdapter implements JwtBenchmarkAdapter {
   }
 
   @Override
-  public Object unsafeDecode(String token) {
+  public Object unsafeDecodeClaims(String token) {
+    // Claims-only: base64-decode the payload segment to bytes. No JSON parse, no header.
     int firstDot = token.indexOf('.');
     int secondDot = token.indexOf('.', firstDot + 1);
     return B64D.decode(token.substring(firstDot + 1, secondDot));
+  }
+
+  @Override
+  public Object unsafeDecodeFull(String token) {
+    // Full: decode header + payload to two byte arrays; aggregate is the work being measured.
+    int firstDot = token.indexOf('.');
+    int secondDot = token.indexOf('.', firstDot + 1);
+    byte[] header = B64D.decode(token.substring(0, firstDot));
+    byte[] payload = B64D.decode(token.substring(firstDot + 1, secondDot));
+    return new byte[][]{header, payload};
   }
 
   private String encodeAsymmetric(byte[] headerPayload, String jcaAlg, PrivateKey key, boolean derToJOSE) throws Exception {

@@ -90,8 +90,14 @@ public final class Auth0Adapter implements JwtBenchmarkAdapter {
   }
 
   @Override
-  public Object unsafeDecode(String token) {
-    DecodedJWT decoded = JWT.decode(token);
-    return decoded;
+  public Object unsafeDecodeClaims(String token) {
+    // auth0/java-jwt has no payload-only decode API: JWT.decode() always builds a full
+    // DecodedJWT. Reported N/A here so we don't double-count this library on the "full" shape.
+    throw new UnsupportedOperationException("auth0/java-jwt has no payload-only no-verify API");
+  }
+
+  @Override
+  public Object unsafeDecodeFull(String token) {
+    return JWT.decode(token);
   }
 }

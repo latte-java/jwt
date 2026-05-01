@@ -108,7 +108,12 @@ public final class VertxAdapter implements JwtBenchmarkAdapter {
   }
 
   @Override
-  public Object unsafeDecode(String token) {
-    throw new UnsupportedOperationException("vertx-auth-jwt has no public unsafe-decode API");
+  public Object unsafeDecodeClaims(String token) {
+    throw new UnsupportedOperationException("vertx-auth-jwt has no public no-verify API");
+  }
+
+  @Override
+  public Object unsafeDecodeFull(String token) {
+    throw new UnsupportedOperationException("vertx-auth-jwt has no public no-verify API");
   }
 }

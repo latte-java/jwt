@@ -50,25 +50,44 @@ public final class ParityChecker {
       }
     }
 
-    // unsafe_decode (HS256 token) — UnsupportedOperationException is N/A, not a failure
+    // unsafe_decode_claims and unsafe_decode_full (HS256 token).
+    // UnsupportedOperationException is N/A (library doesn't expose that API shape), not a failure.
+    String hs256Token;
     try {
-      String token = adapter.encode(BenchmarkAlgorithm.HS256);
-      Object decoded = adapter.unsafeDecode(token);
-      if (decoded == null) {
-        System.err.println("[" + libraryName + "] unsafe_decode returned null");
-        failures++;
-      } else {
-        System.out.println("[" + libraryName + "] unsafe_decode parity OK");
-      }
-    } catch (UnsupportedOperationException e) {
-      System.out.println("[" + libraryName + "] unsafe_decode N/A (no public unsafe-decode API)");
+      hs256Token = adapter.encode(BenchmarkAlgorithm.HS256);
     } catch (Exception e) {
-      System.err.println("[" + libraryName + "] unsafe_decode parity FAILED: " + e);
+      System.err.println("[" + libraryName + "] HS256 re-encode for unsafe-decode parity FAILED: " + e);
       e.printStackTrace(System.err);
-      failures++;
+      return 1;
     }
+    final String token = hs256Token;
+    failures += parityForUnsafe(libraryName, "unsafe_decode_claims", () -> adapter.unsafeDecodeClaims(token));
+    failures += parityForUnsafe(libraryName, "unsafe_decode_full",   () -> adapter.unsafeDecodeFull(token));
 
     return failures == 0 ? 0 : 1;
+  }
+
+  private interface UnsafeCall {
+    Object call() throws Exception;
+  }
+
+  private static int parityForUnsafe(String libraryName, String label, UnsafeCall call) {
+    try {
+      Object decoded = call.call();
+      if (decoded == null) {
+        System.err.println("[" + libraryName + "] " + label + " returned null");
+        return 1;
+      }
+      System.out.println("[" + libraryName + "] " + label + " parity OK");
+      return 0;
+    } catch (UnsupportedOperationException e) {
+      System.out.println("[" + libraryName + "] " + label + " N/A (no public no-verify API of this shape)");
+      return 0;
+    } catch (Exception e) {
+      System.err.println("[" + libraryName + "] " + label + " parity FAILED: " + e);
+      e.printStackTrace(System.err);
+      return 1;
+    }
   }
 
   private ParityChecker() {}

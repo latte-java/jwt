@@ -100,7 +100,14 @@ public final class Jose4jAdapter implements JwtBenchmarkAdapter {
   }
 
   @Override
-  public Object unsafeDecode(String token) throws Exception {
+  public Object unsafeDecodeClaims(String token) throws Exception {
+    // jose4j's JwtConsumer.process always parses the full JWT structure (header + claims),
+    // even when configured to skip signature verification. There's no payload-only API.
+    throw new UnsupportedOperationException("jose4j has no payload-only no-verify API");
+  }
+
+  @Override
+  public Object unsafeDecodeFull(String token) throws Exception {
     JwtContext ctx = unsafeConsumer.process(token);
     return ctx.getJwtClaims();
   }

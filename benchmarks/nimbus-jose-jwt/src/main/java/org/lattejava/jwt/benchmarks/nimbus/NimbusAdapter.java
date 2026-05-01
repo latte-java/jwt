@@ -93,7 +93,19 @@ public final class NimbusAdapter implements JwtBenchmarkAdapter {
   }
 
   @Override
-  public Object unsafeDecode(String token) throws Exception {
+  public Object unsafeDecodeClaims(String token) throws Exception {
+    // SignedJWT.parse parses both the header and the claims (typed JWTClaimsSet) without
+    // verifying the signature. The matching shape is "claims-only" semantically — the
+    // header's parsed but discarded by the caller below.
+    com.nimbusds.jwt.SignedJWT jwt = com.nimbusds.jwt.SignedJWT.parse(token);
+    return jwt.getJWTClaimsSet();
+  }
+
+  @Override
+  public Object unsafeDecodeFull(String token) throws Exception {
+    // JWSObject.parse parses the header into a typed JWSHeader; the payload is left as
+    // raw bytes (no JSON parse). That's nimbus's natural "full structure, no claims
+    // typing" no-verify path.
     return JWSObject.parse(token);
   }
 
