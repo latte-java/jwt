@@ -19,6 +19,8 @@ DURATION=""
 QUICK=0
 NO_BUILD=0
 DO_UPDATE=0
+PROFILES=()
+INCLUDE=""
 
 usage() {
   cat <<'EOF'
@@ -32,6 +34,12 @@ Usage: run-benchmarks.sh [options]
   --quick               Preset: 5s warmup, 10s measurement, 1 fork
   --no-build            Skip latte build, reuse existing JARs
   --update              Run update-benchmarks.sh after the run completes
+  --profile    <name>   Enable a JMH profiler. Repeatable: --profile gc --profile stack.
+                        Common choices: gc (allocation rate / B-per-op), stack (sampled
+                        stack profiling), safepoints, perf (Linux), async-profiler
+                        (Linux/macOS, requires async-profiler installed).
+  --include    <regex>  Restrict to benchmarks matching this JMH include pattern (e.g.
+                        'hs256_decode_verify_validate$'). Useful when profiling a single op.
   -h, --help            This message
 EOF
 }
@@ -68,6 +76,8 @@ while [[ $# -gt 0 ]]; do
     --quick)      QUICK=1;         shift   ;;
     --no-build)   NO_BUILD=1;      shift   ;;
     --update)     DO_UPDATE=1;     shift   ;;
+    --profile)    PROFILES+=("$2"); shift 2 ;;
+    --include)    INCLUDE="$2";    shift 2 ;;
     -h|--help)    usage; exit 0 ;;
     *) echo "Unknown option: $1" >&2; usage; exit 2 ;;
   esac
@@ -321,16 +331,37 @@ JMH_ARGS=(
   -rf json
 )
 
+# Append --profile flags as JMH -prof entries. Repeatable: each profiler
+# specified via --profile becomes one '-prof <name>' pair, which JMH parses
+# additively (multiple profilers can run on the same trial).
+for profiler in "${PROFILES[@]}"; do
+  JMH_ARGS+=("-prof" "${profiler}")
+done
+
 declare -a SUCCESS=()
 declare -a FAILED=()
 
 echo "→ measurement"
 for lib in "${LIBS_ARRAY[@]}"; do
   cp="$(classpath_for_library "${lib}")"
-  main_class="$(main_class_for_library "${lib}")"
   out="${TMP_DIR}/${lib}.json"
   echo "  ${lib} → ${out}"
-  if BENCHMARK_FIXTURES="${FIXTURES_DIR}" java -cp "${cp}" "${main_class}" "${JMH_ARGS[@]}" -rff "${out}"; then
+  # When --include is set, bypass the harness BenchmarkRunner and call JMH's main
+  # directly with the user-supplied regex as a positional arg. The harness wrapper
+  # adds a class-level include that JMH ORs (rather than ANDs) with any other
+  # include, so going through the wrapper would defeat the user's filter. Direct
+  # JMH invocation works because each per-library JAR is its own classpath island
+  # — META-INF/BenchmarkList contains only that library's @Benchmark methods.
+  run_status=0
+  if [[ -n "${INCLUDE}" ]]; then
+    BENCHMARK_FIXTURES="${FIXTURES_DIR}" java -cp "${cp}" org.openjdk.jmh.Main \
+      "${JMH_ARGS[@]}" -rff "${out}" "${INCLUDE}" || run_status=$?
+  else
+    main_class="$(main_class_for_library "${lib}")"
+    BENCHMARK_FIXTURES="${FIXTURES_DIR}" java -cp "${cp}" "${main_class}" \
+      "${JMH_ARGS[@]}" -rff "${out}" || run_status=$?
+  fi
+  if [[ ${run_status} -eq 0 ]]; then
     SUCCESS+=("${lib}")
   else
     echo "    ${lib} measurement FAILED — continuing" >&2

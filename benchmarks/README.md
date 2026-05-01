@@ -29,6 +29,32 @@ The latest committed results are in [`BENCHMARKS.md`](BENCHMARKS.md).
 ./compare-results.sh results/A.json results/B.json --threshold 5
 ```
 
+## Profiling
+
+JMH ships a few built-in profilers; the orchestrator surfaces them via `--profile`
+(repeatable). Most useful for digging into perf concerns:
+
+```bash
+# Allocation rate / B-per-op for one specific benchmark, on one library
+./run-benchmarks.sh --libraries latte-jwt --profile gc --include 'hs256_decode_verify_validate$' --quick
+
+# Sampled stack profiling — see where wall-clock time is going
+./run-benchmarks.sh --libraries latte-jwt --profile stack --include 'hs256_encode$' --quick
+
+# Multiple profilers in one trial
+./run-benchmarks.sh --libraries latte-jwt --profile gc --profile safepoints --quick
+```
+
+Profiler choices: `gc` (allocation rate, the most useful for hunting heap churn),
+`stack` (sampled stack frames), `safepoints` (safepoint pauses), `perf` (Linux only),
+`async-profiler` (Linux/macOS, requires the `async-profiler` binary on `$ASYNC_PROFILER_HOME`
+or system path). Run `java -cp <classpath> org.openjdk.jmh.Main -lprof` for the
+full list available in the running JMH version.
+
+The `--include <regex>` flag scopes the trial to a single benchmark method (matched
+against the full `Class.method` name as a JMH regex). Without it, every method runs
+under the requested profiler — useful for sweeping, slow for targeted investigation.
+
 ## Quiet-machine guidance
 
 JMH numbers depend on what else the CPU is doing. For results worth quoting:
