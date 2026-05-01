@@ -19,7 +19,7 @@ import org.lattejava.jwt.benchmarks.harness.JwtBenchmarkAdapter;
 
 /**
  * Theoretical-floor reference: the minimum honest JWT path on top of plain JCA.
- * Uses precomputed header bytes per algorithm and hand-rolls base64url + a one-shot
+ * Uses precomputed header bytes per algorithm and hand-rolls base64URL + a one-shot
  * sign call. No external dependencies.
  *
  * Validation is simplified: presence-only checks on iss/aud, numeric exp/nbf windowing

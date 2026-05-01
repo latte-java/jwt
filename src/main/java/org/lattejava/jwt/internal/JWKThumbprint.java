@@ -45,12 +45,12 @@ public final class JWKThumbprint {
   }
 
   /**
-   * Returns the base64url-encoded JWK thumbprint of {@code key} using the given JCA digest algorithm name (e.g.
+   * Returns the base64URL-encoded JWK thumbprint of {@code key} using the given JCA digest algorithm name (e.g.
    * {@code "SHA-1"} or {@code "SHA-256"}).
    *
    * @param algorithm the JCA digest algorithm name; non-null
    * @param key       the JWK; non-null and {@code key.kty} must be set
-   * @return the base64url-encoded thumbprint without padding
+   * @return the base64URL-encoded thumbprint without padding
    * @throws IllegalArgumentException if {@code key.kty} is null or unsupported, or if {@code algorithm} is unknown
    */
   public static String compute(String algorithm, JSONWebKey key) {

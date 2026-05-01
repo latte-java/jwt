@@ -264,7 +264,7 @@ public final class JSONWebKey {
   /**
    * The {@code d} parameter. For RSA (RFC 7518 §6.3.2.1) this is the private exponent. For EC (RFC 7518 §6.2.2.1) and
    * OKP (RFC 8037 §2) this is the private key value. Represented as a Base64urlUInt-encoded value for RSA/EC and a
-   * base64url-encoded octet string for OKP.
+   * base64URL-encoded octet string for OKP.
    */
   public String d() {
     return d;
@@ -455,10 +455,10 @@ public final class JSONWebKey {
   }
 
   /**
-   * Returns the SHA-1 JWK thumbprint of this key as a base64url-no-pad string. Provided for interoperability with
+   * Returns the SHA-1 JWK thumbprint of this key as a base64URL-no-pad string. Provided for interoperability with
    * systems that still emit SHA-1 thumbprints; prefer {@link #thumbprintSHA256()} for new use.
    *
-   * @return the base64url-no-pad SHA-1 thumbprint
+   * @return the base64URL-no-pad SHA-1 thumbprint
    * @throws IllegalArgumentException if {@link #kty()} is null or unsupported
    */
   public String thumbprintSHA1() {
@@ -466,14 +466,14 @@ public final class JSONWebKey {
   }
 
   /**
-   * Returns the RFC 7638 / RFC 8037 SHA-256 JWK thumbprint of this key as a base64url-no-pad string. Suitable for use
+   * Returns the RFC 7638 / RFC 8037 SHA-256 JWK thumbprint of this key as a base64URL-no-pad string. Suitable for use
    * as the JWS {@code kid} value.
    *
    * <p>The thumbprint is computed from the canonical JSON serialization of
    * the required member subset for {@link #kty()} (RFC 7638 §3.2 / RFC 8037 §2). Canonicalisation is independent of any
    * user-configured {@code JSONProcessor} so the bytes are stable across deployments.</p>
    *
-   * @return the base64url-no-pad SHA-256 thumbprint
+   * @return the base64URL-no-pad SHA-256 thumbprint
    * @throws IllegalArgumentException if {@link #kty()} is null or unsupported
    */
   public String thumbprintSHA256() {
@@ -594,7 +594,7 @@ public final class JSONWebKey {
 
   /**
    * The {@code x} parameter. For EC (RFC 7518 §6.2.1.2) this is the x coordinate of the public point,
-   * Base64urlUInt-encoded. For OKP (RFC 8037 §2) this is the public key octet string, base64url-encoded.
+   * Base64urlUInt-encoded. For OKP (RFC 8037 §2) this is the public key octet string, base64URL-encoded.
    */
   public String x() {
     return x;
@@ -602,14 +602,14 @@ public final class JSONWebKey {
 
   /**
    * The {@code x5c} parameter (RFC 7517 §4.7): the X.509 certificate chain. Each entry is a base64-encoded (not
-   * base64url) DER-encoded X.509 certificate; the first entry holds the certificate matching this key.
+   * base64URL) DER-encoded X.509 certificate; the first entry holds the certificate matching this key.
    */
   public List<String> x5c() {
     return x5c;
   }
 
   /**
-   * The {@code x5t} parameter (RFC 7517 §4.8): the base64url-encoded SHA-1 thumbprint of the DER-encoded X.509
+   * The {@code x5t} parameter (RFC 7517 §4.8): the base64URL-encoded SHA-1 thumbprint of the DER-encoded X.509
    * certificate matching this key. Prefer {@link #x5tS256()} for new use; see RFC 6194 on SHA-1 collision resistance.
    */
   public String x5t() {
@@ -617,7 +617,7 @@ public final class JSONWebKey {
   }
 
   /**
-   * The {@code x5t#S256} parameter (RFC 7517 §4.9): the base64url-encoded SHA-256 thumbprint of the DER-encoded X.509
+   * The {@code x5t#S256} parameter (RFC 7517 §4.9): the base64URL-encoded SHA-256 thumbprint of the DER-encoded X.509
    * certificate matching this key.
    */
   public String x5tS256() {
@@ -700,7 +700,7 @@ public final class JSONWebKey {
     /**
      * The {@code d} parameter. For RSA (RFC 7518 §6.3.2.1) this is the private exponent. For EC (RFC 7518 §6.2.2.1) and
      * OKP (RFC 8037 §2) this is the private key value. Represented as a Base64urlUInt-encoded value for RSA/EC and a
-     * base64url-encoded octet string for OKP.
+     * base64URL-encoded octet string for OKP.
      */
     public Builder d(String v) {
       this.d = v;
@@ -830,7 +830,7 @@ public final class JSONWebKey {
 
     /**
      * The {@code x} parameter. For EC (RFC 7518 §6.2.1.2) this is the x coordinate of the public point,
-     * Base64urlUInt-encoded. For OKP (RFC 8037 §2) this is the public key octet string, base64url-encoded.
+     * Base64urlUInt-encoded. For OKP (RFC 8037 §2) this is the public key octet string, base64URL-encoded.
      */
     public Builder x(String v) {
       this.x = v;
@@ -839,7 +839,7 @@ public final class JSONWebKey {
 
     /**
      * The {@code x5c} parameter (RFC 7517 §4.7): the X.509 certificate chain. Each entry is a base64-encoded (not
-     * base64url) DER-encoded X.509 certificate; the first entry holds the certificate matching this key.
+     * base64URL) DER-encoded X.509 certificate; the first entry holds the certificate matching this key.
      */
     public Builder x5c(List<String> v) {
       this.x5c = v;
@@ -847,7 +847,7 @@ public final class JSONWebKey {
     }
 
     /**
-     * The {@code x5t} parameter (RFC 7517 §4.8): the base64url-encoded SHA-1 thumbprint of the DER-encoded X.509
+     * The {@code x5t} parameter (RFC 7517 §4.8): the base64URL-encoded SHA-1 thumbprint of the DER-encoded X.509
      * certificate matching this key. Prefer {@link #x5tS256(String)} for new use; see RFC 6194 on SHA-1 collision
      * resistance.
      */
@@ -857,7 +857,7 @@ public final class JSONWebKey {
     }
 
     /**
-     * The {@code x5t#S256} parameter (RFC 7517 §4.9): the base64url-encoded SHA-256 thumbprint of the DER-encoded X.509
+     * The {@code x5t#S256} parameter (RFC 7517 §4.9): the base64URL-encoded SHA-256 thumbprint of the DER-encoded X.509
      * certificate matching this key.
      */
     public Builder x5tS256(String v) {

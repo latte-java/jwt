@@ -44,9 +44,9 @@ import static org.testng.Assert.*;
  */
 public class JWKThumbprintTest {
 
-  // EC P-256 JWK example (x/y from RFC 7515 §A.3). Pinned SHA-256 base64url
+  // EC P-256 JWK example (x/y from RFC 7515 §A.3). Pinned SHA-256 base64URL
   // thumbprint is "cn-I_WNMClehiVp51i_0VpOENW1upEerA8sEam5hn-s"; pinned
-  // SHA-1 base64url thumbprint is "VHriznG7vJAFpXMXRmGgAkA5sEE".
+  // SHA-1 base64URL thumbprint is "VHriznG7vJAFpXMXRmGgAkA5sEE".
   private static JSONWebKey ecP256() {
     return JSONWebKey.builder()
                      .kty(KeyType.EC)
@@ -57,7 +57,7 @@ public class JWKThumbprintTest {
   }
 
   // RFC 7638 §3.1 — the canonical RSA JWK example. The published SHA-256
-  // base64url thumbprint is "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs".
+  // base64URL thumbprint is "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs".
   private static JSONWebKey rfc7638Rsa() {
     return JSONWebKey.builder()
                      .kty(KeyType.RSA)

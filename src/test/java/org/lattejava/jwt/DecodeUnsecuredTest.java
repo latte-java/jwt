@@ -50,7 +50,7 @@ public class DecodeUnsecuredTest {
 
   @Test
   public void base64UrlStrictness_fires() {
-    // Use case: base64url strictness still enforced under decodeUnsecured.
+    // Use case: base64URL strictness still enforced under decodeUnsecured.
     String header = b64("{\"alg\":\"none\"}") + "+";
     String payload = b64("{\"sub\":\"abc\"}");
     String token = header + "." + payload + ".";

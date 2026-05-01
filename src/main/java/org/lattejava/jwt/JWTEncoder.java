@@ -28,17 +28,17 @@ import org.lattejava.jwt.internal.*;
  * <ol>
  *   <li>Build {@link Header} -- pre-populated with {@code alg} from
  *       {@link Signer#algorithm()} and {@code kid} from {@link Signer#kid()}.</li>
- *   <li>Serialize header via {@link JSONProcessor} and base64url-encode (no padding).</li>
- *   <li>Serialize JWT claims and base64url-encode (no padding).</li>
+ *   <li>Serialize header via {@link JSONProcessor} and base64URL-encode (no padding).</li>
+ *   <li>Serialize JWT claims and base64URL-encode (no padding).</li>
  *   <li>Assemble {@code headerB64.payloadB64} as a single byte array, call
- *       {@link Signer#sign(byte[])}, base64url-encode the signature.</li>
+ *       {@link Signer#sign(byte[])}, base64URL-encode the signature.</li>
  *   <li>Return {@code headerB64.payloadB64.signatureB64}.</li>
  * </ol>
  *
- * <p>The pipeline operates on {@code byte[]} end-to-end: the base64url-encoded
+ * <p>The pipeline operates on {@code byte[]} end-to-end: the base64URL-encoded
  * segments are kept as bytes through signing and only converted to a
  * {@link String} for the final return value. Every byte produced is in the
- * base64url alphabet plus {@code '.'} -- a strict ASCII subset -- so the
+ * base64URL alphabet plus {@code '.'} -- a strict ASCII subset -- so the
  * UTF-8 {@code String} constructor performs no actual decoding work.</p>
  *
  * <p>The {@code alg} header parameter is always derived from the signer and
@@ -115,7 +115,7 @@ public class JWTEncoder {
               + "] but found [" + (header.alg() == null ? "null" : header.alg().name()) + "]");
     }
 
-    // Steps 2-3: serialize header and payload, base64url (no padding) as bytes.
+    // Steps 2-3: serialize header and payload, base64URL (no padding) as bytes.
     byte[] encodedHeader = Base64URL.encode(jsonProcessor.serialize(header.toSerializableMap()));
     byte[] encodedPayload = Base64URL.encode(jsonProcessor.serialize(jwt.toSerializableMap()));
 
@@ -131,7 +131,7 @@ public class JWTEncoder {
     System.arraycopy(signingInput, 0, out, 0, signingInput.length);
     out[signingInput.length] = '.';
     System.arraycopy(encodedSignature, 0, out, signingInput.length + 1, encodedSignature.length);
-    // Output bytes are entirely ASCII (base64url + '.'); UTF-8 decoding is a no-op fast path.
+    // Output bytes are entirely ASCII (base64URL + '.'); UTF-8 decoding is a no-op fast path.
     return new String(out, StandardCharsets.UTF_8);
   }
 

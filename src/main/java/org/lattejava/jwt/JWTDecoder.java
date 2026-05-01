@@ -150,26 +150,13 @@ public class JWTDecoder {
   // Public decode API
   // -------------------------------------------------------------------
 
-  /**
-   * Convert an ASCII-only substring of {@code s} to a freshly allocated {@code byte[]}. Faster than
-   * {@code s.substring(from, to).getBytes(UTF_8)} for ASCII because it avoids the intermediate {@code String}
-   * allocation. The caller is responsible for ensuring every char in {@code [from, to)} is below 0x80.
-   */
-  private static byte[] asciiBytes(String s, int from, int to) {
-    byte[] out = new byte[to - from];
-    for (int i = 0; i < out.length; i++) {
-      out[i] = (byte) s.charAt(from + i);
-    }
-    return out;
+  private static Builder builderDefaults() {
+    return new Builder();
   }
 
   // -------------------------------------------------------------------
   // Internals
   // -------------------------------------------------------------------
-
-  private static Builder builderDefaults() {
-    return new Builder();
-  }
 
   /**
    * Decode a base64URL segment, wrapping any {@link IllegalArgumentException} from {@code Base64URL.decode} into a
@@ -181,8 +168,22 @@ public class JWTDecoder {
       return Base64URL.decode(segment);
     } catch (IllegalArgumentException e) {
       throw new InvalidJWTException(
-          "JWT [" + name + "] segment is not valid base64url", e);
+          "JWT [" + name + "] segment is not valid base64URL", e);
     }
+  }
+
+  /**
+   * Convert an ASCII-only substring of {@code s} to a freshly allocated {@code byte[]}. Faster than
+   * {@code s.substring(from, to).getBytes(UTF_8)} for ASCII because it avoids the intermediate {@code String}
+   * allocation. The caller is responsible for ensuring every char in {@code [from, to)} is below 0x80.
+   */
+  private static byte[] fasterSubstringASCIIBytes(String s, int length) {
+    byte[] out = new byte[length];
+    for (int i = 0; i < out.length; i++) {
+      out[i] = (byte) s.charAt(i);
+    }
+
+    return out;
   }
 
   /**
@@ -232,12 +233,12 @@ public class JWTDecoder {
 
     // Verify the signature BEFORE parsing the payload so that untrusted payload bytes never reach the JSON parser
     // unless authenticated. Compute the signing input bytes directly from the encoded JWT — a char-to-byte cast is
-    // safe for the header range (Base64URL.decode in parseHeader has already rejected any non-base64url char above)
+    // safe for the header range (Base64URL.decode in parseHeader has already rejected any non-base64URL char above)
     // and avoids the String allocation that encodedJWT.substring(0, secondDot).getBytes(UTF_8) would produce. A
-    // non-base64url char inside the payload range would cause asciiBytes to truncate, and the subsequent HMAC
+    // non-base64URL char inside the payload range would cause asciiBytes to truncate, and the subsequent HMAC
     // comparison would fail with InvalidJWTSignatureException -- parsePayload's Base64URL.decode then surfaces the
     // structural problem after the signature path has already rejected the token.
-    byte[] message = asciiBytes(encodedJWT, 0, segments.signingInputEnd);
+    byte[] message = fasterSubstringASCIIBytes(encodedJWT, segments.signingInputEnd);
     byte[] signatureBytes = decodeBase64URL(segments.signatureB64, "signature");
     verifier.verify(message, signatureBytes);
 
@@ -305,7 +306,7 @@ public class JWTDecoder {
   /**
    * <strong>WARNING: This method does NOT verify the JWT signature.</strong>
    * The returned {@link JWT} has its header and claims populated but the token's authenticity has not been validated.
-   * Only the minimum structural defenses run (input size cap, segment count, base64url decode validity); the decoder's
+   * Only the minimum structural defenses run (input size cap, segment count, base64URL decode validity); the decoder's
    * configured {@code expectedType}, {@code expectedAlgorithms}, {@code criticalHeaders}, and time-claim checks are
    * <em>not</em> applied. Callers using this method are expected to inspect or verify the returned JWT themselves.
    *
@@ -382,17 +383,15 @@ public class JWTDecoder {
    * Parse the input into segments after enforcing size and structural defenses.
    */
   private Segments parseSegments(String encodedJWT, boolean requireSignature) {
-    // Compact JWS uses only base64url + '.', a strict ASCII subset, so the
-    // String char count equals the UTF-8 byte count. Any non-ASCII char would
-    // be rejected by the per-character base64url alphabet scan below.
+    // Compact JWS uses only base64URL + '.', a strict ASCII subset, so the String char count equals the UTF-8 byte
+    // count. Any non-ASCII char would be rejected by the per-character base64URL alphabet scan below.
     if (encodedJWT.length() > maxInputBytes) {
       throw new InvalidJWTException(
           "Encoded JWT exceeds maxInputBytes [" + maxInputBytes + "]");
     }
 
-    // Count separator positions directly -- String.split would trim a trailing
-    // empty signature segment and we need to distinguish "a.b." (3 segments,
-    // empty signature) from "a.b" (2 segments, no separator).
+    // Count separator positions directly -- String.split would trim a trailing empty signature segment, and we need to
+    // distinguish "a.b." (3 segments, empty signature) from "a.b" (2 segments, no separator).
     int firstDot = encodedJWT.indexOf('.');
     int secondDot = firstDot < 0 ? -1 : encodedJWT.indexOf('.', firstDot + 1);
     int thirdDot = secondDot < 0 ? -1 : encodedJWT.indexOf('.', secondDot + 1);
@@ -402,6 +401,7 @@ public class JWTDecoder {
       throw new MissingSignatureException(
           "Encoded JWT is missing a signature; expected three dot-separated segments");
     }
+
     if (thirdDot >= 0) {
       throw new InvalidJWTException(
           "Encoded JWT has more than three segments; expected exactly two '.' separators");
@@ -414,13 +414,15 @@ public class JWTDecoder {
     if (headerB64.isEmpty()) {
       throw new InvalidJWTException("Encoded JWT header segment is empty");
     }
+
     if (payloadB64.isEmpty()) {
       throw new InvalidJWTException("Encoded JWT payload segment is empty");
     }
+
     // Base64URL alphabet validation is deferred to the per-segment decode calls
     // (decodeBase64URL below). java.util.Base64.getUrlDecoder() rejects invalid
     // characters with IllegalArgumentException, which we wrap into
-    // InvalidJWTException with the segment name. For authenticated decode an
+    // InvalidJWTException with the segment name. For authenticated decoding an
     // empty signature segment is structurally valid here ("a.b." passes); the
     // verifier rejects it downstream.
 
