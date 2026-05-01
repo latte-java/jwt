@@ -30,10 +30,12 @@ import org.lattejava.jwt.Signer;
  *
  * <p>The JCA algorithm name and {@link SecretKeySpec} are cached at construction so
  * {@link #sign(byte[])} skips the per-call allocation and the redundant defensive copy of
- * the secret. {@link Mac} itself is not thread-safe, so each thread caches its own
- * pre-initialised instance via a {@link ThreadLocal}; calls after the first on a given
- * thread skip the {@code Mac.getInstance + init} cost. The per-thread {@code Mac} dies
- * with the thread (no manual cleanup needed).</p>
+ * the secret. The {@link Mac} instance itself is also initialised once in the constructor
+ * and reused across calls; {@link Mac} is not thread-safe so {@link #sign(byte[])}
+ * synchronises on it. Lock cost is essentially free at low/medium concurrency under
+ * HotSpot biased locking; under extreme concurrency on a single shared signer the lock
+ * will become a contention point, in which case callers can construct one signer per
+ * thread or per partition.</p>
  *
  * @author Daniel DeGroff
  */
@@ -42,7 +44,7 @@ public class HMACSigner implements Signer {
   private final String jcaName;
   private final SecretKeySpec keySpec;
   private final String kid;
-  private final ThreadLocal<Mac> macTL;
+  private final Mac mac;
 
   private HMACSigner(Algorithm algorithm, byte[] secret, String kid) {
     Objects.requireNonNull(algorithm);
@@ -54,15 +56,12 @@ public class HMACSigner implements Signer {
     // SecretKeySpec clones the secret internally, satisfying the defensive-copy contract.
     this.keySpec = new SecretKeySpec(secret, jcaName);
     this.kid = kid;
-    this.macTL = ThreadLocal.withInitial(() -> {
-      try {
-        Mac mac = Mac.getInstance(jcaName);
-        mac.init(keySpec);
-        return mac;
-      } catch (NoSuchAlgorithmException | InvalidKeyException e) {
-        throw new JWTSigningException("An unexpected exception occurred when initialising HMAC for [" + jcaName + "]", e);
-      }
-    });
+    try {
+      this.mac = Mac.getInstance(jcaName);
+      this.mac.init(keySpec);
+    } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+      throw new JWTSigningException("An unexpected exception occurred when initialising HMAC for [" + jcaName + "]", e);
+    }
   }
 
   private HMACSigner(Algorithm algorithm, String secret, String kid) {
@@ -131,6 +130,10 @@ public class HMACSigner implements Signer {
   public byte[] sign(byte[] message) {
     Objects.requireNonNull(message);
     // Mac.doFinal implicitly resets the Mac so the same instance is reusable across calls.
-    return macTL.get().doFinal(message);
+    // Synchronise because Mac is not thread-safe; biased locking makes the uncontended
+    // case effectively free.
+    synchronized (mac) {
+      return mac.doFinal(message);
+    }
   }
 }
