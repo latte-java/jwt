@@ -5,3 +5,8 @@
 results/*.json
 !results/latest.json
 !results/latest.conditions.json
+
+# Per-batch raw run files (canonical multi-batch runs preserve per-library JSONs here
+# for the merge step). Kept on disk for audit but not committed — latest.json is the
+# canonical merged form that gets committed.
+results/canonical/
