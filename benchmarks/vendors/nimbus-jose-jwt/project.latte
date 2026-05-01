@@ -2,18 +2,16 @@
  * Copyright (c) 2026, The Latte Project, All Rights Reserved
  * License: MIT (See LICENSE file in root)
  */
-jacksonVersion = "2.15.4"
-jmhVersion     = "1.37"
+jmhVersion    = "1.37"
+nimbusVersion = "10.3"
 
-project(group: "org.lattejava.jwt.benchmarks", name: "latte-jwt-jackson-bench", version: "0.1.0", licenses: ["MIT"]) {
+project(group: "org.lattejava.jwt.benchmarks", name: "nimbus-jose-jwt-bench", version: "0.1.0", licenses: ["MIT"]) {
   workflow { standard() }
 
   dependencies {
     group(name: "compile") {
-      dependency(id: "com.fasterxml.jackson.core:jackson-core:${jacksonVersion}")
-      dependency(id: "com.fasterxml.jackson.core:jackson-databind:${jacksonVersion}")
+      dependency(id: "com.nimbusds:nimbus-jose-jwt:${nimbusVersion}")
       dependency(id: "org.lattejava.jwt.benchmarks:harness:0.1.0-{integration}")
-      dependency(id: "org.lattejava:jwt:0.1.0-{integration}")
       dependency(id: "org.openjdk.jmh:jmh-core:${jmhVersion}")
       dependency(id: "org.openjdk.jmh:jmh-generator-annprocess:${jmhVersion}")
     }
@@ -23,8 +21,8 @@ project(group: "org.lattejava.jwt.benchmarks", name: "latte-jwt-jackson-bench", 
 }
 
 dependency = loadPlugin(id: "org.lattejava.plugin:dependency:0.1.5")
-java       = loadPlugin(id: "org.lattejava.plugin:java:0.1.7")
 idea       = loadPlugin(id: "org.lattejava.plugin:idea:0.1.5")
+java       = loadPlugin(id: "org.lattejava.plugin:java:0.1.8")
 
 java.settings.javaVersion = "21"
 

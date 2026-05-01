@@ -73,7 +73,7 @@ Libraries marked N/A are simply absent from the unsafe_decode leaderboard.
 
 ## Adding a library
 
-1. Create `benchmarks/<lib>/project.latte` depending on `org.lattejava.jwt.benchmarks:harness:0.1.0-{integration}`,
+1. Create `benchmarks/vendors/<lib>/project.latte` depending on `org.lattejava.jwt.benchmarks:harness:0.1.0-{integration}`,
    the new library, and JMH (core + annprocess).
 2. Implement `org.lattejava.jwt.benchmarks.<lib>.<Lib>Adapter` against `JwtBenchmarkAdapter`.
 3. Add a one-line `<Lib>Benchmark extends AbstractJwtBenchmark` and a `Main` that calls
@@ -107,5 +107,7 @@ relative to wall-clock time so the token is fresh at trial start.
 - `library-versions.md` — pinned versions per library (working notes)
 - `fixtures/` — keys + canonical claims
 - `harness/` — shared adapter contract + JMH abstract class + parity checker
-- `<library-name>/` — per-library Latte project + adapter implementation
+- `vendors/<library-name>/` — per-library Latte project + adapter implementation. Every
+  library being measured (including the JCA baseline and our own latte-jwt projects)
+  lives here so the suite gives no preferential treatment to any vendor.
 - `results/` — JSON outputs (only `latest.json` and `latest.conditions.json` are committed)

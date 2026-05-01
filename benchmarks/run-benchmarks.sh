@@ -77,6 +77,12 @@ done
 yaml_libraries() { sed -n '/^libraries:/,/^[a-zA-Z]/p' "${BENCH_DIR}/benchmarks.yaml" | sed -n 's/^  - //p'; }
 yaml_jmh()       { grep -E "^[[:space:]]+$1:" "${BENCH_DIR}/benchmarks.yaml" | head -1 | awk '{print $2}'; }
 
+# ── library directory layout
+# Every library being measured (including the JCA baseline and our own latte-jwt projects)
+# lives under benchmarks/vendors/ so the suite gives no preferential treatment to any
+# vendor. The framework code (harness, fixtures, scripts) stays at the top level.
+lib_dir_for() { echo "${BENCH_DIR}/vendors/$1"; }
+
 DEFAULT_LIBS="$(yaml_libraries | paste -sd ',' -)"
 LIBS_TO_RUN="${LIBRARIES:-${DEFAULT_LIBS}}"
 WARMUP_ITERS="$(yaml_jmh warmup-iterations)"
@@ -105,7 +111,7 @@ java -version 2>&1 | head -1 | grep -qE 'version "(2[1-9]|[3-9][0-9])' || {
 [[ -f "${FIXTURES_DIR}/claims.json" ]] || { echo "fixtures incomplete (no claims.json)" >&2; exit 1; }
 IFS=',' read -ra LIBS_ARRAY <<< "${LIBS_TO_RUN}"
 for lib in "${LIBS_ARRAY[@]}"; do
-  [[ -d "${BENCH_DIR}/${lib}" ]] || { echo "library dir missing: ${lib}" >&2; exit 1; }
+  [[ -d "$(lib_dir_for "${lib}")" ]] || { echo "library dir missing: $(lib_dir_for "${lib}")" >&2; exit 1; }
 done
 echo "  ok"
 
@@ -114,7 +120,7 @@ if (( NO_BUILD == 0 )); then
   echo "→ build"
   for lib in "${LIBS_ARRAY[@]}"; do
     echo "  building ${lib}…"
-    ( cd "${BENCH_DIR}/${lib}" && latte build ) >"${RESULTS_DIR}/.${lib}.build.log" 2>&1 || {
+    ( cd "$(lib_dir_for "${lib}")" && latte build ) >"${RESULTS_DIR}/.${lib}.build.log" 2>&1 || {
       echo "build failed for ${lib} — see ${RESULTS_DIR}/.${lib}.build.log" >&2
       exit 1
     }
@@ -215,11 +221,13 @@ VERTX_JACKSON_CORE_JAR="${M2_REPO}/com/fasterxml/jackson/core/jackson-core/2.16.
 # uses artifact "latte-jwt-bench"), so we glob for the primary (non-test, non-src) JAR.
 lib_jar_for() {
   local lib="$1"
+  local lib_dir
+  lib_dir="$(lib_dir_for "${lib}")"
   local jar
-  jar="$(find "${BENCH_DIR}/${lib}/build/jars" -maxdepth 1 -name '*.jar' \
+  jar="$(find "${lib_dir}/build/jars" -maxdepth 1 -name '*.jar' \
          ! -name '*-test-*' ! -name '*-src*' 2>/dev/null | head -1)"
   if [[ -z "${jar}" ]]; then
-    echo "cannot find built JAR for ${lib} under ${BENCH_DIR}/${lib}/build/jars/" >&2
+    echo "cannot find built JAR for ${lib} under ${lib_dir}/build/jars/" >&2
     exit 1
   fi
   echo "${jar}"
