@@ -130,7 +130,7 @@ public class HMACSigner implements Signer {
   public byte[] sign(byte[] message) {
     Objects.requireNonNull(message);
     // Mac.doFinal implicitly resets the Mac so the same instance is reusable across calls.
-    // Synchronise because Mac is not thread-safe; biased locking makes the uncontended
+    // Synchronize because Mac is not thread-safe; biased locking makes the uncontended
     // case effectively free.
     synchronized (mac) {
       return mac.doFinal(message);
