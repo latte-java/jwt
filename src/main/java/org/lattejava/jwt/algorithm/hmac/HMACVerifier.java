@@ -42,7 +42,7 @@ import org.lattejava.jwt.*;
  * {@link #verify(byte[], byte[])} skips the per-call allocation and the redundant defensive
  * copy of the secret. The {@link Mac} instance itself is also initialized once in the
  * constructor and reused across calls; {@link Mac} is not thread-safe so
- * {@link #verify(byte[], byte[])} synchronises on it. Lock cost is essentially free at
+ * {@link #verify(byte[], byte[])} synchronizes on it. Lock cost is essentially free at
  * low/medium concurrency under HotSpot biased locking; under extreme concurrency on a
  * single shared verifier, the lock will become a contention point, in which case callers
  * can construct one verifier per thread or per partition.</p>
@@ -65,7 +65,7 @@ public class HMACVerifier implements Verifier {
       this.mac = Mac.getInstance(jcaAlgorithm);
       this.mac.init(keySpec);
     } catch (NoSuchAlgorithmException | InvalidKeyException e) {
-      throw new JWTVerifierException("An unexpected exception occurred when initialising HMAC for [" + jcaAlgorithm + "]", e);
+      throw new JWTVerifierException("An unexpected exception occurred when initializing HMAC for [" + jcaAlgorithm + "]", e);
     }
   }
 

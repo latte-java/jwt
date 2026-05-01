@@ -898,34 +898,36 @@ Lenient base64url decoding is a known source of token ambiguity (two encodings p
 
 ### Unsecured JWT Decoding
 
-Unsecured decoding lives on `JWTDecoder.decodeUnsecured()`, keeping the `JWT` class a pure model/POJO with no infrastructure dependencies. The method is explicitly named to make the security implications clear. It parses the payload without any signature verification -- for inspection/debugging only.
+Unsecured decoding lives on three sibling methods on `JWTDecoder`:
+
+- `decodeUnsecured(String)` -- parses both header and payload, returns a populated `JWT`.
+- `decodeHeaderUnsecured(String)` -- parses only the header. Useful for the kid-lookup pattern: read `kid`/`alg`, select a verifier, then call the authenticated `decode(...)`.
+- `decodeClaimsUnsecured(String)` -- parses only the payload claims as a `Map<String, Object>`. Useful when the caller needs to peek at `iss`/`sub`/etc. before performing an authenticated decode.
 
 ```java
 JWT claims = new JWTDecoder().decodeUnsecured(token);
 ```
 
-The returned JWT has its `header()` populated, so a separate header-only decode method is unnecessary.
+The methods are explicitly named to make the security implications clear: they perform Base64URL decode + JSON parse + structural shape validation, and nothing else. No signature verification, no semantic policy enforcement.
 
-**Defenses that still run for `decodeUnsecured`.** The security implications concern the *missing signature check*, not input handling. All structural and resource defenses still apply so that the "debug path" cannot be turned into a DoS amplifier:
+**What runs and what does not.** `decodeUnsecured` is a *parsing* operation, not an *authentication* operation. Structural and resource defenses still apply so the "debug path" cannot be turned into a DoS amplifier; configured policy checks (`expectedType`, `expectedAlgorithms`, `criticalHeaders`, time validation) do **not** apply, because by definition the caller has opted out of authenticated decoding and is responsible for whatever inspection or downstream verification follows.
 
 | Defense | Runs in `decodeUnsecured`? |
 |---------|----------------------------|
 | `maxInputBytes` size check | Yes -- before any parsing |
-| Base64URL strictness (alphabet, no padding, no whitespace) | Yes |
+| Base64URL decode validity (`Base64URL.decode` rejects non-alphabet chars) | Yes |
 | Three-segment split check | Yes -- a token with exactly two `.` separators (three segments) is required, matching the authenticated decode path. A trailing dot with an empty third segment (`"header.payload."`) is accepted as RFC 7519 §6.1 unsecured wire form. Fewer separators throws `MissingSignatureException`; more throws `InvalidJWTException`. |
 | `maxNestingDepth` JSON parse limit | Yes |
 | `maxNumberLength` JSON parse limit | Yes -- the BigInteger/BigDecimal parse-DoS is a structural concern, independent of whether the signature is checked |
 | Duplicate JSON key rejection | Yes (controlled by `allowDuplicateJSONKeys`) |
 | `Header.fromMap` shape validation | Yes -- a malformed header is still a malformed header |
 | `JWT.fromMap` shape validation | Yes |
+| `expectedType` check | **No** -- `typ` enforcement is a configured policy, not a structural defense; the unsecured path returns raw claims and lets the caller apply policy after their own inspection |
+| `expectedAlgorithms` whitelist | **No** -- configured policy, skipped with the rest of authentication-path enforcement |
 | `crit` understood-parameters check | **No** -- `crit` is a signing contract, skipped with the rest of signature handling |
-| `expectedAlgorithms` whitelist | **No** -- same reason |
-| `expectedType` check | Yes -- `typ` is a structural header field, not a signature binding |
 | Verifier resolution | **No** -- unsecured by definition |
 | Signature verification | **No** |
 | `exp` / `nbf` time validation | **No** -- the unsecured path returns raw claims; callers decide what to do with them |
-
-This matches the principle that `decodeUnsecured` is a *parsing* operation, not an *authentication* operation.
 
 ### Encode Flow
 
@@ -941,7 +943,7 @@ This matches the principle that `decodeUnsecured` is a *parsing* operation, not 
 ### Decode Flow
 
 1. **Size check.** Encoded JWT length > `maxInputBytes` → `InvalidJWTException`. Runs before any parsing.
-2. **Structural check.** Validate each segment is strict base64url (alphabet, no padding, no whitespace).
+2. **Structural check.** Each segment must be valid base64url; this is enforced when `Base64URL.decode` runs on the segment, which rejects non-alphabet characters with `IllegalArgumentException` (wrapped as `InvalidJWTException`).
 3. **Split on `.`** -- the encoded JWT MUST contain exactly two `.` separators (three segments, counted by separator position). Fewer separators throws `MissingSignatureException` (e.g., `"a.b"` -- two segments, no signature). More separators throws `InvalidJWTException` (e.g., a JWE compact serialization with four `.` separators and five segments). The third segment MAY be empty: `"a.b."` (trailing dot, empty third segment) is the RFC 7519 §6.1 unsecured-JWT wire form and is structurally valid under this rule. `decodeUnsecured` accepts it without inspection. The authenticated `decode` path passes the empty bytes through to `verifier.verify(...)` -- no built-in verifier handles `alg: none`, so the empty signature is rejected as `MissingVerifierException` unless the caller has explicitly wired a verifier for `"none"` (see §1 "Security: the `none` algorithm").
 4. **Decode header.** Base64URL decode header -> `jsonProcessor.deserialize()` -> `Header.fromMap()`. Missing `alg` throws `InvalidJWTException`.
 5. **Algorithm whitelist check.** If `expectedAlgorithms` is set and `header.alg()` is not in the set → `InvalidJWTException`. Runs before verifier selection as defense-in-depth.
@@ -1202,15 +1204,20 @@ Test: `// Use case: ES256 verifier constructed from a hand-built ECPublicKey wit
 
 ### Signer / Verifier Thread-Safety
 
-`JWTEncoder` and `JWTDecoder` are thread-safe by construction (immutable final fields, no mutable internal state). For this to be a real guarantee, every `Signer` and `Verifier` implementation -- built-in or caller-supplied -- MUST follow this rule:
+`JWTEncoder` and `JWTDecoder` are thread-safe by construction (immutable final fields, no mutable internal state). For this to be a real guarantee, every `Signer` and `Verifier` implementation -- built-in or caller-supplied -- MUST be safe to share across threads.
 
-**Each invocation of `sign(byte[])` or `verify(...)` MUST obtain a fresh JCA primitive (`Mac`, `Signature`, or `MessageDigest`) instance. Implementations MUST NOT cache a `Mac`/`Signature`/`MessageDigest` in an instance field and reuse it across threads.**
+**The strategy used to achieve thread safety is an implementation detail.** Acceptable approaches include per-call JCA primitive allocation (`Mac.getInstance(...).init(key)` inside `sign()`), a single cached primitive guarded by an internal lock, a `ThreadLocal` per primitive, or any equivalent. Callers should treat each `Signer`/`Verifier` as a thread-safe black box and not depend on the strategy.
 
-Rationale: `javax.crypto.Mac`, `java.security.Signature`, and `java.security.MessageDigest` are explicitly documented as **not thread-safe**. A shared instance under concurrent `sign()` produces corrupted output (intermingled state from two input streams) with no exception -- a silent correctness failure. The allocation cost of a fresh `Mac.getInstance("HmacSHA256")` is in the low microseconds; the HMAC computation itself on a 500-byte JWT is multiple microseconds, and asymmetric operations (RSA/EC/Ed*) are hundreds of microseconds to milliseconds. The allocation is noise relative to the crypto.
+Rationale: `javax.crypto.Mac`, `java.security.Signature`, and `java.security.MessageDigest` are explicitly documented as **not thread-safe**. A naive shared-instance implementation under concurrent `sign()` produces corrupted output (intermingled state from two input streams) with no exception -- a silent correctness failure. Implementations are responsible for ensuring this cannot happen.
+
+The built-in signers/verifiers in this library use the following strategies:
+
+- `HMACSigner` / `HMACVerifier` cache the `Mac` at construction and `synchronized` on it inside `sign()`/`verify()`. The lock is uncontended at low/medium concurrency; under extreme contention on a single shared instance, callers can construct one signer per thread or per partition.
+- `RSASigner` / `ECSigner` / `RSAPSSSigner` / `EdDSASigner` and their verifier counterparts allocate a fresh `Signature` per call. The allocation is noise relative to the asymmetric crypto cost (hundreds of microseconds to milliseconds).
+
+Either strategy satisfies the thread-safety contract. The choice is driven by the relative cost of allocation vs. crypto: HMAC's per-call HMAC computation on a 500-byte JWT is in the low microseconds, and the `Mac.getInstance(...) + init(...)` cost is meaningful at that scale; for the asymmetric primitives it is not.
 
 This means `JWTEncoder` and `JWTDecoder` can and should be constructed once and shared across threads (typical: one instance per DI container, per application lifetime). Per-request instantiation is wasteful and not expected.
-
-All built-in signers and verifiers follow this rule. A custom `Signer`/`Verifier` that caches a JCA primitive is a latent concurrency bug; callers who want the cache optimization should use a `ThreadLocal<Mac>` or equivalent and must document the thread model.
 
 Tests (in §13):
 
@@ -2134,7 +2141,7 @@ The table below captures decisions that have been raised and resolved across mul
 | Specify ECDSA DER↔JOSE concat conversion contract in spec? | **Yes**, in §6. | JOSE/DER conversion is a known CVE surface in JWT libraries (Auth0 Node 2015, historical nimbus); codifying the contract makes the implementation auditable against a written rule rather than folklore. |
 | Re-validate caller-supplied `ECPublicKey` on Verifier construction? | **Yes**, via `KeyFactory` round-trip. | JDK 17+ `SunEC` validates on-curve + not-infinity during `KeyFactory.generatePublic(X509EncodedKeySpec)`. Re-running a caller-supplied key through that path ensures invalid-curve rejection regardless of how the caller obtained the `ECPublicKey`. Nimbus does an explicit check (`ECChecks.isPointOnCurve`); this is the same defense expressed in standard JDK APIs. |
 | Specify RSASSA-PSS `PSSParameterSpec` in spec? | **Yes**, in §6. | JCA provider defaults for `RSASSA-PSS` vary between stdlib and BouncyCastle. An implementation that omits `Signature.setParameter(...)` can accept non-RFC salt lengths and silently break interop with every other JWT library. Explicit contract with test coverage forecloses this. |
-| Document Signer/Verifier thread-safety contract? | **Yes** -- per-call fresh JCA primitive. | `Mac`, `Signature`, `MessageDigest` are not thread-safe; a cached instance corrupts output under concurrent `sign()`/`verify()` with no exception. Allocation cost is noise vs. the crypto op. `JWTEncoder`/`JWTDecoder` remain thread-safe and intended for sharing. Documented in §6. |
+| Document Signer/Verifier thread-safety contract? | **Yes** -- implementations must be thread-safe; strategy is an implementation detail. | `Mac`, `Signature`, `MessageDigest` are not thread-safe, so a naive cached-and-shared instance corrupts output under concurrent `sign()`/`verify()` with no exception. Built-in HMAC implementations cache the `Mac` and synchronize on it (allocation cost is meaningful relative to the HMAC compute); built-in asymmetric signers allocate per call (allocation cost is noise vs. the crypto op). Either approach satisfies the contract. Documented in §6. |
 | Add `maxNumberLength` to decoder config? | **Yes**, default `1000`. | `BigInteger`/`BigDecimal` string-to-value is O(n²) in JDK 17. A multi-hundred-KB digit string in the header parses in multi-second CPU time *before* signature verification -- a pre-auth CPU DoS primitive. 1000 digits is vastly more than any legitimate claim needs (`exp` is 10 digits) and matches Jackson 2.15+ `StreamReadConstraints.maxNumberLength`. |
 | Key `expectedAlgorithms` membership by `name()` or by `Algorithm.equals`? | **By `name()`.** | Defense-in-depth against third-party `Algorithm` implementations that don't honor the equals/hashCode contract. Built-in `StandardAlgorithm` instances behave identically under either strategy; no perf or API cost. |
 | `claimsEquals` sensitive to `AudienceSerialization`? | **No** -- ignores serialization mode, compares audience list contents. | The user intent behind `claimsEquals` is "same claims, ignore framing." Making it sensitive to `ALWAYS_ARRAY` vs `STRING_WHEN_SINGLE` defeats that purpose. Strict equals (including serialization mode) remains available via `equals()`. Matches jjwt/nimbus posture on audience equality. |

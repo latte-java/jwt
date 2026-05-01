@@ -19,9 +19,9 @@ package org.lattejava.jwt;
 /**
  * A {@code Signer} produces a signature for the JWT signing-input bytes (header.payload encoded as UTF-8).
  *
- * <p>Implementations MUST be safe to share across threads. Each call to
- * {@link #sign(byte[])} MUST obtain a fresh JCA primitive ({@code Mac}/{@code Signature}) and MUST NOT cache and reuse
- * it across threads -- the JDK explicitly documents these as not thread-safe.</p>
+ * <p>Implementations MUST be safe to share across threads. The strategy used to achieve that thread safety -- per-call
+ * JCA primitive allocation, internal locking around a cached primitive, thread-local pooling, or any equivalent -- is
+ * an implementation detail. Callers should treat each {@link Signer} as a thread-safe black box.</p>
  *
  * @author Daniel DeGroff
  */

@@ -31,7 +31,7 @@ import org.lattejava.jwt.Signer;
  * <p>The JCA algorithm name and {@link SecretKeySpec} are cached at construction so
  * {@link #sign(byte[])} skips the per-call allocation and the redundant defensive copy of the secret. The {@link Mac}
  * instance itself is also initialized once in the constructor and reused across calls; {@link Mac} is not thread-safe
- * so {@link #sign(byte[])} synchronises on it. Lock cost is essentially free at low/medium concurrency under HotSpot
+ * so {@link #sign(byte[])} synchronizes on it. Lock cost is essentially free at low/medium concurrency under HotSpot
  * biased locking; under extreme concurrency on a single shared signer, the lock will become a contention point, in
  * which case callers can construct one signer per thread or per partition.</p>
  *
@@ -55,7 +55,7 @@ public class HMACSigner implements Signer {
       this.mac = Mac.getInstance(jcaAlgorithm);
       this.mac.init(keySpec);
     } catch (NoSuchAlgorithmException | InvalidKeyException e) {
-      throw new JWTSigningException("An unexpected exception occurred when initialising HMAC for [" + jcaAlgorithm + "]", e);
+      throw new JWTSigningException("An unexpected exception occurred when initializing HMAC for [" + jcaAlgorithm + "]", e);
     }
   }
 

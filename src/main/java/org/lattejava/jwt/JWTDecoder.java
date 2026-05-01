@@ -230,13 +230,13 @@ public class JWTDecoder {
               + header.alg().name() + "]");
     }
 
-    // Verify the signature BEFORE parsing the payload so that untrusted
-    // payload bytes never reach the JSON parser unless authenticated.
-    // Compute the signing input bytes directly from the encoded JWT — chars
-    // in [0, signingInputEnd) are pure ASCII (validated by parseSegments'
-    // alphabet checks on header/payload/separators), so a char-to-byte cast
-    // is well-defined and avoids the String allocation that
-    // encodedJWT.substring(0, secondDot).getBytes(UTF_8) would produce.
+    // Verify the signature BEFORE parsing the payload so that untrusted payload bytes never reach the JSON parser
+    // unless authenticated. Compute the signing input bytes directly from the encoded JWT — a char-to-byte cast is
+    // safe for the header range (Base64URL.decode in parseHeader has already rejected any non-base64url char above)
+    // and avoids the String allocation that encodedJWT.substring(0, secondDot).getBytes(UTF_8) would produce. A
+    // non-base64url char inside the payload range would cause asciiBytes to truncate, and the subsequent HMAC
+    // comparison would fail with InvalidJWTSignatureException -- parsePayload's Base64URL.decode then surfaces the
+    // structural problem after the signature path has already rejected the token.
     byte[] message = asciiBytes(encodedJWT, 0, segments.signingInputEnd);
     byte[] signatureBytes = decodeBase64URL(segments.signatureB64, "signature");
     verifier.verify(message, signatureBytes);
@@ -365,14 +365,14 @@ public class JWTDecoder {
   }
 
   private Header parseHeader(String headerB64) {
-    // headerB64 alphabet was already validated by parseSegments — skip the redundant scan.
+    // Base64URL.decode is the alphabet check; a separate pre-scan would walk the segment a second time for no gain.
     byte[] headerJson = decodeBase64URL(headerB64, "header");
     Map<String, Object> raw = jsonProcessor.deserialize(headerJson);
     return Header.fromMap(raw);
   }
 
   private JWT parsePayload(String payloadB64, Header header) {
-    // payloadB64 alphabet was already validated by parseSegments — skip the redundant scan.
+    // Base64URL.decode is the alphabet check; a separate pre-scan would walk the segment a second time for no gain.
     byte[] payloadJson = decodeBase64URL(payloadB64, "payload");
     Map<String, Object> raw = jsonProcessor.deserialize(payloadJson);
     return JWT.fromMap(raw, header);
