@@ -28,11 +28,11 @@ import org.lattejava.jwt.Signer;
 /**
  * HMAC-based {@link Signer} for the {@code HS256} / {@code HS384} / {@code HS512} JWA algorithms (RFC 7518 §3.2).
  *
- * <p>The JCA algorithm name and {@link SecretKeySpec} are cached at construction so
- * {@link #sign(byte[])} skips the per-call allocation and the redundant defensive copy of the secret. The {@link Mac}
- * instance itself is also initialized once in the constructor and reused across calls; {@link Mac} is not thread-safe
- * so {@link #sign(byte[])} synchronizes on it. Lock cost is essentially free at low/medium concurrency under HotSpot
- * biased locking; under extreme concurrency on a single shared signer, the lock will become a contention point, in
+ * <p>The JCA algorithm name and {@link SecretKeySpec} are cached at construction so {@link #sign(byte[]...)} skips
+ * the per-call allocation and the redundant defensive copy of the secret. The {@link Mac} instance itself is also
+ * initialized once in the constructor and reused across calls; {@link Mac} is not thread-safe, so
+ * {@link #sign(byte[]...)} synchronizes on it. Lock cost is essentially free at low/medium concurrency under HotSpot
+ * biased locking; under extreme concurrency on a single shared signer the lock will become a contention point, in
  * which case callers can construct one signer per thread or per partition.</p>
  *
  * @author Daniel DeGroff
@@ -122,12 +122,17 @@ public class HMACSigner implements Signer {
   }
 
   @Override
-  public byte[] sign(byte[] message) {
-    Objects.requireNonNull(message);
+  public byte[] sign(byte[]... segments) {
+    Objects.requireNonNull(segments);
     // Mac.doFinal implicitly resets the Mac so the same instance is reusable across calls.
-    // Synchronize because Mac is not thread-safe; biased locking makes the uncontended case effectively free.
+    // The full update / doFinal sequence MUST be atomic — a second thread interleaving updates between ours would
+    // splice its bytes into our MAC computation with no exception thrown. Synchronize because Mac is not thread-safe;
+    // biased locking makes the uncontended case effectively free.
     synchronized (mac) {
-      return mac.doFinal(message);
+      for (byte[] segment : segments) {
+        mac.update(segment);
+      }
+      return mac.doFinal();
     }
   }
 }

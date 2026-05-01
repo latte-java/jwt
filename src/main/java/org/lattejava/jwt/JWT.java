@@ -51,12 +51,12 @@ public final class JWT {
     this(b, false);
   }
 
-  // Internal constructor used by fromMap (and other in-package paths) where the Builder's
-  // collections are guaranteed to be locally constructed and never aliased outside this
-  // class. With adopt=true the constructor wraps those collections in unmodifiable views
-  // directly instead of copying them — saves a LinkedHashMap and an ArrayList allocation
-  // per decode while preserving the public immutability contract on the resulting JWT.
-  // The public Builder.build() path continues to pass adopt=false.
+  // Internal constructor reachable only via {@link #adoptingFromLocalBuilder(Builder)} (adopt=true) and the
+  // single-arg {@code JWT(Builder)} delegator (adopt=false). When adopt=true the constructor wraps the Builder's
+  // collections in unmodifiable views directly instead of copying them — saves a LinkedHashMap and an ArrayList
+  // allocation per decode while preserving the public immutability contract on the resulting JWT. The adopting path
+  // is correct only when the supplied Builder is unreachable from any caller after this constructor returns; see
+  // adoptingFromLocalBuilder for the invariant.
   private JWT(Builder b, boolean adopt) {
     this.issuer = b.issuer;
     this.subject = b.subject;
@@ -289,9 +289,22 @@ public final class JWT {
       }
     }
 
-    // Adopt the Builder's locally-constructed collections directly. They were created by
-    // this method and are never exposed elsewhere, so the defensive copies in the public
-    // Builder.build() path are unnecessary here.
+    return adoptingFromLocalBuilder(b);
+  }
+
+  /**
+   * Constructs a {@link JWT} that adopts the supplied {@link Builder}'s collections by reference (no defensive copy),
+   * trading a {@code LinkedHashMap} and {@code ArrayList} allocation for an aliasing invariant the caller MUST honor.
+   *
+   * <p><strong>Invariant.</strong> The supplied Builder MUST be local to the caller and unreachable from any other
+   * code after this method returns. Adopting a Builder that anyone else can still mutate would silently break the
+   * immutability contract on the returned {@link JWT} — its {@code audience()} and {@code customClaims()} views would
+   * surface those mutations.</p>
+   *
+   * <p>Today this is reachable only from {@link #fromMap(Map, Header)}, which constructs a fresh Builder, populates
+   * it from the input map, and never exposes it. New callers MUST preserve the same shape.</p>
+   */
+  private static JWT adoptingFromLocalBuilder(Builder b) {
     return new JWT(b, true);
   }
 

@@ -48,6 +48,7 @@ import org.lattejava.jwt.internal.*;
  * @author Daniel DeGroff
  */
 public class JWTEncoder {
+  private static final byte[] DOT = { (byte) '.' };
   private final JSONProcessor jsonProcessor;
 
   /**
@@ -115,23 +116,25 @@ public class JWTEncoder {
               + "] but found [" + (header.alg() == null ? "null" : header.alg().name()) + "]");
     }
 
-    // Steps 2-3: serialize header and payload, base64URL (no padding) as bytes.
+    // Steps 2-4: serialize header and payload, base64URL (no padding) as bytes, then sign over header.payload. The
+    // encoder owns the JWT compact-serialization layout — it hands the signer the segments in order (with the dot as
+    // its own segment) so signers stay JWT-format-agnostic.
     byte[] encodedHeader = Base64URL.encode(jsonProcessor.serialize(header.toSerializableMap()));
     byte[] encodedPayload = Base64URL.encode(jsonProcessor.serialize(jwt.toSerializableMap()));
+    byte[] encodedSignature = Base64URL.encode(signer.sign(encodedHeader, DOT, encodedPayload));
 
-    // Step 4: assemble headerB64.payloadB64 as bytes and sign.
-    byte[] signingInput = new byte[encodedHeader.length + 1 + encodedPayload.length];
-    System.arraycopy(encodedHeader, 0, signingInput, 0, encodedHeader.length);
-    signingInput[encodedHeader.length] = '.';
-    System.arraycopy(encodedPayload, 0, signingInput, encodedHeader.length + 1, encodedPayload.length);
-    byte[] encodedSignature = Base64URL.encode(signer.sign(signingInput));
+    // Step 5: assemble the final compact JWS bytes and wrap as String. Output bytes are entirely ASCII (base64URL +
+    // '.') so the String constructor takes the compact-string LATIN1 fast path with no UTF-8 decoding work.
+    byte[] out = new byte[encodedHeader.length + 1 + encodedPayload.length + 1 + encodedSignature.length];
+    int pos = 0;
+    System.arraycopy(encodedHeader, 0, out, pos, encodedHeader.length);
+    pos += encodedHeader.length;
+    out[pos++] = (byte) '.';
+    System.arraycopy(encodedPayload, 0, out, pos, encodedPayload.length);
+    pos += encodedPayload.length;
+    out[pos++] = (byte) '.';
+    System.arraycopy(encodedSignature, 0, out, pos, encodedSignature.length);
 
-    // Step 5: assemble the final compact JWS bytes and wrap as String.
-    byte[] out = new byte[signingInput.length + 1 + encodedSignature.length];
-    System.arraycopy(signingInput, 0, out, 0, signingInput.length);
-    out[signingInput.length] = '.';
-    System.arraycopy(encodedSignature, 0, out, signingInput.length + 1, encodedSignature.length);
-    // Output bytes are entirely ASCII (base64URL + '.'); UTF-8 decoding is a no-op fast path.
     return new String(out, StandardCharsets.UTF_8);
   }
 

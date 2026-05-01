@@ -16,6 +16,8 @@
 
 package org.lattejava.jwt.algorithm.rsa;
 
+import java.nio.charset.*;
+
 import org.lattejava.jwt.*;
 import org.lattejava.jwt.internal.pem.*;
 import org.testng.annotations.*;
@@ -112,5 +114,18 @@ public class RSASignerTest extends BaseJWTTest {
     assertEquals(RSASigner.newSHA512Signer(readFile("rsa_private_key_2048_with_meta.pem"), "abc").kid(), "abc");
     assertEquals(RSASigner.newSHA512Signer(readFile("rsa_private_key_3072.pem"), "abc").kid(), "abc");
     assertEquals(RSASigner.newSHA512Signer(readFile("rsa_private_key_4096.pem"), "abc").kid(), "abc");
+  }
+
+  @Test
+  public void test_varargsSign_multiSegmentMatchesConcatenation() {
+    // Use case: chunked Signature.update calls must produce the same RS256 signature as a single update over the concatenated buffer — RSA-PKCS1 is deterministic, so byte equality is the right invariant.
+    RSASigner signer = RSASigner.newSHA256Signer(readFile("rsa_private_key_2048.pem"));
+
+    byte[] header = "eyJhbGciOiJSUzI1NiJ9".getBytes(StandardCharsets.UTF_8);
+    byte[] dot = { (byte) '.' };
+    byte[] payload = "eyJzdWIiOiJ4In0".getBytes(StandardCharsets.UTF_8);
+    byte[] combined = "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ4In0".getBytes(StandardCharsets.UTF_8);
+
+    assertEquals(signer.sign(header, dot, payload), signer.sign(combined));
   }
 }

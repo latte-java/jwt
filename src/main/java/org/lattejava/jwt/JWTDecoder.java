@@ -16,6 +16,7 @@
 
 package org.lattejava.jwt;
 
+import java.nio.charset.*;
 import java.time.*;
 import java.util.*;
 import java.util.function.*;
@@ -173,20 +174,6 @@ public class JWTDecoder {
   }
 
   /**
-   * Convert an ASCII-only substring of {@code s} to a freshly allocated {@code byte[]}. Faster than
-   * {@code s.substring(from, to).getBytes(UTF_8)} for ASCII because it avoids the intermediate {@code String}
-   * allocation. The caller is responsible for ensuring every char in {@code [from, to)} is below 0x80.
-   */
-  private static byte[] fasterSubstringASCIIBytes(String s, int length) {
-    byte[] out = new byte[length];
-    for (int i = 0; i < out.length; i++) {
-      out[i] = (byte) s.charAt(i);
-    }
-
-    return out;
-  }
-
-  /**
    * Decode a JWT, resolving the {@link Verifier} via the supplied {@link VerifierResolver}. Signature verification runs
    * BEFORE payload deserialization, so a malformed payload cannot be observed until the signature has been validated.
    *
@@ -238,7 +225,7 @@ public class JWTDecoder {
     // non-base64URL char inside the payload range would cause asciiBytes to truncate, and the subsequent HMAC
     // comparison would fail with InvalidJWTSignatureException -- parsePayload's Base64URL.decode then surfaces the
     // structural problem after the signature path has already rejected the token.
-    byte[] message = fasterSubstringASCIIBytes(encodedJWT, segments.signingInputEnd);
+    byte[] message = encodedJWT.substring(0, segments.signingInputEnd).getBytes(StandardCharsets.UTF_8);
     byte[] signatureBytes = decodeBase64URL(segments.signatureB64, "signature");
     verifier.verify(message, signatureBytes);
 

@@ -17,6 +17,7 @@
 package org.lattejava.jwt.algorithm.hmac;
 
 import java.nio.charset.*;
+import java.util.*;
 
 import org.lattejava.jwt.*;
 import org.testng.annotations.*;
@@ -84,7 +85,7 @@ public class HMACSignerTest extends BaseJWTTest {
 
   @Test(expectedExceptions = NullPointerException.class)
   public void test_nullMessage_throwsNpe() {
-    HMACSigner.newSHA256Signer(SECRET_32).sign(null);
+    HMACSigner.newSHA256Signer(SECRET_32).sign((byte[]) null);
   }
 
   @Test(expectedExceptions = NullPointerException.class)
@@ -102,9 +103,7 @@ public class HMACSignerTest extends BaseJWTTest {
     byte[] before = signer.sign(message);
 
     // Scribble over every byte of the original
-    for (int i = 0; i < original.length; i++) {
-      original[i] = 0;
-    }
+    Arrays.fill(original, (byte) 0);
 
     byte[] after = signer.sign(message);
     assertEquals(after, before);
@@ -146,5 +145,71 @@ public class HMACSignerTest extends BaseJWTTest {
     assertNotNull(HMACSigner.newSHA256Signer(SECRET_32));
     assertNotNull(HMACSigner.newSHA384Signer(SECRET_48));
     assertNotNull(HMACSigner.newSHA512Signer(SECRET_64));
+  }
+
+  @Test
+  public void test_varargsSign_emptySegmentsProduceConstantSignature() {
+    // Use case: sign() with no arguments is equivalent to signing a zero-length message — should produce a stable signature, not throw.
+    HMACSigner signer = HMACSigner.newSHA256Signer(SECRET_32);
+    byte[] empty = signer.sign();
+    byte[] singleEmpty = signer.sign(new byte[0]);
+    assertEquals(singleEmpty, empty);
+  }
+
+  @Test
+  public void test_varargsSign_segmentBoundariesDoNotChangeResult() {
+    // Use case: every grouping of the same bytes must produce the same signature — proves the signer treats segments as a contiguous byte stream with no implicit separator.
+    HMACSigner signer = HMACSigner.newSHA256Signer(SECRET_32);
+    byte[] header = "eyJhbGciOiJIUzI1NiJ9".getBytes(StandardCharsets.UTF_8);
+    byte[] dot = { (byte) '.' };
+    byte[] payload = "eyJzdWIiOiJ4In0".getBytes(StandardCharsets.UTF_8);
+    byte[] combined = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ4In0".getBytes(StandardCharsets.UTF_8);
+
+    byte[] expected = signer.sign(combined);
+    assertEquals(signer.sign(header, dot, payload), expected);
+    assertEquals(signer.sign(header, new byte[]{(byte) '.'}, payload), expected);
+    // First segment empty
+    assertEquals(signer.sign(new byte[0], header, dot, payload), expected);
+    // Empty segment in the middle
+    assertEquals(signer.sign(header, new byte[0], dot, payload), expected);
+    // Trailing empty segment
+    assertEquals(signer.sign(header, dot, payload, new byte[0]), expected);
+  }
+
+  @Test
+  public void test_varargsSign_threadSafetyUnderConcurrentCallers() throws InterruptedException {
+    // Use case: chunked update + doFinal must be atomic — interleaved updates from a second thread would splice bytes into the MAC and produce a wrong signature with no exception.
+    HMACSigner signer = HMACSigner.newSHA256Signer(SECRET_32);
+    byte[] header = "header-segment-bytes".getBytes(StandardCharsets.UTF_8);
+    byte[] dot = { (byte) '.' };
+    byte[] payload = "payload-segment-bytes".getBytes(StandardCharsets.UTF_8);
+    byte[] expected = signer.sign(header, dot, payload);
+
+    int threadCount = 16;
+    int iterations = 200;
+    Thread[] threads = new Thread[threadCount];
+    boolean[] mismatched = new boolean[threadCount];
+    for (int t = 0; t < threadCount; t++) {
+      final int idx = t;
+      threads[t] = new Thread(() -> {
+        for (int i = 0; i < iterations; i++) {
+          byte[] sig = signer.sign(header, dot, payload);
+          if (!java.util.Arrays.equals(sig, expected)) {
+            mismatched[idx] = true;
+            return;
+          }
+        }
+      });
+    }
+    for (Thread th : threads) th.start();
+    for (Thread th : threads) th.join();
+    for (int t = 0; t < threadCount; t++) {
+      assertFalse(mismatched[t], "Thread [" + t + "] observed a spliced signature under concurrent sign() calls");
+    }
+  }
+
+  @Test(expectedExceptions = NullPointerException.class)
+  public void test_varargsSign_nullSegmentArray_throwsNpe() {
+    HMACSigner.newSHA256Signer(SECRET_32).sign((byte[][]) null);
   }
 }

@@ -28,7 +28,7 @@ import org.lattejava.jwt.internal.*;
  * RSASSA-PKCS1-v1_5 {@link Signer} for the {@code RS256} / {@code RS384} / {@code RS512} JWA algorithms (RFC 7518
  * §3.3).
  *
- * <p>Each call to {@link #sign(byte[])} obtains a fresh
+ * <p>Each call to {@link #sign(byte[]...)} obtains a fresh
  * {@link Signature} instance ({@link Signature} is not thread-safe).</p>
  *
  * @author Daniel DeGroff
@@ -117,12 +117,14 @@ public class RSASigner implements Signer {
   }
 
   @Override
-  public byte[] sign(byte[] message) {
-    Objects.requireNonNull(message);
+  public byte[] sign(byte[]... segments) {
+    Objects.requireNonNull(segments);
     try {
       Signature signature = Signature.getInstance(RSAFamily.toJCA(algorithm));
       signature.initSign(privateKey);
-      signature.update(message);
+      for (byte[] segment : segments) {
+        signature.update(segment);
+      }
       return signature.sign();
     } catch (InvalidKeyException | NoSuchAlgorithmException | SignatureException e) {
       throw new JWTSigningException("An unexpected exception occurred when attempting to sign the JWT", e);
