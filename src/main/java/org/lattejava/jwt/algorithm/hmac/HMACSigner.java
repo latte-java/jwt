@@ -29,20 +29,16 @@ import org.lattejava.jwt.Signer;
  * HMAC-based {@link Signer} for the {@code HS256} / {@code HS384} / {@code HS512} JWA algorithms (RFC 7518 §3.2).
  *
  * <p>The JCA algorithm name and {@link SecretKeySpec} are cached at construction so
- * {@link #sign(byte[])} skips the per-call allocation and the redundant defensive copy of
- * the secret. The {@link Mac} instance itself is also initialised once in the constructor
- * and reused across calls; {@link Mac} is not thread-safe so {@link #sign(byte[])}
- * synchronises on it. Lock cost is essentially free at low/medium concurrency under
- * HotSpot biased locking; under extreme concurrency on a single shared signer the lock
- * will become a contention point, in which case callers can construct one signer per
- * thread or per partition.</p>
+ * {@link #sign(byte[])} skips the per-call allocation and the redundant defensive copy of the secret. The {@link Mac}
+ * instance itself is also initialized once in the constructor and reused across calls; {@link Mac} is not thread-safe
+ * so {@link #sign(byte[])} synchronises on it. Lock cost is essentially free at low/medium concurrency under HotSpot
+ * biased locking; under extreme concurrency on a single shared signer, the lock will become a contention point, in
+ * which case callers can construct one signer per thread or per partition.</p>
  *
  * @author Daniel DeGroff
  */
 public class HMACSigner implements Signer {
   private final Algorithm algorithm;
-  private final String jcaName;
-  private final SecretKeySpec keySpec;
   private final String kid;
   private final Mac mac;
 
@@ -52,15 +48,14 @@ public class HMACSigner implements Signer {
     HMACFamily.assertMinimumSecretLength(algorithm, secret);
 
     this.algorithm = algorithm;
-    this.jcaName = HMACFamily.toJCA(algorithm);
-    // SecretKeySpec clones the secret internally, satisfying the defensive-copy contract.
-    this.keySpec = new SecretKeySpec(secret, jcaName);
+    String jcaAlgorithm = HMACFamily.toJCA(algorithm);
+    SecretKeySpec keySpec = new SecretKeySpec(secret, jcaAlgorithm);
     this.kid = kid;
     try {
-      this.mac = Mac.getInstance(jcaName);
+      this.mac = Mac.getInstance(jcaAlgorithm);
       this.mac.init(keySpec);
     } catch (NoSuchAlgorithmException | InvalidKeyException e) {
-      throw new JWTSigningException("An unexpected exception occurred when initialising HMAC for [" + jcaName + "]", e);
+      throw new JWTSigningException("An unexpected exception occurred when initialising HMAC for [" + jcaAlgorithm + "]", e);
     }
   }
 
@@ -130,8 +125,7 @@ public class HMACSigner implements Signer {
   public byte[] sign(byte[] message) {
     Objects.requireNonNull(message);
     // Mac.doFinal implicitly resets the Mac so the same instance is reusable across calls.
-    // Synchronize because Mac is not thread-safe; biased locking makes the uncontended
-    // case effectively free.
+    // Synchronize because Mac is not thread-safe; biased locking makes the uncontended case effectively free.
     synchronized (mac) {
       return mac.doFinal(message);
     }

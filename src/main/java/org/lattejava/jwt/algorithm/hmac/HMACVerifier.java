@@ -40,19 +40,17 @@ import org.lattejava.jwt.*;
  *
  * <p>The JCA algorithm name and {@link SecretKeySpec} are cached at construction so
  * {@link #verify(byte[], byte[])} skips the per-call allocation and the redundant defensive
- * copy of the secret. The {@link Mac} instance itself is also initialised once in the
+ * copy of the secret. The {@link Mac} instance itself is also initialized once in the
  * constructor and reused across calls; {@link Mac} is not thread-safe so
  * {@link #verify(byte[], byte[])} synchronises on it. Lock cost is essentially free at
  * low/medium concurrency under HotSpot biased locking; under extreme concurrency on a
- * single shared verifier the lock will become a contention point, in which case callers
+ * single shared verifier, the lock will become a contention point, in which case callers
  * can construct one verifier per thread or per partition.</p>
  *
  * @author Daniel DeGroff
  */
 public class HMACVerifier implements Verifier {
   private final Algorithm algorithm;
-  private final String jcaName;
-  private final SecretKeySpec keySpec;
   private final Mac mac;
 
   private HMACVerifier(Algorithm algorithm, byte[] secret) {
@@ -61,14 +59,13 @@ public class HMACVerifier implements Verifier {
     requireHMAC(algorithm);
     HMACFamily.assertMinimumSecretLength(algorithm, secret);
     this.algorithm = algorithm;
-    this.jcaName = HMACFamily.toJCA(algorithm);
-    // SecretKeySpec clones the secret internally, satisfying the defensive-copy contract.
-    this.keySpec = new SecretKeySpec(secret, jcaName);
+    String jcaAlgorithm = HMACFamily.toJCA(algorithm);
+    SecretKeySpec keySpec = new SecretKeySpec(secret, jcaAlgorithm);
     try {
-      this.mac = Mac.getInstance(jcaName);
+      this.mac = Mac.getInstance(jcaAlgorithm);
       this.mac.init(keySpec);
     } catch (NoSuchAlgorithmException | InvalidKeyException e) {
-      throw new JWTVerifierException("An unexpected exception occurred when initialising HMAC for [" + jcaName + "]", e);
+      throw new JWTVerifierException("An unexpected exception occurred when initialising HMAC for [" + jcaAlgorithm + "]", e);
     }
   }
 
@@ -112,8 +109,7 @@ public class HMACVerifier implements Verifier {
     Objects.requireNonNull(message);
     Objects.requireNonNull(signature);
     // Mac.doFinal implicitly resets the Mac so the same instance is reusable across calls.
-    // Synchronise because Mac is not thread-safe; biased locking makes the uncontended
-    // case effectively free.
+    // Synchronize because Mac is not thread-safe; biased locking makes the uncontended case effectively free.
     byte[] expected;
     synchronized (mac) {
       expected = mac.doFinal(message);
