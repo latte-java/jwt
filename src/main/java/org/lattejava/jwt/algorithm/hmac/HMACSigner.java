@@ -28,9 +28,12 @@ import org.lattejava.jwt.Signer;
 /**
  * HMAC-based {@link Signer} for the {@code HS256} / {@code HS384} / {@code HS512} JWA algorithms (RFC 7518 §3.2).
  *
- * <p>The JCA algorithm name and {@link SecretKeySpec} are cached at construction
- * so {@link #sign(byte[])} skips the per-call allocation and the redundant defensive copy of the secret. Each call
- * still obtains a fresh {@link Mac} instance ({@link Mac} is not thread-safe).</p>
+ * <p>The JCA algorithm name and {@link SecretKeySpec} are cached at construction so
+ * {@link #sign(byte[])} skips the per-call allocation and the redundant defensive copy of
+ * the secret. {@link Mac} itself is not thread-safe, so each thread caches its own
+ * pre-initialised instance via a {@link ThreadLocal}; calls after the first on a given
+ * thread skip the {@code Mac.getInstance + init} cost. The per-thread {@code Mac} dies
+ * with the thread (no manual cleanup needed).</p>
  *
  * @author Daniel DeGroff
  */
@@ -39,6 +42,7 @@ public class HMACSigner implements Signer {
   private final String jcaName;
   private final SecretKeySpec keySpec;
   private final String kid;
+  private final ThreadLocal<Mac> macTL;
 
   private HMACSigner(Algorithm algorithm, byte[] secret, String kid) {
     Objects.requireNonNull(algorithm);
@@ -50,6 +54,15 @@ public class HMACSigner implements Signer {
     // SecretKeySpec clones the secret internally, satisfying the defensive-copy contract.
     this.keySpec = new SecretKeySpec(secret, jcaName);
     this.kid = kid;
+    this.macTL = ThreadLocal.withInitial(() -> {
+      try {
+        Mac mac = Mac.getInstance(jcaName);
+        mac.init(keySpec);
+        return mac;
+      } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+        throw new JWTSigningException("An unexpected exception occurred when initialising HMAC for [" + jcaName + "]", e);
+      }
+    });
   }
 
   private HMACSigner(Algorithm algorithm, String secret, String kid) {
@@ -117,12 +130,7 @@ public class HMACSigner implements Signer {
   @Override
   public byte[] sign(byte[] message) {
     Objects.requireNonNull(message);
-    try {
-      Mac mac = Mac.getInstance(jcaName);
-      mac.init(keySpec);
-      return mac.doFinal(message);
-    } catch (InvalidKeyException | NoSuchAlgorithmException e) {
-      throw new JWTSigningException("An unexpected exception occurred when attempting to sign the JWT", e);
-    }
+    // Mac.doFinal implicitly resets the Mac so the same instance is reusable across calls.
+    return macTL.get().doFinal(message);
   }
 }
