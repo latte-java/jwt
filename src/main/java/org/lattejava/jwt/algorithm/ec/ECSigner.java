@@ -140,6 +140,7 @@ public class ECSigner implements Signer {
       Signature signature = Signature.getInstance(ECFamily.toJCA(algorithm));
       signature.initSign(privateKey);
       for (byte[] segment : segments) {
+        Objects.requireNonNull(segment, "segment");
         signature.update(segment);
       }
       byte[] der = signature.sign();

@@ -87,6 +87,7 @@ public class EdDSASigner implements Signer {
       Signature signature = Signature.getInstance(EdDSAFamily.toJCA(algorithm));
       signature.initSign(privateKey);
       for (byte[] segment : segments) {
+        Objects.requireNonNull(segment, "segment");
         signature.update(segment);
       }
       return signature.sign();

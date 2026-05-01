@@ -124,6 +124,7 @@ public class RSAPSSSigner implements Signer {
       signature.setParameter(RSAFamily.pssParameterSpec(algorithm));
       signature.initSign(privateKey);
       for (byte[] segment : segments) {
+        Objects.requireNonNull(segment, "segment");
         signature.update(segment);
       }
       return signature.sign();

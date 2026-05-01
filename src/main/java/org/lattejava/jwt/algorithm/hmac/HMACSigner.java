@@ -130,6 +130,7 @@ public class HMACSigner implements Signer {
     // biased locking makes the uncontended case effectively free.
     synchronized (mac) {
       for (byte[] segment : segments) {
+        Objects.requireNonNull(segment, "segment");
         mac.update(segment);
       }
       return mac.doFinal();
