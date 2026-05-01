@@ -65,15 +65,15 @@ dependency(id: "org.lattejava:latte-jwt:1.0.0")
 
 | # | Library | ops/sec | vs leader | vs latte-jwt |
 |--:|---------|--------:|----------:|-------------:|
-| 1 | fusionauth-jwt | 39745 | 100.0 % | 101.9 % |
-| 2 | latte-jwt | 38995 | 98.1 % | 100.0 % |
-| 3 | vertx-auth-jwt | 38592 | 97.1 % | 99.0 % |
-| 4 | latte-jwt-jackson | 35398 | 89.1 % | 90.8 % |
-| 5 | auth0-java-jwt | 33643 | 84.6 % | 86.3 % |
-| 6 | nimbus-jose-jwt | 28858 | 72.6 % | 74.0 % |
-| 7 | jjwt | 28661 | 72.1 % | 73.5 % |
-| 8 | jose4j | 24441 | 61.5 % | 62.7 % |
-| | _baseline (JCA)_ | _39944_ | _100.5 %_ | _102.4 %_ |
+| 1 | latte-jwt | 40150 | 100.0 % | 100.0 % |
+| 2 | vertx-auth-jwt | 40075 | 99.8 % | 99.8 % |
+| 3 | auth0-java-jwt | 39413 | 98.2 % | 98.2 % |
+| 4 | latte-jwt-jackson | 38863 | 96.8 % | 96.8 % |
+| 5 | fusionauth-jwt | 38439 | 95.7 % | 95.7 % |
+| 6 | nimbus-jose-jwt | 34345 | 85.5 % | 85.5 % |
+| 7 | jose4j | 30934 | 77.0 % | 77.0 % |
+| 8 | jjwt | 29915 | 74.5 % | 74.5 % |
+| | _baseline (JCA)_ | _40198_ | _100.1 %_ | _100.1 %_ |
 <!-- README:PERFORMANCE:END -->
 
 Full methodology and per-algorithm leaderboards in [`benchmarks/BENCHMARKS.md`](benchmarks/BENCHMARKS.md).

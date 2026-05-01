@@ -16,15 +16,15 @@ Mean ops/sec across HS256, RS256, ES256 decode-verify-validate (Throughput mode)
 
 | # | Library | mean ops/sec |
 |--:|---------|-------------:|
-| 1 | latte-jwt | 281278 |
-| 2 | fusionauth-jwt | 258512 |
-| 3 | vertx-auth-jwt | 231308 |
-| 4 | auth0-java-jwt | 206954 |
-| 5 | latte-jwt-jackson | 159389 |
-| 6 | nimbus-jose-jwt | 81057 |
-| 7 | jjwt | 59043 |
-| 8 | jose4j | 40788 |
-| | _baseline (JCA)_ | _417870_ |
+| 1 | latte-jwt | 319537 |
+| 2 | fusionauth-jwt | 250648 |
+| 3 | vertx-auth-jwt | 238132 |
+| 4 | auth0-java-jwt | 234137 |
+| 5 | latte-jwt-jackson | 181624 |
+| 6 | nimbus-jose-jwt | 93027 |
+| 7 | jjwt | 62883 |
+| 8 | jose4j | 59815 |
+| | _baseline (JCA)_ | _455102_ |
 
 ## Throughput by algorithm (ops/sec, higher is better)
 
@@ -32,85 +32,85 @@ Mean ops/sec across HS256, RS256, ES256 decode-verify-validate (Throughput mode)
 
 | # | Library | ops/sec | vs leader | vs latte-jwt |
 |--:|---------|--------:|----------:|-------------:|
-| 1 | vertx-auth-jwt | 1091414 | 100.0 % | 136.2 % |
-| 2 | fusionauth-jwt | 836771 | 76.7 % | 104.4 % |
-| 3 | latte-jwt-jackson | 810414 | 74.3 % | 101.1 % |
-| 4 | latte-jwt | 801562 | 73.4 % | 100.0 % |
-| 5 | auth0-java-jwt | 657653 | 60.3 % | 82.0 % |
-| 6 | nimbus-jose-jwt | 361829 | 33.2 % | 45.1 % |
-| 7 | jjwt | 204213 | 18.7 % | 25.5 % |
-| 8 | jose4j | 152172 | 13.9 % | 19.0 % |
-| | _baseline (JCA)_ | _2333550_ | _213.8 %_ | _291.1 %_ |
+| 1 | vertx-auth-jwt | 1089742 | 100.0 % | 116.8 % |
+| 2 | latte-jwt | 933365 | 85.7 % | 100.0 % |
+| 3 | latte-jwt-jackson | 894084 | 82.0 % | 95.8 % |
+| 4 | fusionauth-jwt | 808988 | 74.2 % | 86.7 % |
+| 5 | auth0-java-jwt | 737308 | 67.7 % | 79.0 % |
+| 6 | nimbus-jose-jwt | 422450 | 38.8 % | 45.3 % |
+| 7 | jjwt | 222377 | 20.4 % | 23.8 % |
+| 8 | jose4j | 178596 | 16.4 % | 19.1 % |
+| | _baseline (JCA)_ | _2400547_ | _220.3 %_ | _257.2 %_ |
 
 ### HS256 — decode + verify + validate
 
 | # | Library | ops/sec | vs leader | vs latte-jwt |
 |--:|---------|--------:|----------:|-------------:|
-| 1 | latte-jwt | 802135 | 100.0 % | 100.0 % |
-| 2 | fusionauth-jwt | 732842 | 91.4 % | 91.4 % |
-| 3 | vertx-auth-jwt | 652526 | 81.3 % | 81.3 % |
-| 4 | auth0-java-jwt | 584536 | 72.9 % | 72.9 % |
-| 5 | latte-jwt-jackson | 440187 | 54.9 % | 54.9 % |
-| 6 | nimbus-jose-jwt | 211859 | 26.4 % | 26.4 % |
-| 7 | jjwt | 145804 | 18.2 % | 18.2 % |
-| 8 | jose4j | 95152 | 11.9 % | 11.9 % |
-| | _baseline (JCA)_ | _1210418_ | _150.9 %_ | _150.9 %_ |
+| 1 | latte-jwt | 915132 | 100.0 % | 100.0 % |
+| 2 | fusionauth-jwt | 710477 | 77.6 % | 77.6 % |
+| 3 | vertx-auth-jwt | 670971 | 73.3 % | 73.3 % |
+| 4 | auth0-java-jwt | 659895 | 72.1 % | 72.1 % |
+| 5 | latte-jwt-jackson | 503100 | 55.0 % | 55.0 % |
+| 6 | nimbus-jose-jwt | 241553 | 26.4 % | 26.4 % |
+| 7 | jjwt | 155819 | 17.0 % | 17.0 % |
+| 8 | jose4j | 145477 | 15.9 % | 15.9 % |
+| | _baseline (JCA)_ | _1321779_ | _144.4 %_ | _144.4 %_ |
 
 ### RS256 — encode
 
 | # | Library | ops/sec | vs leader | vs latte-jwt |
 |--:|---------|--------:|----------:|-------------:|
-| 1 | vertx-auth-jwt | 1570 | 100.0 % | 104.3 % |
-| 2 | fusionauth-jwt | 1540 | 98.1 % | 102.3 % |
-| 3 | latte-jwt | 1506 | 95.9 % | 100.0 % |
-| 4 | latte-jwt-jackson | 1360 | 86.6 % | 90.3 % |
-| 5 | auth0-java-jwt | 1346 | 85.7 % | 89.4 % |
-| 6 | jose4j | 1332 | 84.8 % | 88.4 % |
-| 7 | nimbus-jose-jwt | 1278 | 81.4 % | 84.9 % |
-| 8 | jjwt | 1105 | 70.4 % | 73.4 % |
-| | _baseline (JCA)_ | _1588_ | _101.1 %_ | _105.5 %_ |
+| 1 | latte-jwt | 1641 | 100.0 % | 100.0 % |
+| 2 | auth0-java-jwt | 1599 | 97.4 % | 97.4 % |
+| 3 | vertx-auth-jwt | 1598 | 97.3 % | 97.3 % |
+| 4 | latte-jwt-jackson | 1569 | 95.6 % | 95.6 % |
+| 5 | nimbus-jose-jwt | 1555 | 94.8 % | 94.8 % |
+| 6 | jjwt | 1522 | 92.7 % | 92.7 % |
+| 7 | jose4j | 1519 | 92.6 % | 92.6 % |
+| 8 | fusionauth-jwt | 1471 | 89.6 % | 89.6 % |
+| | _baseline (JCA)_ | _1625_ | _99.0 %_ | _99.0 %_ |
 
 ### RS256 — decode + verify + validate
 
 | # | Library | ops/sec | vs leader | vs latte-jwt |
 |--:|---------|--------:|----------:|-------------:|
-| 1 | fusionauth-jwt | 39745 | 100.0 % | 101.9 % |
-| 2 | latte-jwt | 38995 | 98.1 % | 100.0 % |
-| 3 | vertx-auth-jwt | 38592 | 97.1 % | 99.0 % |
-| 4 | latte-jwt-jackson | 35398 | 89.1 % | 90.8 % |
-| 5 | auth0-java-jwt | 33643 | 84.6 % | 86.3 % |
-| 6 | nimbus-jose-jwt | 28858 | 72.6 % | 74.0 % |
-| 7 | jjwt | 28661 | 72.1 % | 73.5 % |
-| 8 | jose4j | 24441 | 61.5 % | 62.7 % |
-| | _baseline (JCA)_ | _39944_ | _100.5 %_ | _102.4 %_ |
+| 1 | latte-jwt | 40150 | 100.0 % | 100.0 % |
+| 2 | vertx-auth-jwt | 40075 | 99.8 % | 99.8 % |
+| 3 | auth0-java-jwt | 39413 | 98.2 % | 98.2 % |
+| 4 | latte-jwt-jackson | 38863 | 96.8 % | 96.8 % |
+| 5 | fusionauth-jwt | 38439 | 95.7 % | 95.7 % |
+| 6 | nimbus-jose-jwt | 34345 | 85.5 % | 85.5 % |
+| 7 | jose4j | 30934 | 77.0 % | 77.0 % |
+| 8 | jjwt | 29915 | 74.5 % | 74.5 % |
+| | _baseline (JCA)_ | _40198_ | _100.1 %_ | _100.1 %_ |
 
 ### ES256 — encode
 
 | # | Library | ops/sec | vs leader | vs latte-jwt |
 |--:|---------|--------:|----------:|-------------:|
-| 1 | fusionauth-jwt | 9360 | 100.0 % | 102.2 % |
-| 2 | auth0-java-jwt | 9267 | 99.0 % | 101.2 % |
-| 3 | latte-jwt | 9159 | 97.9 % | 100.0 % |
-| 4 | latte-jwt-jackson | 8934 | 95.4 % | 97.5 % |
-| 5 | jose4j | 8625 | 92.2 % | 94.2 % |
-| 6 | nimbus-jose-jwt | 8379 | 89.5 % | 91.5 % |
-| 7 | vertx-auth-jwt | 8272 | 88.4 % | 90.3 % |
-| 8 | jjwt | 7993 | 85.4 % | 87.3 % |
-| | _baseline (JCA)_ | _10485_ | _112.0 %_ | _114.5 %_ |
+| 1 | vertx-auth-jwt | 11093 | 100.0 % | 100.7 % |
+| 2 | latte-jwt | 11013 | 99.3 % | 100.0 % |
+| 3 | nimbus-jose-jwt | 10584 | 95.4 % | 96.1 % |
+| 4 | auth0-java-jwt | 10441 | 94.1 % | 94.8 % |
+| 5 | fusionauth-jwt | 10065 | 90.7 % | 91.4 % |
+| 6 | latte-jwt-jackson | 9830 | 88.6 % | 89.3 % |
+| 7 | jose4j | 9711 | 87.5 % | 88.2 % |
+| 8 | jjwt | 9517 | 85.8 % | 86.4 % |
+| | _baseline (JCA)_ | _11118_ | _100.2 %_ | _101.0 %_ |
 
 ### ES256 — decode + verify + validate
 
 | # | Library | ops/sec | vs leader | vs latte-jwt |
 |--:|---------|--------:|----------:|-------------:|
-| 1 | fusionauth-jwt | 2950 | 100.0 % | 109.1 % |
-| 2 | vertx-auth-jwt | 2806 | 95.1 % | 103.7 % |
-| 3 | jose4j | 2771 | 93.9 % | 102.5 % |
-| 4 | latte-jwt | 2704 | 91.7 % | 100.0 % |
-| 5 | auth0-java-jwt | 2684 | 91.0 % | 99.2 % |
-| 6 | jjwt | 2665 | 90.3 % | 98.5 % |
-| 7 | latte-jwt-jackson | 2581 | 87.5 % | 95.4 % |
-| 8 | nimbus-jose-jwt | 2454 | 83.2 % | 90.7 % |
-| | _baseline (JCA)_ | _3247_ | _110.1 %_ | _120.1 %_ |
+| 1 | vertx-auth-jwt | 3350 | 100.0 % | 100.6 % |
+| 2 | latte-jwt | 3329 | 99.4 % | 100.0 % |
+| 3 | nimbus-jose-jwt | 3183 | 95.0 % | 95.6 % |
+| 4 | auth0-java-jwt | 3104 | 92.7 % | 93.2 % |
+| 5 | jose4j | 3034 | 90.6 % | 91.1 % |
+| 6 | fusionauth-jwt | 3027 | 90.4 % | 90.9 % |
+| 7 | jjwt | 2914 | 87.0 % | 87.5 % |
+| 8 | latte-jwt-jackson | 2908 | 86.8 % | 87.3 % |
+| | _baseline (JCA)_ | _3330_ | _99.4 %_ | _100.0 %_ |
 
 ## Supporting operations
 
@@ -118,22 +118,22 @@ Mean ops/sec across HS256, RS256, ES256 decode-verify-validate (Throughput mode)
 
 | # | Library | ops/sec | vs leader | vs latte-jwt |
 |--:|---------|--------:|----------:|-------------:|
-| 1 | latte-jwt | 1963677 | 100.0 % | 100.0 % |
-| 2 | fusionauth-jwt | 1648114 | 83.9 % | 83.9 % |
-| 3 | latte-jwt-jackson | 1565578 | 79.7 % | 79.7 % |
-| 4 | nimbus-jose-jwt | 216996 | 11.1 % | 11.1 % |
-| | _baseline (JCA)_ | _9275066_ | _472.3 %_ | _472.3 %_ |
+| 1 | latte-jwt | 2301329 | 100.0 % | 100.0 % |
+| 2 | latte-jwt-jackson | 1690892 | 73.5 % | 73.5 % |
+| 3 | fusionauth-jwt | 1256951 | 54.6 % | 54.6 % |
+| 4 | nimbus-jose-jwt | 264113 | 11.5 % | 11.5 % |
+| | _baseline (JCA)_ | _10307348_ | _447.9 %_ | _447.9 %_ |
 
 ### Unsafe decode — full (header + claims, no signature verification)
 
 | # | Library | ops/sec | vs leader | vs latte-jwt |
 |--:|---------|--------:|----------:|-------------:|
-| 1 | nimbus-jose-jwt | 1349064 | 100.0 % | 116.7 % |
-| 2 | latte-jwt | 1156183 | 85.7 % | 100.0 % |
-| 3 | auth0-java-jwt | 874320 | 64.8 % | 75.6 % |
-| 4 | latte-jwt-jackson | 863599 | 64.0 % | 74.7 % |
-| 5 | jose4j | 131333 | 9.7 % | 11.4 % |
-| | _baseline (JCA)_ | _7323401_ | _542.9 %_ | _633.4 %_ |
+| 1 | nimbus-jose-jwt | 1550467 | 100.0 % | 129.4 % |
+| 2 | latte-jwt | 1198383 | 77.3 % | 100.0 % |
+| 3 | auth0-java-jwt | 1057208 | 68.2 % | 88.2 % |
+| 4 | latte-jwt-jackson | 1015506 | 65.5 % | 84.7 % |
+| 5 | jose4j | 159891 | 10.3 % | 13.3 % |
+| | _baseline (JCA)_ | _8714002_ | _562.0 %_ | _727.1 %_ |
 
 ## Run conditions
 
@@ -143,8 +143,8 @@ Mean ops/sec across HS256, RS256, ES256 decode-verify-validate (Throughput mode)
   "hardware": "Hardware:\n\n    Hardware Overview:\n\n      Model Name: MacBook Air\n      Model Identifier: Mac16,13\n      Model Number: Z1DG000FZLL/A\n      Chip: Apple M4\n      Total Number of Cores: 10 (4 performance and 6 efficiency)\n      Memory: 24 GB\n      System Firmware Version: 13822.61.10\n      OS Loader Version: 11881.140.96\n      Serial Number (system): M09PFPW9V2\n      Hardware UUID: 16709DC3-9DCC-545C-AEA0-380D76082CD4\n      Provisioning UDID: 00008132-000A103C02F8801C\n\n",
   "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n",
   "java": "    java.version = 25.0.2\n    java.version.date = 2026-01-20\n    java.vm.compressedOopsMode = Zero based\n    java.vm.info = mixed mode, sharing\n    java.vm.name = OpenJDK 64-Bit Server VM\n    java.vm.specification.name = Java Virtual Machine Specification\n    java.vm.specification.vendor = Oracle Corporation\n    java.vm.specification.version = 25\n    java.vm.vendor = Eclipse Adoptium\n    java.vm.version = 25.0.2+10-LTS\n    os.arch = aarch64\n    os.name = Mac OS X\n    os.version = 15.7.3\n    sun.arch.data.model = 64\n",
-  "jmh_args": "-wi 2 -w 5s -i 3 -r 10s -f 1 -t 1 -rf json",
-  "captured_at": "2026-05-01T00:31:48Z"
+  "jmh_args": "-wi 2 -w 5s -i 3 -r 10s -f 3 -t 1 -rf json",
+  "captured_at": "2026-05-01T05:46:07Z"
 }
 ```
 
