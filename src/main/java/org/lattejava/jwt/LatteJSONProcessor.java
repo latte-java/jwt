@@ -520,6 +520,7 @@ public class LatteJSONProcessor implements JSONProcessor {
     String parseString() {
       expect('"');
       int start = pos;
+
       // Fast path: scan for the closing quote with no escapes and no control chars.
       // The vast majority of JWT strings (iss, sub, jti, claim keys, aud values,
       // email, scope, etc.) contain neither, so we can return a single substring
@@ -536,6 +537,7 @@ public class LatteJSONProcessor implements JSONProcessor {
         }
         pos++;
       }
+
       // Slow path: handle escapes (or report a stray control char). Carry forward
       // the prefix we already validated as escape-free so we don't re-scan it.
       StringBuilder sb = new StringBuilder(pos - start + 16);
@@ -608,6 +610,7 @@ public class LatteJSONProcessor implements JSONProcessor {
           sb.append(c);
         }
       }
+
       throw new JSONProcessingException("Unterminated string");
     }
 
@@ -616,7 +619,9 @@ public class LatteJSONProcessor implements JSONProcessor {
       if (pos >= len) {
         throw new JSONProcessingException("Unexpected end of input");
       }
+
       char c = s.charAt(pos);
+
       switch (c) {
         case '{':
           return parseObject(depth + 1);
