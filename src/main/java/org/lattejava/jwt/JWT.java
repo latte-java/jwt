@@ -48,6 +48,16 @@ public final class JWT {
   private final String subject;
 
   private JWT(Builder b) {
+    this(b, false);
+  }
+
+  // Internal constructor used by fromMap (and other in-package paths) where the Builder's
+  // collections are guaranteed to be locally constructed and never aliased outside this
+  // class. With adopt=true the constructor wraps those collections in unmodifiable views
+  // directly instead of copying them — saves a LinkedHashMap and an ArrayList allocation
+  // per decode while preserving the public immutability contract on the resulting JWT.
+  // The public Builder.build() path continues to pass adopt=false.
+  private JWT(Builder b, boolean adopt) {
     this.issuer = b.issuer;
     this.subject = b.subject;
     if (b.audience == null) {
@@ -56,7 +66,9 @@ public final class JWT {
     } else {
       // Defensive copy is null-permissive (preserves any null elements) by going
       // through ArrayList rather than List.copyOf, which rejects nulls.
-      this.audience = Collections.unmodifiableList(new ArrayList<>(b.audience));
+      this.audience = adopt
+          ? Collections.unmodifiableList(b.audience)
+          : Collections.unmodifiableList(new ArrayList<>(b.audience));
       this.audienceSerialization = b.audienceSerialization == null
           ? AudienceSerialization.ALWAYS_ARRAY
           : b.audienceSerialization;
@@ -67,7 +79,9 @@ public final class JWT {
     this.id = b.id;
     this.customClaims = b.customClaims == null || b.customClaims.isEmpty()
         ? Collections.emptyMap()
-        : Collections.unmodifiableMap(new LinkedHashMap<>(b.customClaims));
+        : (adopt
+            ? Collections.unmodifiableMap(b.customClaims)
+            : Collections.unmodifiableMap(new LinkedHashMap<>(b.customClaims)));
     this.header = b.header;
   }
 
@@ -191,6 +205,25 @@ public final class JWT {
   }
 
   /**
+   * <strong>WARNING: This method does NOT verify the JWT signature.</strong>
+   * Decode only the payload claims of {@code encodedJWT} via the shared default
+   * {@link JWTDecoder}, returning the parsed JSON object as a {@link Map}. See
+   * {@link JWTDecoder#decodeClaimsUnsecured(String)} for the full contract.
+   */
+  public static Map<String, Object> decodeClaimsUnsecured(String encodedJWT) {
+    return JWTDecoder.getDefault().decodeClaimsUnsecured(encodedJWT);
+  }
+
+  /**
+   * <strong>WARNING: This method does NOT verify the JWT signature.</strong>
+   * Decode only the header of {@code encodedJWT} via the shared default {@link JWTDecoder}.
+   * See {@link JWTDecoder#decodeHeaderUnsecured(String)} for the full contract.
+   */
+  public static Header decodeHeaderUnsecured(String encodedJWT) {
+    return JWTDecoder.getDefault().decodeHeaderUnsecured(encodedJWT);
+  }
+
+  /**
    * Build a {@link JWT} from a parsed JSON object map and an already-parsed {@link Header}. Registered claims
    * ({@code iss}, {@code sub}, {@code aud}, {@code exp}, {@code nbf}, {@code iat}, {@code jti}) are validated for type;
    * all other entries are stored as custom claims.
@@ -256,7 +289,10 @@ public final class JWT {
       }
     }
 
-    return b.build();
+    // Adopt the Builder's locally-constructed collections directly. They were created by
+    // this method and are never exposed elsewhere, so the defensive copies in the public
+    // Builder.build() path are unnecessary here.
+    return new JWT(b, true);
   }
 
   private static Instant expectInstant(String name, Object value) {

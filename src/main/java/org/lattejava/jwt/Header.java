@@ -37,12 +37,22 @@ public final class Header {
   private final String typ;
 
   private Header(Builder b) {
+    this(b, false);
+  }
+
+  // Internal constructor used by fromMap (and other in-package paths) where the Builder's
+  // customParameters map is guaranteed to be locally constructed and never aliased outside
+  // this class. With adopt=true the constructor wraps the source map in an unmodifiable
+  // view directly instead of copying it. The public Builder.build() path passes adopt=false.
+  private Header(Builder b, boolean adopt) {
     this.alg = b.alg;
     this.typ = b.typ;
     this.kid = b.kid;
     this.customParameters = b.customParameters == null || b.customParameters.isEmpty()
         ? Collections.emptyMap()
-        : Collections.unmodifiableMap(new LinkedHashMap<>(b.customParameters));
+        : (adopt
+            ? Collections.unmodifiableMap(b.customParameters)
+            : Collections.unmodifiableMap(new LinkedHashMap<>(b.customParameters)));
   }
 
   // ---------- Fluent getters ----------
@@ -131,7 +141,9 @@ public final class Header {
       }
     }
 
-    return b.build();
+    // Adopt the Builder's locally-constructed customParameters map directly; it was created
+    // by this method and is never exposed elsewhere.
+    return new Header(b, true);
   }
 
   /**

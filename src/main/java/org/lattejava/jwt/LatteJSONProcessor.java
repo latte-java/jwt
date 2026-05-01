@@ -519,7 +519,27 @@ public class LatteJSONProcessor implements JSONProcessor {
 
     String parseString() {
       expect('"');
-      StringBuilder sb = new StringBuilder();
+      int start = pos;
+      // Fast path: scan for the closing quote with no escapes and no control chars.
+      // The vast majority of JWT strings (iss, sub, jti, claim keys, aud values,
+      // email, scope, etc.) contain neither, so we can return a single substring
+      // instead of building up a StringBuilder char-by-char.
+      while (pos < len) {
+        char c = s.charAt(pos);
+        if (c == '"') {
+          String result = s.substring(start, pos);
+          pos++;
+          return result;
+        }
+        if (c == '\\' || c < 0x20) {
+          break;  // fall through to slow path; slow path re-checks the control-char rule
+        }
+        pos++;
+      }
+      // Slow path: handle escapes (or report a stray control char). Carry forward
+      // the prefix we already validated as escape-free so we don't re-scan it.
+      StringBuilder sb = new StringBuilder(pos - start + 16);
+      sb.append(s, start, pos);
       while (pos < len) {
         char c = s.charAt(pos++);
         if (c == '"') {
