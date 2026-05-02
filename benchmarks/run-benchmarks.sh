@@ -333,10 +333,13 @@ JMH_ARGS=(
 
 # Append --profile flags as JMH -prof entries. Repeatable: each profiler
 # specified via --profile becomes one '-prof <name>' pair, which JMH parses
-# additively (multiple profilers can run on the same trial).
-for profiler in "${PROFILES[@]}"; do
-  JMH_ARGS+=("-prof" "${profiler}")
-done
+# additively (multiple profilers can run on the same trial). The length guard
+# keeps macOS's bash 3.2 happy under `set -u` when no profilers are supplied.
+if [[ ${#PROFILES[@]} -gt 0 ]]; then
+  for profiler in "${PROFILES[@]}"; do
+    JMH_ARGS+=("-prof" "${profiler}")
+  done
+fi
 
 declare -a SUCCESS=()
 declare -a FAILED=()
