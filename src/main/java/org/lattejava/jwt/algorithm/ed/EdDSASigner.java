@@ -28,7 +28,7 @@ import org.lattejava.jwt.internal.*;
  * EdDSA {@link Signer} for the {@code Ed25519} / {@code Ed448} JWA algorithms (RFC 8037 §3.1, JOSE registry).
  *
  * <p>The JWA algorithm is derived from the key's curve at construction.
- * Each call to {@link #sign(byte[])} obtains a fresh {@link Signature} instance ({@link Signature} is not
+ * Each call to {@link #sign(byte[]...)} obtains a fresh {@link Signature} instance ({@link Signature} is not
  * thread-safe).</p>
  *
  * @author Daniel DeGroff
@@ -81,12 +81,15 @@ public class EdDSASigner implements Signer {
   }
 
   @Override
-  public byte[] sign(byte[] message) {
-    Objects.requireNonNull(message);
+  public byte[] sign(byte[]... segments) {
+    Objects.requireNonNull(segments);
     try {
       Signature signature = Signature.getInstance(EdDSAFamily.toJCA(algorithm));
       signature.initSign(privateKey);
-      signature.update(message);
+      for (byte[] segment : segments) {
+        Objects.requireNonNull(segment, "segment");
+        signature.update(segment);
+      }
       return signature.sign();
     } catch (InvalidKeyException | NoSuchAlgorithmException | SignatureException e) {
       throw new JWTSigningException("An unexpected exception occurred when attempting to sign the JWT", e);

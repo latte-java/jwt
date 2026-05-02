@@ -28,7 +28,7 @@ import org.lattejava.jwt.internal.*;
  * ECDSA {@link Signer} for the {@code ES256} / {@code ES384} / {@code ES512} / {@code ES256K} JWA algorithms (RFC 7518
  * §3.4 and RFC 8812 §3.2).
  *
- * <p>Each call to {@link #sign(byte[])} obtains a fresh {@link Signature}
+ * <p>Each call to {@link #sign(byte[]...)} obtains a fresh {@link Signature}
  * instance ({@link Signature} is not thread-safe), produces a DER-encoded ECDSA signature, then converts it to JOSE
  * {@code R || S} fixed-length form via {@link JOSEConverter#derToJose(byte[], int)}.</p>
  *
@@ -134,12 +134,15 @@ public class ECSigner implements Signer {
   }
 
   @Override
-  public byte[] sign(byte[] message) {
-    Objects.requireNonNull(message);
+  public byte[] sign(byte[]... segments) {
+    Objects.requireNonNull(segments);
     try {
       Signature signature = Signature.getInstance(ECFamily.toJCA(algorithm));
       signature.initSign(privateKey);
-      signature.update(message);
+      for (byte[] segment : segments) {
+        Objects.requireNonNull(segment, "segment");
+        signature.update(segment);
+      }
       byte[] der = signature.sign();
       return JOSEConverter.derToJose(der, ECFamily.curveIntLength(algorithm));
     } catch (InvalidKeyException | NoSuchAlgorithmException | SignatureException e) {

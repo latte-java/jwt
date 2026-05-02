@@ -37,12 +37,23 @@ public final class Header {
   private final String typ;
 
   private Header(Builder b) {
+    this(b, false);
+  }
+
+  // Internal constructor reachable only via {@link #adoptingFromLocalBuilder(Builder)} (adopt=true) and the
+  // single-arg {@code Header(Builder)} delegator (adopt=false). When adopt=true the constructor wraps the Builder's
+  // customParameters map in an unmodifiable view directly instead of copying it. The adopting path is correct only
+  // when the supplied Builder is unreachable from any caller after this constructor returns; see
+  // adoptingFromLocalBuilder for the invariant.
+  private Header(Builder b, boolean adopt) {
     this.alg = b.alg;
     this.typ = b.typ;
     this.kid = b.kid;
     this.customParameters = b.customParameters == null || b.customParameters.isEmpty()
         ? Collections.emptyMap()
-        : Collections.unmodifiableMap(new LinkedHashMap<>(b.customParameters));
+        : (adopt
+            ? Collections.unmodifiableMap(b.customParameters)
+            : Collections.unmodifiableMap(new LinkedHashMap<>(b.customParameters)));
   }
 
   // ---------- Fluent getters ----------
@@ -131,7 +142,23 @@ public final class Header {
       }
     }
 
-    return b.build();
+    return adoptingFromLocalBuilder(b);
+  }
+
+  /**
+   * Constructs a {@link Header} that adopts the supplied {@link Builder}'s {@code customParameters} map by reference
+   * (no defensive copy), trading a {@code LinkedHashMap} allocation for an aliasing invariant the caller MUST honor.
+   *
+   * <p><strong>Invariant.</strong> The supplied Builder MUST be local to the caller and unreachable from any other
+   * code after this method returns. Adopting a Builder that anyone else can still mutate would silently break the
+   * immutability contract on the returned {@link Header} — its {@code get(String)} view would surface those
+   * mutations.</p>
+   *
+   * <p>Today this is reachable only from {@link #fromMap(Map)}, which constructs a fresh Builder, populates it from
+   * the input map, and never exposes it. New callers MUST preserve the same shape.</p>
+   */
+  private static Header adoptingFromLocalBuilder(Builder b) {
+    return new Header(b, true);
   }
 
   /**
@@ -192,16 +219,12 @@ public final class Header {
     if (name == null) {
       return null;
     }
-    switch (name) {
-      case "alg":
-        return alg;
-      case "typ":
-        return typ;
-      case "kid":
-        return kid;
-      default:
-        return customParameters.get(name);
-    }
+    return switch (name) {
+      case "alg" -> alg;
+      case "typ" -> typ;
+      case "kid" -> kid;
+      default -> customParameters.get(name);
+    };
   }
 
   /**
@@ -329,39 +352,43 @@ public final class Header {
      */
     public Builder parameter(String name, Object value) {
       Objects.requireNonNull(name, "name");
-      if ("alg".equals(name)) {
-        if (value == null) {
-          this.alg = null;
+
+      switch (name) {
+        case "alg" -> {
+          if (value == null) {
+            this.alg = null;
+            return this;
+          }
+          if (!(value instanceof Algorithm a)) {
+            throw new IllegalArgumentException("Header [alg] must be an Algorithm instance");
+          }
+          this.alg = a;
           return this;
         }
-        if (!(value instanceof Algorithm a)) {
-          throw new IllegalArgumentException("Header [alg] must be an Algorithm instance");
-        }
-        this.alg = a;
-        return this;
-      }
-      if ("typ".equals(name)) {
-        if (value == null) {
-          this.typ = null;
+        case "typ" -> {
+          if (value == null) {
+            this.typ = null;
+            return this;
+          }
+          if (!(value instanceof String s)) {
+            throw new IllegalArgumentException("Header [typ] must be a String");
+          }
+          this.typ = s;
           return this;
         }
-        if (!(value instanceof String s)) {
-          throw new IllegalArgumentException("Header [typ] must be a String");
-        }
-        this.typ = s;
-        return this;
-      }
-      if ("kid".equals(name)) {
-        if (value == null) {
-          this.kid = null;
+        case "kid" -> {
+          if (value == null) {
+            this.kid = null;
+            return this;
+          }
+          if (!(value instanceof String s)) {
+            throw new IllegalArgumentException("Header [kid] must be a String");
+          }
+          this.kid = s;
           return this;
         }
-        if (!(value instanceof String s)) {
-          throw new IllegalArgumentException("Header [kid] must be a String");
-        }
-        this.kid = s;
-        return this;
       }
+
       if (value == null) {
         // No need to lazy-init for a remove against a still-empty map.
         if (this.customParameters != null) {
@@ -370,6 +397,7 @@ public final class Header {
       } else {
         customParametersForWrite().put(name, value);
       }
+
       return this;
     }
 

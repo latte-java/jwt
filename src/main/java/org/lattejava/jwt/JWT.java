@@ -48,6 +48,16 @@ public final class JWT {
   private final String subject;
 
   private JWT(Builder b) {
+    this(b, false);
+  }
+
+  // Internal constructor reachable only via {@link #adoptingFromLocalBuilder(Builder)} (adopt=true) and the
+  // single-arg {@code JWT(Builder)} delegator (adopt=false). When adopt=true the constructor wraps the Builder's
+  // collections in unmodifiable views directly instead of copying them — saves a LinkedHashMap and an ArrayList
+  // allocation per decode while preserving the public immutability contract on the resulting JWT. The adopting path
+  // is correct only when the supplied Builder is unreachable from any caller after this constructor returns; see
+  // adoptingFromLocalBuilder for the invariant.
+  private JWT(Builder b, boolean adopt) {
     this.issuer = b.issuer;
     this.subject = b.subject;
     if (b.audience == null) {
@@ -56,7 +66,9 @@ public final class JWT {
     } else {
       // Defensive copy is null-permissive (preserves any null elements) by going
       // through ArrayList rather than List.copyOf, which rejects nulls.
-      this.audience = Collections.unmodifiableList(new ArrayList<>(b.audience));
+      this.audience = adopt
+          ? Collections.unmodifiableList(b.audience)
+          : Collections.unmodifiableList(new ArrayList<>(b.audience));
       this.audienceSerialization = b.audienceSerialization == null
           ? AudienceSerialization.ALWAYS_ARRAY
           : b.audienceSerialization;
@@ -67,7 +79,9 @@ public final class JWT {
     this.id = b.id;
     this.customClaims = b.customClaims == null || b.customClaims.isEmpty()
         ? Collections.emptyMap()
-        : Collections.unmodifiableMap(new LinkedHashMap<>(b.customClaims));
+        : (adopt
+            ? Collections.unmodifiableMap(b.customClaims)
+            : Collections.unmodifiableMap(new LinkedHashMap<>(b.customClaims)));
     this.header = b.header;
   }
 
@@ -191,6 +205,25 @@ public final class JWT {
   }
 
   /**
+   * <strong>WARNING: This method does NOT verify the JWT signature.</strong>
+   * Decode only the payload claims of {@code encodedJWT} via the shared default
+   * {@link JWTDecoder}, returning the parsed JSON object as a {@link Map}. See
+   * {@link JWTDecoder#decodeClaimsUnsecured(String)} for the full contract.
+   */
+  public static Map<String, Object> decodeClaimsUnsecured(String encodedJWT) {
+    return JWTDecoder.getDefault().decodeClaimsUnsecured(encodedJWT);
+  }
+
+  /**
+   * <strong>WARNING: This method does NOT verify the JWT signature.</strong>
+   * Decode only the header of {@code encodedJWT} via the shared default {@link JWTDecoder}.
+   * See {@link JWTDecoder#decodeHeaderUnsecured(String)} for the full contract.
+   */
+  public static Header decodeHeaderUnsecured(String encodedJWT) {
+    return JWTDecoder.getDefault().decodeHeaderUnsecured(encodedJWT);
+  }
+
+  /**
    * Build a {@link JWT} from a parsed JSON object map and an already-parsed {@link Header}. Registered claims
    * ({@code iss}, {@code sub}, {@code aud}, {@code exp}, {@code nbf}, {@code iat}, {@code jti}) are validated for type;
    * all other entries are stored as custom claims.
@@ -256,7 +289,23 @@ public final class JWT {
       }
     }
 
-    return b.build();
+    return adoptingFromLocalBuilder(b);
+  }
+
+  /**
+   * Constructs a {@link JWT} that adopts the supplied {@link Builder}'s collections by reference (no defensive copy),
+   * trading a {@code LinkedHashMap} and {@code ArrayList} allocation for an aliasing invariant the caller MUST honor.
+   *
+   * <p><strong>Invariant.</strong> The supplied Builder MUST be local to the caller and unreachable from any other
+   * code after this method returns. Adopting a Builder that anyone else can still mutate would silently break the
+   * immutability contract on the returned {@link JWT} — its {@code audience()} and {@code customClaims()} views would
+   * surface those mutations.</p>
+   *
+   * <p>Today this is reachable only from {@link #fromMap(Map, Header)}, which constructs a fresh Builder, populates
+   * it from the input map, and never exposes it. New callers MUST preserve the same shape.</p>
+   */
+  private static JWT adoptingFromLocalBuilder(Builder b) {
+    return new JWT(b, true);
   }
 
   private static Instant expectInstant(String name, Object value) {

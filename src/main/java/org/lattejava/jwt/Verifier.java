@@ -22,13 +22,12 @@ package org.lattejava.jwt;
  * structurally prevents algorithm-confusion attacks where a tampered header {@code alg} could coax a family-accepting
  * verifier into using a weaker primitive (RFC 8725 §3.1).
  *
- * <p>Implementations MUST be safe to share across threads. Each call to
- * {@link #verify(byte[], byte[])} MUST obtain a fresh JCA primitive ({@code Mac}/{@code Signature}) and MUST NOT cache
- * and reuse it across threads -- the JDK explicitly documents these as not thread-safe.</p>
+ * <p>Implementations MUST be safe to share across threads. The strategy used to achieve that thread safety -- per-call
+ * JCA primitive allocation, internal locking around a cached primitive, thread-local pooling, or any equivalent -- is
+ * an implementation detail. Callers should treat each {@link Verifier} as a thread-safe black box.</p>
  *
- * <p>Any {@code Verifier} performing HMAC (or any secret-dependent)
- * signature comparison MUST use a constant-time comparison (e.g.
- * {@link java.security.MessageDigest#isEqual(byte[], byte[])}).</p>
+ * <p>Any {@code Verifier} performing HMAC (or any secret-dependent) signature comparison MUST use a constant-time
+ * comparison (e.g. {@link java.security.MessageDigest#isEqual(byte[], byte[])}).</p>
  *
  * @author Daniel DeGroff
  */

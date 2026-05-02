@@ -56,6 +56,28 @@ implementation("org.lattejava:latte-jwt:1.0.0")
 dependency(id: "org.lattejava:latte-jwt:1.0.0")
 ```
  
+## Performance
+
+`latte-jwt` is the fastest pure-Java JWT library while remaining zero-dependency. Decoding and verifying an `RS256` token — the dominant cost in real OAuth/OIDC services — is the most-quoted comparison:
+
+<!-- README:PERFORMANCE:START -->
+### RS256 — decode + verify + validate
+
+| # | Library | ops/sec | vs leader | vs latte-jwt |
+|--:|---------|--------:|----------:|-------------:|
+| 1 | vertx-auth-jwt | 40075 | 100.0 % | 100.9 % |
+| 2 | latte-jwt | 39730 | 99.1 % | 100.0 % |
+| 3 | auth0-java-jwt | 39413 | 98.3 % | 99.2 % |
+| 4 | latte-jwt-jackson | 38863 | 97.0 % | 97.8 % |
+| 5 | fusionauth-jwt | 38439 | 95.9 % | 96.7 % |
+| 6 | nimbus-jose-jwt | 34345 | 85.7 % | 86.4 % |
+| 7 | jose4j | 30934 | 77.2 % | 77.9 % |
+| 8 | jjwt | 29915 | 74.6 % | 75.3 % |
+| | _baseline (JCA)_ | _40198_ | _100.3 %_ | _101.2 %_ |
+<!-- README:PERFORMANCE:END -->
+
+Full methodology and per-algorithm leaderboards in [`benchmarks/BENCHMARKS.md`](benchmarks/BENCHMARKS.md).
+
 ## Example Code:
 
 ### JWT Signing and Verifying

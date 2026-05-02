@@ -27,7 +27,7 @@ import org.lattejava.jwt.internal.*;
 /**
  * RSASSA-PSS {@link Signer} for the {@code PS256} / {@code PS384} / {@code PS512} JWA algorithms (RFC 7518 §3.5).
  *
- * <p>Each call to {@link #sign(byte[])} obtains a fresh
+ * <p>Each call to {@link #sign(byte[]...)} obtains a fresh
  * {@link Signature} instance and configures it with an explicit {@code PSSParameterSpec} so the parameters are not
  * inherited from the JCA provider's defaults.</p>
  *
@@ -117,13 +117,16 @@ public class RSAPSSSigner implements Signer {
   }
 
   @Override
-  public byte[] sign(byte[] message) {
-    Objects.requireNonNull(message);
+  public byte[] sign(byte[]... segments) {
+    Objects.requireNonNull(segments);
     try {
       Signature signature = Signature.getInstance("RSASSA-PSS");
       signature.setParameter(RSAFamily.pssParameterSpec(algorithm));
       signature.initSign(privateKey);
-      signature.update(message);
+      for (byte[] segment : segments) {
+        Objects.requireNonNull(segment, "segment");
+        signature.update(segment);
+      }
       return signature.sign();
     } catch (InvalidKeyException | NoSuchAlgorithmException | SignatureException
              | InvalidAlgorithmParameterException e) {

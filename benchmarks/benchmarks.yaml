@@ -1,0 +1,26 @@
+libraries:
+  - baseline
+  - latte-jwt
+  - latte-jwt-jackson
+  - auth0-java-jwt
+  - jose4j
+  - nimbus-jose-jwt
+  - jjwt
+  - fusionauth-jwt
+  - vertx-auth-jwt
+
+algorithms: [HS256, RS256, ES256]
+operations: [encode, decodeVerifyValidate, unsafeDecode]
+
+jmh:
+  warmup-iterations:      2
+  warmup-time:            5s
+  measurement-iterations: 3
+  measurement-time:       10s
+  forks:                  3
+  threads:                1
+  mode:                   throughput
+
+output:
+  json-dir:  results/
+  label:     ""
