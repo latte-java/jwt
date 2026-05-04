@@ -130,8 +130,8 @@ if (( NO_BUILD == 0 )); then
   echo "→ build"
   for lib in "${LIBS_ARRAY[@]}"; do
     echo "  building ${lib}…"
-    ( cd "$(lib_dir_for "${lib}")" && latte build ) >"${RESULTS_DIR}/.${lib}.build.log" 2>&1 || {
-      echo "build failed for ${lib} — see ${RESULTS_DIR}/.${lib}.build.log" >&2
+    ( cd "$(lib_dir_for "${lib}")" && latte build ) >"${RESULTS_DIR}/${lib}.build.log" 2>&1 || {
+      echo "build failed for ${lib} — see ${RESULTS_DIR}/${lib}.build.log" >&2
       exit 1
     }
   done
