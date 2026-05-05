@@ -50,6 +50,17 @@ render_leaderboard() {
   # competitive rows (not baseline) sorted by score descending
   printf '%s\n' "${rows}" | awk -F'\t' '$1!="BaselineBenchmark" {print}' | sort -t$'\t' -k4 -gr | \
     awk -F'\t' -v ld="${leader_score}" -v lt="${latte_score}" '
+    function commafmt(n,    s, neg, len, i, out) {
+      s = sprintf("%d", n)
+      if (substr(s,1,1) == "-") { neg = 1; s = substr(s,2) }
+      len = length(s)
+      out = ""
+      for (i = 1; i <= len; i++) {
+        if (i > 1 && (len - i + 1) % 3 == 0) out = out ","
+        out = out substr(s, i, 1)
+      }
+      return (neg ? "-" : "") out
+    }
     BEGIN { rank = 0 }
     {
       rank++
@@ -67,17 +78,28 @@ render_leaderboard() {
       else if (libn == "Vertx")      libn = "vertx-auth-jwt"
       else                           libn = tolower(libn)
       vs_latte_str = (lt > 0) ? sprintf("%.1f %%", ($4 / lt) * 100) : "—"
-      printf "| %d | %s | %d | %.1f %% | %s |\n", rank, libn, ops_per_sec, vs_leader, vs_latte_str
+      printf "| %d | %s | %s | %.1f %% | %s |\n", rank, libn, commafmt(ops_per_sec), vs_leader, vs_latte_str
     }
   '
 
   # baseline row in italics, appended last
   printf '%s\n' "${rows}" | awk -F'\t' -v ld="${leader_score}" -v lt="${latte_score}" '
+    function commafmt(n,    s, neg, len, i, out) {
+      s = sprintf("%d", n)
+      if (substr(s,1,1) == "-") { neg = 1; s = substr(s,2) }
+      len = length(s)
+      out = ""
+      for (i = 1; i <= len; i++) {
+        if (i > 1 && (len - i + 1) % 3 == 0) out = out ","
+        out = out substr(s, i, 1)
+      }
+      return (neg ? "-" : "") out
+    }
     $1 == "BaselineBenchmark" {
       ops_per_sec = $4 * 1000000
       vs_leader   = (ld > 0) ? ($4 / ld) * 100 : 0
       vs_latte_str = (lt > 0) ? sprintf("%.1f %%", ($4 / lt) * 100) : "—"
-      printf "| | _baseline (JCA)_ | _%d_ | _%.1f %%_ | _%s_ |\n", ops_per_sec, vs_leader, vs_latte_str
+      printf "| | _baseline (JCA)_ | _%s_ | _%.1f %%_ | _%s_ |\n", commafmt(ops_per_sec), vs_leader, vs_latte_str
     }
   '
   echo
@@ -101,6 +123,17 @@ render_aggregate() {
       for (lib in sum) printf "%s\t%.9f\n", lib, sum[lib] / n[lib]
     }
   ' | sort -t$'\t' -k2 -gr | awk -F'\t' '
+    function commafmt(n,    s, neg, len, i, out) {
+      s = sprintf("%d", n)
+      if (substr(s,1,1) == "-") { neg = 1; s = substr(s,2) }
+      len = length(s)
+      out = ""
+      for (i = 1; i <= len; i++) {
+        if (i > 1 && (len - i + 1) % 3 == 0) out = out ","
+        out = out substr(s, i, 1)
+      }
+      return (neg ? "-" : "") out
+    }
     BEGIN { rank = 0 }
     {
       rank++
@@ -115,17 +148,28 @@ render_aggregate() {
       else if (libn == "FusionAuth") libn = "fusionauth-jwt"
       else if (libn == "Vertx")      libn = "vertx-auth-jwt"
       else                           libn = tolower(libn)
-      printf "| %d | %s | %d |\n", rank, libn, $2 * 1000000
+      printf "| %d | %s | %s |\n", rank, libn, commafmt($2 * 1000000)
     }
   '
 
   extract | awk -F'\t' '
+    function commafmt(n,    s, neg, len, i, out) {
+      s = sprintf("%d", n)
+      if (substr(s,1,1) == "-") { neg = 1; s = substr(s,2) }
+      len = length(s)
+      out = ""
+      for (i = 1; i <= len; i++) {
+        if (i > 1 && (len - i + 1) % 3 == 0) out = out ","
+        out = out substr(s, i, 1)
+      }
+      return (neg ? "-" : "") out
+    }
     $2 ~ /_decode_verify_validate$/ && $3 == "thrpt" && $1 == "BaselineBenchmark" {
       sum += $4
       n++
     }
     END {
-      if (n > 0) printf "| | _baseline (JCA)_ | _%d_ |\n", (sum / n) * 1000000
+      if (n > 0) printf "| | _baseline (JCA)_ | _%s_ |\n", commafmt((sum / n) * 1000000)
     }
   '
   echo
