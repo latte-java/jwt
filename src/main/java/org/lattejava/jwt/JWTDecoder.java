@@ -177,9 +177,19 @@ public class JWTDecoder {
    * Decode a JWT, resolving the {@link Verifier} via the supplied {@link VerifierResolver}. Signature verification runs
    * BEFORE payload deserialization, so a malformed payload cannot be observed until the signature has been validated.
    *
+   * <p>As a consequence of that ordering, an invalid base64URL character inside the payload segment surfaces as
+   * {@link InvalidJWTSignatureException} when it was introduced after signing (the tampered signing-input bytes fail
+   * the HMAC compare), and as {@link InvalidJWTException} only when the malformed bytes were already present at sign
+   * time. Callers that need to distinguish "rejected token" from "valid token" should catch the common supertype
+   * {@link JWTException} rather than a specific subclass.</p>
+   *
    * @param encodedJWT the compact JWS string; must be non-null
    * @param resolver   the verifier resolver; must be non-null
    * @return the decoded {@link JWT}
+   * @throws JWTException on any verification or structural failure; common subtypes include
+   *                      {@link InvalidJWTException} (malformed input), {@link InvalidJWTSignatureException}
+   *                      (signature mismatch or tampered bytes), {@link MissingSignatureException}, and
+   *                      {@link JWTExpiredException}
    */
   public JWT decode(String encodedJWT, VerifierResolver resolver) {
     return decode(encodedJWT, resolver, null);
@@ -189,10 +199,14 @@ public class JWTDecoder {
    * Decode a JWT with an optional post-decode validator. The validator runs after signature verification and built-in
    * time validation; implementations throw any {@link JWTException} subclass to reject the token.
    *
+   * <p>The signature/payload ordering and exception-type semantics described on
+   * {@link #decode(String, VerifierResolver)} also apply to this overload.</p>
+   *
    * @param encodedJWT the compact JWS string; must be non-null
    * @param resolver   the verifier resolver; must be non-null
    * @param validator  optional post-decode validator; may be null
    * @return the decoded {@link JWT}
+   * @throws JWTException on any verification or structural failure
    */
   public JWT decode(String encodedJWT, VerifierResolver resolver, Consumer<JWT> validator) {
     Objects.requireNonNull(encodedJWT, "encodedJWT");
@@ -200,6 +214,7 @@ public class JWTDecoder {
 
     Segments segments = parseSegments(encodedJWT, /* requireSignature */ true);
     Header header = parseHeader(segments.headerB64);
+    enforceJWSClassification(header);
 
     // Algorithm whitelist.
     if (expectedAlgorithmNames != null
@@ -219,12 +234,10 @@ public class JWTDecoder {
     }
 
     // Verify the signature BEFORE parsing the payload so that untrusted payload bytes never reach the JSON parser
-    // unless authenticated. Compute the signing input bytes directly from the encoded JWT — a char-to-byte cast is
-    // safe for the header range (Base64URL.decode in parseHeader has already rejected any non-base64URL char above)
-    // and avoids the String allocation that encodedJWT.substring(0, secondDot).getBytes(UTF_8) would produce. A
-    // non-base64URL char inside the payload range would cause asciiBytes to truncate, and the subsequent HMAC
-    // comparison would fail with InvalidJWTSignatureException -- parsePayload's Base64URL.decode then surfaces the
-    // structural problem after the signature path has already rejected the token.
+    // unless authenticated. A non-base64URL char inside the payload range encodes as multi-byte UTF-8 here, the
+    // resulting signing input no longer matches what the signer produced, and the HMAC comparison fails with
+    // InvalidJWTSignatureException; if the bytes did match (i.e. the signer signed the malformed input), parsePayload
+    // surfaces the structural problem afterwards via Base64URL.decode.
     byte[] message = encodedJWT.substring(0, segments.signingInputEnd).getBytes(StandardCharsets.UTF_8);
     byte[] signatureBytes = decodeBase64URL(segments.signatureB64, "signature");
     verifier.verify(message, signatureBytes);
@@ -259,6 +272,12 @@ public class JWTDecoder {
     if (firstDot < 0 || secondDot < 0) {
       throw new InvalidJWTException("Encoded JWT is missing required segments");
     }
+    // Reject JWE compact serialization (5 segments) and any other shape with more than two separators. Without this
+    // guard a JWE input would have its encrypted CEK extracted and fed to the JSON parser, producing a confusing
+    // JSONProcessingException instead of the documented InvalidJWTException.
+    if (encodedJWT.indexOf('.', secondDot + 1) >= 0) {
+      throw new InvalidJWTException("Encoded JWT has more than three segments; expected exactly two [.] separators. Note, JWE compact serialization is not supported");
+    }
     String payloadB64 = encodedJWT.substring(firstDot + 1, secondDot);
     if (payloadB64.isEmpty()) {
       throw new InvalidJWTException("Encoded JWT payload segment is empty");
@@ -286,6 +305,16 @@ public class JWTDecoder {
     if (firstDot <= 0) {
       throw new InvalidJWTException("Encoded JWT header segment is empty or missing");
     }
+    int secondDot = encodedJWT.indexOf('.', firstDot + 1);
+    if (secondDot < 0) {
+      throw new InvalidJWTException("Encoded JWT is missing required segments");
+    }
+    // Reject JWE compact serialization (5 segments). The JWE protected header parses cleanly as a JWS Header (it
+    // carries alg/enc), so without this guard a caller would receive a Header that silently belongs to a different
+    // token shape than the one the method documents.
+    if (encodedJWT.indexOf('.', secondDot + 1) >= 0) {
+      throw new InvalidJWTException("Encoded JWT has more than three segments; expected exactly two [.] separators. Note, JWE compact serialization is not supported");
+    }
     String headerB64 = encodedJWT.substring(0, firstDot);
     return parseHeader(headerB64);
   }
@@ -305,6 +334,7 @@ public class JWTDecoder {
 
     Segments segments = parseSegments(encodedJWT, /* requireSignature */ false);
     Header header = parseHeader(segments.headerB64);
+    enforceJWSClassification(header);
     return parsePayload(segments.payloadB64, header);
   }
 
@@ -336,6 +366,16 @@ public class JWTDecoder {
     if (typ == null || !typ.equalsIgnoreCase(expectedType)) {
       throw new InvalidJWTException("Header [typ] [" + MessageSanitizer.forMessage(typ)
           + "] does not match expectedType [" + expectedType + "]");
+    }
+  }
+
+  private void enforceJWSClassification(Header header) {
+    // RFC 8725 §3.10: applications MUST validate that the input was properly classified as JWS or JWE. The [enc] header
+    // parameter is REQUIRED in JWE (RFC 7516 §4.1.2) and undefined for JWS, so its presence on a 3-segment input
+    // signals a confused or malicious sender. Methods that produce a fully-formed JWT enforce this; the inspection
+    // helpers (decodeHeaderUnsecured, decodeClaimsUnsecured) deliberately do not, so callers can examine such inputs.
+    if (header.get("enc") != null) {
+      throw new InvalidJWTException("Header [enc] is present; input appears to be JWE. Note, JWE is not supported");
     }
   }
 
@@ -371,7 +411,7 @@ public class JWTDecoder {
    */
   private Segments parseSegments(String encodedJWT, boolean requireSignature) {
     // Compact JWS uses only base64URL + '.', a strict ASCII subset, so the String char count equals the UTF-8 byte
-    // count. Any non-ASCII char would be rejected by the per-character base64URL alphabet scan below.
+    // count. Any non-ASCII char is surfaced later by decodeBase64URL when each segment is decoded.
     if (encodedJWT.length() > maxInputBytes) {
       throw new InvalidJWTException(
           "Encoded JWT exceeds maxInputBytes [" + maxInputBytes + "]");
@@ -391,7 +431,7 @@ public class JWTDecoder {
 
     if (thirdDot >= 0) {
       throw new InvalidJWTException(
-          "Encoded JWT has more than three segments; expected exactly two '.' separators");
+          "Encoded JWT has more than three segments; expected exactly two [.] separators. Note, JWE compact serialization is not supported");
     }
 
     String headerB64 = encodedJWT.substring(0, firstDot);
@@ -414,8 +454,8 @@ public class JWTDecoder {
     // verifier rejects it downstream.
 
     // The signing input is the contiguous prefix encodedJWT[0, secondDot). Store the
-    // boundary index rather than allocating a substring — decode() converts the bytes
-    // directly via asciiBytes() when it needs them, and decodeUnsecured() doesn't need
+    // boundary index rather than allocating a substring here — decode() materializes the
+    // bytes itself via substring().getBytes(UTF_8), and decodeUnsecured() doesn't need
     // them at all, so we save the allocation on that path entirely.
     return new Segments(headerB64, payloadB64, signatureB64, secondDot);
   }
