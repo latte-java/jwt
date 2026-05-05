@@ -42,10 +42,9 @@ import org.lattejava.jwt.*;
  * {@link #verify(byte[], byte[])} skips the per-call allocation and the redundant defensive
  * copy of the secret. The {@link Mac} instance itself is also initialized once in the
  * constructor and reused across calls; {@link Mac} is not thread-safe so
- * {@link #verify(byte[], byte[])} synchronizes on it. Lock cost is essentially free at
- * low/medium concurrency under HotSpot biased locking; under extreme concurrency on a
- * single shared verifier, the lock will become a contention point, in which case callers
- * can construct one verifier per thread or per partition.</p>
+ * {@link #verify(byte[], byte[])} synchronizes on it. Uncontended monitors are cheap on modern
+ * HotSpot; under heavy contention on a single shared verifier the lock will become a contention
+ * point, in which case callers can construct one verifier per thread or per partition.</p>
  *
  * @author Daniel DeGroff
  */
@@ -109,7 +108,7 @@ public class HMACVerifier implements Verifier {
     Objects.requireNonNull(message);
     Objects.requireNonNull(signature);
     // Mac.doFinal implicitly resets the Mac so the same instance is reusable across calls.
-    // Synchronize because Mac is not thread-safe; biased locking makes the uncontended case effectively free.
+    // Synchronize because Mac is not thread-safe.
     byte[] expected;
     synchronized (mac) {
       expected = mac.doFinal(message);

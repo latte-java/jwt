@@ -212,4 +212,26 @@ public class HMACSignerTest extends BaseJWTTest {
   public void test_varargsSign_nullSegmentArray_throwsNpe() {
     HMACSigner.newSHA256Signer(SECRET_32).sign((byte[][]) null);
   }
+
+  @Test
+  public void test_varargsSign_nullSegmentMidArray_doesNotPoisonNextCall() {
+    // Use case: a buggy caller that passes a null mid-array must not corrupt the Mac state seen by subsequent
+    // callers. Without pre-validation, an NPE thrown after some segments had been update()'d would leave the Mac
+    // partially fed, and the next sign() (potentially on another thread sharing this signer) would splice the stale
+    // bytes onto the front of its own MAC computation and silently produce a wrong signature.
+    HMACSigner signer = HMACSigner.newSHA256Signer(SECRET_32);
+    byte[] header = "header-segment-bytes".getBytes(StandardCharsets.UTF_8);
+    byte[] dot = {(byte) '.'};
+    byte[] payload = "payload-segment-bytes".getBytes(StandardCharsets.UTF_8);
+    byte[] expected = signer.sign(header, dot, payload);
+
+    try {
+      signer.sign(header, null, payload);
+      fail("expected NullPointerException for null segment");
+    } catch (NullPointerException ignored) {
+    }
+
+    byte[] afterNpe = signer.sign(header, dot, payload);
+    assertEquals(afterNpe, expected, "Mac left in dirty state after mid-array null segment");
+  }
 }
