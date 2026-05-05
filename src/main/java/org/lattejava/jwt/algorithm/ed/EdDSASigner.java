@@ -83,11 +83,15 @@ public class EdDSASigner implements Signer {
   @Override
   public byte[] sign(byte[]... segments) {
     Objects.requireNonNull(segments);
+    // Validate all segments before doing any crypto setup work. Mirrors HMACSigner's pre-validation pattern: there is
+    // no reason to allocate a Signature instance and run initSign just to throw NPE on a null mid-array element.
+    for (byte[] segment : segments) {
+      Objects.requireNonNull(segment, "segment");
+    }
     try {
       Signature signature = Signature.getInstance(EdDSAFamily.toJCA(algorithm));
       signature.initSign(privateKey);
       for (byte[] segment : segments) {
-        Objects.requireNonNull(segment, "segment");
         signature.update(segment);
       }
       return signature.sign();
