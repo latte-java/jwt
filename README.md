@@ -58,7 +58,7 @@ dependency(id: "org.lattejava:latte-jwt:1.0.0")
  
 ## Performance
 
-`latte-jwt` is the fastest pure-Java JWT library while remaining zero-dependency. Decoding and verifying an `RS256` token — the dominant cost in real OAuth/OIDC services — is the most-quoted comparison:
+Throughput on `RS256` decode + verify + validate (ops/sec, higher is better):
 
 <!-- README:PERFORMANCE:START -->
 ### RS256 — decode + verify + validate

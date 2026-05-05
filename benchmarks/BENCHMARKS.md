@@ -8,6 +8,11 @@ The numbers below come from a single run on a single machine. Relative ranking b
 is what matters; absolute ops/sec depend on hardware and JVM. Always re-run on your own
 hardware before quoting absolute numbers.
 
+If a Java JWT library is missing from this comparison, open an issue and we'll add it. The
+only restriction is that this suite covers Java libraries only — JVM-language ports (Kotlin,
+Scala, etc.) that wrap a Java library are already represented by their underlying Java
+dependency, and non-JVM libraries are out of scope.
+
 <!-- BENCHMARKS:START -->
 
 ## Overall leaderboard — decode-verify-validate (the headline op)
