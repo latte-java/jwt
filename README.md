@@ -551,25 +551,8 @@ Latte JWT is MIT licensed. Code derived from [fusionauth-jwt](https://github.com
 
 See [LICENSE-APACHE](LICENSE-APACHE), [LICENSE-MIT](LICENSE-MIT).
 
-## Building
+## Building with Latte
 
-This project is built with [Savant](http://savantbuild.org/). The Maven coordinate above is for *consuming* the artifact — the build itself does not use Maven.
+**Note:** This project uses the Latte CLI tool. The Latte Project website has detailed instructions on installing and using Latte:
 
-### Savant
-
-```bash
-$ sb int
-```
-
-**Note:** If you do not yet have Savant build tool installed, use the following instructions.
-
-```bash
-mkdir ~/savant
-cd ~/savant
-wget http://savant.inversoft.org/org/savantbuild/savant-core/2.0.2/savant-2.0.2.tar.gz
-tar xvfz savant-2.0.2.tar.gz
-ln -s ./savant-2.0.2 current
-export PATH=$PATH:~/savant/current/bin/
-```
-
-For more information, checkout [savantbuild.org](http://savantbuild.org/).
+https://lattejava.org
