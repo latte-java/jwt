@@ -154,7 +154,7 @@ public class RFC8725ComplianceTest extends BaseJWTTest {
         HMACVerifier.newVerifier(Algorithm.HS256, tooShort));
   }
 
-  // RFC 8725 §2.6 - Multiplicity of JSON encodings (base64url strictness)
+  // RFC 8725 §2.6 - Multiplicity of JSON encodings (base64URL strictness)
   @Test
   public void rfc8725_section_2_6_base64UrlStrictDecoding() {
     // Header encoded with standard base64 ("+", "/", padding) is rejected.
@@ -196,7 +196,7 @@ public class RFC8725ComplianceTest extends BaseJWTTest {
     JWT jwt = JWT.builder().subject("abc").build();
     String token = new JWTEncoder().encode(jwt, HMACSigner.newSHA256Signer(HMAC_SECRET_32));
     String[] parts = token.split("\\.");
-    // Replace payload with valid base64url that decodes to a non-object JSON
+    // Replace payload with valid base64URL that decodes to a non-object JSON
     // value, leaving the original signature in place. Signature verification
     // must fail before payload parsing is attempted.
     String tampered = parts[0] + "." + b64("\"not-an-object\"") + "." + parts[2];
@@ -343,7 +343,7 @@ public class RFC8725ComplianceTest extends BaseJWTTest {
     RSAVerifier.newVerifier(Algorithm.RS256, key); // no exception
   }
 
-  // RFC 8725 §3.7 - UTF-8 used for all JSON and base64url decoding (round-trip non-ASCII)
+  // RFC 8725 §3.7 - UTF-8 used for all JSON and base64URL decoding (round-trip non-ASCII)
   @Test
   public void rfc8725_section_3_7_utf8UsedThroughout() {
     JWT jwt = JWT.builder().subject("résumé—\u00e9").build();

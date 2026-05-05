@@ -3,3 +3,4 @@ target
 .DS_Store
 .worktrees
 .claude/worktrees
+jmh-result.json

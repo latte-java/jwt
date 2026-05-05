@@ -50,7 +50,7 @@ public class DecodeUnsecuredTest {
 
   @Test
   public void base64UrlStrictness_fires() {
-    // Use case: base64url strictness still enforced under decodeUnsecured.
+    // Use case: base64URL strictness still enforced under decodeUnsecured.
     String header = b64("{\"alg\":\"none\"}") + "+";
     String payload = b64("{\"sub\":\"abc\"}");
     String token = header + "." + payload + ".";
@@ -103,19 +103,16 @@ public class DecodeUnsecuredTest {
   }
 
   @Test
-  public void expectedType_fires() {
-    // Use case: expectedType still enforced under decodeUnsecured.
+  public void expectedType_notEnforcedOnUnsecured() {
+    // Use case: decodeUnsecured intentionally skips configured policy checks (typ, alg, crit, time). A typ mismatch on the configured expectedType MUST NOT prevent the unsecured path from returning the parsed JWT — callers opted out of authenticated decoding and own whatever inspection follows.
     String header = b64("{\"alg\":\"none\",\"typ\":\"JWT\"}");
     String payload = b64("{\"sub\":\"abc\"}");
     String token = header + "." + payload + ".";
 
     JWTDecoder decoder = JWTDecoder.builder().expectedType("at+jwt").build();
-    try {
-      decoder.decodeUnsecured(token);
-      fail("Expected InvalidJWTException for typ mismatch");
-    } catch (InvalidJWTException expected) {
-      // good
-    }
+    JWT jwt = decoder.decodeUnsecured(token);
+    assertEquals(jwt.subject(), "abc");
+    assertEquals(jwt.header().typ(), "JWT");
   }
 
   @Test

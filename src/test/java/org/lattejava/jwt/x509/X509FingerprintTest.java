@@ -42,7 +42,7 @@ public class X509FingerprintTest extends BaseJWTTest {
 
   private static final String BASE64_DER = "MIIC5jCCAc6gAwIBAgIQNCdDZLmeeL5H6O2BE+aQCjANBgkqhkiG9w0BAQsFADAvMS0wKwYDVQQDEyRBREZTIFNpZ25pbmcgLSB1bWdjb25uZWN0LnVtdXNpYy5jb20wHhcNMTcxMDE4MTUyOTAzWhcNMTgxMDE4MTUyOTAzWjAvMS0wKwYDVQQDEyRBREZTIFNpZ25pbmcgLSB1bWdjb25uZWN0LnVtdXNpYy5jb20wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDnUl7AwWO1fjpijswRY40bs8jegA4Kz4ycM12h8PqD0CbydWyCnPmY/mzI8EPWsaT3uJ4QaYEEq+taNTu/GB8eFDs1flDb1JNjkZ2ECDZpdwgAS/z+RvI7D+tRARNUU7QvkMAOfFTb3zS4Cx52RoXlp3Bdrtzk9KaO/DJc7IoxLCAWuXL8kxuBRwfPzeQXX/i+wIRtkJAFotOq7j/XxgYO0/UzCenZDAr+Xbl8JfmrkFaegEQFwAC2/jlAP9OYjF39qD+9kI/HP9CcnXxoAIbq8lJkIKvuoURV9mErlel2Oj+tgvveq28NEV36RwqnfAqAIsAT4BTs739JUsnoHnKbAgMBAAEwDQYJKoZIhvcNAQELBQADggEBAGesHLA8V2/4ljxwbjeBsBBk8fJ4DGVufKJJXBit7jb37/9/XVtkVg1Y2IuVoYnzpnOxAZ/Zizp8/HKH2bApqEOcAU3oZ471FZlzXAv1G51S0i1UUD/OWgc3z84pk9AMtWSka26GOWA4pb/Mw/nrBrG3R8NY6ZgLZQqbYR2GQBj5JXbDsJtzYkVXY6N5KmsBekVJ92ddjKMy5SfcGY0j3BFFsBOUpaONWgBFAD2rOH9FnwoY7tcTKa5u4MfwSXMYLal/Vk9kFAtBV2Uqe/MgitB8OgAGYYqGU8VRPVH4K/n8sx5EarZPXcOJkHbI/C70Puc0jxra4e4/2c4HqifMAYQ=";
 
-  private static X509Certificate parseCert(String base64Der) throws Exception {
+  private static X509Certificate parseCert(@SuppressWarnings("SameParameterValue") String base64Der) throws Exception {
     byte[] der = Base64.getDecoder().decode(base64Der.getBytes(StandardCharsets.UTF_8));
     CertificateFactory cf = CertificateFactory.getInstance("X.509");
     return (X509Certificate) cf.generateCertificate(new ByteArrayInputStream(der));
@@ -97,12 +97,12 @@ public class X509FingerprintTest extends BaseJWTTest {
     X509Certificate cert = parseCert(BASE64_DER);
     byte[] der = Base64.getDecoder().decode(BASE64_DER.getBytes(StandardCharsets.UTF_8));
 
-    // Use case: produce the JWS-header `x5t#S256` (SHA-256, base64url-no-pad).
+    // Use case: produce the JWS-header `x5t#S256` (SHA-256, base64URL-no-pad).
     String expectedS256 = "tIFNLfPYY14sM0DLTp6T-BZ3yPaPUPKc8Hnh6evXTeM";
     assertEquals(X509.thumbprintSHA256(cert), expectedS256);
     assertEquals(X509.thumbprintSHA256(der), expectedS256);
 
-    // Use case: produce the legacy JWS-header `x5t` (SHA-1, base64url-no-pad).
+    // Use case: produce the legacy JWS-header `x5t` (SHA-1, base64URL-no-pad).
     String expectedS1 = "vDT213a_AF5eRdElKZla9-9dpc8";
     assertEquals(X509.thumbprintSHA1(cert), expectedS1);
     assertEquals(X509.thumbprintSHA1(der), expectedS1);

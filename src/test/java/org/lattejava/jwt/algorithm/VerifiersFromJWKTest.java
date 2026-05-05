@@ -162,7 +162,7 @@ public class VerifiersFromJWKTest extends BaseTest {
   public void fromJWK_parseFailure_throwsPARSE_FAILURE() {
     // Use case: malformed key material is reported as a parse failure rather than a hard exception family.
     Map<String, Object> m = rsaJWKBase();
-    m.put("n", "***not-base64url***");
+    m.put("n", "***not-base64URL***");
     InvalidJWKException ex = expectThrows(InvalidJWKException.class,
         () -> Verifiers.fromJWK(JSONWebKey.fromMap(m)));
     assertEquals(ex.reason(), InvalidJWKException.Reason.PARSE_FAILURE);

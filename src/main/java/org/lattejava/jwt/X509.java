@@ -123,63 +123,63 @@ public final class X509 {
   }
 
   /**
-   * Converts an uppercase hex X.509 fingerprint to its base64url-no-pad thumbprint form. The input length determines
+   * Converts an uppercase hex X.509 fingerprint to its base64URL-no-pad thumbprint form. The input length determines
    * the digest algorithm: 40 hex chars (SHA-1) becomes an {@code x5t} value, 64 hex chars (SHA-256) becomes an
    * {@code x5t#S256} value.
    *
    * @param fingerprint the hex-encoded fingerprint; non-null
-   * @return the equivalent base64url-no-pad thumbprint
+   * @return the equivalent base64URL-no-pad thumbprint
    */
   public static String fingerprintToThumbprint(String fingerprint) {
-    return base64url(HexUtils.toBytes(fingerprint));
+    return base64URL(HexUtils.toBytes(fingerprint));
   }
 
   /**
-   * Returns the SHA-1 thumbprint of {@code cert} as a base64url-no-pad string. This is the encoding used in the legacy
+   * Returns the SHA-1 thumbprint of {@code cert} as a base64URL-no-pad string. This is the encoding used in the legacy
    * JWS {@code x5t} header (RFC 7515 &sect;4.1.7).
    *
    * @param cert the X.509 certificate; non-null
-   * @return base64url-no-pad of the SHA-1 digest of {@code cert.getEncoded()}
+   * @return base64URL-no-pad of the SHA-1 digest of {@code cert.getEncoded()}
    * @throws IllegalArgumentException if the certificate cannot be encoded
    */
   public static String thumbprintSHA1(X509Certificate cert) {
-    return base64url(digest("SHA-1", encoded(cert)));
+    return base64URL(digest("SHA-1", encoded(cert)));
   }
 
   /**
    * SHA-1 thumbprint of {@code der}; see {@link #thumbprintSHA1(X509Certificate)}.
    */
   public static String thumbprintSHA1(byte[] der) {
-    return base64url(digest("SHA-1", der));
+    return base64URL(digest("SHA-1", der));
   }
 
   /**
-   * Returns the SHA-256 thumbprint of {@code cert} as a base64url-no-pad string. This is the encoding used in the JWS
+   * Returns the SHA-256 thumbprint of {@code cert} as a base64URL-no-pad string. This is the encoding used in the JWS
    * {@code x5t#S256} header (RFC 7515 &sect;4.1.8).
    *
    * <p>For the hex form of the same digest, see
    * {@link #fingerprintSHA256(X509Certificate)}.</p>
    *
    * @param cert the X.509 certificate; non-null
-   * @return base64url-no-pad of the SHA-256 digest of {@code cert.getEncoded()}
+   * @return base64URL-no-pad of the SHA-256 digest of {@code cert.getEncoded()}
    * @throws IllegalArgumentException if the certificate cannot be encoded
    */
   public static String thumbprintSHA256(X509Certificate cert) {
-    return base64url(digest("SHA-256", encoded(cert)));
+    return base64URL(digest("SHA-256", encoded(cert)));
   }
 
   /**
    * SHA-256 thumbprint of {@code der}; see {@link #thumbprintSHA256(X509Certificate)}.
    */
   public static String thumbprintSHA256(byte[] der) {
-    return base64url(digest("SHA-256", der));
+    return base64URL(digest("SHA-256", der));
   }
 
   /**
-   * Converts a base64url-no-pad X.509 thumbprint to its uppercase hex fingerprint form. Reverses
+   * Converts a base64URL-no-pad X.509 thumbprint to its uppercase hex fingerprint form. Reverses
    * {@link #fingerprintToThumbprint(String)}.
    *
-   * @param thumbprint the base64url-no-pad thumbprint; non-null
+   * @param thumbprint the base64URL-no-pad thumbprint; non-null
    * @return the equivalent uppercase hex fingerprint
    */
   public static String thumbprintToFingerprint(String thumbprint) {
@@ -188,7 +188,7 @@ public final class X509 {
 
   // ---- Internal digest helpers ----
 
-  private static String base64url(byte[] bytes) {
+  private static String base64URL(byte[] bytes) {
     return Base64URL.encodeToString(bytes);
   }
 

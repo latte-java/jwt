@@ -1,0 +1,12 @@
+{
+  "iss": "https://benchmarks.lattejava.org",
+  "sub": "5d4f7c8e-3b2a-4d1c-8e9f-1a2b3c4d5e6f",
+  "aud": "benchmark-audience",
+  "iat": 1761408000,
+  "nbf": 1761408000,
+  "exp": 1761411600,
+  "jti": "01JK6V2N5W3YE4XJ5Y7Z8A9BC0",
+  "scope": "openid profile email",
+  "email": "test@example.com",
+  "email_verified": true
+}

@@ -116,4 +116,79 @@ public class SegmentCountTest {
     JWT decoded = new JWTDecoder().decode(encoded, VerifierResolver.of(HMACVerifier.newVerifier(Algorithm.HS256, SECRET)));
     assertNotNull(decoded);
   }
+
+  @Test
+  public void decodeClaimsUnsecured_fiveSegments_jweShape_rejected() {
+    // Use case: JWE compact serialization (header.cek.iv.ciphertext.tag) MUST be rejected. Without this guard the
+    // method would extract the encrypted CEK and feed it to the JSON parser, producing the wrong exception type and
+    // silently treating a JWE as if it were a JWS.
+    String[] hp = validHeaderAndPayload();
+    String token = hp[0] + "." + hp[1] + ".iv.ciphertext.tag";
+    try {
+      new JWTDecoder().decodeClaimsUnsecured(token);
+      fail("Expected InvalidJWTException for 5-segment input");
+    } catch (InvalidJWTException expected) {
+      // good
+    }
+  }
+
+  @Test
+  public void decodeClaimsUnsecured_fourSegments_rejected() {
+    // Use case: 4-segment input MUST be rejected on the unsecured claims path, mirroring parseSegments.
+    String[] hp = validHeaderAndPayload();
+    String token = hp[0] + "." + hp[1] + ".sig.extra";
+    try {
+      new JWTDecoder().decodeClaimsUnsecured(token);
+      fail("Expected InvalidJWTException for 4-segment input");
+    } catch (InvalidJWTException expected) {
+      // good
+    }
+  }
+
+  @Test
+  public void decodeClaimsUnsecured_threeSegments_succeeds() {
+    // Use case: well-formed 3-segment JWS still decodes claims on the unsecured path.
+    JWT jwt = JWT.builder().subject("abc").build();
+    String encoded = new JWTEncoder().encode(jwt, HMACSigner.newSHA256Signer(SECRET));
+    Map<String, Object> claims = new JWTDecoder().decodeClaimsUnsecured(encoded);
+    assertNotNull(claims);
+    assertEquals(claims.get("sub"), "abc");
+  }
+
+  @Test
+  public void decodeHeaderUnsecured_fiveSegments_jweShape_rejected() {
+    // Use case: a JWE protected header parses cleanly as a JWS Header (it carries alg/enc), so without an upfront
+    // segment-count check the caller would receive a Header that silently belongs to a different token shape.
+    String[] hp = validHeaderAndPayload();
+    String token = hp[0] + "." + hp[1] + ".iv.ciphertext.tag";
+    try {
+      new JWTDecoder().decodeHeaderUnsecured(token);
+      fail("Expected InvalidJWTException for 5-segment input");
+    } catch (InvalidJWTException expected) {
+      // good
+    }
+  }
+
+  @Test
+  public void decodeHeaderUnsecured_fourSegments_rejected() {
+    // Use case: 4-segment input MUST be rejected on the unsecured header path, mirroring parseSegments.
+    String[] hp = validHeaderAndPayload();
+    String token = hp[0] + "." + hp[1] + ".sig.extra";
+    try {
+      new JWTDecoder().decodeHeaderUnsecured(token);
+      fail("Expected InvalidJWTException for 4-segment input");
+    } catch (InvalidJWTException expected) {
+      // good
+    }
+  }
+
+  @Test
+  public void decodeHeaderUnsecured_threeSegments_succeeds() {
+    // Use case: well-formed 3-segment JWS still decodes the header on the unsecured path.
+    JWT jwt = JWT.builder().subject("abc").build();
+    String encoded = new JWTEncoder().encode(jwt, HMACSigner.newSHA256Signer(SECRET));
+    Header header = new JWTDecoder().decodeHeaderUnsecured(encoded);
+    assertNotNull(header);
+    assertEquals(header.alg().name(), "HS256");
+  }
 }

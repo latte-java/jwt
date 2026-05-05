@@ -1,22 +1,30 @@
 /*
  * Copyright (c) 2026, The Latte Project, All Rights Reserved
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to permit
+ * persons to whom the Software is furnished to do so, subject to the
+ * following conditions:
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ * The above copyright notice and this permission notice shall be included
+ * in all copies or substantial portions of the Software.
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
- * either express or implied. See the License for the specific
- * language governing permissions and limitations under the License.
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+ * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+ * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+ * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
 package org.lattejava.jwt.algorithm.hmac;
 
 import java.nio.charset.*;
+import java.util.*;
 
 import org.lattejava.jwt.*;
 import org.testng.annotations.*;
@@ -84,7 +92,7 @@ public class HMACSignerTest extends BaseJWTTest {
 
   @Test(expectedExceptions = NullPointerException.class)
   public void test_nullMessage_throwsNpe() {
-    HMACSigner.newSHA256Signer(SECRET_32).sign(null);
+    HMACSigner.newSHA256Signer(SECRET_32).sign((byte[]) null);
   }
 
   @Test(expectedExceptions = NullPointerException.class)
@@ -102,9 +110,7 @@ public class HMACSignerTest extends BaseJWTTest {
     byte[] before = signer.sign(message);
 
     // Scribble over every byte of the original
-    for (int i = 0; i < original.length; i++) {
-      original[i] = 0;
-    }
+    Arrays.fill(original, (byte) 0);
 
     byte[] after = signer.sign(message);
     assertEquals(after, before);
@@ -146,5 +152,93 @@ public class HMACSignerTest extends BaseJWTTest {
     assertNotNull(HMACSigner.newSHA256Signer(SECRET_32));
     assertNotNull(HMACSigner.newSHA384Signer(SECRET_48));
     assertNotNull(HMACSigner.newSHA512Signer(SECRET_64));
+  }
+
+  @Test
+  public void test_varargsSign_emptySegmentsProduceConstantSignature() {
+    // Use case: sign() with no arguments is equivalent to signing a zero-length message — should produce a stable signature, not throw.
+    HMACSigner signer = HMACSigner.newSHA256Signer(SECRET_32);
+    byte[] empty = signer.sign();
+    byte[] singleEmpty = signer.sign(new byte[0]);
+    assertEquals(singleEmpty, empty);
+  }
+
+  @Test
+  public void test_varargsSign_segmentBoundariesDoNotChangeResult() {
+    // Use case: every grouping of the same bytes must produce the same signature — proves the signer treats segments as a contiguous byte stream with no implicit separator.
+    HMACSigner signer = HMACSigner.newSHA256Signer(SECRET_32);
+    byte[] header = "eyJhbGciOiJIUzI1NiJ9".getBytes(StandardCharsets.UTF_8);
+    byte[] dot = {(byte) '.'};
+    byte[] payload = "eyJzdWIiOiJ4In0".getBytes(StandardCharsets.UTF_8);
+    byte[] combined = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ4In0".getBytes(StandardCharsets.UTF_8);
+
+    byte[] expected = signer.sign(combined);
+    assertEquals(signer.sign(header, dot, payload), expected);
+    assertEquals(signer.sign(header, new byte[]{(byte) '.'}, payload), expected);
+    // First segment empty
+    assertEquals(signer.sign(new byte[0], header, dot, payload), expected);
+    // Empty segment in the middle
+    assertEquals(signer.sign(header, new byte[0], dot, payload), expected);
+    // Trailing empty segment
+    assertEquals(signer.sign(header, dot, payload, new byte[0]), expected);
+  }
+
+  @Test
+  public void test_varargsSign_threadSafetyUnderConcurrentCallers() throws InterruptedException {
+    // Use case: chunked update + doFinal must be atomic — interleaved updates from a second thread would splice bytes into the MAC and produce a wrong signature with no exception.
+    HMACSigner signer = HMACSigner.newSHA256Signer(SECRET_32);
+    byte[] header = "header-segment-bytes".getBytes(StandardCharsets.UTF_8);
+    byte[] dot = {(byte) '.'};
+    byte[] payload = "payload-segment-bytes".getBytes(StandardCharsets.UTF_8);
+    byte[] expected = signer.sign(header, dot, payload);
+
+    int threadCount = 16;
+    int iterations = 200;
+    Thread[] threads = new Thread[threadCount];
+    boolean[] mismatched = new boolean[threadCount];
+    for (int t = 0; t < threadCount; t++) {
+      final int idx = t;
+      threads[t] = new Thread(() -> {
+        for (int i = 0; i < iterations; i++) {
+          byte[] sig = signer.sign(header, dot, payload);
+          if (!java.util.Arrays.equals(sig, expected)) {
+            mismatched[idx] = true;
+            return;
+          }
+        }
+      });
+    }
+    for (Thread th : threads) th.start();
+    for (Thread th : threads) th.join();
+    for (int t = 0; t < threadCount; t++) {
+      assertFalse(mismatched[t], "Thread [" + t + "] observed a spliced signature under concurrent sign() calls");
+    }
+  }
+
+  @Test(expectedExceptions = NullPointerException.class)
+  public void test_varargsSign_nullSegmentArray_throwsNpe() {
+    HMACSigner.newSHA256Signer(SECRET_32).sign((byte[][]) null);
+  }
+
+  @Test
+  public void test_varargsSign_nullSegmentMidArray_doesNotPoisonNextCall() {
+    // Use case: a buggy caller that passes a null mid-array must not corrupt the Mac state seen by subsequent
+    // callers. Without pre-validation, an NPE thrown after some segments had been update()'d would leave the Mac
+    // partially fed, and the next sign() (potentially on another thread sharing this signer) would splice the stale
+    // bytes onto the front of its own MAC computation and silently produce a wrong signature.
+    HMACSigner signer = HMACSigner.newSHA256Signer(SECRET_32);
+    byte[] header = "header-segment-bytes".getBytes(StandardCharsets.UTF_8);
+    byte[] dot = {(byte) '.'};
+    byte[] payload = "payload-segment-bytes".getBytes(StandardCharsets.UTF_8);
+    byte[] expected = signer.sign(header, dot, payload);
+
+    try {
+      signer.sign(header, null, payload);
+      fail("expected NullPointerException for null segment");
+    } catch (NullPointerException ignored) {
+    }
+
+    byte[] afterNpe = signer.sign(header, dot, payload);
+    assertEquals(afterNpe, expected, "Mac left in dirty state after mid-array null segment");
   }
 }
