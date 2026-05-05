@@ -37,23 +37,23 @@ Java JWT is intended to be fast and easy to use. It has zero external runtime de
 <dependency>
   <groupId>org.lattejava</groupId>
   <artifactId>latte-jwt</artifactId>
-  <version>1.0.0</version>
+  <version>0.1.0</version>
 </dependency>
  ```
 
 ### Gradle
 ```groovy
-implementation 'org.lattejava:latte-jwt:1.0.0'
+implementation 'org.lattejava:latte-jwt:0.1.0'
 ```
 
 ### Gradle Kotlin
 ```kotlin
-implementation("org.lattejava:latte-jwt:1.0.0")
+implementation("org.lattejava:latte-jwt:0.1.0")
 ```
 
 ### Savant 
 ```groovy
-dependency(id: "org.lattejava:latte-jwt:1.0.0")
+dependency(id: "org.lattejava:latte-jwt:0.1.0")
 ```
 
 ## Example Code:
