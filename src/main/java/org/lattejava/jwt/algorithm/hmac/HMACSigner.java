@@ -31,9 +31,9 @@ import org.lattejava.jwt.Signer;
  * <p>The JCA algorithm name and {@link SecretKeySpec} are cached at construction so {@link #sign(byte[]...)} skips
  * the per-call allocation and the redundant defensive copy of the secret. The {@link Mac} instance itself is also
  * initialized once in the constructor and reused across calls; {@link Mac} is not thread-safe, so
- * {@link #sign(byte[]...)} synchronizes on it. Uncontended monitors are cheap on modern HotSpot; under heavy
- * contention on a single shared signer the lock will become a contention point, in which case callers can construct
- * one signer per thread or per partition.</p>
+ * {@link #sign(byte[]...)} synchronizes on it. Uncontended monitors are inexpensive on modern HotSpot; under heavy contention
+ * on a single shared signer, the lock will become a contention point, in which case callers can construct one signer per
+ * thread or per partition.</p>
  *
  * @author Daniel DeGroff
  */
@@ -129,6 +129,7 @@ public class HMACSigner implements Signer {
     for (byte[] segment : segments) {
       Objects.requireNonNull(segment, "segment");
     }
+
     // Mac.doFinal implicitly resets the Mac so the same instance is reusable across calls.
     // The full update / doFinal sequence MUST be atomic — a second thread interleaving updates between ours would
     // splice its bytes into our MAC computation with no exception thrown. Synchronize because Mac is not thread-safe.
@@ -136,6 +137,7 @@ public class HMACSigner implements Signer {
       for (byte[] segment : segments) {
         mac.update(segment);
       }
+
       return mac.doFinal();
     }
   }

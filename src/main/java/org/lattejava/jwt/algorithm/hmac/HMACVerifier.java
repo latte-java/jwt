@@ -39,12 +39,11 @@ import org.lattejava.jwt.*;
  * leaking the valid MAC via comparison-timing side channels.</p>
  *
  * <p>The JCA algorithm name and {@link SecretKeySpec} are cached at construction so
- * {@link #verify(byte[], byte[])} skips the per-call allocation and the redundant defensive
- * copy of the secret. The {@link Mac} instance itself is also initialized once in the
- * constructor and reused across calls; {@link Mac} is not thread-safe so
- * {@link #verify(byte[], byte[])} synchronizes on it. Uncontended monitors are cheap on modern
- * HotSpot; under heavy contention on a single shared verifier the lock will become a contention
- * point, in which case callers can construct one verifier per thread or per partition.</p>
+ * {@link #verify(byte[], byte[])} skips the per-call allocation and the redundant defensive copy of the secret. The
+ * {@link Mac} instance itself is also initialized once in the constructor and reused across calls; {@link Mac} is not
+ * thread-safe so {@link #verify(byte[], byte[])} synchronizes on it. Uncontended monitors are inexpensive on modern HotSpot;
+ * under heavy contention on a single shared verifier, the lock will become a contention point, in which case callers can
+ * construct one verifier per thread or per partition.</p>
  *
  * @author Daniel DeGroff
  */

@@ -124,12 +124,14 @@ public class RSASigner implements Signer {
     for (byte[] segment : segments) {
       Objects.requireNonNull(segment, "segment");
     }
+
     try {
       Signature signature = Signature.getInstance(RSAFamily.toJCA(algorithm));
       signature.initSign(privateKey);
       for (byte[] segment : segments) {
         signature.update(segment);
       }
+
       return signature.sign();
     } catch (InvalidKeyException | NoSuchAlgorithmException | SignatureException e) {
       throw new JWTSigningException("An unexpected exception occurred when attempting to sign the JWT", e);

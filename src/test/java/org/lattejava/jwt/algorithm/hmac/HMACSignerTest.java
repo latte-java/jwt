@@ -161,7 +161,7 @@ public class HMACSignerTest extends BaseJWTTest {
     // Use case: every grouping of the same bytes must produce the same signature — proves the signer treats segments as a contiguous byte stream with no implicit separator.
     HMACSigner signer = HMACSigner.newSHA256Signer(SECRET_32);
     byte[] header = "eyJhbGciOiJIUzI1NiJ9".getBytes(StandardCharsets.UTF_8);
-    byte[] dot = { (byte) '.' };
+    byte[] dot = {(byte) '.'};
     byte[] payload = "eyJzdWIiOiJ4In0".getBytes(StandardCharsets.UTF_8);
     byte[] combined = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ4In0".getBytes(StandardCharsets.UTF_8);
 
@@ -181,7 +181,7 @@ public class HMACSignerTest extends BaseJWTTest {
     // Use case: chunked update + doFinal must be atomic — interleaved updates from a second thread would splice bytes into the MAC and produce a wrong signature with no exception.
     HMACSigner signer = HMACSigner.newSHA256Signer(SECRET_32);
     byte[] header = "header-segment-bytes".getBytes(StandardCharsets.UTF_8);
-    byte[] dot = { (byte) '.' };
+    byte[] dot = {(byte) '.'};
     byte[] payload = "payload-segment-bytes".getBytes(StandardCharsets.UTF_8);
     byte[] expected = signer.sign(header, dot, payload);
 

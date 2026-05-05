@@ -24,6 +24,7 @@
 package org.lattejava.jwt;
 
 import org.lattejava.jwt.algorithm.hmac.*;
+import org.lattejava.jwt.internal.*;
 import org.testng.annotations.*;
 
 import static org.testng.Assert.*;
@@ -34,8 +35,8 @@ import static org.testng.Assert.*;
  * {@link InvalidJWTException} via {@link Base64URL#decode}; payload-side corruption surfaces as
  * {@link InvalidJWTSignatureException} because payload base64URL decoding runs after signature verification, and a
  * tampered signing-input byte produces an HMAC mismatch first. Either way the token is rejected. Trailing {@code =}
- * padding is accepted by the JDK URL decoder when the resulting segment length is mod 4 = 0; we accept that on
- * decode (RFC 7515 §2's no-padding rule applies to emit, not receive).
+ * padding is accepted by the JDK URL decoder when the resulting segment length is mod 4 = 0; we accept that on decode
+ * (RFC 7515 §2's no-padding rule applies to emit, not receive).
  *
  * @author Daniel DeGroff
  */

@@ -52,8 +52,8 @@ public final class Header {
     this.customParameters = b.customParameters == null || b.customParameters.isEmpty()
         ? Collections.emptyMap()
         : (adopt
-            ? Collections.unmodifiableMap(b.customParameters)
-            : Collections.unmodifiableMap(new LinkedHashMap<>(b.customParameters)));
+           ? Collections.unmodifiableMap(b.customParameters)
+           : Collections.unmodifiableMap(new LinkedHashMap<>(b.customParameters)));
   }
 
   // ---------- Fluent getters ----------

@@ -80,8 +80,8 @@ public final class JWT {
     this.customClaims = b.customClaims == null || b.customClaims.isEmpty()
         ? Collections.emptyMap()
         : (adopt
-            ? Collections.unmodifiableMap(b.customClaims)
-            : Collections.unmodifiableMap(new LinkedHashMap<>(b.customClaims)));
+           ? Collections.unmodifiableMap(b.customClaims)
+           : Collections.unmodifiableMap(new LinkedHashMap<>(b.customClaims)));
     this.header = b.header;
   }
 
@@ -206,9 +206,8 @@ public final class JWT {
 
   /**
    * <strong>WARNING: This method does NOT verify the JWT signature.</strong>
-   * Decode only the payload claims of {@code encodedJWT} via the shared default
-   * {@link JWTDecoder}, returning the parsed JSON object as a {@link Map}. See
-   * {@link JWTDecoder#decodeClaimsUnsecured(String)} for the full contract.
+   * Decode only the payload claims of {@code encodedJWT} via the shared default {@link JWTDecoder}, returning the
+   * parsed JSON object as a {@link Map}. See {@link JWTDecoder#decodeClaimsUnsecured(String)} for the full contract.
    */
   public static Map<String, Object> decodeClaimsUnsecured(String encodedJWT) {
     return JWTDecoder.getDefault().decodeClaimsUnsecured(encodedJWT);
@@ -216,8 +215,8 @@ public final class JWT {
 
   /**
    * <strong>WARNING: This method does NOT verify the JWT signature.</strong>
-   * Decode only the header of {@code encodedJWT} via the shared default {@link JWTDecoder}.
-   * See {@link JWTDecoder#decodeHeaderUnsecured(String)} for the full contract.
+   * Decode only the header of {@code encodedJWT} via the shared default {@link JWTDecoder}. See
+   * {@link JWTDecoder#decodeHeaderUnsecured(String)} for the full contract.
    */
   public static Header decodeHeaderUnsecured(String encodedJWT) {
     return JWTDecoder.getDefault().decodeHeaderUnsecured(encodedJWT);

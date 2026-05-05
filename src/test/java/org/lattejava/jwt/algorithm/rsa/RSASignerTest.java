@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, FusionAuth, All Rights Reserved
+ * Copyright (c) 2017-2026, FusionAuth, All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -122,7 +122,7 @@ public class RSASignerTest extends BaseJWTTest {
     RSASigner signer = RSASigner.newSHA256Signer(readFile("rsa_private_key_2048.pem"));
 
     byte[] header = "eyJhbGciOiJSUzI1NiJ9".getBytes(StandardCharsets.UTF_8);
-    byte[] dot = { (byte) '.' };
+    byte[] dot = {(byte) '.'};
     byte[] payload = "eyJzdWIiOiJ4In0".getBytes(StandardCharsets.UTF_8);
     byte[] combined = "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ4In0".getBytes(StandardCharsets.UTF_8);
 

@@ -31,7 +31,7 @@ import org.lattejava.jwt.internal.*;
  *   <li>Serialize header via {@link JSONProcessor} and base64URL-encode (no padding).</li>
  *   <li>Serialize JWT claims and base64URL-encode (no padding).</li>
  *   <li>Assemble {@code headerB64.payloadB64} as a single byte array, call
- *       {@link Signer#sign(byte[])}, base64URL-encode the signature.</li>
+ *       {@link Signer#sign(byte[]...)}, base64URL-encode the signature.</li>
  *   <li>Return {@code headerB64.payloadB64.signatureB64}.</li>
  * </ol>
  *
@@ -48,7 +48,7 @@ import org.lattejava.jwt.internal.*;
  * @author Daniel DeGroff
  */
 public class JWTEncoder {
-  private static final byte[] DOT = { (byte) '.' };
+  private static final byte[] DOT = {(byte) '.'};
   private final JSONProcessor jsonProcessor;
 
   /**

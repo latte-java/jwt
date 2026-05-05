@@ -141,12 +141,14 @@ public class ECSigner implements Signer {
     for (byte[] segment : segments) {
       Objects.requireNonNull(segment, "segment");
     }
+
     try {
       Signature signature = Signature.getInstance(ECFamily.toJCA(algorithm));
       signature.initSign(privateKey);
       for (byte[] segment : segments) {
         signature.update(segment);
       }
+
       byte[] der = signature.sign();
       return JOSEConverter.derToJose(der, ECFamily.curveIntLength(algorithm));
     } catch (InvalidKeyException | NoSuchAlgorithmException | SignatureException e) {

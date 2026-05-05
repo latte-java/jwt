@@ -179,17 +179,16 @@ public class JWTDecoder {
    *
    * <p>As a consequence of that ordering, an invalid base64URL character inside the payload segment surfaces as
    * {@link InvalidJWTSignatureException} when it was introduced after signing (the tampered signing-input bytes fail
-   * the HMAC compare), and as {@link InvalidJWTException} only when the malformed bytes were already present at sign
-   * time. Callers that need to distinguish "rejected token" from "valid token" should catch the common supertype
+   * the HMAC compare), and as {@link InvalidJWTException} only when the malformed bytes were already present at
+   * signing. Callers that need to distinguish "rejected token" from "valid token" should catch the common supertype
    * {@link JWTException} rather than a specific subclass.</p>
    *
    * @param encodedJWT the compact JWS string; must be non-null
    * @param resolver   the verifier resolver; must be non-null
    * @return the decoded {@link JWT}
-   * @throws JWTException on any verification or structural failure; common subtypes include
-   *                      {@link InvalidJWTException} (malformed input), {@link InvalidJWTSignatureException}
-   *                      (signature mismatch or tampered bytes), {@link MissingSignatureException}, and
-   *                      {@link JWTExpiredException}
+   * @throws JWTException on any verification or structural failure; common subtypes include {@link InvalidJWTException}
+   *                      (malformed input), {@link InvalidJWTSignatureException} (signature mismatch or tampered
+   *                      bytes), {@link MissingSignatureException}, and {@link JWTExpiredException}
    */
   public JWT decode(String encodedJWT, VerifierResolver resolver) {
     return decode(encodedJWT, resolver, null);

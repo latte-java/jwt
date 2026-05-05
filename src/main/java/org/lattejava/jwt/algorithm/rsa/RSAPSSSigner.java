@@ -125,6 +125,7 @@ public class RSAPSSSigner implements Signer {
     for (byte[] segment : segments) {
       Objects.requireNonNull(segment, "segment");
     }
+
     try {
       Signature signature = Signature.getInstance("RSASSA-PSS");
       signature.setParameter(RSAFamily.pssParameterSpec(algorithm));
@@ -132,6 +133,7 @@ public class RSAPSSSigner implements Signer {
       for (byte[] segment : segments) {
         signature.update(segment);
       }
+
       return signature.sign();
     } catch (InvalidKeyException | NoSuchAlgorithmException | SignatureException
              | InvalidAlgorithmParameterException e) {
