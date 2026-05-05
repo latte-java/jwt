@@ -55,28 +55,6 @@ implementation("org.lattejava:latte-jwt:1.0.0")
 ```groovy
 dependency(id: "org.lattejava:latte-jwt:1.0.0")
 ```
- 
-## Performance
-
-Throughput on `RS256` decode + verify + validate (ops/sec, higher is better):
-
-<!-- README:PERFORMANCE:START -->
-### RS256 — decode + verify + validate
-
-| # | Library | ops/sec | vs leader | vs latte-jwt |
-|--:|---------|--------:|----------:|-------------:|
-| 1 | latte-jwt | 41,839 | 100.0 % | 100.0 % |
-| 2 | latte-jwt-jackson | 40,864 | 97.7 % | 97.7 % |
-| 3 | fusionauth-jwt | 37,409 | 89.4 % | 89.4 % |
-| 4 | vertx-auth-jwt | 37,165 | 88.8 % | 88.8 % |
-| 5 | nimbus-jose-jwt | 32,426 | 77.5 % | 77.5 % |
-| 6 | jose4j | 30,326 | 72.5 % | 72.5 % |
-| 7 | auth0-java-jwt | 28,860 | 69.0 % | 69.0 % |
-| 8 | jjwt | 28,044 | 67.0 % | 67.0 % |
-| | _baseline (JCA)_ | _42,321_ | _101.2 %_ | _101.2 %_ |
-<!-- README:PERFORMANCE:END -->
-
-Full methodology and per-algorithm leaderboards in [`benchmarks/BENCHMARKS.md`](benchmarks/BENCHMARKS.md).
 
 ## Example Code:
 
@@ -544,6 +522,28 @@ X509Certificate cert = X509.builder()
 For a CA-signed certificate, set `subject` to the subject DN, `issuer` to the CA's subject DN, `publicKey` to the subject's public key, and `signingKey` to the CA's private key.
 
 Distinguished names are accepted as a comma-separated list of `ATTR=value` pairs (`CN`, `C`, `L`, `ST`, `O`, `OU`); full RFC 4514 DN parsing is not supported.
+
+## Performance
+
+This table shows throughput on `RS256` decode + verify + validate (ops/sec, higher is better):
+
+<!-- README:PERFORMANCE:START -->
+### RS256 — decode + verify + validate
+
+| # | Library | ops/sec | vs leader | vs latte-jwt |
+|--:|---------|--------:|----------:|-------------:|
+| 1 | latte-jwt | 41,839 | 100.0 % | 100.0 % |
+| 2 | latte-jwt-jackson | 40,864 | 97.7 % | 97.7 % |
+| 3 | fusionauth-jwt | 37,409 | 89.4 % | 89.4 % |
+| 4 | vertx-auth-jwt | 37,165 | 88.8 % | 88.8 % |
+| 5 | nimbus-jose-jwt | 32,426 | 77.5 % | 77.5 % |
+| 6 | jose4j | 30,326 | 72.5 % | 72.5 % |
+| 7 | auth0-java-jwt | 28,860 | 69.0 % | 69.0 % |
+| 8 | jjwt | 28,044 | 67.0 % | 67.0 % |
+| | _baseline (JCA)_ | _42,321_ | _101.2 %_ | _101.2 %_ |
+<!-- README:PERFORMANCE:END -->
+
+Full methodology and per-algorithm leaderboards in [`benchmarks/BENCHMARKS.md`](benchmarks/BENCHMARKS.md).
 
 ## License
 
