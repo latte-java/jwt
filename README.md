@@ -30,31 +30,15 @@ Java JWT is intended to be fast and easy to use. It has zero external runtime de
    - Generate ideal HMAC secret lengths for `SHA-256`, `SHA-384` and `SHA-512`
    - Generate the `at_hash` and `c_hash` claims for OpenID Connect
 
-## Get it
+## Installation
 
-### Maven
- ```xml
-<dependency>
-  <groupId>org.lattejava</groupId>
-  <artifactId>latte-jwt</artifactId>
-  <version>0.1.0</version>
-</dependency>
- ```
+If you are using Latte, you can add this to your build file:
 
-### Gradle
-```groovy
-implementation 'org.lattejava:latte-jwt:0.1.0'
+```
+dependency(id: "org.lattejava:jwt:0.1.0")
 ```
 
-### Gradle Kotlin
-```kotlin
-implementation("org.lattejava:latte-jwt:0.1.0")
-```
-
-### Savant 
-```groovy
-dependency(id: "org.lattejava:latte-jwt:0.1.0")
-```
+**NOTE:** We might support Maven in the future, but the plan for now is to support the Latte CLI tool.
 
 ## Example Code:
 
