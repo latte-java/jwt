@@ -1,9 +1,9 @@
 /*
- * Copyright (c) 2016-2025, The Latte Project, All Rights Reserved
- * License: MIT (See LICENSE file in root)
+ * Copyright (c) 2016-2025 The Latte Project
+ * SPDX-License-Identifier: MIT
  */
 
-project(group: "org.lattejava", name: "jwt", version: "0.1.0", licenses: ["MIT"]) {
+project(group: "org.lattejava", name: "jwt", version: "0.1.1", licenses: ["MIT"]) {
   workflow {
     standard()
   }
@@ -15,7 +15,7 @@ project(group: "org.lattejava", name: "jwt", version: "0.1.0", licenses: ["MIT"]
 
   dependencies {
     group(name: "compile") {
-      // Ha! Just kidding. This is pure Java - no dependencies.
+      dependency(id: "org.lattejava:json:0.1.0")
     }
     group(name: "test-compile", export: false) {
       dependency(id: "com.fasterxml.jackson.core:jackson-core:2.21.2")

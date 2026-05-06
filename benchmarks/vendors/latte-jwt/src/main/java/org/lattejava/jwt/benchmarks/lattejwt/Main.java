@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2026, The Latte Project, All Rights Reserved
- * License: MIT (See LICENSE file in root)
+ * Copyright (c) 2026 The Latte Project
+ * SPDX-License-Identifier: MIT
  */
 package org.lattejava.jwt.benchmarks.lattejwt;
 
