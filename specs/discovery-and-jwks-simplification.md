@@ -168,6 +168,7 @@ public Set<String> keyIds();                   // unmodifiable, JWKS-endpoint or
 public void refresh();
 public int consecutiveFailures();
 public Instant lastFailedRefresh();
+public Instant lastRefreshAttempt();
 public Instant lastSuccessfulRefresh();
 public Instant nextDueAt();
 @Override public void close();
@@ -185,7 +186,7 @@ For `JWKS.of(...)`:
 - `resolve` and `get` work identically to the remote case.
 - `refresh()` is a no-op (returns normally — the snapshot is already complete).
 - `consecutiveFailures()` returns 0.
-- `lastFailedRefresh()`, `lastSuccessfulRefresh()`, `nextDueAt()` return null.
+- `lastFailedRefresh()`, `lastRefreshAttempt()`, `lastSuccessfulRefresh()`, `nextDueAt()` return null.
 - `close()` is a no-op (no scheduler, no inflight worker, no thread to interrupt).
 - `JWKS.of()` with no keys (or `of(List.of())`) is permitted, returns a non-null instance, and is not rejected at construction. `keys()` and `keyIds()` return empty collections; `get(kid)` returns null for any input; `resolve(header)` raises `MissingVerifierException` for any header. This is the same behavior as a remote-backed `JWKS` whose snapshot happens to be empty.
 
