@@ -490,15 +490,17 @@ Supported signature algorithms: `RS256`/`RS384`/`RS512`, `PS256`/`PS384`/`PS512`
 
 ```java
 // A self-signed EC certificate, valid for one year.
-KeyPair keyPair = KeyPairs.generateEC_256();
+KeyPairGenerator gen = KeyPairGenerator.getInstance("EC");
+gen.initialize(256);
+var keyPair = gen.generateKeyPair();
 
 X509Certificate cert = X509.builder()
                            .serialNumber(BigInteger.valueOf(System.currentTimeMillis()))
                            .issuer("CN=www.acme.com, O=Acme, C=US")
                            .subject("CN=www.acme.com, O=Acme, C=US")
                            .validity(Instant.now(), Instant.now().plus(Duration.ofDays(365)))
-                           .publicKey(keyPair.publicKey)
-                           .signingKey(keyPair.privateKey)
+                           .publicKey(keyPair.getPublic())
+                           .signingKey(keyPair.getPrivate())
                            .signatureAlgorithm(Algorithm.ES256)
                            .build();
 ```
