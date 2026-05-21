@@ -60,7 +60,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
     this.source = b.source;
     this.staticMode = false;
     this.url = b.url();
-    this.ref.set(new Snapshot(List.of(), Map.of(), Map.of(), Instant.EPOCH, Instant.EPOCH, 0, null));
+    this.ref.set(new Snapshot(List.of(), Map.of(), Map.of(), Instant.EPOCH, Instant.EPOCH, 0, null, Instant.EPOCH));
     CompletableFuture<Snapshot> initial = singleflightRefresh();
     try {
       initial.get(refreshTimeout.toMillis(), TimeUnit.MILLISECONDS);
@@ -134,7 +134,8 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
         Instant.EPOCH,
         Instant.EPOCH,
         0,
-        null));
+        null,
+        Instant.EPOCH));
   }
 
   // --- Public static methods ---
@@ -321,10 +322,6 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
     return new JWKSFetchException(JWKSFetchException.Reason.PARSE, msg, cause);
   }
 
-  private static Duration maxOf(Duration a, Duration b) {
-    return a.compareTo(b) >= 0 ? a : b;
-  }
-
   private static List<JSONWebKey> parseJWKSResponseKeys(HttpURLConnection conn, InputStream is, FetchLimits limits) {
     Map<String, Object> map = HardenedJSON.parse(is, limits);
     Object keys = map.get("keys");
@@ -397,6 +394,12 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
     return ref.get().lastFailedRefresh();
   }
 
+  public Instant lastRefreshAttempt() {
+    if (staticMode) return null;
+    Snapshot s = ref.get();
+    return s.lastAttemptAt().equals(Instant.EPOCH) ? null : s.lastAttemptAt();
+  }
+
   public Instant lastSuccessfulRefresh() {
     if (staticMode) return null;
     Snapshot s = ref.get();
@@ -461,7 +464,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
     if (!refreshOnMiss) return null;
 
     Instant now = Instant.now(clock);
-    if (now.isBefore(snapshot.nextDueAt())) return null;
+    if (now.isBefore(snapshot.lastAttemptAt().plus(minRefreshInterval))) return null;
 
     CompletableFuture<Snapshot> fut = singleflightRefresh();
     try {
@@ -485,8 +488,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
 
   /**
    * Returns the {@link Duration} to use for {@code nextDueAt}. Honors the server's {@code Cache-Control: max-age} when
-   * {@link CacheControlPolicy#CLAMP} is configured, clamped into {@code [minRefreshInterval, refreshInterval]}; the
-   * caller applies the {@code minRefreshInterval} floor again as a final guard.
+   * {@link CacheControlPolicy#CLAMP} is configured, clamped into {@code [minRefreshInterval, refreshInterval]}.
    */
   private Duration chosenInterval(JWKSResponse resp) {
     if (cacheControlPolicy == CacheControlPolicy.IGNORE) return refreshInterval;
@@ -585,15 +587,14 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
       throw new JWKSFetchException(JWKSFetchException.Reason.EMPTY_RESULT,
           "JWKS refresh produced no usable keys after JWK conversion");
     }
-    Duration chosen = chosenInterval(resp);
-    Instant nextDue = now.plus(maxOf(minRefreshInterval, chosen));
+    Instant nextDue = now.plus(chosenInterval(resp));
     if (logger.isInfoEnabled()) {
       logger.info("JWKS refresh succeeded; kids=[" + byKid.keySet() + "]");
     }
     List<JSONWebKey> allKeysSnapshot = Collections.unmodifiableList(new ArrayList<>(allKeys));
     Map<String, Verifier> byKidSnapshot = Collections.unmodifiableMap(new LinkedHashMap<>(byKid));
     Map<String, JSONWebKey> jwkByKidSnapshot = Collections.unmodifiableMap(new LinkedHashMap<>(jwkByKid));
-    return new Snapshot(allKeysSnapshot, byKidSnapshot, jwkByKidSnapshot, now, nextDue, 0, null);
+    return new Snapshot(allKeysSnapshot, byKidSnapshot, jwkByKidSnapshot, now, nextDue, 0, null, now);
   }
 
   /**
@@ -629,7 +630,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
         }
       }
     }
-    return new Snapshot(allKeys, byKid, jwkByKid, fetchedAt, nextDue, next, now);
+    return new Snapshot(allKeys, byKid, jwkByKid, fetchedAt, nextDue, next, now, now);
   }
 
   private JWKSResponse fetchFromSource() {
@@ -821,7 +822,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
       JWKS jwks = new JWKS(this);
       if (failFast && jwks.initialFetchFailure != null) {
         Throwable f = jwks.initialFetchFailure;
-        if (jwks.scheduler != null) jwks.scheduler.shutdownNow();
+        jwks.close();
         if (f instanceof JWKSFetchException jfe) throw jfe;
         if (f instanceof OpenIDConnectException oce) throw oce;
         throw new JWKSFetchException(JWKSFetchException.Reason.PARSE, "Initial JWKS fetch failed", f);
@@ -906,6 +907,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
       Instant fetchedAt,
       Instant nextDueAt,
       int consecutiveFailures,
-      Instant lastFailedRefresh) {
+      Instant lastFailedRefresh,
+      Instant lastAttemptAt) {
   }
 }

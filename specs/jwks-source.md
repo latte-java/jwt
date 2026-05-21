@@ -63,8 +63,9 @@ public final class JWKSource implements VerifierResolver, AutoCloseable {
   // Observability (lock-free reads off the current snapshot)
   public Instant lastSuccessfulRefresh();          // null if no successful refresh yet
   public Instant lastFailedRefresh();              // null if no failure since the last success
+  public Instant lastRefreshAttempt();             // null if no attempt yet; advances on success and failure
   public int consecutiveFailures();                // 0 on the success path
-  public Instant nextDueAt();                      // earliest time at which a refresh is allowed to start
+  public Instant nextDueAt();                      // scheduler's next-eligible refresh time; on-miss uses lastRefreshAttempt + minRefreshInterval
   public Set<String> currentKids();                // unmodifiable snapshot of kids in the cache at call time
 }
 ```
@@ -123,7 +124,7 @@ public enum CacheControlPolicy {
 |---|---|---|
 | `scheduledRefresh` | `false` | Most callers want lazy-warm + miss-driven refresh; opt in to a background thread. |
 | `refreshInterval` | `60 minutes` | Matches the `max-age` most IdPs publish on JWKS responses; conservative wrt rotation. |
-| `refreshOnMiss` | `true` | Unknown `kid` should trigger a fetch. The combination of singleflight + `nextDueAt` bounds amplification. |
+| `refreshOnMiss` | `true` | Unknown `kid` should trigger a fetch. Singleflight + the `minRefreshInterval` on-miss debounce bound amplification. |
 | `refreshTimeout` | `2 seconds` | Bounds blocking on `resolve()` during a miss. Long enough for healthy networks, short enough to fail fast on a wedged IdP. |
 | `minRefreshInterval` | `30 seconds` | Floor for both the scheduler tick rate and the on-miss debounce. Hard cap on amplification under attack. |
 | `cacheControlPolicy` | `CLAMP` | Honor IdP-published `max-age` when sane, but never refresh more often than `minRefreshInterval` and never wait longer than `refreshInterval` between refreshes. |
@@ -197,9 +198,10 @@ The cache state is a single immutable snapshot:
 record Snapshot(
     Map<String, Verifier> byKid,
     Instant fetchedAt,            // time of the snapshot's last successful fetch (Instant.EPOCH if never)
-    Instant nextDueAt,             // earliest time at which a refresh is allowed to start
+    Instant nextDueAt,             // earliest time at which the scheduler may start a refresh
     int consecutiveFailures,      // 0 on the success path
-    Instant lastFailedRefresh     // null if no recorded failure since the last success
+    Instant lastFailedRefresh,    // null if no recorded failure since the last success
+    Instant lastAttemptAt         // time of the snapshot's last refresh attempt, success or failure (Instant.EPOCH if never)
 ) {}
 ```
 
@@ -207,8 +209,8 @@ It is held in `AtomicReference<Snapshot>`. Reads (`resolve()`, `currentKids()`, 
 
 `build()` performs a synchronous initial load, bounded by `refreshTimeout`:
 
-- **On success:** snapshot installed with `consecutiveFailures=0`, `fetchedAt=now`, `nextDueAt` per §2.4, `lastFailedRefresh=null`.
-- **On failure:** snapshot installed with `byKid=emptyMap`, `consecutiveFailures=1`, `fetchedAt=Instant.EPOCH`, `lastFailedRefresh=now`, `nextDueAt` per the failure path in §2.7. Failure is logged at `error`. `build()` returns normally; `lastSuccessfulRefresh()` returns `null`.
+- **On success:** snapshot installed with `consecutiveFailures=0`, `fetchedAt=now`, `lastAttemptAt=now`, `nextDueAt` per §2.4, `lastFailedRefresh=null`.
+- **On failure:** snapshot installed with `byKid=emptyMap`, `consecutiveFailures=1`, `fetchedAt=Instant.EPOCH`, `lastFailedRefresh=now`, `lastAttemptAt=now`, `nextDueAt` per the failure path in §2.7. Failure is logged at `error`. `build()` returns normally; `lastSuccessfulRefresh()` returns `null`.
 
 Operators wanting fail-fast on initial load check `lastSuccessfulRefresh() == null` after `build()` and act accordingly. The library does not throw from `build()` on a network failure, by design — it preserves the same "availability over freshness" stance as the runtime failure path (§2.7), so a brief IdP outage at boot does not make the application unstartable.
 
@@ -221,13 +223,13 @@ Operators wanting fail-fast on initial load check `lastSuccessfulRefresh() == nu
      if !v.canVerify(header.alg()): return null
      return v
 4. if !refreshOnMiss: return null
-5. if now < snapshot.nextDueAt: return null   // bounded by minRefreshInterval-derived window
+5. if now < snapshot.lastAttemptAt + minRefreshInterval: return null   // on-miss debounce
 6. fresh = singleflight.refresh()              // blocks up to refreshTimeout
 7. v = fresh.byKid.get(header.kid())
 8. apply step 3's canVerify check; return v or null
 ```
 
-Step 5 is the DoS gate: even if 10,000 concurrent decoders all see the same unknown `kid`, only the first one past the `nextDueAt` window starts a fetch; the rest see `nextDueAt > now` and return `null` immediately.
+Step 5 is the DoS gate: even if 10,000 concurrent decoders all see the same unknown `kid`, only the first one past the `minRefreshInterval` debounce starts a fetch; the rest return `null` immediately. The debounce is intentionally distinct from the scheduler's `nextDueAt` (§2.4) — see §2.4.1 for why.
 
 If step 6's await elapses at `refreshTimeout` before the in-flight refresh completes, the in-flight fetch continues asynchronously; the await returns the current `ref.get()` (the pre-refresh snapshot), the on-miss path returns `null`, and a later decode benefits from the eventually-installed snapshot. The timeout is not a refresh failure; see §2.7.4.
 
@@ -249,21 +251,30 @@ Synchronous, blocking, singleflight-coalesced. If a refresh is already in flight
 
 The snapshot is updated per §2.7 (prior keys preserved, `consecutiveFailures` incremented, `nextDueAt` advanced) before the exception leaves the method, *except* for `TIMEOUT` — which does not signal a refresh failure (see §2.7.4). Operators can dispatch on `e.reason()` (e.g., escalate `NON_2XX` to a health probe, swallow `TIMEOUT` quietly) without inspecting the cause chain.
 
-`refresh()` ignores `nextDueAt`. The gate exists to defend against amplification on the on-miss / scheduler paths, not to throttle deliberate operator action.
+`refresh()` ignores both `nextDueAt` and the on-miss debounce. Those gates exist to defend against amplification on the scheduler and on-miss paths respectively, not to throttle deliberate operator action.
 
 If the source has been closed, `refresh()` is a no-op and logs at `debug`.
 
 ### 2.4 The `nextDueAt` watermark
 
-`nextDueAt` is the unified "when is the next refresh allowed to start" signal. It is consulted by both the scheduler tick (§2.5) and the on-miss path (§2.2), so the two paths cannot fight each other.
+`nextDueAt` is the scheduler's "when is the next refresh allowed to start" signal. It is consulted only by the scheduler tick (§2.5). The on-miss path uses a separate debounce (§2.4.1).
 
 After a successful refresh:
-- `nextDueAt = max(now + minRefreshInterval, now + chosenInterval)` where `chosenInterval` depends on `cacheControlPolicy` (see §2.6).
+- `nextDueAt = now + chosenInterval` where `chosenInterval` depends on `cacheControlPolicy` (see §2.6). `chosenInterval` is itself clamped to `[minRefreshInterval, refreshInterval]`, so `nextDueAt` is always at least `now + minRefreshInterval`.
 
 After a failed refresh:
 - `nextDueAt = now + backoff(consecutiveFailures)` (see §2.7).
 
-The on-miss path checks `now < nextDueAt` to decide whether to debounce. The scheduler tick checks the same condition before dispatching a refresh. There is no second cooldown variable.
+### 2.4.1 The on-miss debounce
+
+The on-miss path (§2.2) uses `lastAttemptAt + minRefreshInterval` as its debounce, independent of `nextDueAt`. `lastAttemptAt` is set to `now` on every refresh attempt — success or failure.
+
+The two watermarks serve different purposes and cannot be unified:
+
+- `nextDueAt` paces the scheduler against the IdP's published cache directive (often 5–60 minutes via `Cache-Control: max-age`). Unifying it with the on-miss debounce would block on-miss refresh for the full `chosenInterval` after a successful fetch, defeating the rotation use case: an IdP that rotates keys mid-interval would produce JWTs with unknown `kid`s that the source refuses to fetch keys for.
+- The on-miss debounce caps amplification: 10,000 concurrent unknown-`kid` resolves are coalesced by singleflight, and subsequent waves are throttled to one fetch per `minRefreshInterval` (default 30s).
+
+The two watermarks are independent. A successful refresh advances both; a refresh inside the `nextDueAt` window dispatched from the on-miss path will subsequently advance the scheduler's `nextDueAt` too (via the singleflight worker installing a fresh snapshot).
 
 ### 2.5 Scheduler tick
 
@@ -312,9 +323,9 @@ When a refresh raises (network failure, non-2xx response, parse failure, etc.):
 #### 2.7.3 Caller-visible behavior during failure
 
 - `resolve()` continues to return cached verifiers from the prior successful snapshot.
-- Misses against unknown `kid`s return `null` immediately once `nextDueAt` is in the future.
+- Misses against unknown `kid`s return `null` immediately while the on-miss debounce (`lastRefreshAttempt + minRefreshInterval`) is in the future.
 - `lastSuccessfulRefresh()` does not advance; an integrator monitoring this can alert on staleness.
-- `lastFailedRefresh()` advances to `now`; `consecutiveFailures()` increments.
+- `lastFailedRefresh()` advances to `now`; `lastRefreshAttempt()` also advances to `now`; `consecutiveFailures()` increments.
 
 There is no separate "circuit breaker open" state; the exponential-backoff `nextDueAt` *is* the circuit. After enough consecutive failures, `nextDueAt` settles at `now + refreshInterval` and the source effectively reverts to "try every full interval until something changes".
 

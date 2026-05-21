@@ -453,6 +453,8 @@ public class JWKSTest extends BaseTest {
     assertNotNull(priorSuccess);
     assertNull(source.lastFailedRefresh());
     assertEquals(source.consecutiveFailures(), 0);
+    assertEquals(source.lastRefreshAttempt(), priorSuccess,
+        "lastRefreshAttempt matches lastSuccessfulRefresh when the last attempt succeeded");
 
     b.responses.get("/jwks.json").status = 500;
     JWKSFetchException ex = expectThrows(JWKSFetchException.class, source::refresh);
@@ -462,6 +464,10 @@ public class JWKSTest extends BaseTest {
         "lastSuccessfulRefresh must not advance on failure");
     assertNotNull(source.lastFailedRefresh());
     assertEquals(source.consecutiveFailures(), 1);
+    assertTrue(source.lastRefreshAttempt().isAfter(priorSuccess),
+        "lastRefreshAttempt must advance on failure even when lastSuccessfulRefresh does not");
+    assertEquals(source.lastRefreshAttempt(), source.lastFailedRefresh(),
+        "lastRefreshAttempt matches lastFailedRefresh when the last attempt failed");
 
     assertNotNull(source.resolve(org.lattejava.jwt.Header.builder()
                                                          .alg(org.lattejava.jwt.Algorithm.RS256).kid("k1").build()));
@@ -968,6 +974,7 @@ public class JWKSTest extends BaseTest {
     jwks.refresh();
     assertEquals(jwks.consecutiveFailures(), 0);
     assertNull(jwks.lastFailedRefresh());
+    assertNull(jwks.lastRefreshAttempt());
     assertNull(jwks.lastSuccessfulRefresh());
     assertNull(jwks.nextDueAt());
     jwks.close();  // no-op
@@ -1154,6 +1161,37 @@ public class JWKSTest extends BaseTest {
   }
 
   @Test
+  public void resolve_onMissRefresh_picksUpRotatedKid_insideRefreshIntervalWindow() throws Exception {
+    // Use case: rotation inside the scheduled refresh window. With realistic intervals
+    // (refreshInterval far larger than minRefreshInterval), an unknown kid must still
+    // trigger a fetch once minRefreshInterval has elapsed since the last attempt.
+    String body1 = RSA_JWKS_BODY;
+    String body2 = body1.replace("\"k1\"", "\"k2\"");
+    org.lattejava.jwt.HttpServerBuilder b = new org.lattejava.jwt.HttpServerBuilder()
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = body1)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json"));
+    startHttpServer(b);
+
+    JWKS source = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+                      .minRefreshInterval(Duration.ofMillis(100))
+                      .refreshInterval(Duration.ofMinutes(60))
+                      .build();
+    assertEquals(source.keyIds(), java.util.Set.of("k1"));
+
+    b.responses.get("/jwks.json").response = body2;
+    Thread.sleep(150);
+
+    org.lattejava.jwt.Verifier v = source.resolve(org.lattejava.jwt.Header.builder()
+                                                                          .alg(org.lattejava.jwt.Algorithm.RS256).kid("k2").build());
+    assertNotNull(v, "on-miss refresh must fire after minRefreshInterval, not refreshInterval");
+    source.close();
+  }
+
+  @Test
   public void resolve_onMissRefresh_findsNewlyAddedKid() throws Exception {
     // Use case: rotation — a fresh kid not in the cache triggers a fetch and resolves.
     String body1 = RSA_JWKS_BODY;
@@ -1174,7 +1212,7 @@ public class JWKSTest extends BaseTest {
     assertEquals(source.keyIds(), java.util.Set.of("k1"));
 
     b.responses.get("/jwks.json").response = body2;
-    Thread.sleep(150);  // pass nextDueAt window
+    Thread.sleep(150);  // pass on-miss debounce window (lastAttemptAt + minRefreshInterval)
 
     org.lattejava.jwt.Verifier v = source.resolve(org.lattejava.jwt.Header.builder()
                                                                           .alg(org.lattejava.jwt.Algorithm.RS256).kid("k2").build());
@@ -1186,7 +1224,8 @@ public class JWKSTest extends BaseTest {
 
   @Test
   public void resolve_unknownKid_inside_minRefreshInterval_returnsNullWithoutFetch() throws Exception {
-    // Use case: §2.2 step 5 — within nextDueAt's window, second miss does not refetch.
+    // Use case: within the on-miss debounce window (last attempt + minRefreshInterval), a second
+    // miss does not refetch. Bounds amplification when many unverifiable JWTs arrive in a burst.
     startHttpServer(server -> server
         .listenOn(PORT)
         .handleURI("/jwks.json")
@@ -1234,7 +1273,7 @@ public class JWKSTest extends BaseTest {
 
   @Test
   public void resolve_unknownKid_refreshOnMissTrue_singleflight_oneFetch_for_concurrent_calls() throws Exception {
-    // Use case: 100 concurrent unknown-kid resolves past nextDueAt coalesce into a single fetch.
+    // Use case: 100 concurrent unknown-kid resolves past the on-miss debounce window coalesce into a single fetch.
     startHttpServer(server -> server
         .listenOn(PORT)
         .handleURI("/jwks.json")
@@ -1248,7 +1287,7 @@ public class JWKSTest extends BaseTest {
                       .refreshInterval(Duration.ofMillis(200))
                       .build();
     int callsAfterBuild = httpHandlers.get(httpHandlers.size() - 1).called;
-    Thread.sleep(250);  // pass nextDueAt window
+    Thread.sleep(250);  // pass on-miss debounce window (lastAttemptAt + minRefreshInterval)
 
     java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor();
     java.util.List<java.util.concurrent.Future<org.lattejava.jwt.Verifier>> futures = new java.util.ArrayList<>();
