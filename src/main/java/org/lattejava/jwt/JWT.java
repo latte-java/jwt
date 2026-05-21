@@ -98,7 +98,7 @@ public final class JWT {
    * be observed until the signature has been validated.
    *
    * <p>Build your own decoder with {@link JWTDecoder#builder()} when you need non-default settings (custom
-   * {@link JSONProcessor}, {@code clockSkew}, allowed algorithms, {@code fixedTime}, etc.).</p>
+   * {@link JSONProcessor}, {@code clockSkew}, allowed algorithms, custom {@link java.time.Clock}, etc.).</p>
    *
    * @param encodedJWT the compact JWS string; must be non-null
    * @param resolver   the verifier resolver; must be non-null
@@ -151,7 +151,7 @@ public final class JWT {
    * subclass to reject the token.
    *
    * <p>Build your own decoder with {@link JWTDecoder#builder()} when you need non-default settings (custom
-   * {@link JSONProcessor}, {@code clockSkew}, allowed algorithms, {@code fixedTime}, etc.).</p>
+   * {@link JSONProcessor}, {@code clockSkew}, allowed algorithms, custom {@link java.time.Clock}, etc.).</p>
    *
    * @param encodedJWT the compact JWS string; must be non-null
    * @param resolver   the verifier resolver; must be non-null

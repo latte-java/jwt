@@ -48,7 +48,7 @@ The recommended entry points are the `Signers` and `Verifiers` factories. They t
 
 JWTs are built with an immutable fluent builder and serialized by a `JWTEncoder`. Decoding is done by a `JWTDecoder`, which takes a `VerifierResolver` — use `VerifierResolver.byKid(Map<String, Verifier>)` for a `kid`-indexed keyring, or `VerifierResolver.of(verifier)` to wrap a single verifier.
 
-For the happy path, `JWT.decode(encodedJWT, verifier)` (and an `(encodedJWT, verifier, validator)` overload) routes through a shared default `JWTDecoder` so you don't have to construct one. The same overloads accept a `VerifierResolver` when you have a keyring. Build your own `JWTDecoder` with `JWTDecoder.builder()` when you need non-default settings — a custom `JSONProcessor`, `clockSkew`, allowed algorithms, `fixedTime`, etc. — and pass it to the `JWT.decode(encodedJWT, decoder, verifier)` overload (or call `decoder.decode(...)` directly).
+For the happy path, `JWT.decode(encodedJWT, verifier)` (and an `(encodedJWT, verifier, validator)` overload) routes through a shared default `JWTDecoder` so you don't have to construct one. The same overloads accept a `VerifierResolver` when you have a keyring. Build your own `JWTDecoder` with `JWTDecoder.builder()` when you need non-default settings — a custom `JSONProcessor`, `clockSkew`, allowed algorithms, a custom `Clock`, etc. — and pass it to the `JWT.decode(encodedJWT, decoder, verifier)` overload (or call `decoder.decode(...)` directly).
 
 #### Sign and encode a JWT using HMAC
 ```java
@@ -175,7 +175,7 @@ Alternate: `ECVerifier.newVerifier(Paths.get("public_key.pem"))`.
 
 #### Build your own JWTDecoder
 
-The `JWT.decode(...)` static helpers route through a shared default decoder that uses the bundled zero-dependency `LatteJSONProcessor`. Build your own when you need a different `JSONProcessor` or any other non-default setting — `clockSkew`, `expectedAlgorithms`, `expectedType`, `criticalHeaders`, `maxInputBytes`, `fixedTime`, etc. The clock-skew and time-pinning examples below use the same builder.
+The `JWT.decode(...)` static helpers route through a shared default decoder that uses the bundled zero-dependency `LatteJSONProcessor`. Build your own when you need a different `JSONProcessor` or any other non-default setting — `clockSkew`, `expectedAlgorithms`, `expectedType`, `criticalHeaders`, `maxInputBytes`, a custom `Clock`, etc. The clock-skew and time-pinning examples below use the same builder.
 
 `JSONProcessor` is a strategy interface — `serialize(Map)` / `deserialize(byte[])` — and **the library does not bundle a Jackson, Gson, or other third-party adapter**. To use one, write a small class that implements `JSONProcessor` and delegates to your JSON library of choice. Implementations must be stateless and thread-safe; the encoder and decoder may call them concurrently.
 
@@ -291,7 +291,7 @@ Verifier verifier = Verifiers.forAsymmetric(Algorithm.ES256,
 // Pin the decoder to a specific instant. Use ONLY in tests — never in production.
 Instant thePast = Instant.parse("2019-01-01T00:00:00Z");
 JWTDecoder timeMachine = JWTDecoder.builder()
-                                   .fixedTime(thePast)
+                                   .clock(Clock.fixed(thePast, ZoneOffset.UTC))
                                    .build();
 
 JWT jwt = timeMachine.decode(encodedJWT, VerifierResolver.of(verifier));

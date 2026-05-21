@@ -139,7 +139,7 @@ public class JWTDecoder {
   /**
    * Returns the shared default {@link JWTDecoder} used by {@link JWT#decode(String, VerifierResolver)} and its
    * overloads. Build your own with {@link #builder()} when you need non-default settings (custom {@link JSONProcessor},
-   * {@code clockSkew}, allowed algorithms, {@code fixedTime}, etc.).
+   * {@code clockSkew}, allowed algorithms, custom {@link Clock}, etc.).
    *
    * @return the shared default instance; never {@code null}
    */
@@ -547,15 +547,6 @@ public class JWTDecoder {
 
     public Builder expectedType(String expectedType) {
       this.expectedType = expectedType;
-      return this;
-    }
-
-    /**
-     * Convenience for {@code clock(Clock.fixed(instant, ZoneOffset.UTC))}.
-     */
-    public Builder fixedTime(Instant instant) {
-      Objects.requireNonNull(instant, "instant");
-      this.clock = Clock.fixed(instant, ZoneOffset.UTC);
       return this;
     }
 
