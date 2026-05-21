@@ -308,9 +308,9 @@ public class JWTTest {
 
   @Test
   public void decode_uses_supplied_decoder() {
-    // Use case: JWT.decode(encodedJWT, decoder, resolver) routes through the supplied decoder. We confirm by
-    // pinning fixedTime far in the future and asserting the call would fail without our supplied clock skew --
-    // proving the supplied decoder (not the default) was consulted.
+    // Use case: JWT.decode(encodedJWT, decoder, resolver) routes through the supplied decoder. We confirm by pinning
+    // the clock far in the future and asserting the call would fail without our supplied clock skew -- proving the
+    // supplied decoder (not the default) was consulted.
     JWT jwt = JWT.builder()
                  .subject("supplied-decoder")
                  .expiresAt(Instant.parse("2026-04-26T12:00:00Z"))

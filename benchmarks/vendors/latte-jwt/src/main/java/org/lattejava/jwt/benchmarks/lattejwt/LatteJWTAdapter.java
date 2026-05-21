@@ -4,7 +4,9 @@
  */
 package org.lattejava.jwt.benchmarks.lattejwt;
 
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 
 import org.lattejava.jwt.Algorithm;
 import org.lattejava.jwt.JWT;
@@ -46,10 +48,10 @@ public final class LatteJWTAdapter implements JwtBenchmarkAdapter {
 
     encoder = new JWTEncoder();
 
-    Instant fixedNow = Instant.ofEpochSecond(1761408000L + 1800L);
-    es256Decoder = JWTDecoder.builder().fixedTime(fixedNow).build();
-    hs256Decoder = JWTDecoder.builder().fixedTime(fixedNow).build();
-    rs256Decoder = JWTDecoder.builder().fixedTime(fixedNow).build();
+    Clock fixedClock = Clock.fixed(Instant.ofEpochSecond(1761408000L + 1800L), ZoneOffset.UTC);
+    es256Decoder = JWTDecoder.builder().clock(fixedClock).build();
+    hs256Decoder = JWTDecoder.builder().clock(fixedClock).build();
+    rs256Decoder = JWTDecoder.builder().clock(fixedClock).build();
     unsafeDecoder = JWTDecoder.builder().build();
 
     canonicalJWT = JWT.builder()

@@ -8,6 +8,7 @@ package org.lattejava.jwt;
 import java.math.*;
 import java.security.*;
 import java.security.spec.*;
+import java.time.*;
 import java.util.*;
 
 import org.lattejava.jwt.algorithm.ec.*;
@@ -97,7 +98,7 @@ public class RFC7515VectorsTest extends BaseJWTTest {
    */
   private static JWTDecoder vectorClockDecoder() {
     return JWTDecoder.builder()
-                     .fixedTime(java.time.Instant.ofEpochSecond(1300819300L))
+                     .clock(Clock.fixed(Instant.ofEpochSecond(1300819300L), ZoneOffset.UTC))
                      .build();
   }
 
