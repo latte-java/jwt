@@ -1212,7 +1212,7 @@ public class JWKSTest extends BaseTest {
     assertEquals(source.keyIds(), java.util.Set.of("k1"));
 
     b.responses.get("/jwks.json").response = body2;
-    Thread.sleep(150);  // pass nextDueAt window
+    Thread.sleep(150);  // pass on-miss debounce window (lastAttemptAt + minRefreshInterval)
 
     org.lattejava.jwt.Verifier v = source.resolve(org.lattejava.jwt.Header.builder()
                                                                           .alg(org.lattejava.jwt.Algorithm.RS256).kid("k2").build());
@@ -1273,7 +1273,7 @@ public class JWKSTest extends BaseTest {
 
   @Test
   public void resolve_unknownKid_refreshOnMissTrue_singleflight_oneFetch_for_concurrent_calls() throws Exception {
-    // Use case: 100 concurrent unknown-kid resolves past nextDueAt coalesce into a single fetch.
+    // Use case: 100 concurrent unknown-kid resolves past the on-miss debounce window coalesce into a single fetch.
     startHttpServer(server -> server
         .listenOn(PORT)
         .handleURI("/jwks.json")
@@ -1287,7 +1287,7 @@ public class JWKSTest extends BaseTest {
                       .refreshInterval(Duration.ofMillis(200))
                       .build();
     int callsAfterBuild = httpHandlers.get(httpHandlers.size() - 1).called;
-    Thread.sleep(250);  // pass nextDueAt window
+    Thread.sleep(250);  // pass on-miss debounce window (lastAttemptAt + minRefreshInterval)
 
     java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor();
     java.util.List<java.util.concurrent.Future<org.lattejava.jwt.Verifier>> futures = new java.util.ArrayList<>();

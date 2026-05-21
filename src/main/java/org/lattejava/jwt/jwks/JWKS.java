@@ -488,8 +488,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
 
   /**
    * Returns the {@link Duration} to use for {@code nextDueAt}. Honors the server's {@code Cache-Control: max-age} when
-   * {@link CacheControlPolicy#CLAMP} is configured, clamped into {@code [minRefreshInterval, refreshInterval]}; the
-   * caller applies the {@code minRefreshInterval} floor again as a final guard.
+   * {@link CacheControlPolicy#CLAMP} is configured, clamped into {@code [minRefreshInterval, refreshInterval]}.
    */
   private Duration chosenInterval(JWKSResponse resp) {
     if (cacheControlPolicy == CacheControlPolicy.IGNORE) return refreshInterval;
@@ -823,7 +822,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
       JWKS jwks = new JWKS(this);
       if (failFast && jwks.initialFetchFailure != null) {
         Throwable f = jwks.initialFetchFailure;
-        if (jwks.scheduler != null) jwks.scheduler.shutdownNow();
+        jwks.close();
         if (f instanceof JWKSFetchException jfe) throw jfe;
         if (f instanceof OpenIDConnectException oce) throw oce;
         throw new JWKSFetchException(JWKSFetchException.Reason.PARSE, "Initial JWKS fetch failed", f);
