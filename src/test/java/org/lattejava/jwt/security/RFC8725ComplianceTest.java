@@ -46,70 +46,40 @@ public class RFC8725ComplianceTest extends BaseJWTTest {
     return (RSAPublicKey) KeyFactory.getInstance("RSA").generatePublic(new RSAPublicKeySpec(modulus, exponent));
   }
 
-  @Test
-  public void rfc8017_section_3_rsaPublicExponentOneRejected() throws Exception {
-    // Use case: e = 1 makes RSA the identity function (ciphertext == message).
-    // Rejected -- either by JCA's KeyFactory (which enforces e >= 3 itself)
-    // or by our defence-in-depth check in RSAFamily for any caller-supplied
-    // RSAPublicKey that bypassed KeyFactory validation.
-    try {
-      RSAPublicKey key = syntheticRsa(2048, BigInteger.ONE);
-      expectException(InvalidKeyTypeException.class, () -> RSAVerifier.newVerifier(Algorithm.RS256, key));
-    } catch (java.security.spec.InvalidKeySpecException | IllegalArgumentException ignored) {
-      // KeyFactory rejected e=1 before we could even build the key; acceptable.
-    }
-  }
-
-  @Test
-  public void rfc8017_section_3_rsaPublicExponentTwoRejected() throws Exception {
-    // Use case: e = 2 is even and cryptographically invalid for RSA.
-    // Rejected -- either by JCA's KeyFactory or by our check in RSAFamily.
-    try {
-      RSAPublicKey key = syntheticRsa(2048, BigInteger.TWO);
-      expectException(InvalidKeyTypeException.class, () -> RSAVerifier.newVerifier(Algorithm.RS256, key));
-    } catch (java.security.spec.InvalidKeySpecException | IllegalArgumentException ignored) {
-      // KeyFactory rejected e=2 before we could even build the key; acceptable.
-    }
-  }
-
-  // FIPS 186-5 §A.1.1 - RSA public exponent e must satisfy 65537 <= e < 2^256
-  @Test
-  public void fips186_5_rsaPublicExponentAboveFipsCeilingRejected() throws Exception {
-    // Use case: a huge odd exponent is structurally valid, so nothing else rejects it, but every verification against
-    // it becomes a proportionally expensive modular exponentiation. The FIPS ceiling bounds that cost.
-    BigInteger oversized = BigInteger.ONE.shiftLeft(256).setBit(0);
-    try {
-      RSAPublicKey key = syntheticRsa(4096, oversized);
-      expectException(InvalidKeyTypeException.class, () -> RSAVerifier.newVerifier(Algorithm.RS256, key));
-    } catch (java.security.spec.InvalidKeySpecException | IllegalArgumentException ignored) {
-      // The provider rejected the oversized exponent before we could build the key; also an acceptable outcome.
-    }
-  }
-
-  @Test
-  public void fips186_5_rsaPublicExponentStandard65537Accepted() throws Exception {
-    // Use case: the standard exponent must remain accepted by the ceiling check.
-    RSAPublicKey key = syntheticRsa(2048, BigInteger.valueOf(65537));
-    assertNotNull(RSAVerifier.newVerifier(Algorithm.RS256, key));
-  }
-
   // RFC 8017 §3 - RSA public exponent e must satisfy 2 < e < n and be odd
-  @Test
-  public void rfc8017_section_3_rsaPublicExponentZeroRejected() throws Exception {
-    // Use case: e = 0 is trivially broken (everything maps to 1). Rejected.
-    // A 0 exponent may be rejected earlier by KeyFactory itself on some
-    // providers; either InvalidKeyTypeException from our check or a JCA
-    // exception bubbling out is acceptable behaviour, but the rejection
-    // must happen.
+  // FIPS 186-5 §A.1.1 - and e < 2^256
+  @Test(dataProvider = "rsaPublicExponents")
+  public void rfc8017_section_3_rsaPublicExponentBounds(BigInteger exponent, boolean accepted) throws Exception {
+    // Use case: a hostile key source picks the exponent. Broken values are cryptographically useless, and an oversized
+    // one makes every verification a proportionally expensive modular exponentiation. The modulus stays at 2048 bits
+    // because KeyFactory caps the exponent at 64 bits above 3072, which would reject the oversized case on its own.
+    RSAPublicKey key;
     try {
-      RSAPublicKey key = syntheticRsa(2048, BigInteger.ZERO);
-      expectException(InvalidKeyTypeException.class, () -> RSAVerifier.newVerifier(Algorithm.RS256, key));
-    } catch (java.security.spec.InvalidKeySpecException | IllegalArgumentException ignored) {
-      // The JCA provider rejected e=0 before we could even build the key
-      // (Sun raises InvalidKeySpecException, BC FIPS raises
-      // IllegalArgumentException). Both indicate the key was rejected at
-      // the provider boundary, which is the desired outcome.
+      key = syntheticRsa(2048, exponent);
+    } catch (InvalidKeySpecException | IllegalArgumentException e) {
+      // The provider rejected the exponent before we could build the key (Sun raises InvalidKeySpecException, BC FIPS
+      // IllegalArgumentException). Rejection at that boundary is the desired outcome too.
+      assertFalse(accepted, "The provider rejected exponent [" + exponent + "], which must be accepted");
+      return;
     }
+
+    if (accepted) {
+      assertNotNull(RSAVerifier.newVerifier(Algorithm.RS256, key));
+    } else {
+      expectException(InvalidKeyTypeException.class, () -> RSAVerifier.newVerifier(Algorithm.RS256, key));
+    }
+  }
+
+  @DataProvider(name = "rsaPublicExponents")
+  public Object[][] rsaPublicExponents() {
+    return new Object[][]{
+        // (exponent, accepted)
+        {BigInteger.ZERO, false},                          // maps everything to 1
+        {BigInteger.ONE, false},                           // RSA becomes the identity function
+        {BigInteger.TWO, false},                           // even
+        {BigInteger.ONE.shiftLeft(256).setBit(0), false},  // above the FIPS 186-5 ceiling
+        {BigInteger.valueOf(65537), true}                  // the standard exponent
+    };
   }
 
   // RFC 8725 §2.1 - HMAC-with-RSA-public-key (cross-algorithm) attack rejected

@@ -1122,16 +1122,26 @@ public class JWKSTest extends BaseTest {
     source.close();
   }
 
-  @Test
-  public void maxStaleness_belowRefreshInterval_rejected() {
-    // Use case: a bound below the refresh cadence would mark keys stale before a scheduled refresh could renew them,
-    // turning every resolve into a blocking fetch, so it is rejected at build time.
+  @Test(dataProvider = "invalidMaxStaleness")
+  public void maxStaleness_invalidBound_rejected(Duration refreshInterval, Duration maxStaleness) {
+    // Use case: a non-positive bound makes every key stale on arrival, and one below the refresh cadence marks keys
+    // stale before a scheduled refresh could renew them. Both turn every resolve into a blocking fetch.
     IllegalArgumentException e = expectThrows(IllegalArgumentException.class,
         () -> JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json")
-                  .refreshInterval(Duration.ofMinutes(10))
-                  .maxStaleness(Duration.ofMinutes(5))
+                  .refreshInterval(refreshInterval)
+                  .maxStaleness(maxStaleness)
                   .build());
     assertTrue(e.getMessage().contains("maxStaleness"), e.getMessage());
+  }
+
+  @DataProvider(name = "invalidMaxStaleness")
+  public Object[][] invalidMaxStaleness() {
+    return new Object[][]{
+        // (refreshInterval, maxStaleness)
+        {Duration.ofMinutes(10), Duration.ZERO},
+        {Duration.ofMinutes(10), Duration.ofMinutes(-1)},
+        {Duration.ofMinutes(10), Duration.ofMinutes(5)}
+    };
   }
 
   @Test
@@ -1156,15 +1166,6 @@ public class JWKSTest extends BaseTest {
     assertNotNull(source.resolve(org.lattejava.jwt.Header.builder()
                                                          .alg(org.lattejava.jwt.Algorithm.RS256).kid("k1").build()));
     source.close();
-  }
-
-  @Test
-  public void maxStaleness_nonPositive_rejected() {
-    // Use case: zero or negative would make every key stale on arrival.
-    assertThrows(IllegalArgumentException.class,
-        () -> JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json").maxStaleness(Duration.ZERO).build());
-    assertThrows(IllegalArgumentException.class,
-        () -> JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json").maxStaleness(Duration.ofMinutes(-1)).build());
   }
 
   @Test
@@ -1608,37 +1609,6 @@ public class JWKSTest extends BaseTest {
     return "http://127.0.0.1:" + PORT + "/jwks.json";
   }
 
-  /**
-   * A {@link Clock} the test can move forward on demand, for exercising time-dependent cache behavior without
-   * sleeping.
-   */
-  static final class SettableClock extends Clock {
-    private volatile Instant instant;
-
-    SettableClock(Instant instant) {
-      this.instant = instant;
-    }
-
-    @Override
-    public ZoneId getZone() {
-      return ZoneOffset.UTC;
-    }
-
-    @Override
-    public Instant instant() {
-      return instant;
-    }
-
-    @Override
-    public Clock withZone(ZoneId zone) {
-      return this;
-    }
-
-    void advance(Duration amount) {
-      this.instant = this.instant.plus(amount);
-    }
-  }
-
   static final class RecordingLogger implements org.lattejava.jwt.log.Logger {
     final java.util.List<String> events = new java.util.concurrent.CopyOnWriteArrayList<>();
 
@@ -1733,6 +1703,36 @@ public class JWKSTest extends BaseTest {
 
     private void record(org.lattejava.jwt.log.Level level, String message, Throwable t) {
       events.add(level + " " + message + (t == null ? "" : " :: " + t.getClass().getSimpleName()));
+    }
+  }
+
+  /**
+   * A {@link Clock} the test can move forward on demand, to exercise time-dependent cache behavior without sleeping.
+   */
+  static final class SettableClock extends Clock {
+    private volatile Instant instant;
+
+    SettableClock(Instant instant) {
+      this.instant = instant;
+    }
+
+    @Override
+    public ZoneId getZone() {
+      return ZoneOffset.UTC;
+    }
+
+    @Override
+    public Instant instant() {
+      return instant;
+    }
+
+    @Override
+    public Clock withZone(ZoneId zone) {
+      return this;
+    }
+
+    void advance(Duration amount) {
+      this.instant = this.instant.plus(amount);
     }
   }
 }
