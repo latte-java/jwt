@@ -1123,6 +1123,134 @@ public class JWKSTest extends BaseTest {
   }
 
   @Test
+  public void maxStaleness_belowRefreshInterval_rejected() {
+    // Use case: a bound tighter than the refresh cadence would mark keys stale before a scheduled refresh could renew
+    // them, so it is rejected at build time rather than silently degrading every resolve into a blocking fetch.
+    IllegalArgumentException e = expectThrows(IllegalArgumentException.class,
+        () -> JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+                  .refreshInterval(Duration.ofMinutes(10))
+                  .maxStaleness(Duration.ofMinutes(5))
+                  .build());
+    assertTrue(e.getMessage().contains("maxStaleness"), e.getMessage());
+  }
+
+  @Test
+  public void maxStaleness_freshSnapshot_resolves() throws Exception {
+    // Use case: keys fetched well within the staleness bound resolve straight from the cache.
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = RSA_JWKS_BODY)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+
+    SettableClock clock = new SettableClock(Instant.parse("2026-04-25T12:00:00Z"));
+    JWKS source = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+                      .clock(clock)
+                      .refreshInterval(Duration.ofMinutes(60))
+                      .maxStaleness(Duration.ofHours(24))
+                      .build();
+
+    clock.advance(Duration.ofHours(23));
+    assertNotNull(source.resolve(org.lattejava.jwt.Header.builder()
+                                                         .alg(org.lattejava.jwt.Algorithm.RS256).kid("k1").build()));
+    source.close();
+  }
+
+  @Test
+  public void maxStaleness_nonPositive_rejected() {
+    // Use case: zero or negative would make every key stale on arrival.
+    assertThrows(IllegalArgumentException.class,
+        () -> JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json").maxStaleness(Duration.ZERO).build());
+    assertThrows(IllegalArgumentException.class,
+        () -> JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json").maxStaleness(Duration.ofMinutes(-1)).build());
+  }
+
+  @Test
+  public void maxStaleness_staleSnapshot_refreshFails_returnsNull() throws Exception {
+    // Use case: the endpoint has been unreachable past the staleness bound, so the cached key is no longer trusted
+    // and resolve() reports no verifier rather than serving a key that may have been revoked at the provider.
+    HttpServerBuilder b = new HttpServerBuilder();
+    b.listenOn(PORT)
+     .handleURI("/jwks.json")
+     .andReturn(new ExpectedResponse()
+         .with(r -> r.response = RSA_JWKS_BODY)
+         .with(r -> r.status = 200)
+         .with(r -> r.contentType = "application/json"));
+    startHttpServer(b);
+
+    SettableClock clock = new SettableClock(Instant.parse("2026-04-25T12:00:00Z"));
+    JWKS source = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+                      .clock(clock)
+                      .refreshInterval(Duration.ofMinutes(60))
+                      .maxStaleness(Duration.ofHours(24))
+                      .build();
+    org.lattejava.jwt.Header header = org.lattejava.jwt.Header.builder()
+                                                              .alg(org.lattejava.jwt.Algorithm.RS256).kid("k1").build();
+    assertNotNull(source.resolve(header));
+
+    b.responses.get("/jwks.json").status = 500;
+    clock.advance(Duration.ofHours(25));
+    assertNull(source.resolve(header));
+    assertEquals(source.consecutiveFailures(), 1, "the stale resolve must have attempted a refresh");
+    source.close();
+  }
+
+  @Test
+  public void maxStaleness_staleSnapshot_refreshSucceeds_resolves() throws Exception {
+    // Use case: past the bound the cached key is not served directly, but the refresh it triggers succeeds, so the
+    // caller still gets a verifier — backed by freshly fetched keys.
+    startHttpServer(server -> server
+        .listenOn(PORT)
+        .handleURI("/jwks.json")
+        .andReturn(new ExpectedResponse()
+            .with(r -> r.response = RSA_JWKS_BODY)
+            .with(r -> r.status = 200)
+            .with(r -> r.contentType = "application/json")));
+
+    SettableClock clock = new SettableClock(Instant.parse("2026-04-25T12:00:00Z"));
+    JWKS source = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+                      .clock(clock)
+                      .refreshInterval(Duration.ofMinutes(60))
+                      .maxStaleness(Duration.ofHours(24))
+                      .build();
+    Instant firstFetch = source.lastSuccessfulRefresh();
+
+    clock.advance(Duration.ofHours(25));
+    assertNotNull(source.resolve(org.lattejava.jwt.Header.builder()
+                                                         .alg(org.lattejava.jwt.Algorithm.RS256).kid("k1").build()));
+    assertTrue(source.lastSuccessfulRefresh().isAfter(firstFetch), "resolve must have refreshed the snapshot");
+    source.close();
+  }
+
+  @Test
+  public void maxStaleness_unset_staleSnapshotStillResolves() throws Exception {
+    // Use case: the default is unlimited retention, so an arbitrarily old snapshot keeps resolving. This is the
+    // pre-existing availability-first behavior that maxStaleness opts out of.
+    HttpServerBuilder b = new HttpServerBuilder();
+    b.listenOn(PORT)
+     .handleURI("/jwks.json")
+     .andReturn(new ExpectedResponse()
+         .with(r -> r.response = RSA_JWKS_BODY)
+         .with(r -> r.status = 200)
+         .with(r -> r.contentType = "application/json"));
+    startHttpServer(b);
+
+    SettableClock clock = new SettableClock(Instant.parse("2026-04-25T12:00:00Z"));
+    JWKS source = JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json")
+                      .clock(clock)
+                      .refreshInterval(Duration.ofMinutes(60))
+                      .build();
+
+    b.responses.get("/jwks.json").status = 500;
+    clock.advance(Duration.ofDays(365));
+    assertNotNull(source.resolve(org.lattejava.jwt.Header.builder()
+                                                         .alg(org.lattejava.jwt.Algorithm.RS256).kid("k1").build()));
+    source.close();
+  }
+
+  @Test
   public void resolve_cacheHit_returnsVerifier() throws Exception {
     // Use case: kid in the snapshot resolves to a verifier without a network hop.
     startHttpServer(server -> server
@@ -1478,6 +1606,37 @@ public class JWKSTest extends BaseTest {
             .with(r -> r.status = 302)
             .with(r -> r.redirectLocation = "http://localhost:" + PORT + "/jwks.json")));
     return "http://127.0.0.1:" + PORT + "/jwks.json";
+  }
+
+  /**
+   * A {@link Clock} the test can move forward on demand, for exercising time-dependent cache behavior without
+   * sleeping.
+   */
+  static final class SettableClock extends Clock {
+    private volatile Instant instant;
+
+    SettableClock(Instant instant) {
+      this.instant = instant;
+    }
+
+    @Override
+    public ZoneId getZone() {
+      return ZoneOffset.UTC;
+    }
+
+    @Override
+    public Instant instant() {
+      return instant;
+    }
+
+    @Override
+    public Clock withZone(ZoneId zone) {
+      return this;
+    }
+
+    void advance(Duration amount) {
+      this.instant = this.instant.plus(amount);
+    }
   }
 
   static final class RecordingLogger implements org.lattejava.jwt.log.Logger {

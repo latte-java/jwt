@@ -30,6 +30,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
   private final Consumer<HttpURLConnection> httpConnectionCustomizer;
   private final AtomicReference<CompletableFuture<Snapshot>> inflight = new AtomicReference<>();
   private final Logger logger;
+  private final Duration maxStaleness;
   private final Duration minRefreshInterval;
   private final AtomicReference<Snapshot> ref = new AtomicReference<>();
   private final Duration refreshInterval;
@@ -52,6 +53,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
     this.fetchLimits = b.fetchLimits;
     this.httpConnectionCustomizer = b.httpConnectionCustomizer;
     this.logger = b.logger;
+    this.maxStaleness = b.maxStaleness;
     this.minRefreshInterval = b.minRefreshInterval;
     this.refreshInterval = b.refreshInterval;
     this.refreshOnMiss = b.refreshOnMiss;
@@ -94,6 +96,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
     this.fetchLimits = FetchLimits.defaults();
     this.httpConnectionCustomizer = null;
     this.logger = NoOpLogger.INSTANCE;
+    this.maxStaleness = null;
     this.minRefreshInterval = Duration.ofMinutes(60);
     this.refreshInterval = Duration.ofMinutes(60);
     this.refreshOnMiss = false;
@@ -342,6 +345,18 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
     return result;
   }
 
+  /**
+   * Render a set of key IDs for a log message. Key IDs are chosen by the remote JWKS operator, so each one is passed
+   * through {@link MessageSanitizer} to keep control characters out of the caller's log pipeline.
+   */
+  private static String sanitizedKids(Set<String> kids) {
+    StringJoiner joiner = new StringJoiner(", ");
+    for (String kid : kids) {
+      joiner.add(MessageSanitizer.forMessage(kid));
+    }
+    return joiner.toString();
+  }
+
   private static HTTPResponseException unwrapHTTP(Throwable t) {
     while (t != null) {
       if (t instanceof HTTPResponseException he) return he;
@@ -449,6 +464,15 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
     }
   }
 
+  /**
+   * Resolves the {@link Verifier} for the token's {@code kid}.
+   *
+   * <p>When {@code maxStaleness} is configured and the cached keys are older than that bound, they are not returned
+   * even on a {@code kid} hit; a refresh is attempted first and the resolve fails (returning {@code null}, which the
+   * decoder surfaces as {@link MissingVerifierException}) unless that refresh succeeds. Introspection accessors such as
+   * {@link #keys()} and {@link #get(String)} are not subject to the staleness bound — they report cache state as it
+   * is.</p>
+   */
   @Override
   public Verifier resolve(Header header) {
     Objects.requireNonNull(header, "header");
@@ -456,14 +480,16 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
     String kid = header.kid();
     if (kid == null) return null;
 
+    Instant now = Instant.now(clock);
     Snapshot snapshot = ref.get();
+    boolean stale = isStale(snapshot, now);
     Verifier v = snapshot.byKid().get(kid);
-    if (v != null) {
+    if (v != null && !stale) {
       return v.canVerify(header.alg()) ? v : null;
     }
-    if (!refreshOnMiss) return null;
 
-    Instant now = Instant.now(clock);
+    // Stale keys always warrant a refresh attempt; a plain kid miss only does so when refreshOnMiss is enabled.
+    if (!stale && !refreshOnMiss) return null;
     if (now.isBefore(snapshot.lastAttemptAt().plus(minRefreshInterval))) return null;
 
     CompletableFuture<Snapshot> fut = singleflightRefresh();
@@ -479,6 +505,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
     }
 
     Snapshot fresh = ref.get();
+    if (isStale(fresh, Instant.now(clock))) return null;
     Verifier v2 = fresh.byKid().get(kid);
     if (v2 == null) return null;
     return v2.canVerify(header.alg()) ? v2 : null;
@@ -573,7 +600,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
       String kid = jwk.kid();
       if (kid != null && byKid.containsKey(kid)) {
         if (logger.isWarnEnabled()) {
-          logger.warn("JWKS contains duplicate kid [" + kid + "]; first-write-wins");
+          logger.warn("JWKS contains duplicate kid [" + MessageSanitizer.forMessage(kid) + "]; first-write-wins");
         }
         continue;
       }
@@ -589,7 +616,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
     }
     Instant nextDue = now.plus(chosenInterval(resp));
     if (logger.isInfoEnabled()) {
-      logger.info("JWKS refresh succeeded; kids=[" + byKid.keySet() + "]");
+      logger.info("JWKS refresh succeeded; kids=[" + sanitizedKids(byKid.keySet()) + "]");
     }
     List<JSONWebKey> allKeysSnapshot = Collections.unmodifiableList(new ArrayList<>(allKeys));
     Map<String, Verifier> byKidSnapshot = Collections.unmodifiableMap(new LinkedHashMap<>(byKid));
@@ -675,6 +702,18 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
           return new JWKSResponse(keys, status, sel);
         },
         JWKS::classifyFetchFailure);
+  }
+
+  /**
+   * Whether {@code snapshot}'s keys are older than the configured {@code maxStaleness}. Always {@code false} when no
+   * bound is configured, and when no fetch has ever succeeded ({@code fetchedAt} is still the epoch) — in that case the
+   * snapshot holds no keys to serve, so the miss path handles it.
+   */
+  private boolean isStale(Snapshot snapshot, Instant now) {
+    if (maxStaleness == null) return false;
+    Instant fetchedAt = snapshot.fetchedAt();
+    if (fetchedAt.equals(Instant.EPOCH)) return false;
+    return now.isAfter(fetchedAt.plus(maxStaleness));
   }
 
   private void onTick() {
@@ -780,6 +819,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
     private FetchLimits fetchLimits = FetchLimits.defaults();
     private Consumer<HttpURLConnection> httpConnectionCustomizer;
     private Logger logger = NoOpLogger.INSTANCE;
+    private Duration maxStaleness;
     private Duration minRefreshInterval = Duration.ofSeconds(30);
     private Duration refreshInterval = Duration.ofMinutes(60);
     private boolean refreshOnMiss = true;
@@ -819,6 +859,17 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
       if (refreshTimeout.isZero() || refreshTimeout.isNegative()) {
         throw new IllegalArgumentException("refreshTimeout must be > 0 but found [" + refreshTimeout + "]");
       }
+      if (maxStaleness != null) {
+        if (maxStaleness.isZero() || maxStaleness.isNegative()) {
+          throw new IllegalArgumentException("maxStaleness must be > 0 but found [" + maxStaleness + "]");
+        }
+        // A bound tighter than the refresh cadence would mark keys stale before the scheduled refresh could renew
+        // them, turning every resolve into a blocking fetch.
+        if (maxStaleness.compareTo(refreshInterval) < 0) {
+          throw new IllegalArgumentException(
+              "maxStaleness [" + maxStaleness + "] must be >= refreshInterval [" + refreshInterval + "]");
+        }
+      }
       JWKS jwks = new JWKS(this);
       if (failFast && jwks.initialFetchFailure != null) {
         Throwable f = jwks.initialFetchFailure;
@@ -857,6 +908,25 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
 
     public Builder logger(Logger l) {
       this.logger = (l == null) ? NoOpLogger.INSTANCE : l;
+      return this;
+    }
+
+    /**
+     * The longest a cached key set may be served after the last <em>successful</em> fetch. Once that bound is passed,
+     * {@link JWKS#resolve(Header)} stops returning verifiers until a refresh succeeds, so a key that was rotated out
+     * or revoked at the provider cannot remain trusted indefinitely while the endpoint is unreachable.
+     *
+     * <p>Default: {@code null}, meaning unlimited — keys are retained across an outage of any length. That is the
+     * more available choice and matches the behavior of prior releases; setting a bound trades availability for a
+     * guarantee about key freshness. Because refreshes are attempted on the normal {@code refreshInterval} cadence,
+     * the bound must be at least that interval.</p>
+     *
+     * @param d the maximum staleness, or {@code null} for unlimited; must be positive and &gt;=
+     *          {@code refreshInterval}.
+     * @return this builder.
+     */
+    public Builder maxStaleness(Duration d) {
+      this.maxStaleness = d;
       return this;
     }
 
