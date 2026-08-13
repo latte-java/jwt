@@ -130,8 +130,8 @@ public final class Verifiers {
       throw new InvalidJWKException(InvalidJWKException.Reason.MISSING_KID, "JWK is missing required member [kid]");
     }
 
-    // The kid, use, and crv values arrive from a remote JWKS and land in exception messages that callers routinely
-    // log, so they are sanitized before interpolation.
+    // Every JWK member below is supplied by the remote JWKS and lands in messages callers log, so it is sanitized
+    // before interpolation.
     String kid = MessageSanitizer.forMessage(jwk.kid());
 
     Algorithm alg = jwk.alg();
@@ -164,7 +164,7 @@ public final class Verifiers {
 
     if (!algKtyCrvConsistent(algName, kty, jwk.crv())) {
       throw new InvalidJWKException(InvalidJWKException.Reason.ALG_CRV_MISMATCH,
-          "JWK [" + kid + "] has inconsistent [alg=" + algName + "], [kty=" + kty + "], [crv=" + MessageSanitizer.forMessage(jwk.crv()) + "]");
+          "JWK [" + kid + "] has inconsistent [alg=" + MessageSanitizer.forMessage(algName) + "], [kty=" + kty + "], [crv=" + MessageSanitizer.forMessage(jwk.crv()) + "]");
     }
 
     PublicKey publicKey;
