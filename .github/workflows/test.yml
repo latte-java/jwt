@@ -13,7 +13,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install Latte Build
         run: |
           curl -fsSL https://lattejava.org/javaenv/install | bash
@@ -29,11 +29,11 @@ jobs:
       - name: Run the build
         run: |
           export PATH=~/.local/bin:$PATH
-          latte clean int
+          latte clean test
         shell: bash
       - name: Archive TestNG reports
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: testng-reports
           path: build/test-reports

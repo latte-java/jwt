@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Build system
 
-This project is built with the Latte CLI (`latte`), not Maven and not Savant. Ignore `.github/workflows/test.yml` — it references `mvn verify` but is stale; the authoritative build is `project.latte`. Compile target is Java 21.
+This project is built with the Latte CLI (`latte`), not Maven and not Savant. The authoritative build is `project.latte`; `.github/workflows/test.yml` drives the same targets with `latte clean test`. Compile target is Java 21.
 
 Common targets (run from the repo root):
 
