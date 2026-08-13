@@ -57,9 +57,11 @@ public class VerifiersFromJWKTest extends BaseTest {
   }
 
   @Test
-  public void fromJWK_ES256K_producesVerifierBoundToES256K() {
-    // Use case: fromJWK accepted alg=ES256K with crv=secp256k1 but the parser rejected that curve, so every such key
-    // failed as PARSE_FAILURE. The pair now yields a verifier, still bound to ES256K so a P-256 token cannot use it.
+  public void fromJWK_ES256K_usableOrRejectedNamingTheCurve() {
+    // Use case: ES256K needs a provider that can sign over secp256k1, and not every configuration has one -- the JDK's
+    // own EC provider supplies the curve parameters but no ECDSA over them, and FIPS-approved mode omits it entirely.
+    // Where the curve is usable the JWK yields a verifier bound to ES256K alone; where it is not, construction fails
+    // naming the curve rather than deferring to an invalid-signature at verify time.
     Map<String, Object> m = new HashMap<>();
     m.put("kty", "EC");
     m.put("kid", "k1");
@@ -73,9 +75,8 @@ public class VerifiersFromJWKTest extends BaseTest {
       assertTrue(v.canVerify(Algorithm.ES256K));
       assertFalse(v.canVerify(Algorithm.ES256));
     } catch (InvalidJWKException e) {
-      // secp256k1 is not offered by every provider configuration (FIPS-approved mode excludes it); a parse failure
-      // there is expected rather than a regression.
       assertEquals(e.reason(), InvalidJWKException.Reason.PARSE_FAILURE);
+      assertTrue(e.getCause().getMessage().contains("secp256k1"), e.getCause().getMessage());
     }
   }
 
