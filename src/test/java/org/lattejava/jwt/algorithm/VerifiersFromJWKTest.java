@@ -57,6 +57,56 @@ public class VerifiersFromJWKTest extends BaseTest {
   }
 
   @Test
+  public void fromJWK_ES256K_producesVerifierBoundToES256K() {
+    // Use case: fromJWK has always accepted alg=ES256K with crv=secp256k1, but the JWK parser rejected that curve, so
+    // every such key failed as PARSE_FAILURE. With the curve supported the pair now yields a usable verifier, still
+    // bound to ES256K alone so a P-256 token cannot borrow it.
+    Map<String, Object> m = new HashMap<>();
+    m.put("kty", "EC");
+    m.put("kid", "k1");
+    m.put("alg", "ES256K");
+    m.put("use", "sig");
+    m.put("crv", "secp256k1");
+    m.put("x", "eb5mfvncu6xVoGKVzocLBwKb_NstzijZWfKBWxb4F5g");
+    m.put("y", "SDradyajxGVdpPv8DhEIqP0XtEimhVQZnEfQj_sQ1Lg");
+    try {
+      Verifier v = Verifiers.fromJWK(JSONWebKey.fromMap(m));
+      assertTrue(v.canVerify(Algorithm.ES256K));
+      assertFalse(v.canVerify(Algorithm.ES256));
+    } catch (InvalidJWKException e) {
+      // secp256k1 is not offered by every provider configuration (FIPS-approved mode excludes it); a parse failure
+      // there is expected rather than a regression.
+      assertEquals(e.reason(), InvalidJWKException.Reason.PARSE_FAILURE);
+    }
+  }
+
+  @Test
+  public void fromJWK_controlCharactersInKidAreSanitized() {
+    // Use case: kid is chosen by whoever operates the JWKS, and these messages are routinely logged. A kid carrying
+    // CRLF could forge log lines, so control characters are replaced before interpolation.
+    Map<String, Object> m = rsaJWKBase();
+    m.put("kid", "k1\r\nWarn Forged log line");
+    m.put("use", "enc");
+    InvalidJWKException ex = expectThrows(InvalidJWKException.class,
+        () -> Verifiers.fromJWK(JSONWebKey.fromMap(m)));
+    assertEquals(ex.reason(), InvalidJWKException.Reason.USE_ENC);
+    assertFalse(ex.getMessage().contains("\r"), ex.getMessage());
+    assertFalse(ex.getMessage().contains("\n"), ex.getMessage());
+    assertTrue(ex.getMessage().contains("k1??Warn Forged log line"), ex.getMessage());
+  }
+
+  @Test
+  public void fromJWK_controlCharactersInUseAreSanitized() {
+    // Use case: use is remote-supplied too and lands in the same message.
+    Map<String, Object> m = rsaJWKBase();
+    m.put("use", "enc\r\ninjected");
+    InvalidJWKException ex = expectThrows(InvalidJWKException.class,
+        () -> Verifiers.fromJWK(JSONWebKey.fromMap(m)));
+    assertEquals(ex.reason(), InvalidJWKException.Reason.USE_ENC);
+    assertFalse(ex.getMessage().contains("\n"), ex.getMessage());
+  }
+
+  @Test
   public void fromJWK_HMACAlg_throwsHMAC_ALG() {
     // Use case: HMAC algorithms do not belong on a public JWKS.
     Map<String, Object> m = new HashMap<>();

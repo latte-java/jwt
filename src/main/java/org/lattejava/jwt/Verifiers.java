@@ -12,6 +12,7 @@ import org.lattejava.jwt.algorithm.ec.*;
 import org.lattejava.jwt.algorithm.ed.*;
 import org.lattejava.jwt.algorithm.hmac.*;
 import org.lattejava.jwt.algorithm.rsa.*;
+import org.lattejava.jwt.internal.*;
 import org.lattejava.jwt.jwks.*;
 
 /**
@@ -129,37 +130,41 @@ public final class Verifiers {
       throw new InvalidJWKException(InvalidJWKException.Reason.MISSING_KID, "JWK is missing required member [kid]");
     }
 
+    // The kid, use, and crv values arrive from a remote JWKS and land in exception messages that callers routinely
+    // log, so they are sanitized before interpolation.
+    String kid = MessageSanitizer.forMessage(jwk.kid());
+
     Algorithm alg = jwk.alg();
     if (alg == null) {
       throw new InvalidJWKException(InvalidJWKException.Reason.MISSING_ALG,
-          "JWK [" + jwk.kid() + "] is missing required member [alg]");
+          "JWK [" + kid + "] is missing required member [alg]");
     }
 
     String algName = alg.name();
     if (algName.equals("HS256") || algName.equals("HS384") || algName.equals("HS512")) {
       throw new InvalidJWKException(InvalidJWKException.Reason.HMAC_ALG,
-          "JWK [" + jwk.kid() + "] uses HMAC alg [" + algName + "]; not usable for signature verification on a public JWKS");
+          "JWK [" + kid + "] uses HMAC alg [" + algName + "]; not usable for signature verification on a public JWKS");
     }
 
     KeyType kty = jwk.kty();
     if (kty == null) {
       throw new InvalidJWKException(InvalidJWKException.Reason.PARSE_FAILURE,
-          "JWK [" + jwk.kid() + "] is missing required member [kty]");
+          "JWK [" + kid + "] is missing required member [kty]");
     }
     if (kty == KeyType.OCT) {
       throw new InvalidJWKException(InvalidJWKException.Reason.KTY_OCT,
-          "JWK [" + jwk.kid() + "] has [kty=oct]; symmetric secrets do not belong on a public JWKS");
+          "JWK [" + kid + "] has [kty=oct]; symmetric secrets do not belong on a public JWKS");
     }
 
     String use = jwk.use();
     if (use != null && !"sig".equals(use)) {
       throw new InvalidJWKException(InvalidJWKException.Reason.USE_ENC,
-          "JWK [" + jwk.kid() + "] has [use=" + use + "]; only [sig] is usable for signature verification");
+          "JWK [" + kid + "] has [use=" + MessageSanitizer.forMessage(use) + "]; only [sig] is usable for signature verification");
     }
 
     if (!algKtyCrvConsistent(algName, kty, jwk.crv())) {
       throw new InvalidJWKException(InvalidJWKException.Reason.ALG_CRV_MISMATCH,
-          "JWK [" + jwk.kid() + "] has inconsistent [alg=" + algName + "], [kty=" + kty + "], [crv=" + jwk.crv() + "]");
+          "JWK [" + kid + "] has inconsistent [alg=" + algName + "], [kty=" + kty + "], [crv=" + MessageSanitizer.forMessage(jwk.crv()) + "]");
     }
 
     PublicKey publicKey;
@@ -167,14 +172,14 @@ public final class Verifiers {
       publicKey = jwk.toPublicKey();
     } catch (RuntimeException e) {
       throw new InvalidJWKException(InvalidJWKException.Reason.PARSE_FAILURE,
-          "JWK [" + jwk.kid() + "] key material failed to parse", e);
+          "JWK [" + kid + "] key material failed to parse", e);
     }
 
     try {
       return forAsymmetric(alg, publicKey);
     } catch (RuntimeException e) {
       throw new InvalidJWKException(InvalidJWKException.Reason.PARSE_FAILURE,
-          "JWK [" + jwk.kid() + "] verifier construction failed", e);
+          "JWK [" + kid + "] verifier construction failed", e);
     }
   }
 
