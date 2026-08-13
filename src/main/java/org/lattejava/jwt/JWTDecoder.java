@@ -64,14 +64,7 @@ public class JWTDecoder {
   private final String expectedType;
   private final JSONProcessor jsonProcessor;
   private final int maxInputBytes;
-  /**
-   * True when {@code exp} was named in {@code requiredClaims}. Checked ahead of time validation.
-   */
-  private final boolean requireExpiration;
-  /**
-   * The required claims other than {@code exp}, checked after time validation so an expired token reports the expiry.
-   */
-  private final Set<String> requiredClaimsAfterTimeValidation;
+  private final Set<String> requiredClaims;
 
   /**
    * Constructs a decoder with all defaults.
@@ -134,10 +127,7 @@ public class JWTDecoder {
       this.expectedAlgorithmNames = Collections.unmodifiableSet(names);
     }
     this.maxInputBytes = b.maxInputBytes;
-    this.requireExpiration = b.requiredClaims.contains("exp");
-    LinkedHashSet<String> remaining = new LinkedHashSet<>(b.requiredClaims);
-    remaining.remove("exp");
-    this.requiredClaimsAfterTimeValidation = Collections.unmodifiableSet(remaining);
+    this.requiredClaims = Collections.unmodifiableSet(new LinkedHashSet<>(b.requiredClaims));
   }
 
   /**
@@ -254,7 +244,6 @@ public class JWTDecoder {
     verifier.verify(message, signatureBytes);
 
     JWT jwt = parsePayload(segments.payloadB64, header);
-    enforceRequiredExpiration(jwt);
     enforceTimeClaims(jwt);
     enforceRequiredClaims(jwt);
 
@@ -393,16 +382,10 @@ public class JWTDecoder {
   }
 
   private void enforceRequiredClaims(JWT jwt) {
-    for (String name : requiredClaimsAfterTimeValidation) {
+    for (String name : requiredClaims) {
       if (jwt.getObject(name) == null) {
         throw new InvalidJWTException("Claim [" + name + "] is required but was not present");
       }
-    }
-  }
-
-  private void enforceRequiredExpiration(JWT jwt) {
-    if (requireExpiration && jwt.expiresAt() == null) {
-      throw new InvalidJWTException("Claim [exp] is required but was not present");
     }
   }
 
@@ -639,11 +622,8 @@ public class JWTDecoder {
      *                                .build();
      * }</pre>
      *
-     * <p>{@code exp} is checked before time validation; every other required claim is checked after it. A token
-     * missing {@code exp} therefore reports that, and an expired token raises {@link JWTExpiredException} rather than
-     * naming an unrelated absent claim.</p>
-     *
-     * <p>Null or empty disables the check (the default).</p>
+     * <p>Checked after time validation, so an expired token raises {@link JWTExpiredException} rather than naming an
+     * absent claim. Null or empty disables the check (the default).</p>
      *
      * @param requiredClaims the claim names that must be present, or null to disable.
      * @return this builder.
