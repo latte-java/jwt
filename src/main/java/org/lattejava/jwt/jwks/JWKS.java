@@ -151,7 +151,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
    * Performs a one-shot fetch of the JWKS at {@code jwksURL} and returns the parsed keys. Uses
    * {@link FetchLimits#defaults()} for all hardening limits.
    *
-   * @param jwksURL the JWKS endpoint URL; while not enforced, please use {@code https} in production
+   * @param jwksURL the JWKS endpoint URL
    * @return the list of parsed {@link JSONWebKey} objects
    * @throws JWKSFetchException if the fetch or parse fails
    */
@@ -163,7 +163,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
    * Performs a one-shot fetch of the JWKS at {@code jwksURL}, applying {@code customizer} to the connection before the
    * request is sent.
    *
-   * @param jwksURL    the JWKS endpoint URL; while not enforced, please use {@code https} in production
+   * @param jwksURL    the JWKS endpoint URL
    * @param customizer an optional consumer to configure the connection (e.g., set request headers)
    * @return the list of parsed {@link JSONWebKey} objects
    * @throws JWKSFetchException if the fetch or parse fails
@@ -175,7 +175,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
   /**
    * Performs a one-shot fetch of the JWKS at {@code jwksURL} with the supplied hardening limits.
    *
-   * @param jwksURL the JWKS endpoint URL; while not enforced, please use {@code https} in production
+   * @param jwksURL the JWKS endpoint URL
    * @param limits  the hardening limits to apply
    * @return the list of parsed {@link JSONWebKey} objects
    * @throws JWKSFetchException if the fetch or parse fails
@@ -188,7 +188,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
    * Performs a one-shot fetch of the JWKS at {@code jwksURL} with the supplied hardening limits and connection
    * customizer.
    *
-   * @param jwksURL    the JWKS endpoint URL; while not enforced, please use {@code https} in production
+   * @param jwksURL    the JWKS endpoint URL
    * @param limits     the hardening limits to apply
    * @param customizer an optional consumer to configure the connection before sending
    * @return the list of parsed {@link JSONWebKey} objects
@@ -227,7 +227,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
   /**
    * Builds from an OIDC issuer, discovering the JWKS URL from the issuer's {@code /.well-known/openid-configuration}.
    *
-   * @param issuer the OIDC issuer URL; while not enforced, please use {@code https} in production
+   * @param issuer the OIDC issuer URL
    */
   public static Builder fromIssuer(String issuer) {
     return new Builder(FetchSource.ISSUER, issuer);
@@ -236,7 +236,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
   /**
    * Builds from a JWKS endpoint directly, skipping discovery.
    *
-   * @param jwksURL the JWKS endpoint URL; while not enforced, please use {@code https} in production
+   * @param jwksURL the JWKS endpoint URL
    */
   public static Builder fromJWKS(String jwksURL) {
     return new Builder(FetchSource.JWKS, jwksURL);
@@ -245,7 +245,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
   /**
    * Builds from a fully-qualified discovery URL, taking the JWKS URL from the document it returns.
    *
-   * @param wellKnownURL the discovery document URL; while not enforced, please use {@code https} in production
+   * @param wellKnownURL the discovery document URL
    */
   public static Builder fromWellKnown(String wellKnownURL) {
     return new Builder(FetchSource.WELL_KNOWN, wellKnownURL);

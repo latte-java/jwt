@@ -64,7 +64,7 @@ public class OpenIDConnect {
    * non-2xx, parse error, missing required field, mismatched issuer, cross-origin redirect rejection, oversize
    * response).
    *
-   * @param issuer the OIDC issuer URL; while not enforced, please use {@code https} in production
+   * @param issuer the OIDC issuer URL
    * @return the parsed {@link OpenIDConnectConfiguration}
    * @throws OpenIDConnectException on any failure
    */
@@ -80,7 +80,7 @@ public class OpenIDConnect {
    * non-2xx, parse error, missing required field, mismatched issuer, cross-origin redirect rejection, oversize
    * response).
    *
-   * @param issuer     the OIDC issuer URL; while not enforced, please use {@code https} in production
+   * @param issuer     the OIDC issuer URL
    * @param customizer an optional {@link Consumer} to configure the {@link HttpURLConnection} before the request is
    *                   sent; may be {@code null}
    * @return the parsed {@link OpenIDConnectConfiguration}
@@ -98,7 +98,7 @@ public class OpenIDConnect {
    * non-2xx, parse error, missing required field, mismatched issuer, cross-origin redirect rejection, oversize
    * response).
    *
-   * @param issuer the OIDC issuer URL; while not enforced, please use {@code https} in production
+   * @param issuer the OIDC issuer URL
    * @param limits the fetch and parse hardening limits to apply
    * @return the parsed {@link OpenIDConnectConfiguration}
    * @throws OpenIDConnectException on any failure
@@ -115,7 +115,7 @@ public class OpenIDConnect {
    * non-2xx, parse error, missing required field, mismatched issuer, cross-origin redirect rejection, oversize
    * response).
    *
-   * @param issuer     the OIDC issuer URL; while not enforced, please use {@code https} in production
+   * @param issuer     the OIDC issuer URL
    * @param limits     the fetch and parse hardening limits to apply
    * @param customizer an optional {@link Consumer} to configure the {@link HttpURLConnection} before the request is
    *                   sent; may be {@code null}
@@ -137,8 +137,7 @@ public class OpenIDConnect {
    * {@link #discover(String)}. This overload is also the right entry point for an RFC 8414 server's
    * {@code /.well-known/oauth-authorization-server} URL.
    *
-   * @param wellKnownURL the full well-known URL of the discovery document; while not enforced, please use
-   *                     {@code https} in production
+   * @param wellKnownURL the full well-known URL of the discovery document
    * @return the parsed {@link OpenIDConnectConfiguration}
    * @throws OpenIDConnectException on any failure
    */
@@ -153,8 +152,7 @@ public class OpenIDConnect {
    * {@link #discover(String)}. This overload is also the right entry point for an RFC 8414 server's
    * {@code /.well-known/oauth-authorization-server} URL.
    *
-   * @param wellKnownURL the full well-known URL of the discovery document; while not enforced, please use
-   *                     {@code https} in production
+   * @param wellKnownURL the full well-known URL of the discovery document
    * @param customizer   an optional {@link Consumer} to configure the {@link HttpURLConnection} before the request is
    *                     sent; may be {@code null}
    * @return the parsed {@link OpenIDConnectConfiguration}
@@ -171,8 +169,7 @@ public class OpenIDConnect {
    * {@link #discover(String)}. This overload is also the right entry point for an RFC 8414 server's
    * {@code /.well-known/oauth-authorization-server} URL.
    *
-   * @param wellKnownURL the full well-known URL of the discovery document; while not enforced, please use
-   *                     {@code https} in production
+   * @param wellKnownURL the full well-known URL of the discovery document
    * @param limits       the fetch and parse hardening limits to apply
    * @return the parsed {@link OpenIDConnectConfiguration}
    * @throws OpenIDConnectException on any failure
@@ -188,8 +185,7 @@ public class OpenIDConnect {
    * {@link #discover(String)}. This overload is also the right entry point for an RFC 8414 server's
    * {@code /.well-known/oauth-authorization-server} URL.
    *
-   * @param wellKnownURL the full well-known URL of the discovery document; while not enforced, please use
-   *                     {@code https} in production
+   * @param wellKnownURL the full well-known URL of the discovery document
    * @param limits       the fetch and parse hardening limits to apply
    * @param customizer   an optional {@link Consumer} to configure the {@link HttpURLConnection} before the request is
    *                     sent; may be {@code null}
