@@ -37,8 +37,7 @@ public class ObjectIdentifier {
    */
   public static final String ECDSA_P521 = "1.3.132.0.35";
   /**
-   * Elliptic curve / 256 bit / secp256k1 SECG curve over a 256 bit prime field, used by the ES256K algorithm (RFC
-   * 8812).
+   * Elliptic curve / 256 bit / secp256k1 SECG curve over a 256 bit prime field, used by ES256K (RFC 8812)
    */
   public static final String ECDSA_SECP256K1 = "1.3.132.0.10";
   /**

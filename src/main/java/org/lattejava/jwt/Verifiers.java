@@ -130,8 +130,7 @@ public final class Verifiers {
       throw new InvalidJWKException(InvalidJWKException.Reason.MISSING_KID, "JWK is missing required member [kid]");
     }
 
-    // Every JWK member below is supplied by the remote JWKS and lands in messages callers log, so it is sanitized
-    // before interpolation.
+    // The JWK members below come from the remote JWKS and land in messages callers log, so they are sanitized first.
     String kid = MessageSanitizer.forMessage(jwk.kid());
 
     Algorithm alg = jwk.alg();

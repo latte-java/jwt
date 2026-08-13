@@ -16,7 +16,6 @@ Java JWT is intended to be fast and easy to use. It has zero external runtime de
    - Build JWK from Public Key
    - Build JWK from PEM
    - Parse public keys from a JSON Web Key
-     - EC curves `P-256`, `P-384`, `P-521` and `secp256k1` (for `ES256K`), plus `Ed25519` and `Ed448`
    - Retrieve JWK from JWKS endpoints
  - X.509 Certificates
    - Build self-signed or CA-signed X.509 (v3) certificates
@@ -236,9 +235,9 @@ Other entry points:
 - `JWKS.of(jwk1, jwk2, ...)` — static in-memory keys (no HTTP, no scheduler).
 - `JWKS.fetch(url)` — one-shot `List<JSONWebKey>` from a JWKS URL.
 
-**Use `https`.** The scheme is not enforced on any URL this library fetches — issuer, well-known, or JWKS — because plaintext `http` is genuinely useful against a local test server. But those keys decide which tokens you trust, so over `http` anyone on the network path can substitute their own. While not enforced, please use `https` in production.
+**Use `https`.** The scheme is not enforced on any URL this library fetches — issuer, well-known, or JWKS — so that `http` stays usable against a local test server. Those keys decide which tokens you trust, so over `http` anyone on the network path can substitute their own.
 
-By default a cached key set is retained indefinitely when refreshes fail, so tokens keep verifying through an outage. If you would rather stop trusting keys that can no longer be revalidated, set a bound with `maxStaleness(Duration)` — past it, `resolve` returns no verifier until a refresh succeeds:
+When a refresh fails the cached keys are retained indefinitely, so tokens keep verifying through an outage. Set `maxStaleness(Duration)` to bound that instead — past it, `resolve` returns no verifier until a refresh succeeds:
 
 ```java
 try (JWKS jwks = JWKS.fromIssuer("https://idp.example.com/")
@@ -442,9 +441,9 @@ JSONWebKey jwk = JSONWebKey.fromMap(map);
 PublicKey publicKey = JSONWebKey.parse(jwk);
 ```
 
-EC keys are parsed for the `P-256`, `P-384`, `P-521` and `secp256k1` curves, and OKP keys for `Ed25519` and `Ed448`. `secp256k1` (the curve behind `ES256K`) is not offered by every JCE provider — notably it is absent under FIPS-approved configurations — and a provider that does not carry it produces a `JSONWebKeyParserException` naming the curve.
+EC keys are parsed for the `P-256`, `P-384`, `P-521` and `secp256k1` curves, and OKP keys for `Ed25519` and `Ed448`. `secp256k1` (the curve behind `ES256K`) is not carried by every JCE provider — the JDK's own supplies the curve parameters but no ECDSA over them, and FIPS-approved configurations omit it entirely — so building a verifier for one fails naming the curve unless a provider such as Bouncy Castle is installed.
 
-**`x5c` chains are not validated.** When a JWK carries `x5c`, parsing checks only that the leaf certificate's public key matches the JWK's own key material, so the two cannot disagree. It does not build or verify a path to a trust anchor, and does not check validity dates, key usage, or revocation — the authoritative key is always the JWK's own parameters. This matches how Nimbus, jose4j, and java-jwt treat `x5c`; if your application needs a validated chain, validate it yourself against a trust store you control.
+**`x5c` chains are not validated.** Parsing only checks the leaf certificate's public key against the JWK's own key material, so the two cannot disagree. It does not build a path to a trust anchor, nor check validity dates, key usage, or revocation. This matches Nimbus, jose4j, and java-jwt; validate the chain yourself if your application relies on it.
 
 ### Convert a Private Key to JWK
 

@@ -1163,8 +1163,7 @@ public class JWKSTest extends BaseTest {
                       .build();
 
     clock.advance(Duration.ofHours(23));
-    assertNotNull(source.resolve(org.lattejava.jwt.Header.builder()
-                                                         .alg(org.lattejava.jwt.Algorithm.RS256).kid("k1").build()));
+    assertNotNull(source.resolve(Header.builder().alg(Algorithm.RS256).kid("k1").build()));
     source.close();
   }
 
@@ -1187,8 +1186,7 @@ public class JWKSTest extends BaseTest {
                       .refreshInterval(Duration.ofMinutes(60))
                       .maxStaleness(Duration.ofHours(24))
                       .build();
-    org.lattejava.jwt.Header header = org.lattejava.jwt.Header.builder()
-                                                              .alg(org.lattejava.jwt.Algorithm.RS256).kid("k1").build();
+    Header header = Header.builder().alg(Algorithm.RS256).kid("k1").build();
     assertNotNull(source.resolve(header));
 
     b.responses.get("/jwks.json").status = 500;
@@ -1219,8 +1217,7 @@ public class JWKSTest extends BaseTest {
     Instant firstFetch = source.lastSuccessfulRefresh();
 
     clock.advance(Duration.ofHours(25));
-    assertNotNull(source.resolve(org.lattejava.jwt.Header.builder()
-                                                         .alg(org.lattejava.jwt.Algorithm.RS256).kid("k1").build()));
+    assertNotNull(source.resolve(Header.builder().alg(Algorithm.RS256).kid("k1").build()));
     assertTrue(source.lastSuccessfulRefresh().isAfter(firstFetch), "resolve must have refreshed the snapshot");
     source.close();
   }
@@ -1246,8 +1243,7 @@ public class JWKSTest extends BaseTest {
 
     b.responses.get("/jwks.json").status = 500;
     clock.advance(Duration.ofDays(365));
-    assertNotNull(source.resolve(org.lattejava.jwt.Header.builder()
-                                                         .alg(org.lattejava.jwt.Algorithm.RS256).kid("k1").build()));
+    assertNotNull(source.resolve(Header.builder().alg(Algorithm.RS256).kid("k1").build()));
     source.close();
   }
 

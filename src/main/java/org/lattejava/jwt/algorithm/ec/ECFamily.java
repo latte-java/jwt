@@ -24,8 +24,7 @@ import org.lattejava.jwt.*;
  */
 final class ECFamily {
   /**
-   * A syntactically valid DER ECDSA signature ({@code r = 1, s = 1}) used only by {@link #assertCurveIsUsable}. A
-   * provider that supports the curve returns {@code false} for it; one that does not throws.
+   * A well-formed but wrong DER ECDSA signature ({@code r = 1, s = 1}), used by {@link #assertCurveIsUsable}.
    */
   private static final byte[] PROBE_SIGNATURE = {0x30, 0x06, 0x02, 0x01, 0x01, 0x02, 0x01, 0x01};
   private static final BigInteger SECP256K1_A = BigInteger.ZERO;
@@ -56,10 +55,10 @@ final class ECFamily {
   }
 
   /**
-   * Validate that the installed providers can verify with the key's curve, not merely represent it. The JDK's SunEC
-   * supplies secp256k1 parameters but no ECDSA over that curve, so an ES256K key builds and only verification fails --
-   * as {@link InvalidJWTSignatureException}, indistinguishable from a forged token. Probing here turns that into a
-   * clear failure at construction. Only ES256K is probed; the NIST curves are universally supported.
+   * Validate that a provider can verify on the key's curve, not merely represent it. SunEC supplies secp256k1
+   * parameters but no ECDSA over that curve, so the key builds and only verification fails -- as
+   * {@link InvalidJWTSignatureException}, indistinguishable from a forged token. A provider that has the curve returns
+   * false for the probe signature; one that does not throws. Only ES256K needs this; the NIST curves are universal.
    */
   static void assertCurveIsUsable(Algorithm algorithm, PublicKey publicKey) {
     if (algorithm != Algorithm.ES256K) {
@@ -69,7 +68,6 @@ final class ECFamily {
     try {
       Signature probe = Signature.getInstance(toJCA(algorithm));
       probe.initVerify(publicKey);
-      probe.update(PROBE_SIGNATURE);
       probe.verify(PROBE_SIGNATURE);
     } catch (GeneralSecurityException e) {
       throw new InvalidKeyTypeException("EC curve [secp256k1] is not usable for [ES256K] with the installed JCE providers", e);

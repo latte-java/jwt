@@ -80,30 +80,42 @@ public class VerifiersFromJWKTest extends BaseTest {
     }
   }
 
-  @Test
-  public void fromJWK_controlCharactersInKidAreSanitized() {
-    // Use case: kid is supplied by the remote JWKS and these messages are logged, so a kid carrying CRLF could forge
-    // log lines. Control characters are replaced before interpolation.
-    Map<String, Object> m = rsaJWKBase();
-    m.put("kid", "k1\r\nWarn Forged log line");
-    m.put("use", "enc");
-    InvalidJWKException ex = expectThrows(InvalidJWKException.class,
-        () -> Verifiers.fromJWK(JSONWebKey.fromMap(m)));
-    assertEquals(ex.reason(), InvalidJWKException.Reason.USE_ENC);
-    assertFalse(ex.getMessage().contains("\r"), ex.getMessage());
-    assertFalse(ex.getMessage().contains("\n"), ex.getMessage());
-    assertTrue(ex.getMessage().contains("k1??Warn Forged log line"), ex.getMessage());
+  @Test(dataProvider = "controlCharacterJWKs")
+  public void fromJWK_controlCharactersAreSanitized(Map<String, Object> jwk, InvalidJWKException.Reason reason) {
+    // Use case: these members are chosen by whoever operates the JWKS and land in messages callers log, so a value
+    // carrying CRLF could forge log lines. The value still reaches the message -- only the control characters go.
+    InvalidJWKException e = expectThrows(InvalidJWKException.class, () -> Verifiers.fromJWK(JSONWebKey.fromMap(jwk)));
+    assertEquals(e.reason(), reason);
+    assertFalse(e.getMessage().contains("\r"), e.getMessage());
+    assertFalse(e.getMessage().contains("\n"), e.getMessage());
+    assertTrue(e.getMessage().contains("forged"), e.getMessage());
   }
 
-  @Test
-  public void fromJWK_controlCharactersInUseAreSanitized() {
-    // Use case: use is remote-supplied too and lands in the same message.
-    Map<String, Object> m = rsaJWKBase();
-    m.put("use", "enc\r\ninjected");
-    InvalidJWKException ex = expectThrows(InvalidJWKException.class,
-        () -> Verifiers.fromJWK(JSONWebKey.fromMap(m)));
-    assertEquals(ex.reason(), InvalidJWKException.Reason.USE_ENC);
-    assertFalse(ex.getMessage().contains("\n"), ex.getMessage());
+  @DataProvider(name = "controlCharacterJWKs")
+  public Object[][] controlCharacterJWKs() {
+    Map<String, Object> kid = rsaJWKBase();
+    kid.put("kid", "k1\r\nforged");
+    kid.put("use", "enc");
+
+    Map<String, Object> use = rsaJWKBase();
+    use.put("use", "enc\r\nforged");
+
+    Map<String, Object> alg = rsaJWKBase();
+    alg.put("alg", "RS256\r\nforged");
+
+    Map<String, Object> crv = new HashMap<>();
+    crv.put("kty", "EC");
+    crv.put("kid", "k1");
+    crv.put("alg", "ES256");
+    crv.put("crv", "P-256\r\nforged");
+
+    return new Object[][]{
+        // (JWK, expected reason)
+        {kid, InvalidJWKException.Reason.USE_ENC},
+        {use, InvalidJWKException.Reason.USE_ENC},
+        {alg, InvalidJWKException.Reason.ALG_CRV_MISMATCH},
+        {crv, InvalidJWKException.Reason.ALG_CRV_MISMATCH}
+    };
   }
 
   @Test

@@ -96,13 +96,7 @@ public class JSONWebKeyParser {
             parameters.init(new ECGenParameterSpec("secp521r1"));
             break;
           case "secp256k1":
-            // ES256K (RFC 8812). Not every provider carries this curve -- FIPS-approved configurations exclude it --
-            // so report that specifically rather than as a generic parse failure.
-            try {
-              parameters.init(new ECGenParameterSpec("secp256k1"));
-            } catch (InvalidParameterSpecException e) {
-              throw new JSONWebKeyParserException("EC curve [secp256k1] is not supported by the installed JCE providers; an [ES256K] key requires a provider that offers it", e);
-            }
+            parameters.init(new ECGenParameterSpec("secp256k1"));
             break;
           default:
             throw new UnsupportedOperationException("Unsupported EC curve [" + MessageSanitizer.forMessage(key.crv()) + "], expected [P-256], [P-384], [P-521], or [secp256k1]");

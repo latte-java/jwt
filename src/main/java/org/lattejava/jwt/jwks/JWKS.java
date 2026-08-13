@@ -22,9 +22,9 @@ import org.lattejava.jwt.log.*;
 /**
  * A self-refreshing {@link VerifierResolver} backed by a remote JWKS endpoint.
  *
- * <p>The URL scheme is not enforced, so that {@code http} remains usable against a local test server. While not
- * enforced, please use {@code https} in production: the fetched keys determine which tokens are trusted, and over
- * {@code http} they can be substituted in transit.</p>
+ * <p>The URL scheme is not enforced, so that {@code http} remains usable against a local test server. Use
+ * {@code https} in production: the fetched keys determine which tokens are trusted, and over {@code http} they can be
+ * substituted in transit.</p>
  */
 public final class JWKS implements VerifierResolver, AutoCloseable {
   private final CacheControlPolicy cacheControlPolicy;
@@ -217,7 +217,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
   /**
    * Builds from a discovery document that has already been fetched, using its {@code jwks_uri}.
    *
-   * @param cfg the previously fetched provider configuration.
+   * @param cfg the previously fetched provider configuration
    */
   public static Builder fromConfiguration(OpenIDConnectConfiguration cfg) {
     Objects.requireNonNull(cfg, "cfg");
@@ -370,8 +370,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
   }
 
   /**
-   * Render key IDs for a log message. Each is passed through {@link MessageSanitizer} because the values are supplied
-   * by the remote JWKS.
+   * Render key IDs for a log message, sanitized because they are supplied by the remote JWKS.
    */
   private static String sanitizedKids(Set<String> kids) {
     StringJoiner joiner = new StringJoiner(", ");
@@ -937,13 +936,11 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
      * {@link JWKS#resolve(Header)} stops returning verifiers until a refresh succeeds, bounding how long a key
      * revoked at the provider stays trusted while the endpoint is unreachable.
      *
-     * <p>Default: {@code null}, meaning unlimited — keys are retained across an outage of any length. Setting a bound
-     * trades availability for key freshness. A bound below {@code refreshInterval} is rejected, since keys would go
-     * stale before the scheduled refresh could renew them.</p>
+     * <p>Default: {@code null}, meaning unlimited — keys are retained across an outage of any length. A bound below
+     * {@code refreshInterval} is rejected, since keys would go stale before the scheduled refresh could renew them.</p>
      *
-     * @param d the maximum staleness, or {@code null} for unlimited; must be positive and &gt;=
-     *          {@code refreshInterval}.
-     * @return this builder.
+     * @param d the maximum staleness, or {@code null} for unlimited
+     * @return this builder
      */
     public Builder maxStaleness(Duration d) {
       this.maxStaleness = d;

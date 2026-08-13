@@ -132,9 +132,8 @@ public class JSONWebKeyParserTest extends BaseJWTTest {
 
   @Test
   public void parse_ec_secp256k1() {
-    // Use case: ES256K (RFC 8812) uses crv=secp256k1, which Verifiers.fromJWK accepts but this parser used to reject.
-    // Not every provider carries the curve (FIPS-approved mode excludes it), so a failure naming it is also correct;
-    // being rejected as an unrecognized curve is not.
+    // Use case: ES256K (RFC 8812) uses crv=secp256k1, which Verifiers.fromJWK accepts but this parser used to reject
+    // as an unrecognized curve, leaving ES256K unreachable from a JWKS.
     JSONWebKey jwk = JSONWebKey.builder()
                                .kty(KeyType.EC)
                                .alg(Algorithm.ES256K)
@@ -144,11 +143,7 @@ public class JSONWebKeyParserTest extends BaseJWTTest {
                                .x("eb5mfvncu6xVoGKVzocLBwKb_NstzijZWfKBWxb4F5g")
                                .y("SDradyajxGVdpPv8DhEIqP0XtEimhVQZnEfQj_sQ1Lg")
                                .build();
-    try {
-      assertNotNull(JSONWebKey.parse(jwk));
-    } catch (JSONWebKeyParserException e) {
-      assertTrue(e.getMessage().contains("secp256k1"), "The failure must name the curve: " + e.getMessage());
-    }
+    assertNotNull(JSONWebKey.parse(jwk));
   }
 
   @Test
