@@ -95,8 +95,18 @@ public class JSONWebKeyParser {
           case "P-521":
             parameters.init(new ECGenParameterSpec("secp521r1"));
             break;
+          case "secp256k1":
+            // ES256K (RFC 8812). Unlike the NIST curves, secp256k1 is not universally available -- it is absent from
+            // FIPS-approved provider configurations, for instance -- so an unsupported curve is reported as such
+            // rather than surfacing as a generic parse failure.
+            try {
+              parameters.init(new ECGenParameterSpec("secp256k1"));
+            } catch (InvalidParameterSpecException e) {
+              throw new JSONWebKeyParserException("EC curve [secp256k1] is not supported by the installed JCE providers; an [ES256K] key requires a provider that offers it", e);
+            }
+            break;
           default:
-            throw new UnsupportedOperationException("Unsupported EC curve [" + MessageSanitizer.forMessage(key.crv()) + "], expected [P-256], [P-384], or [P-521]");
+            throw new UnsupportedOperationException("Unsupported EC curve [" + MessageSanitizer.forMessage(key.crv()) + "], expected [P-256], [P-384], [P-521], or [secp256k1]");
         }
 
         ECParameterSpec ecParameterSpec = parameters.getParameterSpec(ECParameterSpec.class);
