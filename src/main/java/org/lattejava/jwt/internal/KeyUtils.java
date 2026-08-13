@@ -78,6 +78,7 @@ public class KeyUtils {
       case ECDSA_P256 -> "P-256";
       case ECDSA_P384 -> "P-384";
       case ECDSA_P521 -> "P-521";
+      case ECDSA_SECP256K1 -> "secp256k1";
       case EdDSA_25519 -> "Ed25519";
       case EdDSA_448 -> "Ed448";
       default -> null;

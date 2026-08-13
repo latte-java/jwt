@@ -603,6 +603,10 @@ public final class JSONWebKey {
   /**
    * The {@code x5c} parameter (RFC 7517 §4.7): the X.509 certificate chain. Each entry is a base64-encoded (not
    * base64URL) DER-encoded X.509 certificate; the first entry holds the certificate matching this key.
+   *
+   * <p><strong>The chain is not validated.</strong> {@link #parse(JSONWebKey)} only checks the leaf certificate's
+   * public key against this JWK's own key material — no path building, validity dates, key usage, or revocation.
+   * Validate the chain yourself if your application relies on it.</p>
    */
   public List<String> x5c() {
     return x5c;

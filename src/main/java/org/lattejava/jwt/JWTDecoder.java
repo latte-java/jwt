@@ -32,7 +32,7 @@ import org.lattejava.jwt.internal.*;
  *
  * <p>All fields are final; instances are immutable and safe to share. Use
  * {@link Builder} for advanced configuration (custom {@link Clock}, {@code expectedType}, {@code expectedAlgorithms},
- * {@code criticalHeaders}, size/depth/number-length limits).</p>
+ * {@code criticalHeaders}, {@code requiredClaims}, size/depth/number-length limits).</p>
  *
  * @author Daniel DeGroff
  */
@@ -64,6 +64,7 @@ public class JWTDecoder {
   private final String expectedType;
   private final JSONProcessor jsonProcessor;
   private final int maxInputBytes;
+  private final Set<String> requiredClaims;
 
   /**
    * Constructs a decoder with all defaults.
@@ -126,6 +127,7 @@ public class JWTDecoder {
       this.expectedAlgorithmNames = Collections.unmodifiableSet(names);
     }
     this.maxInputBytes = b.maxInputBytes;
+    this.requiredClaims = Collections.unmodifiableSet(new LinkedHashSet<>(b.requiredClaims));
   }
 
   /**
@@ -243,6 +245,7 @@ public class JWTDecoder {
 
     JWT jwt = parsePayload(segments.payloadB64, header);
     enforceTimeClaims(jwt);
+    enforceRequiredClaims(jwt);
 
     if (validator != null) {
       validator.accept(jwt);
@@ -378,6 +381,14 @@ public class JWTDecoder {
     }
   }
 
+  private void enforceRequiredClaims(JWT jwt) {
+    for (String name : requiredClaims) {
+      if (jwt.getObject(name) == null) {
+        throw new InvalidJWTException("Claim [" + name + "] is required but was not present");
+      }
+    }
+  }
+
   private void enforceTimeClaims(JWT jwt) {
     long skewSeconds = clockSkew.getSeconds();
     Instant now = Instant.now(clock);
@@ -482,6 +493,7 @@ public class JWTDecoder {
     private int maxNestingDepth = DEFAULT_MAX_NESTING_DEPTH;
     private int maxNumberLength = DEFAULT_MAX_NUMBER_LENGTH;
     private int maxObjectMembers = LatteJSONProcessor.DEFAULT_MAX_OBJECT_MEMBERS;
+    private Set<String> requiredClaims = Collections.emptySet();
 
     private Builder() {
     }
@@ -593,6 +605,33 @@ public class JWTDecoder {
         throw new IllegalArgumentException("maxObjectMembers must be > 0");
       }
       this.maxObjectMembers = maxObjectMembers;
+      return this;
+    }
+
+    /**
+     * Claims that must be present on the token. A decode fails with {@link InvalidJWTException} when any named claim
+     * is absent. Only presence is checked — use the validator argument of
+     * {@link JWTDecoder#decode(String, VerifierResolver, Consumer)} to assert values.
+     *
+     * <p>Both registered and custom claim names are accepted. RFC 7519 makes every claim optional, including
+     * {@code exp}, so a token with no expiration never expires. Require it to reject those:</p>
+     *
+     * <pre>{@code
+     * JWTDecoder decoder = JWTDecoder.builder()
+     *                                .requiredClaims(Set.of("exp"))
+     *                                .build();
+     * }</pre>
+     *
+     * <p>Checked after time validation, so an expired token raises {@link JWTExpiredException} rather than naming an
+     * absent claim. Null or empty disables the check (the default).</p>
+     *
+     * @param requiredClaims the claim names that must be present, or null to disable.
+     * @return this builder.
+     */
+    public Builder requiredClaims(Set<String> requiredClaims) {
+      this.requiredClaims = requiredClaims == null
+          ? Collections.emptySet()
+          : new LinkedHashSet<>(requiredClaims);
       return this;
     }
   }

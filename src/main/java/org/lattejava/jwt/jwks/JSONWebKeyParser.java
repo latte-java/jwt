@@ -95,8 +95,11 @@ public class JSONWebKeyParser {
           case "P-521":
             parameters.init(new ECGenParameterSpec("secp521r1"));
             break;
+          case "secp256k1":
+            parameters.init(new ECGenParameterSpec("secp256k1"));
+            break;
           default:
-            throw new UnsupportedOperationException("Unsupported EC curve [" + MessageSanitizer.forMessage(key.crv()) + "], expected [P-256], [P-384], or [P-521]");
+            throw new UnsupportedOperationException("Unsupported EC curve [" + MessageSanitizer.forMessage(key.crv()) + "], expected [P-256], [P-384], [P-521], or [secp256k1]");
         }
 
         ECParameterSpec ecParameterSpec = parameters.getParameterSpec(ECParameterSpec.class);

@@ -130,6 +130,40 @@ public class JSONWebKeyParserTest extends BaseJWTTest {
     };
   }
 
+  @Test
+  public void parse_ec_secp256k1() {
+    // Use case: ES256K (RFC 8812) uses crv=secp256k1, which Verifiers.fromJWK accepts but this parser used to reject
+    // as an unrecognized curve, leaving ES256K unreachable from a JWKS.
+    JSONWebKey jwk = JSONWebKey.builder()
+                               .kty(KeyType.EC)
+                               .alg(Algorithm.ES256K)
+                               .kid("k1")
+                               .use("sig")
+                               .crv("secp256k1")
+                               .x("eb5mfvncu6xVoGKVzocLBwKb_NstzijZWfKBWxb4F5g")
+                               .y("SDradyajxGVdpPv8DhEIqP0XtEimhVQZnEfQj_sQ1Lg")
+                               .build();
+    assertNotNull(JSONWebKey.parse(jwk));
+  }
+
+  @Test
+  public void parse_ec_unknownCurveStillRejected() {
+    // Use case: adding secp256k1 must not turn the curve switch into a pass-through for arbitrary crv values. The
+    // UnsupportedOperationException is wrapped by the method's catch-all, so the observable type is the parser one.
+    JSONWebKey jwk = JSONWebKey.builder()
+                               .kty(KeyType.EC)
+                               .alg(Algorithm.ES256)
+                               .kid("k1")
+                               .use("sig")
+                               .crv("brainpoolP256r1")
+                               .x("NIWpsIea0qzB22S0utDG8dGFYqEInv9C7ZgZuKtwjno")
+                               .y("iVFFtTgiInz_fjh-n1YqbibnUb2vtBZFs3wPpQw3mc0")
+                               .build();
+    JSONWebKeyParserException e = expectThrows(JSONWebKeyParserException.class, () -> JSONWebKey.parse(jwk));
+    assertTrue(e.getCause() instanceof UnsupportedOperationException, String.valueOf(e.getCause()));
+    assertTrue(e.getCause().getMessage().contains("brainpoolP256r1"), e.getCause().getMessage());
+  }
+
   @Test(invocationCount = 1_000)
   public void parse_ec() {
     KeyPair keyPair = KeyPairs.generateEC_256();

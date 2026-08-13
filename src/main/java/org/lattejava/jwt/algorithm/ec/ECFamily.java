@@ -6,6 +6,7 @@
 package org.lattejava.jwt.algorithm.ec;
 
 import java.math.*;
+import java.security.*;
 import java.security.spec.*;
 
 import org.lattejava.jwt.*;
@@ -22,6 +23,10 @@ import org.lattejava.jwt.*;
  * {@link org.lattejava.jwt.internal.JOSEConverter}.</p>
  */
 final class ECFamily {
+  /**
+   * A well-formed but wrong DER ECDSA signature ({@code r = 1, s = 1}), used by {@link #assertCurveIsUsable}.
+   */
+  private static final byte[] PROBE_SIGNATURE = {0x30, 0x06, 0x02, 0x01, 0x01, 0x02, 0x01, 0x01};
   private static final BigInteger SECP256K1_A = BigInteger.ZERO;
   private static final BigInteger SECP256K1_B = BigInteger.valueOf(7);
   // secp256k1 curve parameters per SEC 2 / RFC 5639. Used to detect a
@@ -47,6 +52,26 @@ final class ECFamily {
       default ->
           throw new InvalidKeyTypeException("Unsupported EC curve with field size [" + fieldSize + "], expected 256, 384, or 521");
     };
+  }
+
+  /**
+   * Validate that a provider can verify on the key's curve, not merely represent it. SunEC supplies secp256k1
+   * parameters but no ECDSA over that curve, so the key builds and only verification fails -- as
+   * {@link InvalidJWTSignatureException}, indistinguishable from a forged token. A provider that has the curve returns
+   * false for the probe signature; one that does not throws. Only ES256K needs this; the NIST curves are universal.
+   */
+  static void assertCurveIsUsable(Algorithm algorithm, PublicKey publicKey) {
+    if (algorithm != Algorithm.ES256K) {
+      return;
+    }
+
+    try {
+      Signature probe = Signature.getInstance(toJCA(algorithm));
+      probe.initVerify(publicKey);
+      probe.verify(PROBE_SIGNATURE);
+    } catch (GeneralSecurityException e) {
+      throw new InvalidKeyTypeException("EC curve [secp256k1] is not usable for [ES256K] with the installed JCE providers", e);
+    }
   }
 
   /**

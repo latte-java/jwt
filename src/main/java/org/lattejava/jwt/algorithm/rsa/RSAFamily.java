@@ -21,7 +21,8 @@ final class RSAFamily {
 
   /**
    * RFC 8017 §3: the RSA public exponent {@code e} must satisfy {@code 2 < e < n} and, per PKCS#1 practice, be odd.
-   * Tiny exponents (0, 1, 2) and even exponents are cryptographically broken and are rejected at construction time.
+   * The upper bound is the FIPS 186-5 §A.1.1 ceiling of {@code 2^256}, since an oversized {@code e} makes each
+   * verification a proportionally expensive modular exponentiation.
    */
   static void assertAcceptablePublicExponent(BigInteger e) {
     if (e == null) {
@@ -32,6 +33,10 @@ final class RSAFamily {
     }
     if (!e.testBit(0)) {
       throw new InvalidKeyTypeException("RSA public exponent [" + e + "] is even; must be odd per PKCS#1");
+    }
+    if (e.bitLength() > 256) {
+      throw new InvalidKeyTypeException("RSA public exponent bit length [" + e.bitLength()
+          + "] exceeds the maximum of [256] bits");
     }
   }
 

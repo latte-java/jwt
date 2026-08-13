@@ -22,6 +22,7 @@ import static org.testng.Assert.*;
  * @author Daniel DeGroff
  */
 public class JWTDecoderTest {
+  private static final Instant REQUIRED_CLAIMS_NOW = Instant.parse("2026-04-22T12:00:00Z");
   private static final String SECRET = "super-secret-key-that-is-at-least-32-bytes-long!!";
 
   private static String b64(String raw) {
@@ -64,6 +65,74 @@ public class JWTDecoderTest {
       fail("Expected InvalidJWTException: second decoder must not see the original critical-headers set.");
     } catch (InvalidJWTException expected) {
     }
+  }
+
+  @Test(dataProvider = "requiredClaimsCases")
+  public void requiredClaims_presence(Set<String> required, JWT jwt, Class<? extends Exception> expected,
+                                      String messageFragment) {
+    // Use case: RFC 7519 makes every claim optional, including exp, so a token with no expiration never expires. An
+    // application that will not accept one -- or that depends on iss or a tenant claim -- names them here.
+    JWTDecoder decoder = JWTDecoder.builder()
+                                   .clock(Clock.fixed(REQUIRED_CLAIMS_NOW, ZoneOffset.UTC))
+                                   .requiredClaims(required)
+                                   .build();
+    String encoded = new JWTEncoder().encode(jwt, signer());
+
+    if (expected == null) {
+      assertNotNull(decoder.decode(encoded, VerifierResolver.of(verifier())));
+      return;
+    }
+
+    Exception e = expectThrows(expected, () -> decoder.decode(encoded, VerifierResolver.of(verifier())));
+    if (messageFragment != null) {
+      assertTrue(e.getMessage().contains(messageFragment), e.getMessage());
+    }
+  }
+
+  @DataProvider(name = "requiredClaimsCases")
+  public Object[][] requiredClaimsCases() {
+    Instant expired = REQUIRED_CLAIMS_NOW.minusSeconds(60);
+    Instant live = REQUIRED_CLAIMS_NOW.plusSeconds(60);
+    return new Object[][]{
+        // (requiredClaims, token, expected exception, message fragment)
+        {Set.of(), JWT.builder().subject("s").build(), null, null},
+        {Set.of("exp"), JWT.builder().subject("s").build(), InvalidJWTException.class, "exp"},
+        {Set.of("exp"), JWT.builder().subject("s").expiresAt(live).build(), null, null},
+        {Set.of("tenant"), JWT.builder().subject("s").claim("tenant", "acme").build(), null, null},
+        {Set.of("tenant"), JWT.builder().subject("s").build(), InvalidJWTException.class, "tenant"},
+        // Time validation runs first, so an expired token reports the expiry rather than the absent claim.
+        {Set.of("exp", "tenant"), JWT.builder().subject("s").expiresAt(expired).build(), JWTExpiredException.class, null},
+        {Set.of("exp", "tenant"), JWT.builder().subject("s").expiresAt(live).build(), InvalidJWTException.class, "tenant"}
+    };
+  }
+
+  @Test
+  public void requiredClaims_reuseAndNullDisable() {
+    // Use case: the set is defensively copied at build(), and passing null clears the requirement.
+    Set<String> required = new HashSet<>();
+    required.add("iss");
+    JWTDecoder.Builder b = JWTDecoder.builder().requiredClaims(required);
+    JWTDecoder strict = b.build();
+
+    required.add("sub");
+    JWTDecoder relaxed = b.requiredClaims(null).build();
+
+    String encoded = new JWTEncoder().encode(JWT.builder().subject("s").build(), signer());
+    assertNotNull(relaxed.decode(encoded, VerifierResolver.of(verifier())));
+    try {
+      strict.decode(encoded, VerifierResolver.of(verifier()));
+      fail("Expected InvalidJWTException: [iss] is required but absent.");
+    } catch (InvalidJWTException expected) {
+    }
+  }
+
+  @Test
+  public void requiredClaims_unsecuredDecodeNotSubjectToTheCheck() {
+    // Use case: decodeUnsecured documents that decoder policy is not applied; requiredClaims follows expectedType and
+    // expectedAlgorithms in staying out of that path.
+    JWTDecoder decoder = JWTDecoder.builder().requiredClaims(Set.of("exp")).build();
+    String encoded = new JWTEncoder().encode(JWT.builder().subject("s").build(), signer());
+    assertNotNull(decoder.decodeUnsecured(encoded));
   }
 
   @Test

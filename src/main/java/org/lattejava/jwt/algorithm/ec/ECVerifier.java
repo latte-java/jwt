@@ -51,12 +51,14 @@ public class ECVerifier implements Verifier {
     Objects.requireNonNull(publicKey);
     this.publicKey = revalidate(KeyCoercion.asPublic(publicKey, ECPublicKey.class));
     this.algorithm = ECFamily.algorithmForCurve(this.publicKey.getParams());
+    ECFamily.assertCurveIsUsable(this.algorithm, this.publicKey);
   }
 
   private ECVerifier(String pemPublicKey) {
     Objects.requireNonNull(pemPublicKey);
     this.publicKey = KeyCoercion.publicFromPem(pemPublicKey, ECPublicKey.class);
     this.algorithm = ECFamily.algorithmForCurve(this.publicKey.getParams());
+    ECFamily.assertCurveIsUsable(this.algorithm, this.publicKey);
   }
 
   public static ECVerifier newVerifier(String pemPublicKey) {

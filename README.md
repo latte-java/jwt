@@ -235,6 +235,18 @@ Other entry points:
 - `JWKS.of(jwk1, jwk2, ...)` — static in-memory keys (no HTTP, no scheduler).
 - `JWKS.fetch(url)` — one-shot `List<JSONWebKey>` from a JWKS URL.
 
+**Use `https`.** The scheme is not enforced on any URL this library fetches — issuer, well-known, or JWKS — so that `http` stays usable against a local test server. Those keys decide which tokens you trust, so over `http` anyone on the network path can substitute their own.
+
+When a refresh fails the cached keys are retained indefinitely, so tokens keep verifying through an outage. Set `maxStaleness(Duration)` to bound that instead — past it, `resolve` returns no verifier until a refresh succeeds:
+
+```java
+try (JWKS jwks = JWKS.fromIssuer("https://idp.example.com/")
+                     .maxStaleness(Duration.ofHours(24))
+                     .build()) {
+    JWT jwt = JWT.decode(encodedJWT, jwks);
+}
+```
+
 #### OIDC discovery
 
 `OpenIDConnect.discover(issuer)` fetches the OpenID Connect Provider Metadata for a given issuer and returns a typed `OpenIDConnectConfiguration`:
@@ -428,6 +440,10 @@ JSONWebKey jwk = JSONWebKey.fromMap(map);
 
 PublicKey publicKey = JSONWebKey.parse(jwk);
 ```
+
+EC keys are parsed for the `P-256`, `P-384`, `P-521` and `secp256k1` curves, and OKP keys for `Ed25519` and `Ed448`. `secp256k1` (the curve behind `ES256K`) is not carried by every JCE provider — the JDK's own supplies the curve parameters but no ECDSA over them, and FIPS-approved configurations omit it entirely — so building a verifier for one fails naming the curve unless a provider such as Bouncy Castle is installed.
+
+**`x5c` chains are not validated.** Parsing only checks the leaf certificate's public key against the JWK's own key material, so the two cannot disagree. It does not build a path to a trust anchor, nor check validity dates, key usage, or revocation. This matches Nimbus, jose4j, and java-jwt; validate the chain yourself if your application relies on it.
 
 ### Convert a Private Key to JWK
 
