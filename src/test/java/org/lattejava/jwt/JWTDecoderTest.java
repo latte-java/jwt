@@ -67,6 +67,82 @@ public class JWTDecoderTest {
   }
 
   @Test
+  public void requiredClaims_customClaim_enforced() {
+    // Use case: requiredClaims is not limited to the registered set; an application claim works the same way.
+    JWTDecoder decoder = JWTDecoder.builder().requiredClaims(Set.of("tenant")).build();
+
+    String withClaim = new JWTEncoder().encode(JWT.builder().subject("s").claim("tenant", "acme").build(), signer());
+    assertNotNull(decoder.decode(withClaim, VerifierResolver.of(verifier())));
+
+    String withoutClaim = new JWTEncoder().encode(JWT.builder().subject("s").build(), signer());
+    try {
+      decoder.decode(withoutClaim, VerifierResolver.of(verifier()));
+      fail("Expected InvalidJWTException: [tenant] is required but absent.");
+    } catch (InvalidJWTException expected) {
+      assertTrue(expected.getMessage().contains("tenant"), expected.getMessage());
+    }
+  }
+
+  @Test
+  public void requiredClaims_defaultDoesNotRequireExp() {
+    // Use case: RFC 7519 makes exp optional, so the default decoder must keep accepting a token that has none.
+    String encoded = new JWTEncoder().encode(JWT.builder().subject("s").build(), signer());
+    assertNotNull(JWTDecoder.builder().build().decode(encoded, VerifierResolver.of(verifier())));
+  }
+
+  @Test
+  public void requiredClaims_exp_missingRejected_presentAccepted() {
+    // Use case: the headline reason to require a claim -- a token with no exp never expires, so an application that
+    // will not accept a non-expiring token opts in to requiring it.
+    Instant fakeNow = Instant.parse("2026-04-22T12:00:00Z");
+    JWTDecoder decoder = JWTDecoder.builder()
+                                   .clock(Clock.fixed(fakeNow, ZoneOffset.UTC))
+                                   .requiredClaims(Set.of("exp"))
+                                   .build();
+
+    String noExp = new JWTEncoder().encode(JWT.builder().subject("s").build(), signer());
+    try {
+      decoder.decode(noExp, VerifierResolver.of(verifier()));
+      fail("Expected InvalidJWTException: [exp] is required but absent.");
+    } catch (InvalidJWTException expected) {
+      assertTrue(expected.getMessage().contains("exp"), expected.getMessage());
+    }
+
+    String withExp = new JWTEncoder().encode(
+        JWT.builder().subject("s").expiresAt(fakeNow.plusSeconds(60)).build(), signer());
+    assertNotNull(decoder.decode(withExp, VerifierResolver.of(verifier())));
+  }
+
+  @Test
+  public void requiredClaims_reuseAndNullDisable() {
+    // Use case: the set is defensively copied at build(), and passing null clears the requirement.
+    Set<String> required = new HashSet<>();
+    required.add("iss");
+    JWTDecoder.Builder b = JWTDecoder.builder().requiredClaims(required);
+    JWTDecoder strict = b.build();
+
+    required.add("sub");
+    JWTDecoder relaxed = b.requiredClaims(null).build();
+
+    String encoded = new JWTEncoder().encode(JWT.builder().subject("s").build(), signer());
+    assertNotNull(relaxed.decode(encoded, VerifierResolver.of(verifier())));
+    try {
+      strict.decode(encoded, VerifierResolver.of(verifier()));
+      fail("Expected InvalidJWTException: [iss] is required but absent.");
+    } catch (InvalidJWTException expected) {
+    }
+  }
+
+  @Test
+  public void requiredClaims_unsecuredDecodeNotSubjectToTheCheck() {
+    // Use case: decodeUnsecured documents that decoder policy is not applied; requiredClaims follows expectedType and
+    // expectedAlgorithms in staying out of that path.
+    JWTDecoder decoder = JWTDecoder.builder().requiredClaims(Set.of("exp")).build();
+    String encoded = new JWTEncoder().encode(JWT.builder().subject("s").build(), signer());
+    assertNotNull(decoder.decodeUnsecured(encoded));
+  }
+
+  @Test
   public void builder_reuse_producesIndependentDecoders() {
     // Use case: building twice from the same builder with a mutated clockSkew between calls must produce two independent decoders.
     Instant fakeNow = Instant.parse("2026-04-22T12:00:00Z");
