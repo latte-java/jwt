@@ -64,7 +64,14 @@ public class JWTDecoder {
   private final String expectedType;
   private final JSONProcessor jsonProcessor;
   private final int maxInputBytes;
-  private final Set<String> requiredClaims;
+  /**
+   * True when {@code exp} was named in {@code requiredClaims}. Checked ahead of time validation.
+   */
+  private final boolean requireExpiration;
+  /**
+   * The required claims other than {@code exp}, checked after time validation so an expired token reports the expiry.
+   */
+  private final Set<String> requiredClaimsAfterTimeValidation;
 
   /**
    * Constructs a decoder with all defaults.
@@ -127,7 +134,10 @@ public class JWTDecoder {
       this.expectedAlgorithmNames = Collections.unmodifiableSet(names);
     }
     this.maxInputBytes = b.maxInputBytes;
-    this.requiredClaims = Collections.unmodifiableSet(new LinkedHashSet<>(b.requiredClaims));
+    this.requireExpiration = b.requiredClaims.contains("exp");
+    LinkedHashSet<String> remaining = new LinkedHashSet<>(b.requiredClaims);
+    remaining.remove("exp");
+    this.requiredClaimsAfterTimeValidation = Collections.unmodifiableSet(remaining);
   }
 
   /**
@@ -244,8 +254,9 @@ public class JWTDecoder {
     verifier.verify(message, signatureBytes);
 
     JWT jwt = parsePayload(segments.payloadB64, header);
-    enforceRequiredClaims(jwt);
+    enforceRequiredExpiration(jwt);
     enforceTimeClaims(jwt);
+    enforceRequiredClaims(jwt);
 
     if (validator != null) {
       validator.accept(jwt);
@@ -382,10 +393,16 @@ public class JWTDecoder {
   }
 
   private void enforceRequiredClaims(JWT jwt) {
-    for (String name : requiredClaims) {
+    for (String name : requiredClaimsAfterTimeValidation) {
       if (jwt.getObject(name) == null) {
         throw new InvalidJWTException("Claim [" + name + "] is required but was not present");
       }
+    }
+  }
+
+  private void enforceRequiredExpiration(JWT jwt) {
+    if (requireExpiration && jwt.expiresAt() == null) {
+      throw new InvalidJWTException("Claim [exp] is required but was not present");
     }
   }
 
@@ -614,14 +631,17 @@ public class JWTDecoder {
      * {@link JWTDecoder#decode(String, VerifierResolver, Consumer)} to assert values.
      *
      * <p>Both registered and custom claim names are accepted. RFC 7519 makes every claim optional, including
-     * {@code exp}, so a token with no expiration is valid and never expires; requiring {@code exp} is the usual way to
-     * refuse those:</p>
+     * {@code exp}, so a token with no expiration never expires. Require it to reject those:</p>
      *
      * <pre>{@code
      * JWTDecoder decoder = JWTDecoder.builder()
      *                                .requiredClaims(Set.of("exp"))
      *                                .build();
      * }</pre>
+     *
+     * <p>{@code exp} is checked before time validation; every other required claim is checked after it. A token
+     * missing {@code exp} therefore reports that, and an expired token raises {@link JWTExpiredException} rather than
+     * naming an unrelated absent claim.</p>
      *
      * <p>Null or empty disables the check (the default).</p>
      *

@@ -114,6 +114,57 @@ public class JWTDecoderTest {
   }
 
   @Test
+  public void requiredClaims_expiredTokenReportsExpiryBeforeOtherMissingClaims() {
+    // Use case: a token that is both expired and missing another required claim reports the expiry, because exp is
+    // checked with time validation and every other required claim after it.
+    Instant fakeNow = Instant.parse("2026-04-22T12:00:00Z");
+    JWTDecoder decoder = JWTDecoder.builder()
+                                   .clock(Clock.fixed(fakeNow, ZoneOffset.UTC))
+                                   .requiredClaims(Set.of("exp", "tenant"))
+                                   .build();
+
+    String expiredAndMissingTenant = new JWTEncoder().encode(
+        JWT.builder().subject("s").expiresAt(fakeNow.minusSeconds(60)).build(), signer());
+    try {
+      decoder.decode(expiredAndMissingTenant, VerifierResolver.of(verifier()));
+      fail("Expected JWTExpiredException for a token that is expired and also missing [tenant].");
+    } catch (JWTExpiredException expected) {
+    }
+
+    // Not expired, still missing tenant -- now the missing claim is the real problem and is reported.
+    String liveAndMissingTenant = new JWTEncoder().encode(
+        JWT.builder().subject("s").expiresAt(fakeNow.plusSeconds(60)).build(), signer());
+    try {
+      decoder.decode(liveAndMissingTenant, VerifierResolver.of(verifier()));
+      fail("Expected InvalidJWTException: [tenant] is required but absent.");
+    } catch (InvalidJWTException expected) {
+      assertTrue(expected.getMessage().contains("tenant"), expected.getMessage());
+    }
+  }
+
+  @Test
+  public void requiredClaims_missingExpReportedBeforeNotBeforeCheck() {
+    // Use case: the exp presence check runs ahead of time validation, so a token with no exp is reported as missing
+    // it rather than being rejected by the not-before check.
+    Instant fakeNow = Instant.parse("2026-04-22T12:00:00Z");
+    JWTDecoder decoder = JWTDecoder.builder()
+                                   .clock(Clock.fixed(fakeNow, ZoneOffset.UTC))
+                                   .requiredClaims(Set.of("exp"))
+                                   .build();
+
+    String noExpNotYetValid = new JWTEncoder().encode(
+        JWT.builder().subject("s").notBefore(fakeNow.plusSeconds(600)).build(), signer());
+    try {
+      decoder.decode(noExpNotYetValid, VerifierResolver.of(verifier()));
+      fail("Expected InvalidJWTException: [exp] is required but absent.");
+    } catch (JWTUnavailableForProcessingException e) {
+      fail("The missing [exp] must be reported before the not-before check runs.");
+    } catch (InvalidJWTException expected) {
+      assertTrue(expected.getMessage().contains("exp"), expected.getMessage());
+    }
+  }
+
+  @Test
   public void requiredClaims_reuseAndNullDisable() {
     // Use case: the set is defensively copied at build(), and passing null clears the requirement.
     Set<String> required = new HashSet<>();
