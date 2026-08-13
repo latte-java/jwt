@@ -29,7 +29,7 @@ jobs:
       - name: Run the build
         run: |
           export PATH=~/.local/bin:$PATH
-          latte clean test
+          latte clean int
         shell: bash
       - name: Archive TestNG reports
         if: failure()
