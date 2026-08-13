@@ -132,10 +132,9 @@ public class JSONWebKeyParserTest extends BaseJWTTest {
 
   @Test
   public void parse_ec_secp256k1() {
-    // Use case: ES256K (RFC 8812) uses crv=secp256k1, which Verifiers.fromJWK already accepts but this parser used to
-    // reject, leaving ES256K unreachable. The curve is not available under every provider configuration (FIPS-approved
-    // mode excludes it), so a clear "provider does not offer this curve" failure is also a correct outcome; being
-    // rejected as an unrecognized curve is not.
+    // Use case: ES256K (RFC 8812) uses crv=secp256k1, which Verifiers.fromJWK accepts but this parser used to reject.
+    // Not every provider carries the curve (FIPS-approved mode excludes it), so a failure naming it is also correct;
+    // being rejected as an unrecognized curve is not.
     JSONWebKey jwk = JSONWebKey.builder()
                                .kty(KeyType.EC)
                                .alg(Algorithm.ES256K)
@@ -148,16 +147,14 @@ public class JSONWebKeyParserTest extends BaseJWTTest {
     try {
       assertNotNull(JSONWebKey.parse(jwk));
     } catch (JSONWebKeyParserException e) {
-      assertTrue(e.getMessage().contains("secp256k1"),
-          "The failure must name the curve and the missing provider, not read as a generic parse error: " + e.getMessage());
+      assertTrue(e.getMessage().contains("secp256k1"), "The failure must name the curve: " + e.getMessage());
     }
   }
 
   @Test
   public void parse_ec_unknownCurveStillRejected() {
     // Use case: adding secp256k1 must not turn the curve switch into a pass-through for arbitrary crv values. The
-    // UnsupportedOperationException raised for an unrecognized curve is wrapped by the method's catch-all, so the
-    // observable type is JSONWebKeyParserException.
+    // UnsupportedOperationException is wrapped by the method's catch-all, so the observable type is the parser one.
     JSONWebKey jwk = JSONWebKey.builder()
                                .kty(KeyType.EC)
                                .alg(Algorithm.ES256)

@@ -75,9 +75,8 @@ public class RFC8725ComplianceTest extends BaseJWTTest {
   // FIPS 186-5 §A.1.1 - RSA public exponent e must satisfy 65537 <= e < 2^256
   @Test
   public void fips186_5_rsaPublicExponentAboveFipsCeilingRejected() throws Exception {
-    // Use case: a hostile key source supplies a huge odd exponent. It is cryptographically usable, so nothing rejects
-    // it structurally, but every verification against it becomes an arbitrarily expensive modular exponentiation --
-    // a CPU denial-of-service. The FIPS ceiling bounds that cost.
+    // Use case: a huge odd exponent is structurally valid, so nothing else rejects it, but every verification against
+    // it becomes a proportionally expensive modular exponentiation. The FIPS ceiling bounds that cost.
     BigInteger oversized = BigInteger.ONE.shiftLeft(256).setBit(0);
     try {
       RSAPublicKey key = syntheticRsa(4096, oversized);
@@ -89,7 +88,7 @@ public class RFC8725ComplianceTest extends BaseJWTTest {
 
   @Test
   public void fips186_5_rsaPublicExponentStandard65537Accepted() throws Exception {
-    // Use case: the exponent essentially every real key uses must remain accepted by the ceiling check.
+    // Use case: the standard exponent must remain accepted by the ceiling check.
     RSAPublicKey key = syntheticRsa(2048, BigInteger.valueOf(65537));
     assertNotNull(RSAVerifier.newVerifier(Algorithm.RS256, key));
   }

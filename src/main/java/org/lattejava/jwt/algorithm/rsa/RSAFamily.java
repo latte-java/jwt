@@ -23,10 +23,9 @@ final class RSAFamily {
    * RFC 8017 §3: the RSA public exponent {@code e} must satisfy {@code 2 < e < n} and, per PKCS#1 practice, be odd.
    * Tiny exponents (0, 1, 2) and even exponents are cryptographically broken and are rejected at construction time.
    *
-   * <p>An upper bound is also enforced: FIPS 186-5 §A.1.1 requires {@code 65537 <= e < 2^256}. Every real-world key
-   * uses a small exponent (almost always 65537), and an oversized {@code e} from a hostile key source (e.g. a
-   * compromised JWKS) would make each signature verification an arbitrarily expensive modular exponentiation — a CPU
-   * denial-of-service vector. The FIPS ceiling is generous enough to never reject a legitimate key.</p>
+   * <p>An upper bound is also enforced: FIPS 186-5 §A.1.1 requires {@code 65537 <= e < 2^256}. An oversized {@code e}
+   * makes each verification a proportionally expensive modular exponentiation, so an untrusted key source could use
+   * one to burn CPU.</p>
    */
   static void assertAcceptablePublicExponent(BigInteger e) {
     if (e == null) {

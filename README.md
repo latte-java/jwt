@@ -16,6 +16,7 @@ Java JWT is intended to be fast and easy to use. It has zero external runtime de
    - Build JWK from Public Key
    - Build JWK from PEM
    - Parse public keys from a JSON Web Key
+     - EC curves `P-256`, `P-384`, `P-521` and `secp256k1` (for `ES256K`), plus `Ed25519` and `Ed448`
    - Retrieve JWK from JWKS endpoints
  - X.509 Certificates
    - Build self-signed or CA-signed X.509 (v3) certificates
@@ -235,6 +236,18 @@ Other entry points:
 - `JWKS.of(jwk1, jwk2, ...)` — static in-memory keys (no HTTP, no scheduler).
 - `JWKS.fetch(url)` — one-shot `List<JSONWebKey>` from a JWKS URL.
 
+**Use `https`.** The scheme is not enforced on any URL this library fetches — issuer, well-known, or JWKS — because plaintext `http` is genuinely useful against a local test server. But those keys decide which tokens you trust, so over `http` anyone on the network path can substitute their own. While not enforced, please use `https` in production.
+
+By default a cached key set is retained indefinitely when refreshes fail, so tokens keep verifying through an outage. If you would rather stop trusting keys that can no longer be revalidated, set a bound with `maxStaleness(Duration)` — past it, `resolve` returns no verifier until a refresh succeeds:
+
+```java
+try (JWKS jwks = JWKS.fromIssuer("https://idp.example.com/")
+                     .maxStaleness(Duration.ofHours(24))
+                     .build()) {
+    JWT jwt = JWT.decode(encodedJWT, jwks);
+}
+```
+
 #### OIDC discovery
 
 `OpenIDConnect.discover(issuer)` fetches the OpenID Connect Provider Metadata for a given issuer and returns a typed `OpenIDConnectConfiguration`:
@@ -428,6 +441,10 @@ JSONWebKey jwk = JSONWebKey.fromMap(map);
 
 PublicKey publicKey = JSONWebKey.parse(jwk);
 ```
+
+EC keys are parsed for the `P-256`, `P-384`, `P-521` and `secp256k1` curves, and OKP keys for `Ed25519` and `Ed448`. `secp256k1` (the curve behind `ES256K`) is not offered by every JCE provider — notably it is absent under FIPS-approved configurations — and a provider that does not carry it produces a `JSONWebKeyParserException` naming the curve.
+
+**`x5c` chains are not validated.** When a JWK carries `x5c`, parsing checks only that the leaf certificate's public key matches the JWK's own key material, so the two cannot disagree. It does not build or verify a path to a trust anchor, and does not check validity dates, key usage, or revocation — the authoritative key is always the JWK's own parameters. This matches how Nimbus, jose4j, and java-jwt treat `x5c`; if your application needs a validated chain, validate it yourself against a trust store you control.
 
 ### Convert a Private Key to JWK
 

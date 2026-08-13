@@ -96,9 +96,8 @@ public class JSONWebKeyParser {
             parameters.init(new ECGenParameterSpec("secp521r1"));
             break;
           case "secp256k1":
-            // ES256K (RFC 8812). Unlike the NIST curves, secp256k1 is not universally available -- it is absent from
-            // FIPS-approved provider configurations, for instance -- so an unsupported curve is reported as such
-            // rather than surfacing as a generic parse failure.
+            // ES256K (RFC 8812). Not every provider carries this curve -- FIPS-approved configurations exclude it --
+            // so report that specifically rather than as a generic parse failure.
             try {
               parameters.init(new ECGenParameterSpec("secp256k1"));
             } catch (InvalidParameterSpecException e) {

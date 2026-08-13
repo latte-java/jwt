@@ -58,9 +58,8 @@ public class VerifiersFromJWKTest extends BaseTest {
 
   @Test
   public void fromJWK_ES256K_producesVerifierBoundToES256K() {
-    // Use case: fromJWK has always accepted alg=ES256K with crv=secp256k1, but the JWK parser rejected that curve, so
-    // every such key failed as PARSE_FAILURE. With the curve supported the pair now yields a usable verifier, still
-    // bound to ES256K alone so a P-256 token cannot borrow it.
+    // Use case: fromJWK accepted alg=ES256K with crv=secp256k1 but the parser rejected that curve, so every such key
+    // failed as PARSE_FAILURE. The pair now yields a verifier, still bound to ES256K so a P-256 token cannot use it.
     Map<String, Object> m = new HashMap<>();
     m.put("kty", "EC");
     m.put("kid", "k1");
@@ -82,8 +81,8 @@ public class VerifiersFromJWKTest extends BaseTest {
 
   @Test
   public void fromJWK_controlCharactersInKidAreSanitized() {
-    // Use case: kid is chosen by whoever operates the JWKS, and these messages are routinely logged. A kid carrying
-    // CRLF could forge log lines, so control characters are replaced before interpolation.
+    // Use case: kid is supplied by the remote JWKS and these messages are logged, so a kid carrying CRLF could forge
+    // log lines. Control characters are replaced before interpolation.
     Map<String, Object> m = rsaJWKBase();
     m.put("kid", "k1\r\nWarn Forged log line");
     m.put("use", "enc");

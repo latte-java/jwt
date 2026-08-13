@@ -1124,8 +1124,8 @@ public class JWKSTest extends BaseTest {
 
   @Test
   public void maxStaleness_belowRefreshInterval_rejected() {
-    // Use case: a bound tighter than the refresh cadence would mark keys stale before a scheduled refresh could renew
-    // them, so it is rejected at build time rather than silently degrading every resolve into a blocking fetch.
+    // Use case: a bound below the refresh cadence would mark keys stale before a scheduled refresh could renew them,
+    // turning every resolve into a blocking fetch, so it is rejected at build time.
     IllegalArgumentException e = expectThrows(IllegalArgumentException.class,
         () -> JWKS.fromJWKS("http://localhost:" + PORT + "/jwks.json")
                   .refreshInterval(Duration.ofMinutes(10))
@@ -1169,8 +1169,8 @@ public class JWKSTest extends BaseTest {
 
   @Test
   public void maxStaleness_staleSnapshot_refreshFails_returnsNull() throws Exception {
-    // Use case: the endpoint has been unreachable past the staleness bound, so the cached key is no longer trusted
-    // and resolve() reports no verifier rather than serving a key that may have been revoked at the provider.
+    // Use case: the endpoint has been unreachable past the bound, so the cached key is no longer served -- it may
+    // have been revoked at the provider since the last successful fetch.
     HttpServerBuilder b = new HttpServerBuilder();
     b.listenOn(PORT)
      .handleURI("/jwks.json")
@@ -1200,7 +1200,7 @@ public class JWKSTest extends BaseTest {
   @Test
   public void maxStaleness_staleSnapshot_refreshSucceeds_resolves() throws Exception {
     // Use case: past the bound the cached key is not served directly, but the refresh it triggers succeeds, so the
-    // caller still gets a verifier — backed by freshly fetched keys.
+    // caller gets a verifier backed by freshly fetched keys.
     startHttpServer(server -> server
         .listenOn(PORT)
         .handleURI("/jwks.json")
@@ -1226,8 +1226,8 @@ public class JWKSTest extends BaseTest {
 
   @Test
   public void maxStaleness_unset_staleSnapshotStillResolves() throws Exception {
-    // Use case: the default is unlimited retention, so an arbitrarily old snapshot keeps resolving. This is the
-    // pre-existing availability-first behavior that maxStaleness opts out of.
+    // Use case: the default is unlimited retention, so an old snapshot keeps resolving. This is the behavior
+    // maxStaleness opts out of.
     HttpServerBuilder b = new HttpServerBuilder();
     b.listenOn(PORT)
      .handleURI("/jwks.json")

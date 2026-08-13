@@ -21,6 +21,10 @@ import org.lattejava.jwt.log.*;
 
 /**
  * A self-refreshing {@link VerifierResolver} backed by a remote JWKS endpoint.
+ *
+ * <p>The URL scheme is not enforced, so that {@code http} remains usable against a local test server. While not
+ * enforced, please use {@code https} in production: the fetched keys determine which tokens are trusted, and over
+ * {@code http} they can be substituted in transit.</p>
  */
 public final class JWKS implements VerifierResolver, AutoCloseable {
   private final CacheControlPolicy cacheControlPolicy;
@@ -147,7 +151,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
    * Performs a one-shot fetch of the JWKS at {@code jwksURL} and returns the parsed keys. Uses
    * {@link FetchLimits#defaults()} for all hardening limits.
    *
-   * @param jwksURL the JWKS endpoint URL
+   * @param jwksURL the JWKS endpoint URL; while not enforced, please use {@code https} in production
    * @return the list of parsed {@link JSONWebKey} objects
    * @throws JWKSFetchException if the fetch or parse fails
    */
@@ -159,7 +163,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
    * Performs a one-shot fetch of the JWKS at {@code jwksURL}, applying {@code customizer} to the connection before the
    * request is sent.
    *
-   * @param jwksURL    the JWKS endpoint URL
+   * @param jwksURL    the JWKS endpoint URL; while not enforced, please use {@code https} in production
    * @param customizer an optional consumer to configure the connection (e.g., set request headers)
    * @return the list of parsed {@link JSONWebKey} objects
    * @throws JWKSFetchException if the fetch or parse fails
@@ -171,7 +175,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
   /**
    * Performs a one-shot fetch of the JWKS at {@code jwksURL} with the supplied hardening limits.
    *
-   * @param jwksURL the JWKS endpoint URL
+   * @param jwksURL the JWKS endpoint URL; while not enforced, please use {@code https} in production
    * @param limits  the hardening limits to apply
    * @return the list of parsed {@link JSONWebKey} objects
    * @throws JWKSFetchException if the fetch or parse fails
@@ -184,7 +188,7 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
    * Performs a one-shot fetch of the JWKS at {@code jwksURL} with the supplied hardening limits and connection
    * customizer.
    *
-   * @param jwksURL    the JWKS endpoint URL
+   * @param jwksURL    the JWKS endpoint URL; while not enforced, please use {@code https} in production
    * @param limits     the hardening limits to apply
    * @param customizer an optional consumer to configure the connection before sending
    * @return the list of parsed {@link JSONWebKey} objects
@@ -210,19 +214,39 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
     }
   }
 
+  /**
+   * Builds from a discovery document that has already been fetched, using its {@code jwks_uri}.
+   *
+   * @param cfg the previously fetched provider configuration.
+   */
   public static Builder fromConfiguration(OpenIDConnectConfiguration cfg) {
     Objects.requireNonNull(cfg, "cfg");
     return new Builder(FetchSource.JWKS, cfg.jwksURI(), cfg);
   }
 
+  /**
+   * Builds from an OIDC issuer, discovering the JWKS URL from the issuer's {@code /.well-known/openid-configuration}.
+   *
+   * @param issuer the OIDC issuer URL; while not enforced, please use {@code https} in production
+   */
   public static Builder fromIssuer(String issuer) {
     return new Builder(FetchSource.ISSUER, issuer);
   }
 
+  /**
+   * Builds from a JWKS endpoint directly, skipping discovery.
+   *
+   * @param jwksURL the JWKS endpoint URL; while not enforced, please use {@code https} in production
+   */
   public static Builder fromJWKS(String jwksURL) {
     return new Builder(FetchSource.JWKS, jwksURL);
   }
 
+  /**
+   * Builds from a fully-qualified discovery URL, taking the JWKS URL from the document it returns.
+   *
+   * @param wellKnownURL the discovery document URL; while not enforced, please use {@code https} in production
+   */
   public static Builder fromWellKnown(String wellKnownURL) {
     return new Builder(FetchSource.WELL_KNOWN, wellKnownURL);
   }
@@ -346,8 +370,8 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
   }
 
   /**
-   * Render a set of key IDs for a log message. Key IDs are chosen by the remote JWKS operator, so each one is passed
-   * through {@link MessageSanitizer} to keep control characters out of the caller's log pipeline.
+   * Render key IDs for a log message. Each is passed through {@link MessageSanitizer} because the values are supplied
+   * by the remote JWKS.
    */
   private static String sanitizedKids(Set<String> kids) {
     StringJoiner joiner = new StringJoiner(", ");
@@ -467,11 +491,9 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
   /**
    * Resolves the {@link Verifier} for the token's {@code kid}.
    *
-   * <p>When {@code maxStaleness} is configured and the cached keys are older than that bound, they are not returned
-   * even on a {@code kid} hit; a refresh is attempted first and the resolve fails (returning {@code null}, which the
-   * decoder surfaces as {@link MissingVerifierException}) unless that refresh succeeds. Introspection accessors such as
-   * {@link #keys()} and {@link #get(String)} are not subject to the staleness bound — they report cache state as it
-   * is.</p>
+   * <p>Past {@code maxStaleness} a {@code kid} hit is not returned directly: a refresh is attempted, and the resolve
+   * returns {@code null} unless it succeeds. {@link #keys()} and {@link #get(String)} report cache state as-is and are
+   * not subject to the bound.</p>
    */
   @Override
   public Verifier resolve(Header header) {
@@ -705,9 +727,8 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
   }
 
   /**
-   * Whether {@code snapshot}'s keys are older than the configured {@code maxStaleness}. Always {@code false} when no
-   * bound is configured, and when no fetch has ever succeeded ({@code fetchedAt} is still the epoch) — in that case the
-   * snapshot holds no keys to serve, so the miss path handles it.
+   * Whether {@code snapshot}'s keys are older than {@code maxStaleness}. False when no bound is configured, and when
+   * no fetch has succeeded yet ({@code fetchedAt} is the epoch), since that snapshot holds no keys to serve.
    */
   private boolean isStale(Snapshot snapshot, Instant now) {
     if (maxStaleness == null) return false;
@@ -912,14 +933,13 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
     }
 
     /**
-     * The longest a cached key set may be served after the last <em>successful</em> fetch. Once that bound is passed,
-     * {@link JWKS#resolve(Header)} stops returning verifiers until a refresh succeeds, so a key that was rotated out
-     * or revoked at the provider cannot remain trusted indefinitely while the endpoint is unreachable.
+     * The longest a cached key set may be served after the last successful fetch. Past that bound
+     * {@link JWKS#resolve(Header)} stops returning verifiers until a refresh succeeds, bounding how long a key
+     * revoked at the provider stays trusted while the endpoint is unreachable.
      *
-     * <p>Default: {@code null}, meaning unlimited — keys are retained across an outage of any length. That is the
-     * more available choice and matches the behavior of prior releases; setting a bound trades availability for a
-     * guarantee about key freshness. Because refreshes are attempted on the normal {@code refreshInterval} cadence,
-     * the bound must be at least that interval.</p>
+     * <p>Default: {@code null}, meaning unlimited — keys are retained across an outage of any length. Setting a bound
+     * trades availability for key freshness. A bound below {@code refreshInterval} is rejected, since keys would go
+     * stale before the scheduled refresh could renew them.</p>
      *
      * @param d the maximum staleness, or {@code null} for unlimited; must be positive and &gt;=
      *          {@code refreshInterval}.
