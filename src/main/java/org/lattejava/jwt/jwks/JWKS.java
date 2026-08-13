@@ -510,7 +510,10 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
     }
 
     // Stale keys always warrant a refresh attempt; a plain kid miss only does so when refreshOnMiss is enabled.
-    if (!stale && !refreshOnMiss) return null;
+    if (!stale && !refreshOnMiss) {
+      return null;
+    }
+
     if (now.isBefore(snapshot.lastAttemptAt().plus(minRefreshInterval))) return null;
 
     CompletableFuture<Snapshot> fut = singleflightRefresh();
@@ -526,7 +529,10 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
     }
 
     Snapshot fresh = ref.get();
-    if (isStale(fresh, Instant.now(clock))) return null;
+    if (isStale(fresh, Instant.now(clock))) {
+      return null;
+    }
+
     Verifier v2 = fresh.byKid().get(kid);
     if (v2 == null) return null;
     return v2.canVerify(header.alg()) ? v2 : null;
@@ -730,9 +736,11 @@ public final class JWKS implements VerifierResolver, AutoCloseable {
    * no fetch has succeeded yet ({@code fetchedAt} is the epoch), since that snapshot holds no keys to serve.
    */
   private boolean isStale(Snapshot snapshot, Instant now) {
-    if (maxStaleness == null) return false;
     Instant fetchedAt = snapshot.fetchedAt();
-    if (fetchedAt.equals(Instant.EPOCH)) return false;
+    if (maxStaleness == null || fetchedAt.equals(Instant.EPOCH)) {
+      return false;
+    }
+
     return now.isAfter(fetchedAt.plus(maxStaleness));
   }
 
